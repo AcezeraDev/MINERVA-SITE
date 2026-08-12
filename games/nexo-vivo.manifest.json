@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "minerva-nexo-vivo",
+  "title": "Nexo Vivo",
+  "version": "1.0.0",
+  "mode": "educational",
+  "audience": {
+    "minimumAge": 12,
+    "locale": "pt-BR"
+  },
+  "session": {
+    "targetMinutes": 4,
+    "minPlayers": 1,
+    "maxPlayers": 1
+  },
+  "objectives": [
+    "Relacionar conceitos às definições corretas e formar uma rede semântica"
+  ],
+  "controls": [
+    "pointer",
+    "touch",
+    "keyboard"
+  ],
+  "progression": {
+    "xpEnabled": true,
+    "ranked": false,
+    "leaderboardScopes": [
+      "personal"
+    ]
+  },
+  "integrity": {
+    "serverAuthoritativeRewards": false,
+    "idempotentCompletion": false
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "muteControl": false,
+    "keyboardPlayable": true,
+    "colorIndependentSignals": true
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "minerva-forja-sequencias",
+  "title": "Forja de Sequências",
+  "version": "1.0.0",
+  "mode": "educational",
+  "audience": {
+    "minimumAge": 12,
+    "locale": "pt-BR"
+  },
+  "session": {
+    "targetMinutes": 5,
+    "minPlayers": 1,
+    "maxPlayers": 1
+  },
+  "objectives": [
+    "Reconstruir processos ordenando quatro etapas causalmente relacionadas"
+  ],
+  "controls": [
+    "pointer",
+    "touch",
+    "keyboard"
+  ],
+  "progression": {
+    "xpEnabled": true,
+    "ranked": false,
+    "leaderboardScopes": [
+      "personal"
+    ]
+  },
+  "integrity": {
+    "serverAuthoritativeRewards": false,
+    "idempotentCompletion": false
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "muteControl": false,
+    "keyboardPlayable": true,
+    "colorIndependentSignals": true
+  }
+}

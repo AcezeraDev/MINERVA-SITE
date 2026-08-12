@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#070D0A" />
+    <script>
+      (() => {
+        try {
+          const saved = JSON.parse(localStorage.getItem("minerva-appearance-v1") || "{}");
+          const light = saved.themeMode === "light";
+          const color = /^#[0-9a-f]{6}$/i.test(saved.accentColor || "") ? saved.accentColor : "#39F59A";
+          const raw = color.slice(1);
+          const rgb = [0, 2, 4].map((start) => parseInt(raw.slice(start, start + 2), 16));
+          const ui = light ? rgb.map((channel) => Math.round(channel * 0.78)) : rgb;
+          document.documentElement.classList.toggle("theme-light", light);
+          document.documentElement.style.colorScheme = light ? "light" : "dark";
+          document.documentElement.style.setProperty("--mint", ui.join(" "));
+          document.documentElement.style.setProperty("--mint-deep", ui.map((channel) => Math.round(channel * 0.8)).join(" "));
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", light ? "#F1F6F2" : "#070D0A");
+        } catch {}
+      })();
+    </script>
+    <title>Minerva</title>
+    <link rel="icon" href="assets/ic_launcher_logo.png" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

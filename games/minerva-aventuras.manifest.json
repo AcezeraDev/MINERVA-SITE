@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "minerva-aventuras",
+  "title": "Aventuras com a Mine",
+  "version": "3.0.0",
+  "mode": "educational",
+  "audience": {
+    "minimumAge": 12,
+    "locale": "pt-BR"
+  },
+  "session": {
+    "targetMinutes": 6,
+    "minPlayers": 1,
+    "maxPlayers": 1
+  },
+  "objectives": [
+    "Avançar por histórias interativas ao dominar o conteúdo da matéria",
+    "Relacionar conceitos e reconstruir processos em desafios espaciais"
+  ],
+  "controls": [
+    "pointer",
+    "touch",
+    "keyboard"
+  ],
+  "progression": {
+    "xpEnabled": true,
+    "ranked": false,
+    "leaderboardScopes": [
+      "personal"
+    ]
+  },
+  "integrity": {
+    "serverAuthoritativeRewards": false,
+    "idempotentCompletion": false
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "muteControl": false,
+    "keyboardPlayable": true,
+    "colorIndependentSignals": true
+  }
+}

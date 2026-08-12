@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.data/
+.env
+.env.*
+!.env.example
+.claude/
+.vercel/
+.agents/
+useful-ai-prompts/
+skills-lock.json
