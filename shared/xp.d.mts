@@ -6,6 +6,7 @@ export type XpStatKey =
   | "focus"
   | "provas"
   | "games"
+  | "gameXp"
   | "mineMessages"
   | "cardReviews"
   | "mastered"
@@ -28,7 +29,7 @@ export type XpScope = {
   materials?: Array<{ createdAt: number; studied?: boolean; studiedAt?: number }>;
   tasks?: Array<{ done?: boolean; doneAt?: number }>;
   chats?: Array<{ role: string; createdAt: number }>;
-  sessions?: Array<{ kind: string; createdAt: number }>;
+  sessions?: Array<{ kind: string; createdAt: number; xpEarned?: number }>;
   flashcards?: Array<{ reps?: number; level?: number; lastReviewedAt?: number }>;
 };
 
@@ -49,3 +50,4 @@ export function totalXp(stats: XpStats): number;
 export function levelFromXp(xp: number): { level: number; levelXp: number; levelNeed: number; title: string };
 export function xpSince(scope: XpScope, since: number): number;
 export function rankingWindows(now?: number): { day: number; week: number };
+export function gameXpFromCorrectAnswers(correctAnswers: number): number;

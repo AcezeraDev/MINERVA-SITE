@@ -21,7 +21,7 @@ export const xpPerAction = {
   taskDone: 20,
   focus: 25,
   prova: 30,
-  game: 20,
+  game: 5,
   mineMessage: 3,
   cardReview: 5,
 };
@@ -34,7 +34,7 @@ export const xpActions = [
   ["Concluir uma tarefa", xpPerAction.taskDone],
   ["Completar uma sessão de foco", xpPerAction.focus],
   ["Concluir um simulado", xpPerAction.prova],
-  ["Terminar uma partida nos jogos", xpPerAction.game],
+  ["Acertar uma pergunta nos jogos", xpPerAction.game],
   ["Conversar com a Mine", xpPerAction.mineMessage],
   ["Revisar um flashcard", xpPerAction.cardReview],
 ];
@@ -117,6 +117,9 @@ export function gamificationStats(scope, now = Date.now()) {
     focus: sessions.filter((item) => item.kind === "Foco").length,
     provas: sessions.filter((item) => item.kind === "Prova").length,
     games: sessions.filter((item) => item.kind === "Games").length,
+    gameXp: sessions
+      .filter((item) => item.kind === "Games")
+      .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0),
     mineMessages: list(scope?.chats).filter((item) => item.role === "user").length,
     cardReviews: flashcards.reduce((sum, card) => sum + (Number(card.reps) || 0), 0),
     mastered: flashcards.filter((card) => (Number(card.level) || 0) >= 4).length,
@@ -136,7 +139,7 @@ export function totalXp(stats) {
     stats.tasksDone * xpPerAction.taskDone +
     stats.focus * xpPerAction.focus +
     stats.provas * xpPerAction.prova +
-    stats.games * xpPerAction.game +
+    (Number(stats.gameXp) || 0) +
     stats.mineMessages * xpPerAction.mineMessage +
     stats.cardReviews * xpPerAction.cardReview;
   return base + unlockedAchievements(stats).reduce((sum, item) => sum + item.xp, 0);
@@ -176,10 +179,17 @@ export function xpSince(scope, since) {
     list(scope?.tasks).filter((item) => item.done && after(item.doneAt)).length * xpPerAction.taskDone +
     sessions.filter((item) => item.kind === "Foco" && after(item.createdAt)).length * xpPerAction.focus +
     sessions.filter((item) => item.kind === "Prova" && after(item.createdAt)).length * xpPerAction.prova +
-    sessions.filter((item) => item.kind === "Games" && after(item.createdAt)).length * xpPerAction.game +
+    sessions
+      .filter((item) => item.kind === "Games" && after(item.createdAt))
+      .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0) +
     list(scope?.chats).filter((item) => item.role === "user" && after(item.createdAt)).length * xpPerAction.mineMessage +
     list(scope?.flashcards).filter((item) => after(item.lastReviewedAt)).length * xpPerAction.cardReview
   );
+}
+
+/** Jogos premiam apenas respostas corretas; concluir ou errar não rende XP. */
+export function gameXpFromCorrectAnswers(correctAnswers) {
+  return Math.max(0, Math.floor(Number(correctAnswers) || 0)) * xpPerAction.game;
 }
 
 /** Começo do dia de hoje e dos últimos 7 dias — os dois recortes do ranking. */

@@ -1192,6 +1192,464 @@ html.theme-light body {
   }
 }
 
+/* Torre dos Códigos: um terminal arcano em vez de uma forca revestida.
+   A torre é a assinatura; teclado, dica e placar ficam deliberadamente quietos. */
+.code-tower-game {
+  --tower-violet: #b99bff;
+  --tower-mint: #39f59a;
+  --tower-rose: #fb7185;
+}
+
+.code-tower-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.2rem 0.15rem;
+}
+
+.code-tower-heading p,
+.code-tower-heading > span {
+  color: rgba(185, 155, 255, 0.78);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.code-tower-heading h2 {
+  margin-top: 0.2rem;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.45rem, 4vw, 2rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.code-tower-heading > span {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(57, 245, 154, 0.25);
+  border-radius: 999px;
+  background: rgba(57, 245, 154, 0.07);
+  padding: 0.45rem 0.75rem;
+  color: var(--tower-mint);
+  letter-spacing: 0.1em;
+}
+
+.code-tower-stage {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid rgba(185, 155, 255, 0.2);
+  border-radius: 1.4rem;
+  background: #080b13;
+  box-shadow: 0 30px 80px -54px rgba(167, 139, 250, 0.85);
+}
+
+.code-tower-chamber {
+  position: relative;
+  display: grid;
+  min-height: 22rem;
+  place-items: center;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(185, 155, 255, 0.14);
+  background:
+    radial-gradient(circle at 50% 45%, rgba(167, 139, 250, 0.18), transparent 42%),
+    linear-gradient(155deg, rgba(185, 155, 255, 0.07), transparent 42%),
+    #070a11;
+}
+
+.code-tower-chamber-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(185, 155, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(185, 155, 255, 0.06) 1px, transparent 1px);
+  background-size: 2.5rem 2.5rem;
+  mask-image: linear-gradient(to bottom, black, transparent 92%);
+  opacity: 0.7;
+}
+
+.code-tower-visual {
+  position: relative;
+  display: grid;
+  width: min(18rem, 78vw);
+  aspect-ratio: 1;
+  place-items: center;
+}
+
+.code-tower-visual::after {
+  content: "";
+  position: absolute;
+  right: 18%;
+  bottom: 13%;
+  left: 18%;
+  height: 1rem;
+  border-radius: 50%;
+  background: rgba(57, 245, 154, 0.28);
+  filter: blur(14px);
+}
+
+.code-tower-visual.is-critical::after {
+  background: rgba(251, 113, 133, 0.32);
+}
+
+.code-tower-visual svg {
+  position: relative;
+  z-index: 2;
+  width: 68%;
+  filter: drop-shadow(0 22px 30px rgba(0, 0, 0, 0.62));
+}
+
+.code-tower-orbit {
+  position: absolute;
+  z-index: 1;
+  border: 1px solid rgba(185, 155, 255, 0.24);
+  border-radius: 50%;
+}
+
+.code-tower-orbit::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -0.22rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--tower-violet);
+  box-shadow: 0 0 14px var(--tower-violet);
+}
+
+.code-tower-orbit-a {
+  inset: 12%;
+}
+
+.code-tower-orbit-b {
+  inset: 21%;
+  border-style: dashed;
+  opacity: 0.58;
+}
+
+.code-tower-energy-readout {
+  position: absolute;
+  z-index: 3;
+  right: 1%;
+  bottom: 10%;
+  display: grid;
+  border: 1px solid rgba(185, 155, 255, 0.22);
+  border-radius: 0.8rem;
+  background: rgba(6, 8, 15, 0.82);
+  padding: 0.55rem 0.7rem;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.code-tower-energy-readout span,
+.code-tower-terminal-bar,
+.code-tower-terminal-foot,
+.code-tower-floor-status > span {
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.code-tower-energy-readout span {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.code-tower-energy-readout strong {
+  color: var(--tower-mint);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.code-tower-visual.is-critical .code-tower-energy-readout strong {
+  color: var(--tower-rose);
+}
+
+.code-tower-energy-readout small {
+  margin-left: 0.1rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.65rem;
+}
+
+.code-tower-floor-status {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.code-tower-floor-status > span {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.code-tower-floor-status > div {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.code-tower-floor-status i {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.code-tower-floor-status i.is-on {
+  background: var(--tower-mint);
+  box-shadow: 0 0 8px rgba(57, 245, 154, 0.6);
+}
+
+.code-tower-terminal {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: clamp(1rem, 4vw, 2rem);
+  background:
+    linear-gradient(90deg, rgba(185, 155, 255, 0.035) 1px, transparent 1px),
+    rgba(12, 14, 24, 0.9);
+  background-size: 4rem 100%;
+}
+
+.code-tower-terminal-bar,
+.code-tower-terminal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.code-tower-terminal-bar > span:first-child,
+.code-tower-terminal-live,
+.code-tower-terminal-foot > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.code-tower-terminal-live {
+  color: var(--tower-mint);
+}
+
+.code-tower-terminal-live i {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 9px currentColor;
+}
+
+.code-tower-hint {
+  margin-top: clamp(1.5rem, 5vw, 3rem);
+}
+
+.code-tower-hint > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--tower-violet);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.code-tower-hint p {
+  margin-top: 0.75rem;
+  max-width: 42rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: clamp(0.92rem, 2.5vw, 1.08rem);
+  font-weight: 650;
+  line-height: 1.65;
+}
+
+.code-tower-word {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(0.35rem, 1.4vw, 0.65rem);
+  margin-block: clamp(1.5rem, 6vw, 3rem);
+}
+
+.code-tower-letter {
+  position: relative;
+  display: grid;
+  width: clamp(2rem, 7vw, 3.1rem);
+  height: clamp(2.7rem, 9vw, 4rem);
+  place-items: center;
+  border: 1px solid rgba(185, 155, 255, 0.18);
+  border-bottom: 3px solid rgba(185, 155, 255, 0.38);
+  border-radius: 0.7rem 0.7rem 0.3rem 0.3rem;
+  background: rgba(185, 155, 255, 0.035);
+  color: white;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.25rem, 4vw, 1.9rem);
+  font-weight: 900;
+  box-shadow: inset 0 -10px 22px rgba(167, 139, 250, 0.04);
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, color 180ms ease;
+}
+
+.code-tower-letter::after {
+  content: "";
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: rgba(185, 155, 255, 0.38);
+}
+
+.code-tower-letter.is-revealed {
+  border-color: rgba(57, 245, 154, 0.45);
+  border-bottom-color: var(--tower-mint);
+  background: rgba(57, 245, 154, 0.09);
+  box-shadow: 0 10px 30px -18px rgba(57, 245, 154, 0.72), inset 0 -10px 22px rgba(57, 245, 154, 0.06);
+}
+
+.code-tower-letter.is-lost {
+  border-color: rgba(251, 113, 133, 0.35);
+  border-bottom-color: var(--tower-rose);
+  background: rgba(251, 113, 133, 0.08);
+  color: var(--tower-rose);
+}
+
+.code-tower-letter.is-revealed::after,
+.code-tower-letter.is-lost::after {
+  display: none;
+}
+
+.code-tower-terminal-foot {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.code-tower-keyboard {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+  padding: clamp(0.65rem, 2vw, 1rem);
+  border: 1px solid rgba(185, 155, 255, 0.12);
+  border-radius: 1.1rem;
+  background: rgba(7, 9, 16, 0.76);
+}
+
+.code-tower-key {
+  display: grid;
+  min-width: 0;
+  min-height: 2.75rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom-color: rgba(185, 155, 255, 0.28);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 900;
+  transition: transform 140ms ease, border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.code-tower-key:focus-visible {
+  outline: 2px solid var(--tower-violet);
+  outline-offset: 2px;
+}
+
+.code-tower-key.is-correct {
+  border-color: rgba(57, 245, 154, 0.35);
+  background: rgba(57, 245, 154, 0.12);
+  color: var(--tower-mint);
+}
+
+.code-tower-key.is-wrong {
+  border-color: transparent;
+  background: rgba(251, 113, 133, 0.035);
+  color: rgba(251, 113, 133, 0.26);
+}
+
+.code-tower-result {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.1rem;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.code-tower-result.is-success {
+  border-color: rgba(57, 245, 154, 0.25);
+  background: rgba(57, 245, 154, 0.06);
+}
+
+.code-tower-result.is-failure {
+  border-color: rgba(251, 113, 133, 0.24);
+  background: rgba(251, 113, 133, 0.05);
+}
+
+.code-tower-result > span,
+.code-tower-help {
+  display: block;
+  margin-top: 0.35rem;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.code-tower-help {
+  margin-top: 0;
+  text-align: center;
+}
+
+@media (min-width: 700px) {
+  .code-tower-stage {
+    grid-template-columns: minmax(17rem, 0.72fr) minmax(0, 1.28fr);
+  }
+
+  .code-tower-chamber {
+    min-height: 25rem;
+    border-right: 1px solid rgba(185, 155, 255, 0.14);
+    border-bottom: 0;
+  }
+
+  .code-tower-keyboard {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .code-tower-key:not(:disabled):hover {
+    transform: translateY(-2px);
+    border-color: rgba(185, 155, 255, 0.5);
+    background: rgba(185, 155, 255, 0.11);
+    color: white;
+  }
+}
+
+@media (max-width: 420px) {
+  .code-tower-heading {
+    align-items: flex-start;
+  }
+
+  .code-tower-heading > span {
+    max-width: 7rem;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .code-tower-chamber {
+    min-height: 19rem;
+  }
+
+  .code-tower-terminal-bar > span:last-child,
+  .code-tower-terminal-foot > span:first-child {
+    display: none;
+  }
+}
+
 .auth-studio {
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),

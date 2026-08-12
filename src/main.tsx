@@ -133,6 +133,7 @@ import { parseSequencePuzzles, type SequencePuzzle } from "../shared/game-core.m
 // montar o ranking. Ver shared/xp.mjs.
 import {
   achievementList,
+  gameXpFromCorrectAnswers,
   gamificationStats as scopeStats,
   levelFromXp,
   levelTitles,
@@ -418,6 +419,9 @@ type Session = {
   title: string;
   kind: string;
   createdAt: number;
+  xpEarned?: number;
+  correctAnswers?: number;
+  questionsAnswered?: number;
 };
 
 type Flashcard = {
@@ -7736,13 +7740,13 @@ const gameCatalog: Array<{
     icon: ListChecks,
     accent: "#FB923C",
     howTo: [
-      "A Mine escolhe três processos reais da matéria e embaralha as etapas.",
+      "A Mine cria a quantidade de processos que você escolheu e embaralha as etapas.",
       "Arraste cada etapa ou use os botões de subir e descer.",
       "Acione o núcleo para testar a ordem montada.",
       "O painel informa quantas posições estão corretas sem entregar toda a solução.",
       "Quando a sequência funciona, uma explicação mostra por que aquela ordem faz sentido.",
     ],
-    goal: "Reativar os três mecanismos com o menor número de movimentos e testes.",
+    goal: "Reativar todos os mecanismos com o menor número de movimentos e testes.",
     badge: "Novo",
   },
   {
@@ -7790,7 +7794,7 @@ const gameCatalog: Array<{
       "Seis erros encerram aquela palavra e você segue para a próxima.",
       "Palavras seguidas sem erro multiplicam os pontos.",
     ],
-    goal: "Decifrar as seis palavras gastando o mínimo de energia da torre.",
+    goal: "Decifrar todas as palavras escolhidas gastando o mínimo de energia da torre.",
   },
   {
     id: "caca",
@@ -8014,7 +8018,7 @@ function SpeedRunGame({
 }: {
   items: TrueFalseItem[];
   recordKey: string;
-  onFinish: (score: number, recorde: boolean) => void;
+  onFinish: (score: number, recorde: boolean, correctAnswers: number) => void;
 }) {
   const DURACAO = 60_000;
   const BONUS_ACERTO = 3_000;
@@ -8032,18 +8036,19 @@ function SpeedRunGame({
   const [vivo, setVivo] = useState(true);
   const [mode, setMode] = useState<"intro" | "playing" | "chapter" | "ending">("intro");
   const [endingScore, setEndingScore] = useState(0);
+  const [endingCorrect, setEndingCorrect] = useState(0);
   const encerrado = useRef(false);
   const feedbackTimerRef = useRef<number | null>(null);
 
-  const atual = items[indice % items.length];
+  const atual = items[indice];
   const multiplicador = Math.min(1 + Math.floor(combo / 3), 5);
 
   const terminar = useCallback(
-    (pontuacao: number) => {
+    (pontuacao: number, respostasCorretas: number) => {
       if (encerrado.current) return;
       encerrado.current = true;
       setVivo(false);
-      onFinish(pontuacao, saveRecord(recordKey, pontuacao));
+      onFinish(pontuacao, saveRecord(recordKey, pontuacao), respostasCorretas);
     },
     [onFinish, recordKey],
   );
@@ -8057,7 +8062,7 @@ function SpeedRunGame({
       const novo = base - decorrido;
       if (novo <= 0) {
         setRestante(0);
-        terminar(pontos);
+        terminar(pontos, acertos);
         return;
       }
       setRestante(novo);
@@ -8080,11 +8085,13 @@ function SpeedRunGame({
   function responder(valor: boolean) {
     if (!vivo || !atual || flash) return;
     const certo = valor === atual.answer;
+    const novosAcertos = acertos + (certo ? 1 : 0);
+    let proximaPontuacao = pontos;
     setFeedback(atual.explanation);
     if (certo) {
       const ganho = 10 * multiplicador;
       const novosPontos = pontos + ganho;
-      const novosAcertos = acertos + 1;
+      proximaPontuacao = novosPontos;
       setPontos(novosPontos);
       setAcertos(novosAcertos);
       setCombo((c) => {
@@ -8094,19 +8101,23 @@ function SpeedRunGame({
       });
       setRestante((t) => Math.min(t + BONUS_ACERTO, DURACAO));
       setFlash("acerto");
-      if (novosAcertos >= 12) {
-        setEndingScore(novosPontos + Math.floor(restante / 1000) * 2);
-        setMode("ending");
-        return;
-      }
     } else {
       setCombo(0);
       // Fora do updater de propósito: em StrictMode o updater roda duas vezes,
       // e encerrar a partida é efeito colateral, não cálculo de estado.
       const novoTempo = restante - CASTIGO_ERRO;
       setRestante(Math.max(0, novoTempo));
-      if (novoTempo <= 0) terminar(pontos);
+      if (novoTempo <= 0) {
+        terminar(pontos, novosAcertos);
+        return;
+      }
       setFlash("erro");
+    }
+    if (indice + 1 >= items.length) {
+      setEndingScore(proximaPontuacao + Math.floor(restante / 1000) * 2);
+      setEndingCorrect(novosAcertos);
+      setMode("ending");
+      return;
     }
     if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
     feedbackTimerRef.current = window.setTimeout(() => {
@@ -8135,9 +8146,9 @@ function SpeedRunGame({
           <p className="mt-3 text-[11px] font-black uppercase tracking-[.2em] text-mint">{ending ? "Destino alcançado" : mode === "intro" ? "Prólogo" : `Capítulo ${chapterIndex + 1}`}</p>
           <h2 className="mt-1 font-display text-3xl font-black sm:text-4xl">{ending ? "O farol voltou a brilhar" : scene.title}</h2>
           <p className="mt-2 max-w-2xl text-sm font-bold leading-relaxed text-white/60">{ending ? "A mensagem atravessou a floresta e chegou à cidade. A Mine completou a jornada porque você dominou os desafios." : scene.text}</p>
-          <div className="mt-4 w-full"><StoryJourney game="corrida" successes={acertos} goal={12} compact /></div>
+          <div className="mt-4 w-full"><StoryJourney game="corrida" successes={indice} goal={items.length} compact /></div>
           <div className="mt-4">
-            <PrimaryButton icon={ending ? Trophy : mode === "intro" ? Play : ArrowRight} onClick={() => ending ? terminar(endingScore) : setMode("playing")}>
+            <PrimaryButton icon={ending ? Trophy : mode === "intro" ? Play : ArrowRight} onClick={() => ending ? terminar(endingScore, endingCorrect) : setMode("playing")}>
               {ending ? `Concluir · ${endingScore} pontos` : mode === "intro" ? "Começar a jornada" : "Seguir para a próxima região"}
             </PrimaryButton>
           </div>
@@ -8157,7 +8168,7 @@ function SpeedRunGame({
         ]}
       />
 
-      <StoryJourney game="corrida" successes={acertos} goal={12} />
+      <StoryJourney game="corrida" successes={indice} goal={items.length} />
 
       <div className="h-2 overflow-hidden rounded-full bg-white/[0.08]">
         <motion.div
@@ -8174,7 +8185,7 @@ function SpeedRunGame({
           flash === "acerto" ? "border-mint bg-mint/10" : flash === "erro" ? "border-roseGlow bg-roseGlow/10" : "border-white/12 bg-white/[0.05]"
         }`}
       >
-        <p className="text-[10px] font-black uppercase tracking-[.2em] text-white/35">Afirmação {indice + 1}</p>
+        <p className="text-[10px] font-black uppercase tracking-[.2em] text-white/35">Afirmação {indice + 1}/{items.length}</p>
         <p className="mt-2 font-display text-2xl font-black leading-snug">{atual?.statement}</p>
         {flash ? (
           <div className="mt-3 max-w-3xl" role="status" aria-live="polite">
@@ -8238,7 +8249,7 @@ function MemoryGame({
 }: {
   pairs: PairItem[];
   recordKey: string;
-  onFinish: (score: number, recorde: boolean) => void;
+  onFinish: (score: number, recorde: boolean, correctAnswers: number) => void;
 }) {
   type Carta = { id: string; parId: number; texto: string; tipo: "termo" | "definicao" };
 
@@ -8269,7 +8280,7 @@ function MemoryGame({
     const tempo = Math.max(1, Math.floor((Date.now() - inicio) / 1000));
     // Perfeito = uma jogada por par. Cada jogada extra e cada segundo pesam.
     const nota = Math.max(50, Math.round(1000 - (jogadas - pairs.length) * 25 - tempo * 3));
-    window.setTimeout(() => onFinish(nota, saveRecord(recordKey, nota)), 700);
+    window.setTimeout(() => onFinish(nota, saveRecord(recordKey, nota), pairs.length), 700);
   }, [feitos, pairs.length, jogadas, inicio, onFinish, recordKey]);
 
   // Só empilha a carta. A comparação vive no efeito abaixo porque dois cliques
@@ -8477,10 +8488,10 @@ function WordSearchGame({
   onFinish,
 }: {
   items: WordMeaning[];
-  wordCount: WordSearchCount;
+  wordCount: GameQuestionCount;
   showPreviews: boolean;
   recordKey: string;
-  onFinish: (score: number, recorde: boolean) => void;
+  onFinish: (score: number, recorde: boolean, correctAnswers: number) => void;
 }) {
   const board = useMemo(() => buildWordSearch(items, wordCount), [items, wordCount]);
   const [found, setFound] = useState<WordPlacement[]>([]);
@@ -8530,7 +8541,7 @@ function WordSearchGame({
       // Achar vale muito; o relógio só arranha o placar, para não punir quem
       // parou para ler os significados — que é justamente o objetivo do jogo.
       const pontos = achadas.length * 150 + Math.max(0, 600 - segundos * 2);
-      onFinish(pontos, saveRecord(recordKey, pontos));
+      onFinish(pontos, saveRecord(recordKey, pontos), achadas.length);
     },
     [onFinish, recordKey, segundos],
   );
@@ -8806,17 +8817,64 @@ function WordSearchGame({
 
 /** Torre de energia: cada erro apaga e danifica um andar. */
 function HangmanFigure({ erros }: { erros: number }) {
+  const reduzido = useSoftMotion();
+  const energia = Math.max(0, 6 - erros);
+
   return (
-    <svg viewBox="0 0 120 140" className="h-40 w-36" role="img" aria-label={`Torre com ${6 - erros} de 6 níveis de energia`}>
-      <defs><filter id="tower-glow"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter></defs>
-      <path d="M31 126V31L60 10l29 21v95Z" fill="rgba(0,0,0,.42)" stroke="rgba(255,255,255,.18)" strokeWidth="2" />
-      {[0, 1, 2, 3, 4, 5].map((level) => {
-        const active = level >= erros;
-        return <motion.rect key={level} x="39" y={105 - level * 14} width="42" height="9" rx="2" fill={active ? "#34D399" : "rgba(251,113,133,.18)"} stroke={active ? "#7CFFCB" : "#FB7185"} animate={active ? { opacity: [0.65, 1, 0.65] } : { opacity: 0.35 }} transition={{ duration: 1.4, repeat: Infinity, delay: level * 0.08 }} filter={active ? "url(#tower-glow)" : undefined} />;
-      })}
-      <path d="M51 126v-10a9 9 0 0 1 18 0v10" fill="rgba(52,211,153,.18)" stroke="#34D399" strokeWidth="2" />
-      <circle cx="60" cy="18" r="4" fill={erros < 6 ? "#FBBF24" : "#FB7185"} />
-    </svg>
+    <div className={`code-tower-visual ${energia <= 2 ? "is-critical" : ""}`} role="img" aria-label={`Torre com ${energia} de 6 níveis de energia`}>
+      <motion.span
+        className="code-tower-orbit code-tower-orbit-a"
+        aria-hidden="true"
+        animate={reduzido ? undefined : { rotate: 360 }}
+        transition={{ duration: 16, repeat: Infinity, ease: "linear" }}
+      />
+      <motion.span
+        className="code-tower-orbit code-tower-orbit-b"
+        aria-hidden="true"
+        animate={reduzido ? undefined : { rotate: -360 }}
+        transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
+      />
+      <svg viewBox="0 0 180 220" aria-hidden="true">
+        <defs>
+          <linearGradient id="tower-shell" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#1d1736" />
+            <stop offset="0.55" stopColor="#090d18" />
+            <stop offset="1" stopColor="#12192b" />
+          </linearGradient>
+          <linearGradient id="tower-energy" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stopColor="#39F59A" />
+            <stop offset="1" stopColor="#B99BFF" />
+          </linearGradient>
+          <filter id="tower-glow"><feGaussianBlur stdDeviation="5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        </defs>
+        <path d="M33 198 46 53 90 18l44 35 13 145Z" fill="url(#tower-shell)" stroke="rgba(185,155,255,.5)" strokeWidth="2" />
+        <path d="M47 53 90 18l43 35" fill="none" stroke="rgba(255,255,255,.28)" strokeWidth="2" />
+        <path d="M25 198h130" stroke="rgba(185,155,255,.42)" strokeWidth="3" strokeLinecap="round" />
+        <path d="m68 198 4-22a18 18 0 0 1 36 0l4 22" fill="#070a12" stroke="rgba(57,245,154,.55)" strokeWidth="2" />
+        {[0, 1, 2, 3, 4, 5].map((level) => {
+          const active = level >= erros;
+          return (
+            <g key={level}>
+              <rect x="58" y={151 - level * 21} width="64" height="13" rx="4" fill={active ? "url(#tower-energy)" : "rgba(251,113,133,.1)"} stroke={active ? "#C8B5FF" : "rgba(251,113,133,.65)"} opacity={active ? 1 : 0.34} filter={active ? "url(#tower-glow)" : undefined} />
+              <path d={`M47 ${170 - level * 21}h86`} stroke={active ? "rgba(185,155,255,.3)" : "rgba(251,113,133,.12)"} />
+            </g>
+          );
+        })}
+        <motion.circle
+          cx="90"
+          cy="24"
+          r="6"
+          fill={energia ? "#FBBF24" : "#FB7185"}
+          filter="url(#tower-glow)"
+          animate={reduzido ? undefined : { opacity: [0.55, 1, 0.55], scale: [0.9, 1.15, 0.9] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        />
+      </svg>
+      <div className="code-tower-energy-readout" aria-hidden="true">
+        <span>energia do selo</span>
+        <strong>{energia}<small>/6</small></strong>
+      </div>
+    </div>
   );
 }
 
@@ -8827,7 +8885,7 @@ function HangmanGame({
 }: {
   words: HangmanItem[];
   recordKey: string;
-  onFinish: (score: number, recorde: boolean) => void;
+  onFinish: (score: number, recorde: boolean, correctAnswers: number) => void;
 }) {
   const [indice, setIndice] = useState(0);
   const [letras, setLetras] = useState<string[]>([]);
@@ -8873,7 +8931,7 @@ function HangmanGame({
     if (indice + 1 >= words.length) {
       if (encerrado.current) return;
       encerrado.current = true;
-      onFinish(novaPontuacao, saveRecord(recordKey, novaPontuacao));
+      onFinish(novaPontuacao, saveRecord(recordKey, novaPontuacao), resolvidas + (venceu ? 1 : 0));
       return;
     }
     setIndice(indice + 1);
@@ -8883,7 +8941,14 @@ function HangmanGame({
   if (!atual) return null;
 
   return (
-    <div className="space-y-5">
+    <section className="code-tower-game space-y-5" aria-labelledby="code-tower-title">
+      <header className="code-tower-heading">
+        <div>
+          <p>Protocolo arcano · setor {String(indice + 1).padStart(2, "0")}</p>
+          <h2 id="code-tower-title">Torre dos Códigos</h2>
+        </div>
+        <span><Zap className="h-4 w-4" aria-hidden /> +5 XP ao decifrar</span>
+      </header>
       <GameHud
         items={[
           { label: "Palavra", value: `${indice + 1}/${words.length}` },
@@ -8895,34 +8960,51 @@ function HangmanGame({
 
       <StoryJourney game="forca" successes={resolvidas + (venceu ? 1 : 0)} goal={words.length} />
 
-      <div className="grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
-        <div className="mx-auto"><HangmanFigure erros={erros} /></div>
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[.2em] text-white/35">Dica</p>
-          <p className="mt-1.5 leading-relaxed text-white/70">{atual.hint}</p>
-          <div className="mt-5 flex flex-wrap gap-1.5">
+      <div className="code-tower-stage">
+        <div className="code-tower-chamber">
+          <div className="code-tower-chamber-grid" aria-hidden="true" />
+          <HangmanFigure erros={erros} />
+          <div className="code-tower-floor-status">
+            <span>{venceu ? "Selo aberto" : perdeu ? "Setor bloqueado" : "Decodificação ativa"}</span>
+            <div>{[0, 1, 2, 3, 4, 5].map((level) => <i key={level} className={level < 6 - erros ? "is-on" : ""} />)}</div>
+          </div>
+        </div>
+        <div className="code-tower-terminal">
+          <div className="code-tower-terminal-bar">
+            <span><Code2 className="h-4 w-4" aria-hidden /> arquivo_{String(indice + 1).padStart(2, "0")}.mnv</span>
+            <span className="code-tower-terminal-live"><i /> ao vivo</span>
+          </div>
+          <div className="code-tower-hint">
+            <span><Brain className="h-4 w-4" aria-hidden /> pista descriptografada</span>
+            <p>{atual.hint}</p>
+          </div>
+          <div className="code-tower-word" aria-label={`Palavra com ${atual.word.length} letras`}>
             {atual.word.split("").map((letra, posicao) => {
               const revelada = letras.includes(letra) || perdeu;
               return (
                 <span
                   key={`${letra}-${posicao}`}
-                  className={`grid h-12 w-9 place-items-center rounded-lg border-b-[3px] font-display text-2xl font-black transition-colors ${
+                  className={`code-tower-letter ${
                     revelada
                       ? perdeu && !letras.includes(letra)
-                        ? "border-roseGlow text-roseGlow"
-                        : "border-mint text-white"
-                      : "border-white/20 text-transparent"
+                        ? "is-lost"
+                        : "is-revealed"
+                      : ""
                   }`}
                 >
-                  {revelada ? letra : "•"}
+                  {revelada ? letra : ""}
                 </span>
               );
             })}
           </div>
+          <div className="code-tower-terminal-foot">
+            <span><Lock className="h-3.5 w-3.5" aria-hidden /> cifra alfabética</span>
+            <span>{letras.length} letras testadas</span>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-9">
+      <div className="code-tower-keyboard" aria-label="Teclado da Torre dos Códigos">
         {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((letra) => {
           const usada = letras.includes(letra);
           const naPalavra = atual.word.includes(letra);
@@ -8934,13 +9016,13 @@ function HangmanGame({
               disabled={usada || venceu || perdeu}
               whileTap={{ scale: 0.9 }}
               transition={spring.snappy}
-              className={`grid h-11 place-items-center rounded-xl text-sm font-black transition ${
+              className={`code-tower-key ${
                 usada
                   ? naPalavra
-                    ? "bg-mint/25 text-mint"
-                    : "bg-white/[0.03] text-white/20"
-                  : "bg-white/[0.08] text-white/80 hover:bg-mint/20 hover:text-mint"
-              } disabled:cursor-not-allowed`}
+                    ? "is-correct"
+                    : "is-wrong"
+                  : ""
+              }`}
             >
               {letra}
             </motion.button>
@@ -8950,10 +9032,11 @@ function HangmanGame({
 
       <AnimatePresence>
         {venceu || perdeu ? (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`code-tower-result ${venceu ? "is-success" : "is-failure"}`} role="status" aria-live="polite">
             <p className={`font-display text-2xl font-black ${venceu ? "text-mint" : "text-roseGlow"}`}>
               {venceu ? `Acertou! +${(100 + (6 - erros) * 25) * Math.min(sequencia + 1, 4)}` : `A palavra era ${atual.word}`}
             </p>
+            <span>{venceu ? "+5 XP conquistados" : "0 XP nesta pergunta"}</span>
             <div className="mt-3">
               <PrimaryButton icon={ArrowRight} onClick={avancar}>
                 {indice + 1 >= words.length ? "Ver resultado" : "Próxima palavra"}
@@ -8961,10 +9044,10 @@ function HangmanGame({
             </div>
           </motion.div>
         ) : (
-          <p className="text-center text-[13px] font-bold text-white/35">Pode digitar no teclado. Acabar com vidas sobrando vale mais pontos.</p>
+          <p className="code-tower-help">Use o teclado físico ou o painel. Cada letra errada desliga um andar.</p>
         )}
       </AnimatePresence>
-    </div>
+    </section>
   );
 }
 
@@ -9441,7 +9524,7 @@ function LegacyGameIntro({
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1.5">
             <Zap className="h-3.5 w-3.5 text-amber-300" />
-            Terminar rende +{xpPerAction.game} XP
+            Cada acerto rende +{xpPerAction.game} XP
           </span>
           {recorde ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1.5">
@@ -9487,6 +9570,7 @@ function LegacyGameIntro({
 function GameIntro({
   jogo,
   materia,
+  questionCount,
   pronto,
   recorde,
   onStart,
@@ -9494,6 +9578,7 @@ function GameIntro({
 }: {
   jogo: (typeof gameCatalog)[number];
   materia: string;
+  questionCount: GameQuestionCount;
   pronto: boolean;
   recorde: number;
   onStart: () => void;
@@ -9551,13 +9636,13 @@ function GameIntro({
             <div className="mt-auto grid grid-cols-3 gap-2 pt-7">
               <div className="game-intro-stat">
                 <Bot className="h-4 w-4 text-[var(--game-accent)]" />
-                <span>Conteúdo</span>
-                <strong>Novo</strong>
+                <span>Perguntas</span>
+                <strong>{questionCount}</strong>
               </div>
               <div className="game-intro-stat">
                 <Zap className="h-4 w-4 text-amber-300" />
                 <span>Prêmio</span>
-                <strong>+{xpPerAction.game} XP</strong>
+                <strong>+{xpPerAction.game} XP/acerto</strong>
               </div>
               <div className="game-intro-stat">
                 <Trophy className="h-4 w-4 text-amber-300" />
@@ -9640,9 +9725,11 @@ function GameIntro({
   );
 }
 
-type WordSearchCount = 4 | 6 | 8;
+type GameQuestionCount = 4 | 6 | 8;
 
-function WordSearchSetup({
+function GameSetup({
+  gameName,
+  isWordSearch,
   count,
   showPreviews,
   subject,
@@ -9651,10 +9738,12 @@ function WordSearchSetup({
   onConfirm,
   onBack,
 }: {
-  count: WordSearchCount;
+  gameName: string;
+  isWordSearch: boolean;
+  count: GameQuestionCount;
   showPreviews: boolean;
   subject: string;
-  onCountChange: (count: WordSearchCount) => void;
+  onCountChange: (count: GameQuestionCount) => void;
   onPreviewChange: (show: boolean) => void;
   onConfirm: () => void;
   onBack: () => void;
@@ -9669,12 +9758,12 @@ function WordSearchSetup({
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-cyanGlow text-black shadow-[0_18px_38px_-20px_#45DFFF]">
-                <Search className="h-7 w-7" />
+                <Gamepad2 className="h-7 w-7" />
               </span>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[.2em] text-cyanGlow">Preparar partida</p>
-                <h2 className="mt-1 font-display text-2xl font-black tracking-[-.03em] sm:text-3xl">Monte seu caça-palavras</h2>
-                <p className="mt-1 text-[13px] font-semibold text-white/48">A Mine criará a grade usando {subject || "a matéria escolhida"}.</p>
+                <h2 className="mt-1 font-display text-2xl font-black tracking-[-.03em] sm:text-3xl">Configure {gameName}</h2>
+                <p className="mt-1 text-[13px] font-semibold text-white/48">A Mine criará perguntas novas usando {subject || "a matéria escolhida"}.</p>
               </div>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/[0.09] bg-black/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-[.14em] text-white/45">
@@ -9683,20 +9772,20 @@ function WordSearchSetup({
             </span>
           </div>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-2">
+          <div className={`mt-8 grid gap-4 ${isWordSearch ? "lg:grid-cols-2" : "mx-auto max-w-xl"}`}>
             <section className="rounded-2xl border border-white/[0.09] bg-black/20 p-5">
               <div className="flex items-start gap-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyanGlow/12 text-cyanGlow">
                   <Layers className="h-[18px] w-[18px]" />
                 </span>
                 <div>
-                  <h3 className="font-display text-lg font-black">Quantas palavras?</h3>
-                  <p className="mt-0.5 text-[12px] font-semibold leading-relaxed text-white/42">Mais palavras deixam a grade maior e a partida mais longa.</p>
+                  <h3 className="font-display text-lg font-black">Quantas perguntas?</h3>
+                  <p className="mt-0.5 text-[12px] font-semibold leading-relaxed text-white/42">Escolha o tamanho da partida. Cada acerto vale 5 XP e cada erro vale 0 XP.</p>
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Quantidade de palavras">
-                {([4, 6, 8] as WordSearchCount[]).map((option) => {
+              <div className="mt-5 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Quantidade de perguntas">
+                {([4, 6, 8] as GameQuestionCount[]).map((option) => {
                   const selected = option === count;
                   return (
                     <motion.button
@@ -9712,14 +9801,14 @@ function WordSearchSetup({
                     >
                       {selected ? <motion.span layoutId="word-count" className="absolute inset-x-3 bottom-0 h-0.5 bg-cyanGlow" /> : null}
                       <span className="block font-display text-2xl font-black tabular">{option}</span>
-                      <span className="mt-0.5 block text-[9px] font-black uppercase tracking-[.14em]">palavras</span>
+                      <span className="mt-0.5 block text-[9px] font-black uppercase tracking-[.14em]">perguntas</span>
                     </motion.button>
                   );
                 })}
               </div>
             </section>
 
-            <section className="rounded-2xl border border-white/[0.09] bg-black/20 p-5">
+            {isWordSearch ? <section className="rounded-2xl border border-white/[0.09] bg-black/20 p-5">
               <div className="flex items-start gap-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyanGlow/12 text-cyanGlow">
                   {showPreviews ? <Eye className="h-[18px] w-[18px]" /> : <EyeOff className="h-[18px] w-[18px]" />}
@@ -9751,7 +9840,7 @@ function WordSearchSetup({
                   />
                 </span>
               </button>
-            </section>
+            </section> : null}
           </div>
 
           <div className="mt-6 flex flex-col-reverse gap-2 border-t border-white/[0.08] pt-5 sm:flex-row sm:items-center sm:justify-end">
@@ -9760,7 +9849,7 @@ function WordSearchSetup({
               Outros jogos
             </button>
             <button type="button" onClick={onConfirm} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-cyanGlow px-6 text-sm font-black text-black shadow-[0_18px_36px_-20px_#45DFFF] transition-transform hover:-translate-y-0.5">
-              Criar com {count} palavras
+              Criar com {count} perguntas
               <ArrowRight className="h-[18px] w-[18px]" />
             </button>
           </div>
@@ -9779,7 +9868,7 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
   const [status, setStatus] = useState<"idle" | "config" | "loading" | "ready" | "playing" | "done" | "error">("idle");
   const [erro, setErro] = useState("");
   const [rodada, setRodada] = useState(0);
-  const [wordSearchCount, setWordSearchCount] = useState<WordSearchCount>(6);
+  const [questionCount, setQuestionCount] = useState<GameQuestionCount>(6);
   const [showWordPreviews, setShowWordPreviews] = useState(true);
 
   const [vf, setVf] = useState<TrueFalseItem[]>([]);
@@ -9788,7 +9877,7 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
   const [termos, setTermos] = useState<WordMeaning[]>([]);
   const [sequencias, setSequencias] = useState<SequencePuzzle[]>([]);
 
-  const [resultado, setResultado] = useState<{ pontos: number; recorde: boolean } | null>(null);
+  const [resultado, setResultado] = useState<{ pontos: number; recorde: boolean; acertos: number; xp: number } | null>(null);
   const [recordes, setRecordes] = useState<Record<string, number>>(() => readRecords());
   const reduzido = useSoftMotion();
   const gameRequestRef = useRef<AbortController | null>(null);
@@ -9806,10 +9895,6 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
 
   function abrirJogo(id: GameId) {
     if (!subject) return;
-    if (id !== "caca") {
-      iniciar(id);
-      return;
-    }
     setGame(id);
     setErro("");
     setResultado(null);
@@ -9832,16 +9917,16 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
 
     const context = subjectContentContext(subject, materials, 4_500);
     const pedidos: Record<GameId, { task: string; prompt: string; maxOutputTokens: number; minimum: number }> = {
-      nexo: { task: "pares", prompt: `Crie 6 pares curtos e conceitualmente distintos sobre ${subject.name}.`, maxOutputTokens: 520, minimum: 6 },
-      sequencia: { task: "sequencia", prompt: `Crie 3 processos de quatro etapas sobre ${subject.name}.`, maxOutputTokens: 980, minimum: 3 },
-      corrida: { task: "vf", prompt: `Gere 4 afirmacoes curtas sobre ${subject.name}.`, maxOutputTokens: 600, minimum: 3 },
-      memoria: { task: "pares", prompt: `Crie 4 pares curtos sobre ${subject.name}.`, maxOutputTokens: 340, minimum: 3 },
-      forca: { task: "forca", prompt: `Escolha 2 palavras sobre ${subject.name}.`, maxOutputTokens: 300, minimum: 1 },
+      nexo: { task: "pares", prompt: `Crie ${questionCount} pares curtos e conceitualmente distintos sobre ${subject.name}.`, maxOutputTokens: 180 + questionCount * 95, minimum: questionCount },
+      sequencia: { task: "sequencia", prompt: `Crie ${questionCount} processos de quatro etapas sobre ${subject.name}.`, maxOutputTokens: 220 + questionCount * 300, minimum: questionCount },
+      corrida: { task: "vf", prompt: `Gere ${questionCount} afirmacoes curtas sobre ${subject.name}.`, maxOutputTokens: 180 + questionCount * 115, minimum: questionCount },
+      memoria: { task: "pares", prompt: `Crie ${questionCount} pares curtos sobre ${subject.name}.`, maxOutputTokens: 160 + questionCount * 85, minimum: questionCount },
+      forca: { task: "forca", prompt: `Escolha ${questionCount} palavras sobre ${subject.name}.`, maxOutputTokens: 160 + questionCount * 75, minimum: questionCount },
       caca: {
         task: "caca",
-        prompt: `Escolha ${wordSearchCount + 2} palavras sobre ${subject.name}. Entregue pelo menos ${wordSearchCount} palavras validas, unicas, de 4 a 12 letras e sem espacos.`,
-        maxOutputTokens: 420 + wordSearchCount * 80,
-        minimum: wordSearchCount,
+        prompt: `Escolha ${questionCount + 2} palavras sobre ${subject.name}. Entregue pelo menos ${questionCount} palavras validas, unicas, de 4 a 12 letras e sem espacos.`,
+        maxOutputTokens: 420 + questionCount * 80,
+        minimum: questionCount,
       },
     };
 
@@ -9865,27 +9950,27 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
       let apply: (() => void) | null = null;
 
       if (id === "corrida") {
-        const itens = parseTrueFalse(text).slice(0, 12);
+        const itens = parseTrueFalse(text).slice(0, questionCount);
         count = itens.length;
         novos = itens.map((item) => item.statement.slice(0, 60));
         apply = () => setVf(shuffle(itens));
       } else if (id === "memoria" || id === "nexo") {
-        const itens = parsePairs(text).slice(0, 8);
+        const itens = parsePairs(text).slice(0, questionCount);
         count = itens.length;
         novos = itens.map((item) => item.term);
         apply = () => setPares(itens);
       } else if (id === "sequencia") {
-        const itens = parseSequencePuzzles(text).slice(0, 3);
+        const itens = parseSequencePuzzles(text).slice(0, questionCount);
         count = itens.length;
         novos = itens.map((item) => item.title);
         apply = () => setSequencias(itens);
       } else if (id === "caca") {
-        const itens = parseWordMeanings(text).slice(0, wordSearchCount);
+        const itens = parseWordMeanings(text).slice(0, questionCount);
         count = itens.length;
         novos = itens.map((item) => item.word);
         apply = () => setTermos(itens);
       } else {
-        const itens = parseHangman(text).slice(0, 6);
+        const itens = parseHangman(text).slice(0, questionCount);
         count = itens.length;
         novos = itens.map((item) => item.word);
         apply = () => setPalavras(itens);
@@ -9930,8 +10015,10 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
   }
 
   const finalizar = useCallback(
-    (pontos: number, recorde: boolean) => {
-      setResultado({ pontos, recorde });
+    (pontos: number, recorde: boolean, correctAnswers: number) => {
+      const acertos = Math.min(questionCount, Math.max(0, Math.floor(correctAnswers)));
+      const xp = gameXpFromCorrectAnswers(acertos);
+      setResultado({ pontos, recorde, acertos, xp });
       gameStatusRef.current = "done";
       setStatus("done");
       setRecordes(readRecords());
@@ -9941,11 +10028,21 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
         ...draft,
         sessions: [
           ...draft.sessions,
-          { id: uid("session"), userId: user.id, subjectId: subject.id, title: `${nome}: ${pontos} pts`, kind: "Games", createdAt: Date.now() },
+          {
+            id: uid("session"),
+            userId: user.id,
+            subjectId: subject.id,
+            title: `${nome}: ${pontos} pts · ${acertos}/${questionCount} acertos`,
+            kind: "Games",
+            createdAt: Date.now(),
+            xpEarned: xp,
+            correctAnswers: acertos,
+            questionsAnswered: questionCount,
+          },
         ],
       }));
     },
-    [game, subject, update, user.id],
+    [game, questionCount, subject, update, user.id],
   );
 
   function sair() {
@@ -9981,7 +10078,7 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
             <div className="flex flex-col items-center gap-2 py-2 text-center">
               <DepthWord text="GAMES" reduced={reduzido} />
               <p className="text-[13px] font-bold text-white/45">
-                {gameCatalog.length} aventuras montadas pela Mine. Cada partida terminada vale +{xpPerAction.game} XP.
+                {gameCatalog.length} aventuras montadas pela Mine. Cada resposta correta vale +{xpPerAction.game} XP; erros valem 0.
               </p>
             </div>
           </Reveal>
@@ -10062,20 +10159,23 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
             })}
           </Stagger>
         </div>
-      ) : status === "config" && jogoAtual?.id === "caca" ? (
-        <WordSearchSetup
-          count={wordSearchCount}
+      ) : status === "config" && jogoAtual ? (
+        <GameSetup
+          gameName={jogoAtual.name}
+          isWordSearch={jogoAtual.id === "caca"}
+          count={questionCount}
           showPreviews={showWordPreviews}
           subject={subject?.name || ""}
-          onCountChange={setWordSearchCount}
+          onCountChange={setQuestionCount}
           onPreviewChange={setShowWordPreviews}
-          onConfirm={() => iniciar("caca")}
+          onConfirm={() => iniciar(jogoAtual.id)}
           onBack={sair}
         />
       ) : (status === "loading" || status === "ready") && jogoAtual ? (
         <GameIntro
           jogo={jogoAtual}
           materia={subject?.name || ""}
+          questionCount={questionCount}
           pronto={status === "ready"}
           recorde={recordes[recordKey] || 0}
           onStart={() => {
@@ -10109,7 +10209,7 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
               </p>
               <p className="inline-flex items-center gap-1.5 rounded-full bg-mint/12 px-3 py-1.5 text-[13px] font-black text-mint">
                 <Zap className="h-3.5 w-3.5" />
-                +{xpPerAction.game} XP para o seu nível
+                +{resultado.xp} XP · {resultado.acertos}/{questionCount} acertos
               </p>
               {!resultado.recorde && recordes[recordKey] ? (
                 <p className="text-[13px] font-bold text-white/35">Seu recorde: {recordes[recordKey]}</p>
@@ -10126,16 +10226,16 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
           {game === "corrida" ? (
             <SpeedRunGame key={rodada} items={vf} recordKey={recordKey} onFinish={finalizar} />
           ) : game === "nexo" ? (
-            <NexusGame key={rodada} pairs={pares} onFinish={(score) => finalizar(score, saveRecord(recordKey, score))} />
+            <NexusGame key={rodada} pairs={pares} onFinish={(score, correctAnswers) => finalizar(score, saveRecord(recordKey, score), correctAnswers)} />
           ) : game === "sequencia" ? (
-            <SequenceForgeGame key={rodada} puzzles={sequencias} onFinish={(score) => finalizar(score, saveRecord(recordKey, score))} />
+            <SequenceForgeGame key={rodada} puzzles={sequencias} onFinish={(score, correctAnswers) => finalizar(score, saveRecord(recordKey, score), correctAnswers)} />
           ) : game === "memoria" ? (
             <MemoryGame key={rodada} pairs={pares} recordKey={recordKey} onFinish={finalizar} />
           ) : game === "caca" ? (
             <WordSearchGame
               key={rodada}
               items={termos}
-              wordCount={wordSearchCount}
+              wordCount={questionCount}
               showPreviews={showWordPreviews}
               recordKey={recordKey}
               onFinish={finalizar}

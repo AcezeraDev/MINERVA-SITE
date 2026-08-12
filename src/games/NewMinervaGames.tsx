@@ -46,15 +46,17 @@ function NexusHud({ score, energy, streak, progress }: { score: number; energy: 
   );
 }
 
-export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish: (score: number) => void }) {
+export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish: (score: number, correctAnswers: number) => void }) {
   const reduced = useSoftMotion();
-  const usablePairs = useMemo(() => pairs.slice(0, 6), [pairs]);
+  const usablePairs = useMemo(() => pairs, [pairs]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [energy, setEnergy] = useState(3);
   const [streak, setStreak] = useState(0);
   const [wrong, setWrong] = useState<string[]>([]);
   const [resolved, setResolved] = useState(false);
+  const [eligibleForXp, setEligibleForXp] = useState(true);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
   const [feedback, setFeedback] = useState("Escolha a definição que completa o conceito central.");
   const finished = useRef(false);
   const current = usablePairs[index];
@@ -65,10 +67,10 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
     return shuffled([current, ...decoys]);
   }, [current, index, usablePairs]);
 
-  const finish = useCallback((finalScore: number) => {
+  const finish = useCallback((finalScore: number, finalCorrectAnswers: number) => {
     if (finished.current) return;
     finished.current = true;
-    onFinish(finalScore);
+    onFinish(finalScore, finalCorrectAnswers);
   }, [onFinish]);
 
   const choose = useCallback((option: ConceptPair) => {
@@ -78,6 +80,7 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
       const nextScore = score + reward;
       setScore(nextScore);
       setStreak((value) => value + 1);
+      if (eligibleForXp) setCorrectAnswers((value) => value + 1);
       setResolved(true);
       setFeedback(`Conexão formada: ${current.term} — ${current.definition}`);
       return;
@@ -86,22 +89,24 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
     const nextEnergy = energy - 1;
     setEnergy(nextEnergy);
     setStreak(0);
+    setEligibleForXp(false);
     setWrong((items) => [...items, option.definition]);
     setFeedback(`Esse sinal pertence a “${option.term}”. Tente outra ligação.`);
-    if (nextEnergy <= 0) finish(score);
-  }, [current, energy, finish, resolved, score, streak, wrong]);
+    if (nextEnergy <= 0) finish(score, correctAnswers);
+  }, [correctAnswers, current, eligibleForXp, energy, finish, resolved, score, streak, wrong]);
 
   const advance = useCallback(() => {
     if (!resolved || !current) return;
     if (index >= usablePairs.length - 1) {
-      finish(score + energy * 50);
+      finish(score + energy * 50, correctAnswers);
       return;
     }
     setIndex((value) => value + 1);
     setWrong([]);
     setResolved(false);
+    setEligibleForXp(true);
     setFeedback("Novo sinal detectado. Encontre a conexão correta.");
-  }, [current, energy, finish, index, resolved, score, usablePairs.length]);
+  }, [correctAnswers, current, energy, finish, index, resolved, score, usablePairs.length]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -178,9 +183,9 @@ function scramblePuzzle(puzzle: SequencePuzzle) {
   return rotated.every((step, index) => step === puzzle.steps[index]) ? [...puzzle.steps].reverse() : rotated;
 }
 
-export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzzle[]; onFinish: (score: number) => void }) {
+export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzzle[]; onFinish: (score: number, correctAnswers: number) => void }) {
   const reduced = useSoftMotion();
-  const usable = useMemo(() => puzzles.slice(0, 3), [puzzles]);
+  const usable = useMemo(() => puzzles, [puzzles]);
   const [puzzleIndex, setPuzzleIndex] = useState(0);
   const puzzle = usable[puzzleIndex];
   const [order, setOrder] = useState<string[]>(() => puzzle ? scramblePuzzle(puzzle) : []);
@@ -188,6 +193,8 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
   const [attempts, setAttempts] = useState(0);
   const [score, setScore] = useState(0);
   const [solved, setSolved] = useState(false);
+  const [eligibleForXp, setEligibleForXp] = useState(true);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
   const [feedback, setFeedback] = useState("Mova as etapas e acione o núcleo quando o processo fizer sentido.");
   const dragIndex = useRef<number | null>(null);
   const finished = useRef(false);
@@ -198,6 +205,7 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
     setMoves(0);
     setAttempts(0);
     setSolved(false);
+    setEligibleForXp(true);
     setFeedback("Mova as etapas e acione o núcleo quando o processo fizer sentido.");
   }, [puzzle]);
 
@@ -216,10 +224,12 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
     if (positions === puzzle.steps.length) {
       const reward = sequenceReward(moves, nextAttempts);
       setScore((value) => value + reward);
+      if (eligibleForXp) setCorrectAnswers((value) => value + 1);
       setSolved(true);
       setFeedback(puzzle.explanation);
       return;
     }
+    setEligibleForXp(false);
     setFeedback(`${positions} de ${puzzle.steps.length} etapas estão no lugar certo. Reorganize as demais.`);
   };
 
@@ -228,7 +238,7 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
     if (puzzleIndex >= usable.length - 1) {
       if (!finished.current) {
         finished.current = true;
-        onFinish(score);
+        onFinish(score, correctAnswers);
       }
       return;
     }
