@@ -21,10 +21,15 @@ import {
   sequenceReward,
   type SequencePuzzle,
 } from "../../shared/game-core.mjs";
+import type { GameAnswer } from "../../shared/game-meta.mjs";
 import { useSoftMotion } from "../motion";
 import "./new-games.css";
 
 export type ConceptPair = { term: string; definition: string };
+
+function answerId() {
+  return `answer_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
 
 function shuffled<T>(items: T[]): T[] {
   const result = [...items];
@@ -46,7 +51,7 @@ function NexusHud({ score, energy, streak, progress }: { score: number; energy: 
   );
 }
 
-export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish: (score: number, correctAnswers: number) => void }) {
+export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish: (score: number, correctAnswers: number, answers: GameAnswer[]) => void }) {
   const reduced = useSoftMotion();
   const usablePairs = useMemo(() => pairs, [pairs]);
   const [index, setIndex] = useState(0);
@@ -59,6 +64,7 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [feedback, setFeedback] = useState("Escolha a definição que completa o conceito central.");
   const finished = useRef(false);
+  const answersRef = useRef<GameAnswer[]>([]);
   const current = usablePairs[index];
 
   const options = useMemo(() => {
@@ -70,7 +76,7 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
   const finish = useCallback((finalScore: number, finalCorrectAnswers: number) => {
     if (finished.current) return;
     finished.current = true;
-    onFinish(finalScore, finalCorrectAnswers);
+    onFinish(finalScore, finalCorrectAnswers, answersRef.current);
   }, [onFinish]);
 
   const choose = useCallback((option: ConceptPair) => {
@@ -81,6 +87,7 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
       setScore(nextScore);
       setStreak((value) => value + 1);
       if (eligibleForXp) setCorrectAnswers((value) => value + 1);
+      answersRef.current = [...answersRef.current, { id: answerId(), prompt: `Qual definição pertence a “${current.term}”?`, userAnswer: option.definition, correctAnswer: current.definition, explanation: `${current.term} — ${current.definition}`, correct: eligibleForXp }];
       setResolved(true);
       setFeedback(`Conexão formada: ${current.term} — ${current.definition}`);
       return;
@@ -92,7 +99,10 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
     setEligibleForXp(false);
     setWrong((items) => [...items, option.definition]);
     setFeedback(`Esse sinal pertence a “${option.term}”. Tente outra ligação.`);
-    if (nextEnergy <= 0) finish(score, correctAnswers);
+    if (nextEnergy <= 0) {
+      answersRef.current = [...answersRef.current, { id: answerId(), prompt: `Qual definição pertence a “${current.term}”?`, userAnswer: option.definition, correctAnswer: current.definition, explanation: `${current.term} — ${current.definition}`, correct: false }];
+      finish(score, correctAnswers);
+    }
   }, [correctAnswers, current, eligibleForXp, energy, finish, resolved, score, streak, wrong]);
 
   const advance = useCallback(() => {
@@ -183,7 +193,7 @@ function scramblePuzzle(puzzle: SequencePuzzle) {
   return rotated.every((step, index) => step === puzzle.steps[index]) ? [...puzzle.steps].reverse() : rotated;
 }
 
-export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzzle[]; onFinish: (score: number, correctAnswers: number) => void }) {
+export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzzle[]; onFinish: (score: number, correctAnswers: number, answers: GameAnswer[]) => void }) {
   const reduced = useSoftMotion();
   const usable = useMemo(() => puzzles, [puzzles]);
   const [puzzleIndex, setPuzzleIndex] = useState(0);
@@ -198,6 +208,7 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
   const [feedback, setFeedback] = useState("Mova as etapas e acione o núcleo quando o processo fizer sentido.");
   const dragIndex = useRef<number | null>(null);
   const finished = useRef(false);
+  const answersRef = useRef<GameAnswer[]>([]);
 
   useEffect(() => {
     if (!puzzle) return;
@@ -225,6 +236,7 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
       const reward = sequenceReward(moves, nextAttempts);
       setScore((value) => value + reward);
       if (eligibleForXp) setCorrectAnswers((value) => value + 1);
+      answersRef.current = [...answersRef.current, { id: answerId(), prompt: `Ordene o processo: ${puzzle.title}`, userAnswer: order.join(" → "), correctAnswer: puzzle.steps.join(" → "), explanation: puzzle.explanation, correct: eligibleForXp }];
       setSolved(true);
       setFeedback(puzzle.explanation);
       return;
@@ -238,7 +250,7 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
     if (puzzleIndex >= usable.length - 1) {
       if (!finished.current) {
         finished.current = true;
-        onFinish(score, correctAnswers);
+        onFinish(score, correctAnswers, answersRef.current);
       }
       return;
     }

@@ -145,6 +145,20 @@ import {
   type AchievementRule,
   type XpStats,
 } from "../shared/xp.mjs";
+import {
+  currentSeason,
+  dailyChallengeKey,
+  dailyChallengeQuestions,
+  dailyMissionProgress,
+  gameAchievementRules,
+  gameNames,
+  leagueFromPoints,
+  seasonPoints,
+  unlockedGameAchievementIds,
+  unresolvedGameErrors,
+  type DailyQuestion,
+  type GameAnswer,
+} from "../shared/game-meta.mjs";
 
 const Cubes = React.lazy(() => import("./components/Cubes"));
 
@@ -422,6 +436,19 @@ type Session = {
   xpEarned?: number;
   correctAnswers?: number;
   questionsAnswered?: number;
+  gameId?: string;
+  gameName?: string;
+  score?: number;
+  record?: boolean;
+  durationMs?: number;
+  answers?: GameAnswer[];
+  accuracy?: number;
+  seasonId?: string;
+  dailyChallenge?: boolean;
+  dailyKey?: string;
+  mode?: "standard" | "daily" | "review";
+  reviewedErrorIds?: string[];
+  reviewCount?: number;
 };
 
 type Flashcard = {
@@ -4984,14 +5011,20 @@ type RankingRow = {
   streak: number;
   focus: number;
   tasksDone: number;
+  seasonPoints: number;
+  league: string;
+  dailyCorrect: number;
+  dailyDurationMs: number;
 };
 
-type RankingRange = "dayXp" | "weekXp" | "xp";
+type RankingRange = "dayXp" | "weekXp" | "seasonPoints" | "dailyCorrect" | "xp";
 
-const rankingRanges: Array<{ id: RankingRange; label: string; hint: string }> = [
-  { id: "dayXp", label: "Hoje", hint: "XP conquistado desde a meia-noite" },
-  { id: "weekXp", label: "Semana", hint: "XP dos últimos 7 dias" },
-  { id: "xp", label: "Total", hint: "XP acumulado desde o começo" },
+const rankingRanges: Array<{ id: RankingRange; label: string; hint: string; unit: string }> = [
+  { id: "dayXp", label: "Hoje", hint: "XP conquistado desde a meia-noite", unit: "XP" },
+  { id: "weekXp", label: "Semana", hint: "XP dos últimos 7 dias", unit: "XP" },
+  { id: "seasonPoints", label: "Temporada", hint: "Pontos dos jogos nesta temporada", unit: "PTS" },
+  { id: "dailyCorrect", label: "Desafio", hint: "Acertos no desafio compartilhado de hoje", unit: "ACERTOS" },
+  { id: "xp", label: "Total", hint: "XP acumulado desde o começo", unit: "XP" },
 ];
 
 /**
@@ -5073,7 +5106,16 @@ function RankingView({
   // Ordena a lista inteira primeiro: assim a posição mostrada é a posição no
   // site, e não muda quando a busca ou o filtro de amigos escondem alguém.
   const ordenado = useMemo(() => {
-    const lista = [...rows].sort((a, b) => b[range] - a[range] || b.xp - a.xp);
+    const lista = [...rows].sort((a, b) => {
+      const score = b[range] - a[range];
+      if (score) return score;
+      if (range === "dailyCorrect") {
+        const aTime = a.dailyDurationMs || Number.POSITIVE_INFINITY;
+        const bTime = b.dailyDurationMs || Number.POSITIVE_INFINITY;
+        if (aTime !== bTime) return aTime - bTime;
+      }
+      return b.xp - a.xp;
+    });
     return lista.map((row, index) => ({ row, position: index + 1 }));
   }, [rows, range]);
 
@@ -5112,13 +5154,13 @@ function RankingView({
                       {eu.position}º<span className="text-lg text-white/35"> de {ordenado.length}</span>
                     </p>
                     <p className="mt-1 truncate text-[13px] font-bold text-white/50">
-                      {eu.row[range]} XP {rangeInfo.label.toLowerCase() === "total" ? "no total" : `· ${rangeInfo.label.toLowerCase()}`}
+                      {eu.row[range]} {rangeInfo.unit} {range === "seasonPoints" ? `· liga ${eu.row.league}` : rangeInfo.label.toLowerCase() === "total" ? "no total" : `· ${rangeInfo.label.toLowerCase()}`}
                     </p>
                   </div>
                 </div>
                 <p className="max-w-xs text-[13px] font-bold leading-relaxed text-white/55">
                   {acimaDeMim
-                    ? `Faltam ${Math.max(0, acimaDeMim.row[range] - eu.row[range])} XP para passar ${acimaDeMim.row.displayName}.`
+                    ? `Faltam ${Math.max(0, acimaDeMim.row[range] - eu.row[range])} ${rangeInfo.unit.toLowerCase()} para passar ${acimaDeMim.row.displayName}.`
                     : ordenado.length > 1
                       ? "Você está na frente de todo mundo. Segure o ritmo."
                       : "Chame a turma para o site e o placar começa a ficar interessante."}
@@ -5225,6 +5267,7 @@ function RankingView({
                       row={row}
                       position={position}
                       value={row[range]}
+                      unit={rangeInfo.unit}
                       leader={lider}
                       reduced={Boolean(reduced)}
                       onOpen={() => go("perfil", row.id)}
@@ -5251,6 +5294,7 @@ function RankingRowCard({
   row,
   position,
   value,
+  unit,
   leader,
   reduced,
   onOpen,
@@ -5259,6 +5303,7 @@ function RankingRowCard({
   row: RankingRow;
   position: number;
   value: number;
+  unit: string;
   leader: number;
   reduced: boolean;
   onOpen: () => void;
@@ -5325,7 +5370,7 @@ function RankingRowCard({
             <span className="block font-display text-lg font-black tabular sm:text-xl" style={{ color: medalha ? cor : undefined }}>
               {value}
             </span>
-            <span className="block text-[10px] font-black uppercase tracking-[.12em] text-white/32">XP</span>
+            <span className="block text-[10px] font-black uppercase tracking-[.12em] text-white/32">{unit}</span>
           </span>
         </button>
         {!row.you ? (
@@ -8018,7 +8063,7 @@ function SpeedRunGame({
 }: {
   items: TrueFalseItem[];
   recordKey: string;
-  onFinish: (score: number, recorde: boolean, correctAnswers: number) => void;
+  onFinish: (score: number, recorde: boolean, correctAnswers: number, answers: GameAnswer[]) => void;
 }) {
   const DURACAO = 60_000;
   const BONUS_ACERTO = 3_000;
@@ -8038,6 +8083,7 @@ function SpeedRunGame({
   const [endingScore, setEndingScore] = useState(0);
   const [endingCorrect, setEndingCorrect] = useState(0);
   const encerrado = useRef(false);
+  const answersRef = useRef<GameAnswer[]>([]);
   const feedbackTimerRef = useRef<number | null>(null);
 
   const atual = items[indice];
@@ -8048,7 +8094,7 @@ function SpeedRunGame({
       if (encerrado.current) return;
       encerrado.current = true;
       setVivo(false);
-      onFinish(pontuacao, saveRecord(recordKey, pontuacao), respostasCorretas);
+      onFinish(pontuacao, saveRecord(recordKey, pontuacao), respostasCorretas, answersRef.current);
     },
     [onFinish, recordKey],
   );
@@ -8085,6 +8131,14 @@ function SpeedRunGame({
   function responder(valor: boolean) {
     if (!vivo || !atual || flash) return;
     const certo = valor === atual.answer;
+    answersRef.current = [...answersRef.current, {
+      id: uid("answer"),
+      prompt: atual.statement,
+      userAnswer: valor ? "Verdadeiro" : "Falso",
+      correctAnswer: atual.answer ? "Verdadeiro" : "Falso",
+      explanation: atual.explanation,
+      correct: certo,
+    }];
     const novosAcertos = acertos + (certo ? 1 : 0);
     let proximaPontuacao = pontos;
     setFeedback(atual.explanation);
@@ -8249,7 +8303,7 @@ function MemoryGame({
 }: {
   pairs: PairItem[];
   recordKey: string;
-  onFinish: (score: number, recorde: boolean, correctAnswers: number) => void;
+  onFinish: (score: number, recorde: boolean, correctAnswers: number, answers: GameAnswer[]) => void;
 }) {
   type Carta = { id: string; parId: number; texto: string; tipo: "termo" | "definicao" };
 
@@ -8268,6 +8322,7 @@ function MemoryGame({
   const [inicio] = useState(() => Date.now());
   const [segundos, setSegundos] = useState(0);
   const encerrado = useRef(false);
+  const failedPairsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     const timer = window.setInterval(() => setSegundos(Math.floor((Date.now() - inicio) / 1000)), 500);
@@ -8280,7 +8335,15 @@ function MemoryGame({
     const tempo = Math.max(1, Math.floor((Date.now() - inicio) / 1000));
     // Perfeito = uma jogada por par. Cada jogada extra e cada segundo pesam.
     const nota = Math.max(50, Math.round(1000 - (jogadas - pairs.length) * 25 - tempo * 3));
-    window.setTimeout(() => onFinish(nota, saveRecord(recordKey, nota), pairs.length), 700);
+    const answers = pairs.map((pair, pairIndex) => ({
+      id: uid("answer"),
+      prompt: `Qual definição corresponde a “${pair.term}”?`,
+      userAnswer: failedPairsRef.current.has(pairIndex) ? "Houve uma combinação incorreta antes do par" : pair.definition,
+      correctAnswer: pair.definition,
+      explanation: `${pair.term}: ${pair.definition}`,
+      correct: !failedPairsRef.current.has(pairIndex),
+    }));
+    window.setTimeout(() => onFinish(nota, saveRecord(recordKey, nota), answers.filter((answer) => answer.correct).length, answers), 700);
   }, [feitos, pairs.length, jogadas, inicio, onFinish, recordKey]);
 
   // Só empilha a carta. A comparação vive no efeito abaixo porque dois cliques
@@ -8302,6 +8365,8 @@ function MemoryGame({
       setViradas([]);
       return;
     }
+    failedPairsRef.current.add(a.parId);
+    failedPairsRef.current.add(b.parId);
     setErroPar(viradas);
     const timer = window.setTimeout(() => {
       setViradas([]);
@@ -8491,7 +8556,7 @@ function WordSearchGame({
   wordCount: GameQuestionCount;
   showPreviews: boolean;
   recordKey: string;
-  onFinish: (score: number, recorde: boolean, correctAnswers: number) => void;
+  onFinish: (score: number, recorde: boolean, correctAnswers: number, answers: GameAnswer[]) => void;
 }) {
   const board = useMemo(() => buildWordSearch(items, wordCount), [items, wordCount]);
   const [found, setFound] = useState<WordPlacement[]>([]);
@@ -8541,7 +8606,8 @@ function WordSearchGame({
       // Achar vale muito; o relógio só arranha o placar, para não punir quem
       // parou para ler os significados — que é justamente o objetivo do jogo.
       const pontos = achadas.length * 150 + Math.max(0, 600 - segundos * 2);
-      onFinish(pontos, saveRecord(recordKey, pontos), achadas.length);
+      const answers = achadas.map((item) => ({ id: uid("answer"), prompt: `Encontre o termo: ${item.meaning}`, userAnswer: item.word, correctAnswer: item.word, explanation: item.meaning, correct: true }));
+      onFinish(pontos, saveRecord(recordKey, pontos), achadas.length, answers);
     },
     [onFinish, recordKey, segundos],
   );
@@ -8885,7 +8951,7 @@ function HangmanGame({
 }: {
   words: HangmanItem[];
   recordKey: string;
-  onFinish: (score: number, recorde: boolean, correctAnswers: number) => void;
+  onFinish: (score: number, recorde: boolean, correctAnswers: number, answers: GameAnswer[]) => void;
 }) {
   const [indice, setIndice] = useState(0);
   const [letras, setLetras] = useState<string[]>([]);
@@ -8893,6 +8959,7 @@ function HangmanGame({
   const [sequencia, setSequencia] = useState(0);
   const [resolvidas, setResolvidas] = useState(0);
   const encerrado = useRef(false);
+  const answersRef = useRef<GameAnswer[]>([]);
 
   const atual = words[indice];
   const erradas = atual ? letras.filter((letra) => !atual.word.includes(letra)) : [];
@@ -8917,6 +8984,15 @@ function HangmanGame({
   function avancar() {
     let novaPontuacao = pontos;
     let novaSequencia = sequencia;
+    const answer: GameAnswer = {
+      id: uid("answer"),
+      prompt: atual.hint,
+      userAnswer: venceu ? atual.word : letras.join(", ") || "Sem resposta",
+      correctAnswer: atual.word,
+      explanation: atual.hint,
+      correct: venceu,
+    };
+    answersRef.current = [...answersRef.current, answer];
     if (venceu) {
       // Sobrou vida = valeu mais. Sequência multiplica.
       novaSequencia = sequencia + 1;
@@ -8931,7 +9007,7 @@ function HangmanGame({
     if (indice + 1 >= words.length) {
       if (encerrado.current) return;
       encerrado.current = true;
-      onFinish(novaPontuacao, saveRecord(recordKey, novaPontuacao), resolvidas + (venceu ? 1 : 0));
+      onFinish(novaPontuacao, saveRecord(recordKey, novaPontuacao), resolvidas + (venceu ? 1 : 0), answersRef.current);
       return;
     }
     setIndice(indice + 1);
@@ -9859,7 +9935,203 @@ function GameSetup({
   );
 }
 
+type GamesHubTab = "jogar" | "diario" | "missoes" | "erros" | "historico" | "temporada";
+
+const gamesHubTabs: Array<{ id: GamesHubTab; label: string; icon: LucideIcon }> = [
+  { id: "jogar", label: "Jogar", icon: Gamepad2 },
+  { id: "diario", label: "Desafio", icon: CalendarCheck },
+  { id: "missoes", label: "Missões", icon: Target },
+  { id: "erros", label: "Erros", icon: BookOpen },
+  { id: "historico", label: "Histórico", icon: ListChecks },
+  { id: "temporada", label: "Liga", icon: Trophy },
+];
+
+function GamesHubNav({ active, onChange, errorCount }: { active: GamesHubTab; onChange: (tab: GamesHubTab) => void; errorCount: number }) {
+  return (
+    <nav aria-label="Áreas dos jogos" className="mb-5 overflow-x-auto rounded-2xl border border-white/10 bg-black/25 p-1.5">
+      <div className="flex min-w-max gap-1">
+        {gamesHubTabs.map((tab) => {
+          const activeTab = tab.id === active;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              aria-current={activeTab ? "page" : undefined}
+              onClick={() => onChange(tab.id)}
+              className={`relative inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12px] font-black transition-colors ${activeTab ? "bg-mint text-black shadow-glowSoft" : "text-white/48 hover:bg-white/[0.06] hover:text-white"}`}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+              {tab.id === "erros" && errorCount > 0 ? <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${activeTab ? "bg-black/15" : "bg-roseGlow/18 text-roseGlow"}`}>{errorCount}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function formatGameDuration(durationMs?: number) {
+  const seconds = Math.max(0, Math.round(Number(durationMs || 0) / 1000));
+  if (!seconds) return "—";
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}min ${seconds % 60}s`;
+}
+
+function DailyChallengePanel({ data, user, update }: { data: ReturnType<typeof useMemoUserData>; user: User; update: (next: (draft: AppData) => AppData) => void }) {
+  const key = dailyChallengeKey();
+  const previous = data.sessions.find((session) => session.kind === "Games" && session.dailyChallenge && session.dailyKey === key);
+  const questions = useMemo(() => dailyChallengeQuestions(Date.now(), 5), [key]);
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<GameAnswer[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [startedAt] = useState(() => Date.now());
+  const [complete, setComplete] = useState<Session | null>(previous || null);
+  const current = questions[index];
+
+  function choose(option: string) {
+    if (!current || selected || complete) return;
+    setSelected(option);
+  }
+
+  function advance() {
+    if (!current || !selected || complete) return;
+    const correct = selected === current.answer;
+    const nextAnswer: GameAnswer = {
+      id: `answer_daily_${key}_${current.id}_${user.id}`,
+      prompt: current.prompt,
+      userAnswer: selected,
+      correctAnswer: current.answer,
+      explanation: current.explanation,
+      correct,
+    };
+    const nextAnswers = [...answers, nextAnswer];
+    if (index < questions.length - 1) {
+      setAnswers(nextAnswers);
+      setIndex((value) => value + 1);
+      setSelected(null);
+      return;
+    }
+    const correctAnswers = nextAnswers.filter((answer) => answer.correct).length;
+    const now = Date.now();
+    const session: Session = {
+      id: uid("session"),
+      userId: user.id,
+      subjectId: "daily-general",
+      title: `Desafio diário: ${correctAnswers}/5 acertos`,
+      kind: "Games",
+      createdAt: now,
+      xpEarned: gameXpFromCorrectAnswers(correctAnswers),
+      correctAnswers,
+      questionsAnswered: questions.length,
+      gameId: "daily",
+      gameName: "Desafio diário",
+      score: correctAnswers * 100,
+      durationMs: now - startedAt,
+      answers: nextAnswers,
+      accuracy: correctAnswers / questions.length,
+      seasonId: currentSeason(now).id,
+      dailyChallenge: true,
+      dailyKey: key,
+      mode: "daily",
+    };
+    setAnswers(nextAnswers);
+    setComplete(session);
+    update((draft) => {
+      const alreadyExists = draft.sessions.some((item) => item.userId === user.id && item.kind === "Games" && item.dailyChallenge && item.dailyKey === key);
+      return alreadyExists ? draft : { ...draft, sessions: [...draft.sessions, session] };
+    });
+  }
+
+  if (complete) {
+    const correct = Number(complete.correctAnswers || 0);
+    return (
+      <HeroCard>
+        <div className="grid gap-6 py-2 text-center sm:grid-cols-[1fr_auto] sm:text-left">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[.2em] text-mint">Desafio de hoje concluído</p>
+            <h2 className="mt-2 font-display text-3xl font-black">{correct}/5 respostas corretas</h2>
+            <p className="mt-2 text-sm font-bold text-white/52">Você ganhou +{gameXpFromCorrectAnswers(correct)} XP. Amanhã haverá uma combinação nova e igual para toda a comunidade.</p>
+            <p className="mt-3 text-xs font-bold text-white/35">Veja sua posição em Ranking → Desafio. Em caso de empate, o menor tempo vence.</p>
+          </div>
+          <div className="grid h-28 w-28 place-items-center rounded-full border border-mint/35 bg-mint/10 shadow-glowSoft">
+            <div><p className="font-display text-3xl font-black text-mint">{correct * 100}</p><p className="text-[9px] font-black uppercase tracking-[.16em] text-white/38">pontos</p></div>
+          </div>
+        </div>
+      </HeroCard>
+    );
+  }
+
+  return (
+    <GlassCard>
+      <div className="flex items-start justify-between gap-4">
+        <div><p className="text-[10px] font-black uppercase tracking-[.2em] text-mint">Mesmo desafio, mesma regra</p><h2 className="mt-1 font-display text-2xl font-black">Questão {index + 1} de {questions.length}</h2></div>
+        <span className="rounded-full bg-mint/12 px-3 py-1 text-[11px] font-black text-mint">+5 XP por acerto</span>
+      </div>
+      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-mint transition-all" style={{ width: `${((index + (selected ? 1 : 0)) / questions.length) * 100}%` }} /></div>
+      <p className="mt-6 font-display text-xl font-black leading-snug sm:text-2xl">{current?.prompt}</p>
+      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        {current?.options.map((option) => {
+          const chosen = selected === option;
+          const reveal = Boolean(selected);
+          const correct = option === current.answer;
+          return <button key={option} type="button" disabled={reveal} onClick={() => choose(option)} className={`rounded-xl border p-4 text-left text-sm font-black transition ${reveal && correct ? "border-mint bg-mint/12 text-mint" : reveal && chosen ? "border-roseGlow bg-roseGlow/10 text-roseGlow" : "border-white/10 bg-white/[0.04] text-white/72 hover:border-mint/35 hover:bg-mint/[0.06]"}`}>{option}</button>;
+        })}
+      </div>
+      {selected ? <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4"><p className="text-sm font-bold leading-relaxed text-white/62">{current?.explanation}</p><div className="mt-3"><PrimaryButton icon={index === questions.length - 1 ? Trophy : ArrowRight} onClick={advance}>{index === questions.length - 1 ? "Concluir desafio" : "Próxima questão"}</PrimaryButton></div></div> : null}
+    </GlassCard>
+  );
+}
+
+function GameMissionsPanel({ sessions }: { sessions: Session[] }) {
+  const missions = dailyMissionProgress(sessions);
+  const completed = missions.filter((mission) => mission.completed).length;
+  return (
+    <div className="grid gap-4">
+      <HeroCard><p className="text-[10px] font-black uppercase tracking-[.2em] text-mint">Renova à meia-noite</p><h2 className="mt-1 font-display text-3xl font-black">{completed}/{missions.length} missões cumpridas</h2><p className="mt-2 text-sm font-bold text-white/48">As recompensas entram automaticamente nos pontos da temporada. Elas nunca adicionam XP.</p></HeroCard>
+      <div className="grid gap-3 md:grid-cols-2">
+        {missions.map((mission) => <GlassCard key={mission.id}>
+          <div className="flex items-start gap-3"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${mission.completed ? "bg-mint text-black" : "bg-white/[0.07] text-white/35"}`}>{mission.completed ? <Check className="h-5 w-5" /> : <Target className="h-5 w-5" />}</span><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="font-display text-lg font-black">{mission.title}</p><p className="text-[12px] font-bold text-white/42">{mission.description}</p></div><span className="shrink-0 rounded-full bg-amber-300/12 px-2 py-1 text-[10px] font-black text-amber-300">+{mission.reward} PTS</span></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-mint" style={{ width: `${Math.min(100, (mission.current / mission.goal) * 100)}%` }} /></div><p className="mt-1.5 text-right text-[10px] font-black text-white/35">{mission.current}/{mission.goal}</p></div></div>
+        </GlassCard>)}
+      </div>
+    </div>
+  );
+}
+
+function GameErrorsPanel({ data, user, update }: { data: ReturnType<typeof useMemoUserData>; user: User; update: (next: (draft: AppData) => AppData) => void }) {
+  const errors = unresolvedGameErrors(data.sessions);
+  function review(answer: GameAnswer) {
+    update((draft) => ({ ...draft, sessions: [...draft.sessions, { id: uid("session"), userId: user.id, subjectId: answer.subjectId || "games", title: `Erro revisado: ${answer.prompt}`, kind: "GameReview", createdAt: Date.now(), reviewedErrorIds: [answer.id], reviewCount: 1, mode: "review" }] }));
+  }
+  if (!errors.length) return <GlassCard><EmptyState icon={CheckCircle2} title="Caderno em dia" text="Quando você errar uma pergunta, ela aparecerá aqui com a resposta correta e a explicação." /></GlassCard>;
+  return <div className="grid gap-3">{errors.map((answer) => <GlassCard key={answer.id}>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[.16em] text-roseGlow">{answer.gameName || "Jogo"} · {new Date(answer.createdAt || 0).toLocaleDateString("pt-BR")}</p><h3 className="mt-1 font-display text-lg font-black leading-snug">{answer.prompt}</h3><div className="mt-3 grid gap-2 text-[13px] font-bold sm:grid-cols-2"><p className="rounded-xl bg-roseGlow/8 p-3 text-roseGlow/85"><span className="block text-[9px] uppercase tracking-[.15em] text-white/32">Sua resposta</span>{answer.userAnswer || "Sem resposta"}</p><p className="rounded-xl bg-mint/8 p-3 text-mint"><span className="block text-[9px] uppercase tracking-[.15em] text-white/32">Resposta correta</span>{answer.correctAnswer}</p></div>{answer.explanation ? <p className="mt-3 text-[13px] font-bold leading-relaxed text-white/48">{answer.explanation}</p> : null}</div><SecondaryButton icon={CheckCircle2} onClick={() => review(answer)}>Marcar revisado</SecondaryButton></div>
+  </GlassCard>)}</div>;
+}
+
+function GameHistoryPanel({ data }: { data: ReturnType<typeof useMemoUserData> }) {
+  const sessions = [...data.sessions].filter((session) => session.kind === "Games").sort((a, b) => b.createdAt - a.createdAt);
+  if (!sessions.length) return <GlassCard><EmptyState icon={Gamepad2} title="Nenhuma partida ainda" text="Seu histórico mostrará jogo, matéria, acertos, XP, pontuação e duração." /></GlassCard>;
+  return <div className="grid gap-2.5">{sessions.map((session) => {
+    const subject = data.subjects.find((item) => item.id === session.subjectId)?.name || (session.dailyChallenge ? "Conhecimentos gerais" : "Matéria removida");
+    const correct = Number(session.correctAnswers || 0); const total = Number(session.questionsAnswered || 0); const accuracy = total ? Math.round((correct / total) * 100) : 0;
+    return <div key={session.id} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-mint/10 text-mint"><Gamepad2 className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="truncate font-display text-base font-black">{session.gameName || gameNames[session.gameId || ""] || session.title}</p><p className="mt-0.5 text-[11px] font-bold text-white/38">{subject} · {new Date(session.createdAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</p></div><div className="grid grid-cols-4 gap-2 text-center sm:min-w-[22rem]"><div><p className="font-display text-base font-black text-mint">{correct}/{total}</p><p className="text-[9px] font-black uppercase text-white/30">acertos</p></div><div><p className="font-display text-base font-black">{accuracy}%</p><p className="text-[9px] font-black uppercase text-white/30">precisão</p></div><div><p className="font-display text-base font-black text-amber-300">+{session.xpEarned || 0}</p><p className="text-[9px] font-black uppercase text-white/30">XP</p></div><div><p className="font-display text-base font-black">{formatGameDuration(session.durationMs)}</p><p className="text-[9px] font-black uppercase text-white/30">tempo</p></div></div></div></div>;
+  })}</div>;
+}
+
+function GameSeasonPanel({ sessions }: { sessions: Session[] }) {
+  const season = currentSeason();
+  const points = seasonPoints(sessions);
+  const league = leagueFromPoints(points);
+  const unlocked = unlockedGameAchievementIds(sessions);
+  const remainingDays = Math.max(1, Math.ceil((season.endAt - Date.now()) / 86_400_000));
+  return <div className="grid gap-4">
+    <HeroCard><div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-mint">{season.name} · {remainingDays} dias restantes</p><h2 className="mt-1 font-display text-4xl font-black" style={{ color: league.color }}>Liga {league.name}</h2><p className="mt-2 max-w-xl text-sm font-bold text-white/48">Acertos valem 10 pontos de temporada, partidas perfeitas dão +20 e missões concluídas somam recompensas. O XP continua separado.</p></div><div className="min-w-[14rem] rounded-2xl border border-white/10 bg-black/25 p-4"><div className="flex items-end justify-between"><p className="font-display text-3xl font-black">{points}</p><p className="text-[10px] font-black uppercase text-white/35">PTS</p></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full" style={{ width: `${league.progress * 100}%`, backgroundColor: league.color }} /></div><p className="mt-2 text-[11px] font-bold text-white/38">{league.next ? `${Math.max(0, league.next.min - points)} pts para ${league.next.name}` : "Liga máxima alcançada"}</p></div></div></HeroCard>
+    <GlassCard><SectionTitle icon={Award} title={`Conquistas dos jogos (${unlocked.size}/${gameAchievementRules.length})`} hint="marcos permanentes" /><div className="mt-4 grid gap-2 sm:grid-cols-2">{gameAchievementRules.map((achievement) => { const done = unlocked.has(achievement.id); return <div key={achievement.id} className={`flex gap-3 rounded-xl border p-3 ${done ? "border-mint/28 bg-mint/[0.07]" : "border-white/8 bg-black/20 opacity-55"}`}><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${done ? "bg-mint text-black" : "bg-white/8 text-white/35"}`}>{done ? <Trophy className="h-5 w-5" /> : <Lock className="h-4 w-4" />}</span><div><p className="font-display text-sm font-black">{achievement.name}</p><p className="mt-0.5 text-[11px] font-bold leading-relaxed text-white/42">{achievement.description}</p></div></div>; })}</div></GlassCard>
+  </div>;
+}
+
 function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUserData>; user: User; update: (next: (draft: AppData) => AppData) => void }) {
+  const [hubTab, setHubTab] = useState<GamesHubTab>("jogar");
   const [subjectId, setSubjectId] = useState<string | undefined>(data.subjects[0]?.id);
   const [game, setGame] = useState<GameId | null>(null);
   // "loading" e "ready" são os dois momentos da tela de instruções: enquanto a
@@ -9877,11 +10149,12 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
   const [termos, setTermos] = useState<WordMeaning[]>([]);
   const [sequencias, setSequencias] = useState<SequencePuzzle[]>([]);
 
-  const [resultado, setResultado] = useState<{ pontos: number; recorde: boolean; acertos: number; xp: number } | null>(null);
+  const [resultado, setResultado] = useState<{ pontos: number; recorde: boolean; acertos: number; total: number; xp: number } | null>(null);
   const [recordes, setRecordes] = useState<Record<string, number>>(() => readRecords());
   const reduzido = useSoftMotion();
   const gameRequestRef = useRef<AbortController | null>(null);
   const gameStatusRef = useRef(status);
+  const playStartedAtRef = useRef(0);
 
   useEffect(() => {
     gameStatusRef.current = status;
@@ -10015,15 +10288,19 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
   }
 
   const finalizar = useCallback(
-    (pontos: number, recorde: boolean, correctAnswers: number) => {
-      const acertos = Math.min(questionCount, Math.max(0, Math.floor(correctAnswers)));
+    (pontos: number, recorde: boolean, correctAnswers: number, answers: GameAnswer[] = []) => {
+      const totalQuestions = answers.length || questionCount;
+      const acertosFromAnswers = answers.filter((answer) => answer.correct).length;
+      const acertos = Math.min(totalQuestions, Math.max(0, Math.floor(answers.length ? acertosFromAnswers : correctAnswers)));
       const xp = gameXpFromCorrectAnswers(acertos);
-      setResultado({ pontos, recorde, acertos, xp });
+      setResultado({ pontos, recorde, acertos, total: totalQuestions, xp });
       gameStatusRef.current = "done";
       setStatus("done");
       setRecordes(readRecords());
       if (!subject) return;
       const nome = gameCatalog.find((item) => item.id === game)?.name || "Jogo";
+      const now = Date.now();
+      const detailedAnswers = answers.map((answer) => ({ ...answer, gameId: game || undefined, gameName: nome, subjectId: subject.id, createdAt: now }));
       update((draft) => ({
         ...draft,
         sessions: [
@@ -10032,12 +10309,21 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
             id: uid("session"),
             userId: user.id,
             subjectId: subject.id,
-            title: `${nome}: ${pontos} pts · ${acertos}/${questionCount} acertos`,
+            title: `${nome}: ${pontos} pts · ${acertos}/${totalQuestions} acertos`,
             kind: "Games",
-            createdAt: Date.now(),
+            createdAt: now,
             xpEarned: xp,
             correctAnswers: acertos,
-            questionsAnswered: questionCount,
+            questionsAnswered: totalQuestions,
+            gameId: game || undefined,
+            gameName: nome,
+            score: pontos,
+            record: recorde,
+            durationMs: playStartedAtRef.current ? now - playStartedAtRef.current : undefined,
+            answers: detailedAnswers,
+            accuracy: totalQuestions ? acertos / totalQuestions : 0,
+            seasonId: currentSeason(now).id,
+            mode: "standard",
           },
         ],
       }));
@@ -10068,12 +10354,11 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
       />
       ) : null}
 
-      {!data.subjects.length ? (
-        <GlassCard>
-          <EmptyState icon={Gamepad2} title="Crie uma matéria primeiro" text="Os jogos usam os conteúdos das suas matérias como base das partidas." />
-        </GlassCard>
-      ) : !game ? (
+      {!game ? (
         <div className="space-y-5">
+          <GamesHubNav active={hubTab} onChange={setHubTab} errorCount={unresolvedGameErrors(data.sessions).length} />
+          {hubTab === "jogar" ? (
+          <>
           <Reveal>
             <div className="flex flex-col items-center gap-2 py-2 text-center">
               <DepthWord text="GAMES" reduced={reduzido} />
@@ -10082,6 +10367,12 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
               </p>
             </div>
           </Reveal>
+          {!data.subjects.length ? (
+            <GlassCard>
+              <EmptyState icon={Gamepad2} title="Crie uma matéria para jogar" text="Os seis jogos usam os conteúdos das suas matérias. O desafio diário e as outras áreas já estão disponíveis acima." />
+            </GlassCard>
+          ) : (
+          <>
           <Reveal delay={0.05}>
             <GlassCard>
               <SectionTitle icon={BookOpen} title="Jogar com qual matéria?" />
@@ -10158,6 +10449,20 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
               );
             })}
           </Stagger>
+          </>
+          )}
+          </>
+          ) : hubTab === "diario" ? (
+            <DailyChallengePanel data={data} user={user} update={update} />
+          ) : hubTab === "missoes" ? (
+            <GameMissionsPanel sessions={data.sessions} />
+          ) : hubTab === "erros" ? (
+            <GameErrorsPanel data={data} user={user} update={update} />
+          ) : hubTab === "historico" ? (
+            <GameHistoryPanel data={data} />
+          ) : (
+            <GameSeasonPanel sessions={data.sessions} />
+          )}
         </div>
       ) : status === "config" && jogoAtual ? (
         <GameSetup
@@ -10178,8 +10483,9 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
           questionCount={questionCount}
           pronto={status === "ready"}
           recorde={recordes[recordKey] || 0}
-          onStart={() => {
-            gameStatusRef.current = "playing";
+           onStart={() => {
+             playStartedAtRef.current = Date.now();
+             gameStatusRef.current = "playing";
             setStatus("playing");
             requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: reduzido ? "auto" : "smooth" }));
           }}
@@ -10209,7 +10515,7 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
               </p>
               <p className="inline-flex items-center gap-1.5 rounded-full bg-mint/12 px-3 py-1.5 text-[13px] font-black text-mint">
                 <Zap className="h-3.5 w-3.5" />
-                +{resultado.xp} XP · {resultado.acertos}/{questionCount} acertos
+                +{resultado.xp} XP · {resultado.acertos}/{resultado.total} acertos
               </p>
               {!resultado.recorde && recordes[recordKey] ? (
                 <p className="text-[13px] font-bold text-white/35">Seu recorde: {recordes[recordKey]}</p>
@@ -10226,9 +10532,9 @@ function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUser
           {game === "corrida" ? (
             <SpeedRunGame key={rodada} items={vf} recordKey={recordKey} onFinish={finalizar} />
           ) : game === "nexo" ? (
-            <NexusGame key={rodada} pairs={pares} onFinish={(score, correctAnswers) => finalizar(score, saveRecord(recordKey, score), correctAnswers)} />
+            <NexusGame key={rodada} pairs={pares} onFinish={(score, correctAnswers, answers) => finalizar(score, saveRecord(recordKey, score), correctAnswers, answers)} />
           ) : game === "sequencia" ? (
-            <SequenceForgeGame key={rodada} puzzles={sequencias} onFinish={(score, correctAnswers) => finalizar(score, saveRecord(recordKey, score), correctAnswers)} />
+            <SequenceForgeGame key={rodada} puzzles={sequencias} onFinish={(score, correctAnswers, answers) => finalizar(score, saveRecord(recordKey, score), correctAnswers, answers)} />
           ) : game === "memoria" ? (
             <MemoryGame key={rodada} pairs={pares} recordKey={recordKey} onFinish={finalizar} />
           ) : game === "caca" ? (

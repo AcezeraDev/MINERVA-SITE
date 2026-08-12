@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import pg from "pg";
 import { loadLocalEnv } from "./gemini-server.mjs";
 import { gamificationStats, levelFromXp, rankingWindows, totalXp, unlockedAchievements, xpSince } from "./shared/xp.mjs";
+import { dailyChallengeKey, leagueFromPoints, seasonPoints } from "./shared/game-meta.mjs";
 
 const { Pool } = pg;
 const scrypt = promisify(scryptCallback);
@@ -553,6 +554,11 @@ function leaderboardRow(user, scope, windows, { you = false, friend = false } = 
   const stats = gamificationStats(scope);
   const xp = totalXp(stats);
   const { level, title } = levelFromXp(xp);
+  const seasonScore = seasonPoints(scope.sessions || []);
+  const todayKey = dailyChallengeKey();
+  const dailySession = (scope.sessions || [])
+    .filter((item) => item?.kind === "Games" && item.dailyChallenge && item.dailyKey === todayKey)
+    .sort((a, b) => Number(a.durationMs || Infinity) - Number(b.durationMs || Infinity))[0];
   return {
     id: user.id,
     name: user.name,
@@ -568,6 +574,10 @@ function leaderboardRow(user, scope, windows, { you = false, friend = false } = 
     streak: stats.streakDays,
     focus: stats.focus,
     tasksDone: stats.tasksDone,
+    seasonPoints: seasonScore,
+    league: leagueFromPoints(seasonScore).name,
+    dailyCorrect: Number(dailySession?.correctAnswers || 0),
+    dailyDurationMs: Number(dailySession?.durationMs || 0),
   };
 }
 
