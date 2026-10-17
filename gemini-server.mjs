@@ -233,7 +233,9 @@ async function streamResponse(req, res, { task, payload, maxTokens }) {
   // Jogos e geradores estruturados precisam de um lote completo e validado.
   // Enviar o primeiro fragmento fazia a interface congelar dicas como ":" ou
   // definicoes como "C" antes de o modelo terminar a linha.
-  const deliverDeltas = !String(task || "").trim();
+  // Excecao: o chat do MineCode escreve o codigo ao vivo no editor, entao
+  // os pedacos tambem vao para a tela (o cliente le o bloco ainda aberto).
+  const deliverDeltas = !String(task || "").trim() || String(task).trim() === "minecode";
 
   try {
     const result = await runMineRequest({

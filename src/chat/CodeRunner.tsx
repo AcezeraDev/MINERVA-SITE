@@ -82,7 +82,7 @@ export function RunOutput({ lines, status, elapsed, onClear }: { lines: RunLine[
             <span key={index} className={`is-${line.kind}`}>
               {line.kind === "result" ? "← " : ""}
               {line.text}
-              {line.text.endsWith("\n") ? "" : "\n"}
+              {line.raw || line.text.endsWith("\n") ? "" : "\n"}
             </span>
           ))
         ) : status === "idle" ? (

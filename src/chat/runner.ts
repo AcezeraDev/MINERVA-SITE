@@ -11,7 +11,8 @@
  */
 
 export type RunLanguage = "python" | "javascript";
-export type RunLine = { kind: "stdout" | "stderr" | "error" | "result" | "info"; text: string };
+/** `raw`: pedaço cru do Python (já traz as próprias quebras de linha). */
+export type RunLine = { kind: "stdout" | "stderr" | "error" | "result" | "info"; text: string; raw?: boolean };
 export type RunHandlers = { onLine: (line: RunLine) => void; onStatus?: (status: "loading" | "running") => void };
 
 const PYTHON_TIMEOUT_MS = 20_000;
@@ -54,6 +55,7 @@ function runPython(code: string, stdin: string[], handlers: RunHandlers) {
           }, PYTHON_TIMEOUT_MS);
         }
       } else if (message.type === "done") finish();
+      else if (message.type === "raw") handlers.onLine({ kind: "stdout", text: message.text, raw: true });
       else handlers.onLine({ kind: message.type as RunLine["kind"], text: message.text });
     };
     target.addEventListener("message", onMessage);

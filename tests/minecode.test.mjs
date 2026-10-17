@@ -50,3 +50,33 @@ test("o roleplay proíbe a Mine de falar as frases do aluno e traz um exemplo co
   assert.match(prompt, /nunca vira "You are/);
   assert.match(prompt, /Exemplo \(parada do aeroporto/);
 });
+
+test("chat do MineCode: separa explicação e código, inclusive com o bloco ainda chegando", async () => {
+  const { readCodeReply } = await import("../shared/code-run.mjs");
+  const fence = "```";
+  const full = readCodeReply(["Pronto! Fiz a calculadora.", "", `${fence}python`, "a = 1", "print(a)", fence, "", "- digite os números em Entradas"].join("\n"));
+  assert.equal(full.lang, "python");
+  assert.equal(full.code, "a = 1\nprint(a)\n");
+  assert.equal(full.open, false);
+  assert.match(full.explanation, /Pronto!/);
+  assert.match(full.explanation, /Entradas/);
+  assert.doesNotMatch(full.explanation, /print/);
+
+  const partial = readCodeReply(["Escrevendo o site…", `${fence}html`, "<!doctype html>", "<h1>Oi"].join("\n"));
+  assert.equal(partial.lang, "html");
+  assert.equal(partial.open, true);
+  assert.equal(partial.code, "<!doctype html>\n<h1>Oi");
+
+  assert.equal(readCodeReply("Uma lista guarda vários valores.").lang, null);
+  // bloco de saída (text) não conta; vale o último bloco que roda
+  const two = readCodeReply([`${fence}text`, "erro", fence, `${fence}js`, "console.log(1)", fence].join("\n"));
+  assert.equal(two.lang, "javascript");
+});
+
+test("o prompt do MineCode exige o arquivo completo e respeita o que roda no navegador", async () => {
+  const { buildInstructionForTask } = await import("../mine/prompts.mjs");
+  const prompt = buildInstructionForTask("minecode", "Linguagem aberta no editor: Python");
+  assert.match(prompt, /ARQUIVO COMPLETO/);
+  assert.match(prompt, /nada de tkinter/);
+  assert.match(prompt, /Linguagem aberta no editor: Python/);
+});

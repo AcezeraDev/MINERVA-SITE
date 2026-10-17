@@ -12,7 +12,7 @@ const PYODIDE_VERSION = "0.26.4";
 const PYODIDE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 
 type Pyodide = {
-  setStdout: (options: { batched: (text: string) => void }) => void;
+  setStdout: (options: { batched?: (text: string) => void; write?: (buffer: Uint8Array) => number }) => void;
   setStderr: (options: { batched: (text: string) => void }) => void;
   setStdin: (options: { stdin: () => string | null; isatty?: boolean }) => void;
   runPythonAsync: (code: string) => Promise<unknown>;
@@ -38,10 +38,26 @@ self.onmessage = async (event: MessageEvent<{ id: number; code: string; stdin: s
     post("status", "loading");
     const pyodide = await load();
     post("status", "running");
-    pyodide.setStdout({ batched: (text) => post("stdout", text) });
+    // sem buffer de linha: a pergunta do input() ("Seu nome: ") aparece antes da resposta ecoada
+    const decoder = new TextDecoder();
+    pyodide.setStdout({
+      write: (buffer: Uint8Array) => {
+        post("raw", decoder.decode(buffer, { stream: true }));
+        return buffer.length;
+      },
+    });
     pyodide.setStderr({ batched: (text) => post("stderr", text) });
     const queue = [...(stdin || [])];
-    pyodide.setStdin({ stdin: () => (queue.length ? (queue.shift() as string) : null), isatty: false });
+    // cada resposta lida aparece na saída depois da pergunta, como num terminal
+    pyodide.setStdin({
+      stdin: () => {
+        if (!queue.length) return null;
+        const answer = queue.shift() as string;
+        post("raw", `${answer}\n`);
+        return answer;
+      },
+      isatty: false,
+    });
     // pacotes como numpy entram sozinhos quando o código importa
     await pyodide.loadPackagesFromImports(code).catch(() => undefined);
     const result = await pyodide.runPythonAsync(code);

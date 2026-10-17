@@ -1,17 +1,21 @@
 // Carregado sob demanda (React.lazy) pela aba MineCode do chat da Mine.
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Bug, Code2, Lightbulb, Loader2, Play, RotateCcw, Sparkles, Wand2 } from "lucide-react";
+import { Bug, Check, Code2, Lightbulb, Loader2, Play, RotateCcw, Send, Square, Trash2, Undo2, Wand2 } from "lucide-react";
 import { RunOutput, useRunner, usesInput } from "./CodeRunner";
 import { SiteFrame } from "./SitePreview";
-import { mineCodeLanguage } from "../../shared/code-run.mjs";
+import { MineRichText } from "./MineRichText";
+import { MineFace } from "../caderno/MineFace";
+import { streamMineCode } from "./minecode-api";
+import { mineCodeLanguage, readCodeReply } from "../../shared/code-run.mjs";
 import "./minecode.css";
 
 /*
  * MineCode: o caderno de programação do chat. Um editor simples (textarea com
  * números de linha, Tab vira espaços, Ctrl+Enter executa), a saída do
- * programa e, para HTML, a página ao vivo. O código de qualquer resposta da
- * Mine abre aqui pelo botão "MineCode", e daqui volta para a conversa com
- * "Explicar", "Corrigir" ou "Melhorar".
+ * programa ou, para HTML, a página ao vivo — e, ao lado, o chat com a Mine:
+ * você pede, ela escreve o arquivo inteiro direto no editor (ao vivo, pelo
+ * streaming), e o resultado roda sozinho. Cada resposta tem Desfazer. O
+ * código de qualquer resposta da conversa abre aqui pelo botão "MineCode".
  */
 
 export type MineCodeLanguage = "python" | "javascript" | "html";
@@ -69,16 +73,39 @@ function loadSaved(): { language: MineCodeLanguage; code: Partial<Record<MineCod
 
 export const languageFromFence = mineCodeLanguage;
 
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  /** Código que a resposta escreveu no editor, com o que havia antes (para Desfazer). */
+  applied?: { lang: MineCodeLanguage; lines: number; previous: string; undone?: boolean };
+  error?: boolean;
+};
+
+const CHAT_STORAGE = "minerva-minecode-chat-v1";
+
+const STARTERS: Record<MineCodeLanguage, string[]> = {
+  python: ["Faz uma calculadora", "Cria um jogo de adivinhar o número", "Faz um quiz de capitais"],
+  javascript: ["Mostra a tabuada do 7", "Ordena uma lista de nomes", "Conta as vogais de uma frase"],
+  html: ["Faz um site de portfólio", "Cria um jogo da velha", "Faz uma página de receitas"],
+};
+
+function loadChat(): ChatMessage[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CHAT_STORAGE) || "[]");
+    return Array.isArray(parsed) ? parsed.slice(-30) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function MineCode({
   incoming,
-  onAsk,
-  busy,
 }: {
   /** Código vindo de uma resposta da Mine (botão "MineCode"). */
   incoming: { code: string; lang: string; at: number } | null;
-  /** Manda uma pergunta para a conversa (e volta para a aba Conversa). */
-  onAsk: (text: string) => void;
-  busy: boolean;
+  onAsk?: (text: string) => void;
+  busy?: boolean;
 }) {
   const saved = useMemo(loadSaved, []);
   const [language, setLanguage] = useState<MineCodeLanguage>(saved.language);
@@ -89,11 +116,17 @@ export function MineCode({
   }));
   const [stdin, setStdin] = useState("");
   const [htmlRun, setHtmlRun] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>(loadChat);
+  const [draft, setDraft] = useState("");
+  const [live, setLive] = useState<string | null>(null);
   const runner = useRunner();
-  const editor = useRef<HTMLTextAreaElement | null>(null);
   const gutter = useRef<HTMLDivElement | null>(null);
+  const chatScroll = useRef<HTMLDivElement | null>(null);
+  const abort = useRef<AbortController | null>(null);
   const code = codes[language] ?? "";
   const lineCount = code.split("\n").length;
+  const writing = live !== null;
+  const meta = LANGUAGES.find((item) => item.id === language)!;
 
   useEffect(() => {
     try {
@@ -102,6 +135,20 @@ export function MineCode({
       // sem armazenamento: o código vale só nesta visita
     }
   }, [language, codes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAT_STORAGE, JSON.stringify(messages.slice(-30)));
+    } catch {
+      // idem
+    }
+  }, [messages]);
+
+  useEffect(() => () => abort.current?.abort(), []);
+
+  useEffect(() => {
+    chatScroll.current?.scrollTo({ top: chatScroll.current.scrollHeight, behavior: "smooth" });
+  }, [messages, live]);
 
   useEffect(() => {
     if (!incoming) return;
@@ -116,27 +163,93 @@ export function MineCode({
 
   const setCode = (value: string) => setCodes((current) => ({ ...current, [language]: value }));
 
-  const run = () => {
-    if (language === "html") {
-      setHtmlRun(code);
+  const runCode = (lang: MineCodeLanguage, source: string) => {
+    if (lang === "html") {
+      setHtmlRun(source);
       return;
     }
-    void runner.run(language, code, stdin.split("\n"));
+    void runner.run(lang, source, stdin.split("\n"));
   };
+  const run = () => runCode(language, code);
 
   const output = runner.lines.map((line) => line.text).join("").trim().slice(-1500);
   const failed = runner.lines.some((line) => line.kind === "error");
-  const label = LANGUAGES.find((item) => item.id === language)!.label;
-  const ask = (kind: "explicar" | "corrigir" | "melhorar") => {
-    const question =
-      kind === "corrigir"
-        ? "Deu erro. Me explica o erro em português simples e me manda o código corrigido completo."
-        : kind === "melhorar"
-          ? "Como posso melhorar este código? Me mostra a versão melhorada completa e explica o que mudou."
-          : "Me explica o que este código faz, parte por parte, como se eu estivesse começando.";
-    const fence = language === "html" ? "html" : language;
-    const ran = language !== "html" && (runner.lines.length || runner.elapsed !== null) ? `\n\nA saída foi:\n\`\`\`text\n${output || "(nada impresso)"}\n\`\`\`` : "";
-    onAsk(`No MineCode eu tenho este código ${label}:\n\n\`\`\`${fence}\n${code.trimEnd()}\n\`\`\`${ran}\n\n${question}`);
+
+  /** Manda um pedido para a Mine; a resposta escreve o código no editor. */
+  const ask = async (request: string) => {
+    const text = request.trim();
+    if (!text || writing) return;
+    const fence = language;
+    const ran = runner.lines.length || runner.elapsed !== null;
+    const context = [
+      `Linguagem aberta no editor: ${meta.label} (arquivo ${meta.file}).`,
+      `Codigo atual do editor:\n\`\`\`${fence}\n${code.trimEnd().slice(0, 12000)}\n\`\`\``,
+      language === "html" ? "" : ran ? `Ultima saida do programa${failed ? " (deu erro)" : ""}:\n\`\`\`text\n${output || "(nada impresso)"}\n\`\`\`` : "O programa ainda nao foi executado.",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const history = messages.slice(-8).map((item) => ({ role: item.role, text: item.text }));
+    const before = { ...codes };
+    let switched: MineCodeLanguage | null = null;
+    setMessages((current) => [...current, { id: `u${Date.now()}`, role: "user", text }]);
+    setDraft("");
+    setLive("");
+    const controller = new AbortController();
+    abort.current = controller;
+    try {
+      const reply = await streamMineCode(
+        { prompt: text, context, history },
+        {
+          signal: controller.signal,
+          onText: (partial) => {
+            setLive(partial);
+            const read = readCodeReply(partial);
+            if (!read.lang || !read.code) return;
+            // o código vai aparecendo no editor enquanto a Mine escreve
+            if (switched !== read.lang) {
+              switched = read.lang;
+              setLanguage(read.lang);
+            }
+            const lang = read.lang;
+            setCodes((current) => ({ ...current, [lang]: read.code }));
+          },
+        },
+      );
+      const read = readCodeReply(reply);
+      let applied: ChatMessage["applied"];
+      if (read.lang && read.code.trim()) {
+        const lang = read.lang;
+        setLanguage(lang);
+        setCodes((current) => ({ ...current, [lang]: read.code }));
+        applied = { lang, lines: read.code.trimEnd().split("\n").length, previous: before[lang] ?? "" };
+        runner.clear();
+        // roda sozinho para mostrar o resultado (se o programa não pedir input)
+        if (lang === "html") setHtmlRun(read.code);
+        else if (!usesInput(lang, read.code)) void runner.run(lang, read.code, []);
+        else setHtmlRun(null);
+      }
+      setMessages((current) => [...current, { id: `a${Date.now()}`, role: "assistant", text: read.explanation || "Pronto! Coloquei o código no editor.", applied }]);
+    } catch (error) {
+      // o que já tinha sido escrito ao vivo volta ao que era
+      setCodes(before);
+      if (switched) setLanguage(language);
+      if (!controller.signal.aborted) {
+        setMessages((current) => [...current, { id: `e${Date.now()}`, role: "assistant", text: error instanceof Error ? error.message : "A Mine não conseguiu programar agora.", error: true }]);
+      }
+    } finally {
+      setLive(null);
+      abort.current = null;
+    }
+  };
+
+  const undo = (message: ChatMessage) => {
+    if (!message.applied || message.applied.undone) return;
+    const { lang, previous } = message.applied;
+    setLanguage(lang);
+    setCodes((current) => ({ ...current, [lang]: previous }));
+    setMessages((current) => current.map((item) => (item.id === message.id && item.applied ? { ...item, applied: { ...item.applied, undone: true } } : item)));
+    runner.clear();
+    setHtmlRun(null);
   };
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -157,6 +270,8 @@ export function MineCode({
     }
   };
 
+  const liveRead = live !== null ? readCodeReply(live) : null;
+
   return (
     <section className="minecode" aria-label="MineCode">
       <header className="minecode-head">
@@ -166,7 +281,7 @@ export function MineCode({
           </span>
           <div>
             <p className="minecode-title">MineCode</p>
-            <p className="minecode-sub">escreva, rode e peça ajuda à Mine</p>
+            <p className="minecode-sub">peça e a Mine programa com você</p>
           </div>
         </div>
         <div className="minecode-langs" role="tablist" aria-label="Linguagem">
@@ -177,6 +292,7 @@ export function MineCode({
               role="tab"
               aria-selected={language === item.id}
               className={language === item.id ? "is-on" : ""}
+              disabled={writing}
               onClick={() => {
                 setLanguage(item.id);
                 runner.clear();
@@ -189,85 +305,92 @@ export function MineCode({
       </header>
 
       <div className="minecode-body">
-        <div className="minecode-editor">
-          <div className="minecode-tabbar">
-            <span className="minecode-file">{LANGUAGES.find((item) => item.id === language)!.file}</span>
-            <label className="minecode-examples">
-              <Lightbulb aria-hidden />
-              <select
-                value=""
-                onChange={(event) => {
-                  const example = EXAMPLES[language].find((item) => item.title === event.target.value);
-                  if (example) {
-                    setCode(example.code);
-                    runner.clear();
-                    setHtmlRun(null);
-                  }
-                }}
-                aria-label="Carregar um exemplo"
-              >
-                <option value="">exemplos…</option>
-                {EXAMPLES[language].map((item) => (
-                  <option key={item.title} value={item.title}>
-                    {item.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="minecode-code">
-            <div className="minecode-gutter" ref={gutter} aria-hidden>
-              {Array.from({ length: lineCount }, (_, index) => (
-                <span key={index}>{index + 1}</span>
-              ))}
+        <div className="minecode-work">
+          <div className={`minecode-editor ${writing ? "is-writing" : ""}`}>
+            <div className="minecode-tabbar">
+              <span className="minecode-file">{meta.file}</span>
+              {writing ? (
+                <span className="minecode-writing">
+                  <Loader2 className="animate-spin" aria-hidden /> a Mine está escrevendo…
+                </span>
+              ) : (
+                <label className="minecode-examples">
+                  <Lightbulb aria-hidden />
+                  <select
+                    value=""
+                    onChange={(event) => {
+                      const example = EXAMPLES[language].find((item) => item.title === event.target.value);
+                      if (example) {
+                        setCode(example.code);
+                        runner.clear();
+                        setHtmlRun(null);
+                      }
+                    }}
+                    aria-label="Carregar um exemplo"
+                  >
+                    <option value="">exemplos…</option>
+                    {EXAMPLES[language].map((item) => (
+                      <option key={item.title} value={item.title}>
+                        {item.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
-            <textarea
-              ref={editor}
-              className="minecode-textarea"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              onKeyDown={onKeyDown}
-              onScroll={(event) => {
-                if (gutter.current) gutter.current.scrollTop = event.currentTarget.scrollTop;
-              }}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoComplete="off"
-              aria-label={`Código ${label}`}
-            />
+            <div className="minecode-code">
+              <div className="minecode-gutter" ref={gutter} aria-hidden>
+                {Array.from({ length: lineCount }, (_, index) => (
+                  <span key={index}>{index + 1}</span>
+                ))}
+              </div>
+              <textarea
+                className="minecode-textarea"
+                value={code}
+                readOnly={writing}
+                onChange={(event) => setCode(event.target.value)}
+                onKeyDown={onKeyDown}
+                onScroll={(event) => {
+                  if (gutter.current) gutter.current.scrollTop = event.currentTarget.scrollTop;
+                }}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoComplete="off"
+                aria-label={`Código ${meta.label}`}
+              />
+            </div>
+            <div className="minecode-actions">
+              <button type="button" className="minecode-run" onClick={run} disabled={runner.status !== "idle" || writing}>
+                {runner.status !== "idle" ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
+                {language === "html" ? "Ver página" : runner.status !== "idle" ? "Rodando…" : "Executar"}
+                <kbd>Ctrl ↵</kbd>
+              </button>
+              <button
+                type="button"
+                className="minecode-ghost"
+                disabled={writing}
+                onClick={() => {
+                  setCode(EXAMPLES[language][0].code);
+                  runner.clear();
+                  setHtmlRun(null);
+                }}
+                title="Voltar ao exemplo"
+              >
+                <RotateCcw aria-hidden /> Recomeçar
+              </button>
+            </div>
+            {language !== "html" && usesInput(language, code) ? (
+              <label className="minecode-stdin">
+                <span>Entradas para {language === "python" ? "input()" : "prompt()"} — uma por linha</span>
+                <textarea value={stdin} onChange={(event) => setStdin(event.target.value)} rows={2} spellCheck={false} placeholder="ex.: 7" />
+              </label>
+            ) : null}
           </div>
-          <div className="minecode-actions">
-            <button type="button" className="minecode-run" onClick={run} disabled={runner.status !== "idle"}>
-              {runner.status !== "idle" ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
-              {language === "html" ? "Ver página" : runner.status !== "idle" ? "Rodando…" : "Executar"}
-              <kbd>Ctrl ↵</kbd>
-            </button>
-            <button
-              type="button"
-              className="minecode-ghost"
-              onClick={() => {
-                setCode(EXAMPLES[language][0].code);
-                runner.clear();
-                setHtmlRun(null);
-              }}
-              title="Voltar ao exemplo"
-            >
-              <RotateCcw aria-hidden /> Recomeçar
-            </button>
-          </div>
-          {language !== "html" && usesInput(language, code) ? (
-            <label className="minecode-stdin">
-              <span>Entradas para {language === "python" ? "input()" : "prompt()"} — uma por linha</span>
-              <textarea value={stdin} onChange={(event) => setStdin(event.target.value)} rows={2} spellCheck={false} placeholder="ex.: 7" />
-            </label>
-          ) : null}
-        </div>
 
-        <div className="minecode-side">
           {language === "html" ? (
             htmlRun ? (
               <div className="minecode-preview">
-                <SiteFrame code={htmlRun} title="index.html" device="desktop" />
+                <SiteFrame code={htmlRun} title={meta.file} device="desktop" />
               </div>
             ) : (
               <p className="minecode-empty">Toque em “Ver página” para ver o site funcionando aqui.</p>
@@ -277,23 +400,115 @@ export function MineCode({
           ) : (
             <p className="minecode-empty">A saída do programa aparece aqui. Use print() {language === "javascript" ? "(ou console.log())" : ""} para ver resultados.</p>
           )}
-          <div className="minecode-mine">
-            <p className="minecode-mine-title">
-              <Sparkles aria-hidden /> Pedir à Mine
-            </p>
-            <div className="minecode-mine-actions">
-              <button type="button" onClick={() => ask("explicar")} disabled={busy}>
+        </div>
+
+        <aside className="minecode-chat" aria-label="Chat com a Mine">
+          <div className="minecode-chat-head">
+            <MineFace thinking={writing} className="minecode-chat-face" />
+            <div>
+              <p className="minecode-chat-title">Mine programadora</p>
+              <p className="minecode-chat-sub">{writing ? "escrevendo o código…" : "diz o que você quer e eu escrevo"}</p>
+            </div>
+            {messages.length && !writing ? (
+              <button type="button" className="minecode-chat-clear" onClick={() => setMessages([])} title="Limpar conversa">
+                <Trash2 aria-hidden />
+              </button>
+            ) : null}
+          </div>
+
+          <div className="minecode-chat-log" ref={chatScroll} aria-live="polite">
+            {!messages.length && !writing ? (
+              <div className="minecode-chat-empty">
+                <p>Me pede um programa e eu escrevo direto no editor. Depois é só rodar, mexer e me pedir ajustes.</p>
+                <div className="minecode-starters">
+                  {STARTERS[language].map((item) => (
+                    <button key={item} type="button" onClick={() => void ask(item)}>
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {messages.map((message) =>
+              message.role === "user" ? (
+                <p key={message.id} className="minecode-msg is-user">
+                  {message.text}
+                </p>
+              ) : (
+                <div key={message.id} className={`minecode-msg is-mine ${message.error ? "is-error" : ""}`}>
+                  <MineRichText text={message.text} />
+                  {message.applied ? (
+                    <div className={`minecode-applied ${message.applied.undone ? "is-undone" : ""}`}>
+                      <Check aria-hidden />
+                      <span>
+                        {message.applied.undone ? "desfeito" : `${message.applied.lines} linhas no editor`} · {LANGUAGES.find((item) => item.id === message.applied!.lang)?.file}
+                      </span>
+                      {!message.applied.undone ? (
+                        <button type="button" onClick={() => undo(message)} disabled={writing}>
+                          <Undo2 aria-hidden /> Desfazer
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ),
+            )}
+            {liveRead ? (
+              <div className="minecode-msg is-mine is-live">
+                {liveRead.explanation ? <MineRichText text={liveRead.explanation} streaming /> : null}
+                <p className="minecode-live">
+                  <Loader2 className="animate-spin" aria-hidden />
+                  {liveRead.code ? `escrevendo no editor… ${liveRead.code.split("\n").length} linhas` : "pensando…"}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="minecode-chat-input">
+            <div className="minecode-quick">
+              <button type="button" onClick={() => void ask("Me explica este código parte por parte, como se eu estivesse começando.")} disabled={writing}>
                 <Lightbulb aria-hidden /> Explicar
               </button>
-              <button type="button" onClick={() => ask("corrigir")} disabled={busy} className={failed ? "is-hot" : ""}>
+              <button type="button" className={failed ? "is-hot" : ""} onClick={() => void ask("Corrige o erro do meu código e me explica o que estava errado.")} disabled={writing}>
                 <Bug aria-hidden /> Corrigir erro
               </button>
-              <button type="button" onClick={() => ask("melhorar")} disabled={busy}>
+              <button type="button" onClick={() => void ask("Melhora este código e me conta o que mudou.")} disabled={writing}>
                 <Wand2 aria-hidden /> Melhorar
               </button>
             </div>
+            <form
+              className="minecode-chat-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void ask(draft);
+              }}
+            >
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void ask(draft);
+                  }
+                }}
+                rows={2}
+                placeholder={language === "html" ? "Ex.: faz um site da minha banda com galeria" : "Ex.: faz um jogo de perguntas com placar"}
+                aria-label="Pedido para a Mine"
+                disabled={writing}
+              />
+              {writing ? (
+                <button type="button" className="minecode-send is-stop" onClick={() => abort.current?.abort()} aria-label="Parar">
+                  <Square aria-hidden />
+                </button>
+              ) : (
+                <button type="submit" className="minecode-send" disabled={!draft.trim()} aria-label="Enviar pedido">
+                  <Send aria-hidden />
+                </button>
+              )}
+            </form>
           </div>
-        </div>
+        </aside>
       </div>
     </section>
   );
