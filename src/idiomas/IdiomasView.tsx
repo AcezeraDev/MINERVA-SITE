@@ -1,5 +1,6 @@
 // Carregado sob demanda (React.lazy): a aba Idiomas, o intercâmbio da Mine.
 import React, { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookOpenCheck, Highlighter, Lock, MessageCircle, Play, Printer, Star, Stamp, Volume2, X } from "lucide-react";
 import { PageHeader, uid, type Session, type User, type useMemoUserData, type AppData } from "../main";
@@ -88,7 +89,7 @@ type Active =
   | { kind: "conversa"; unit: LangUnit }
   | { kind: "revisao"; exercises: Exercise[] };
 
-type Finished = { title: string; result: LessonResult; stamped: boolean; retry: () => void };
+type Finished = { title: string; result: LessonResult; stamped: boolean; retry: () => void; missions?: { done: number; total: number } };
 
 export function IdiomasView({ data, user, update }: { data: ReturnType<typeof useMemoUserData>; user: User; update: (next: (draft: AppData) => AppData) => void }) {
   const reduced = useSoftMotion();
@@ -104,6 +105,7 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
   const trailRef = useRef<HTMLDivElement | null>(null);
 
   const sessions = data.sessions;
+  const studentName = user.settings?.displayName || user.name || "";
   const progress = useMemo(() => languageProgress(sessions), [sessions]);
   const review = useMemo(() => wordsToReview(sessions), [sessions]);
   const word = useMemo(() => wordOfTheDay(), []);
@@ -182,6 +184,7 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
       title,
       result,
       stamped,
+      missions: current.kind === "conversa" && unit ? { done: finish.missions || 0, total: unit.missions.length } : undefined,
       retry: () => {
         if (current.kind === "licao") startStage(current.unit, current.stage);
         else if (current.kind === "conversa") setActive({ kind: "conversa", unit: current.unit });
@@ -254,6 +257,22 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
             <p className="idi-hero-title">{nextUnit ? `${nextUnit.emoji} ${nextUnit.placeEn}` : "🎓 Graduated!"}</p>
             <p className="idi-hero-sub">{nextUnit ? `${nextUnit.place} · ${lessonStages[progress.next!.stage - 1].label}` : "Todas as paradas carimbadas."}</p>
           </div>
+          <div className="idi-hero-stats" aria-label="Sua sequência">
+            <span className={`idi-streak ${progress.streak ? "is-on" : ""}`} title="Dias seguidos com pelo menos uma lição">
+              <span className="idi-streak-flame" aria-hidden>
+                🔥
+              </span>
+              <strong>{progress.streak}</strong>
+              <small>{progress.streak === 1 ? "dia" : "dias"}</small>
+            </span>
+            <span className={`idi-goal ${progress.todayLessons >= 1 ? "is-done" : ""}`} title="Meta do dia: uma lição">
+              <svg viewBox="0 0 36 36" aria-hidden>
+                <circle cx="18" cy="18" r="15" />
+                <circle cx="18" cy="18" r="15" pathLength={1} style={{ strokeDashoffset: progress.todayLessons >= 1 ? 0 : 1 }} />
+              </svg>
+              <small>{progress.todayLessons >= 1 ? "meta feita!" : "meta: 1 lição"}</small>
+            </span>
+          </div>
           {nextUnit ? (
             <button type="button" className="idi-go" onClick={() => startStage(nextUnit, progress.next!.stage)}>
               <Play className="h-4 w-4" /> {progress.totals.lessons ? "Continuar" : "Começar a viagem"}
@@ -325,6 +344,16 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
                 <p className="caderno-note">parada {index + 1}</p>
                 <h3 className="idi-stop-title" lang="en">{unit.placeEn}</h3>
                 <p className="idi-stop-sub">{unit.place} · {unit.theme}</p>
+                {state !== "locked" ? (
+                  <p className="idi-stop-meta">
+                    <span>
+                      <mark className="caderno-mark">dica</mark> {unit.tip.title}
+                    </span>
+                    <span>
+                      conversa com <strong lang="en">{unit.character}</strong>
+                    </span>
+                  </p>
+                ) : null}
               </div>
               <div className="idi-stages">
                 {lessonStages.map(({ stage, label, hint }) => {
@@ -358,6 +387,10 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
         })}
       </section>
 
+      {/* As janelas vão direto para o <body>: no celular um contêiner da página
+          tem transform, e aí position: fixed passaria a medir esse contêiner
+          (a lição ficava com a altura da página inteira). */}
+      {createPortal(
       <AnimatePresence>
         {active?.kind === "licao" ? (
           <LessonPlayer
@@ -365,15 +398,16 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
             unit={active.unit}
             title={`${active.unit.placeEn} · ${lessonStages[active.stage - 1].label}`}
             exercises={active.exercises}
+            studentName={studentName}
             onClose={() => setActive(null)}
             onFinish={(finish) => save(active, finish)}
           />
         ) : null}
         {active?.kind === "revisao" ? (
-          <LessonPlayer key="revisao" unit={null} title="Revisão grifada" exercises={active.exercises} onClose={() => setActive(null)} onFinish={(finish) => save(active, finish)} />
+          <LessonPlayer key="revisao" unit={null} title="Revisão grifada" exercises={active.exercises} studentName={studentName} onClose={() => setActive(null)} onFinish={(finish) => save(active, finish)} />
         ) : null}
         {active?.kind === "conversa" ? (
-          <Conversa key="conversa" unit={active.unit} level={progress.level} onClose={() => setActive(null)} onFinish={(finish) => save(active, finish)} />
+          <Conversa key="conversa" unit={active.unit} level={progress.level} studentName={studentName} onClose={() => setActive(null)} onFinish={(finish) => save(active, finish)} />
         ) : null}
         {finished ? (
           <LessonResultSheet
@@ -386,6 +420,7 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
             spoke={finished.result.spoke}
             wordsMissed={finished.result.wordsMissed}
             stamped={finished.stamped}
+            missions={finished.missions}
             xpRef={xpRef}
             onRetry={finished.retry}
             onClose={() => setFinished(null)}
@@ -441,7 +476,9 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
             </motion.div>
           </motion.div>
         ) : null}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body,
+      )}
     </div>
   );
 }

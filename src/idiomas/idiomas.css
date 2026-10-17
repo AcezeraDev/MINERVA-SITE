@@ -479,6 +479,8 @@ html:not(.theme-light) .idi-lesson {
 .idi-review-words {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
   gap: 0.35rem 0.5rem;
   min-height: 3.2rem;
   margin: 0.4rem 0;
@@ -1654,6 +1656,7 @@ html:not(.theme-light) .idi-lesson {
   }
   .idi-lesson-body {
     grid-template-columns: minmax(0, 1fr);
+    align-content: start;
     padding: 0.3rem 1rem 1rem;
   }
   .idi-mine-corner {
@@ -1712,4 +1715,311 @@ html.no-motion .idi-lesson * {
 .low-fx .idi-house-pin,
 .low-fx .idi-stage.is-next .idi-stage-dot::after {
   animation: none;
+}
+
+/* ───────────── v2: ensinar antes de cobrar ───────────── */
+.idi-learn-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+.idi-learn-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 1rem 0.6rem 0.8rem;
+  border-radius: 1.1rem;
+  background: rgb(var(--panel));
+  border: 2px solid rgb(var(--line));
+  border-bottom-width: 5px;
+  transition: border-color 160ms ease, transform 140ms ease;
+}
+.idi-learn-card:hover {
+  transform: translateY(-3px) rotate(0deg) !important;
+}
+.idi-learn-card.is-heard {
+  border-color: rgb(var(--hl-mint));
+}
+.idi-learn-emoji {
+  font-size: 2.8rem;
+  line-height: 1.1;
+}
+.idi-learn-en {
+  font-family: var(--idi-en);
+  font-weight: 700;
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+.idi-learn-pt {
+  font-size: 0.85rem;
+  color: rgb(var(--theme-muted));
+}
+.idi-learn-ear {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: rgb(var(--pen) / 0.12);
+  color: rgb(var(--pen));
+}
+.idi-learn-card.is-heard .idi-learn-ear {
+  background: rgb(var(--hl-mint));
+  color: #161a22;
+}
+
+.idi-tip-card {
+  position: relative;
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.1rem 1.2rem 1.2rem;
+  border-radius: 0.3rem 1rem 1rem 1rem;
+  background: color-mix(in srgb, rgb(var(--hl-yellow)) 30%, rgb(var(--panel)));
+  box-shadow: var(--card-shadow);
+  transform: rotate(-0.6deg);
+}
+.idi-tip-card::before {
+  content: "";
+  position: absolute;
+  top: -0.6rem;
+  left: 1.4rem;
+  width: 3.6rem;
+  height: 1.1rem;
+  background: rgb(var(--hl-pink) / 0.7);
+  transform: rotate(-4deg);
+}
+.idi-tip-title {
+  font-family: var(--idi-hand);
+  font-size: 1.5rem;
+}
+.idi-tip-rule {
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+.idi-tip-example {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.idi-tip-kicker {
+  margin-top: 0.4rem;
+}
+.idi-tip-phrases {
+  display: grid;
+  gap: 0.45rem;
+}
+.idi-tip-phrase {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.6rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.8rem;
+  border: 1.5px dashed rgb(var(--pen) / 0.4);
+  text-align: left;
+  color: rgb(var(--pen));
+}
+.idi-tip-phrase span {
+  font-family: var(--idi-en);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: rgb(var(--theme-text));
+}
+.idi-tip-phrase small {
+  grid-column: 2;
+  color: rgb(var(--theme-muted));
+}
+
+.idi-options.is-sentences {
+  grid-template-columns: 1fr;
+}
+.idi-options.is-sentences .idi-option {
+  font-family: var(--idi-en);
+}
+
+/* erro que volta no fim */
+.idi-retry-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 99px;
+  background: rgb(var(--idi-red) / 0.12);
+  color: rgb(var(--idi-red));
+  font-weight: 900;
+  font-size: 0.8rem;
+}
+.idi-retry-tag {
+  margin-bottom: 0.4rem;
+  color: rgb(var(--idi-red));
+}
+.idi-feedback-note {
+  font-family: var(--idi-hand);
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* conversa: personagem, missões e tradução */
+.idi-chat-top {
+  flex-wrap: wrap;
+  row-gap: 0.6rem;
+}
+.idi-missions {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.8rem;
+  background: rgb(var(--hl-yellow) / 0.22);
+  list-style: none;
+}
+.idi-missions li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.idi-missions li.is-done .idi-mission-text {
+  text-decoration: line-through;
+  text-decoration-color: rgb(var(--idi-red));
+  text-decoration-thickness: 2px;
+  color: rgb(var(--theme-muted));
+}
+.idi-mission-box {
+  display: grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 0.35rem;
+  border: 2px solid rgb(var(--pen));
+  font-size: 0.7rem;
+  font-weight: 900;
+  color: rgb(var(--pen));
+}
+.idi-missions li.is-done .idi-mission-box {
+  background: rgb(var(--hl-mint));
+  border-color: rgb(var(--hl-mint));
+  color: #161a22;
+}
+.idi-msg-col {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
+}
+.idi-msg-translate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgb(var(--pen) / 0.85);
+}
+.idi-msg-translation {
+  max-width: 30rem;
+  padding: 0.35rem 0.7rem;
+  border-left: 3px solid rgb(var(--hl-lilac));
+  font-size: 0.92rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* herói: ofensiva e meta do dia */
+.idi-hero-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.idi-streak {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  color: rgb(var(--theme-muted));
+}
+.idi-streak strong {
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.idi-streak-flame {
+  font-size: 1.4rem;
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+.idi-streak.is-on {
+  color: #e8730c;
+}
+.idi-streak.is-on .idi-streak-flame {
+  filter: none;
+  opacity: 1;
+  display: inline-block;
+  animation: idi-flicker 1.8s ease-in-out infinite;
+}
+@keyframes idi-flicker {
+  50% {
+    transform: scale(1.12) rotate(-4deg);
+  }
+}
+.idi-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--idi-hand);
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+.idi-goal svg {
+  width: 30px;
+  height: 30px;
+  transform: rotate(-90deg);
+}
+.idi-goal circle {
+  fill: none;
+  stroke-width: 4;
+  stroke: rgb(var(--line));
+}
+.idi-goal circle + circle {
+  stroke: rgb(var(--hl-mint));
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  transition: stroke-dashoffset 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.idi-goal.is-done {
+  color: rgb(var(--pen));
+}
+
+/* trilha: dica e personagem */
+.idi-stop-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.9rem;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  color: rgb(var(--theme-muted));
+}
+.idi-stop-meta mark {
+  font-family: var(--idi-hand);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 640px) {
+  .idi-learn-grid {
+    gap: 0.6rem;
+  }
+  .idi-learn-emoji {
+    font-size: 2.2rem;
+  }
+  .idi-hero-stats {
+    order: 3;
+    width: 100%;
+  }
+  .idi-missions li {
+    font-size: 0.78rem;
+  }
 }

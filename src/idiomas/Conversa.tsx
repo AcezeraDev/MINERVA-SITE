@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Mic, MicOff, Send, X } from "lucide-react";
+import { Check, Languages, Loader2, Mic, MicOff, Send, X } from "lucide-react";
 import { useSoftMotion } from "../motion";
 import { MineFace } from "../caderno/MineFace";
 import { playChime, playPop } from "../caderno";
@@ -17,7 +17,7 @@ import { canListen, listen, speak, stopSpeaking, type Listening } from "./voz";
 import type { LessonFinish } from "./LessonPlayer";
 
 type Line =
-  | { id: string; from: "mine"; text: string }
+  | { id: string; from: "mine"; text: string; translation?: string }
   | { id: string; from: "aluno"; text: string; correction?: string; tip?: string; score?: number; spoken?: boolean };
 
 /**
@@ -26,7 +26,19 @@ type Line =
  * sem cota, formato quebrado), a conversa continua pelo roteiro da parada
  * com respostas para escolher — a lição nunca trava.
  */
-export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; level: LangLevel; onClose: () => void; onFinish: (result: LessonFinish) => void }) {
+export function Conversa({
+  unit,
+  level,
+  studentName = "",
+  onClose,
+  onFinish,
+}: {
+  unit: LangUnit;
+  level: LangLevel;
+  studentName?: string;
+  onClose: () => void;
+  onFinish: (result: LessonFinish) => void;
+}) {
   const reduced = useSoftMotion();
   const [lines, setLines] = useState<Line[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -42,11 +54,23 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
   const mic = useRef<Listening | null>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
   const abort = useRef<AbortController | null>(null);
-  const context = conversationContext(unit, level);
+  const context = conversationContext(unit, level, studentName.trim().split(/\s+/)[0] || "");
   const finishing = useRef(false);
+  // missões cumpridas: a Mine manda a lista inteira a cada fala; no roteiro, cada resposta certa cumpre a sua
+  const [missions, setMissions] = useState<number[]>([]);
+  const missionsRef = useRef<number[]>([]);
+  const [translated, setTranslated] = useState<string[]>([]);
 
-  const mineLine = (text: string) => {
-    setLines((current) => [...current, { id: `m${current.length}`, from: "mine", text }]);
+  const markMissions = (found: number[]) => {
+    const valid = found.filter((item) => item >= 0 && item < unit.missions.length && !missionsRef.current.includes(item));
+    if (!valid.length) return;
+    missionsRef.current = [...missionsRef.current, ...valid].sort((a, b) => a - b);
+    setMissions(missionsRef.current);
+    playChime();
+  };
+
+  const mineLine = (text: string, translation = "") => {
+    setLines((current) => [...current, { id: `m${current.length}`, from: "mine", text, translation }]);
     history.current.push({ role: "assistant", text });
     void speak(text);
   };
@@ -62,7 +86,12 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
   const finish = () => {
     if (finishing.current) return;
     finishing.current = true;
-    window.setTimeout(() => onFinish({ outcomes: outcomes.current, durationMs: Date.now() - startedAt.current }), reduced ? 300 : 1600);
+    // cada missão vira um item da nota: cumprir as três vale tanto quanto falar bem
+    const missionOutcomes: Outcome[] = unit.missions.map((_, index) => ({ kind: "missao", result: missionsRef.current.includes(index) ? "certo" : "errado", word: "" }));
+    window.setTimeout(
+      () => onFinish({ outcomes: [...outcomes.current, ...missionOutcomes], durationMs: Date.now() - startedAt.current, missions: missionsRef.current.length }),
+      reduced ? 300 : 1600,
+    );
   };
 
   // abertura da cena
@@ -71,9 +100,11 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
     abort.current = controller;
     askLanguageMine({ task: "idioma-conversa", prompt: "[COMECAR]", context }, { signal: controller.signal, timeoutMs: 25_000 })
       .then((reply) => {
+        // resposta que chegou depois de a tela fechar (ou do remonte do StrictMode) não entra
+        if (controller.signal.aborted) return;
         const parsed = parseConversationReply(reply);
         if (!parsed) throw new Error("formato");
-        mineLine(parsed.mine);
+        mineLine(parsed.mine, parsed.translation);
         setSuggestions(parsed.suggestions);
         setWaiting(false);
       })
@@ -117,6 +148,7 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
       const chosen = step.options.find((option) => option.en === clean);
       const right = step.options.find((option) => option.ok)!;
       grade(chosen?.ok ? 2 : 0, chosen?.ok ? "" : right.en, chosen?.ok ? "Resposta certinha para a cena!" : "Essa resposta não combina com o que foi perguntado.");
+      if (chosen?.ok) markMissions([unit.scriptMissions[at] ?? -1]);
       if (last) {
         mineLine("That was great! See you at the next stop!");
         finish();
@@ -136,7 +168,8 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
       const parsed = parseConversationReply(reply);
       if (!parsed) throw new Error("formato");
       grade(parsed.score, parsed.correction, parsed.tip);
-      mineLine(parsed.mine);
+      markMissions(parsed.missions);
+      mineLine(parsed.mine, parsed.translation);
       setWaiting(false);
       if (last) finish();
       else setSuggestions(parsed.suggestions);
@@ -147,6 +180,7 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
       const right = step.options.find((option) => option.ok)!;
       const english = /^[\x20-\x7e’]+$/.test(clean) && clean.split(/\s+/).length >= 2;
       grade(english ? 1 : 0, right.en, "A Mine ficou sem sinal; essa é uma resposta modelo para a cena.");
+      if (english) markMissions([unit.scriptMissions[at] ?? -1]);
       if (last) {
         mineLine("Great talk! See you soon!");
         setWaiting(false);
@@ -190,7 +224,7 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
       exit={{ opacity: 0 }}
     >
       <div className="idi-lesson-sheet idi-chat-sheet">
-        <header className="idi-lesson-top">
+        <header className="idi-lesson-top idi-chat-top">
           <button type="button" className="idi-close" onClick={onClose} aria-label="Sair da conversa">
             <X />
           </button>
@@ -200,7 +234,7 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
             </span>
             <div>
               <p className="idi-chat-scene-title">{unit.placeEn}</p>
-              <p className="idi-chat-scene-role">a Mine é {unit.rolePt}</p>
+              <p className="idi-chat-scene-role">a Mine é {unit.characterPt}</p>
             </div>
           </div>
           <span className="idi-turns" aria-label={`${remaining} falas restantes`}>
@@ -208,6 +242,19 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
               <span key={index} className={index < turn.current ? "is-used" : ""} />
             ))}
           </span>
+          <ol className="idi-missions" aria-label="Missões da cena">
+            {unit.missions.map((mission, index) => {
+              const done = missions.includes(index);
+              return (
+                <li key={mission} className={done ? "is-done" : ""}>
+                  <motion.span className="idi-mission-box" animate={done && !reduced ? { scale: [1, 1.35, 1], rotate: [0, -12, 0] } : undefined} transition={{ duration: 0.45 }}>
+                    {done ? <Check className="h-3.5 w-3.5" /> : index + 1}
+                  </motion.span>
+                  <span className="idi-mission-text">{mission}</span>
+                </li>
+              );
+            })}
+          </ol>
         </header>
 
         <div className="idi-chat" ref={scroller} aria-live="polite">
@@ -216,11 +263,22 @@ export function Conversa({ unit, level, onClose, onFinish }: { unit: LangUnit; l
               line.from === "mine" ? (
                 <motion.div key={line.id} className="idi-msg is-mine" initial={reduced ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}>
                   <MineFace className="idi-msg-face" />
-                  <div className="idi-msg-bubble" lang="en">
-                    {line.text}
-                    <button type="button" className="idi-msg-listen" onClick={() => void speak(line.text)} aria-label="Ouvir de novo">
-                      🔊
-                    </button>
+                  <div className="idi-msg-col">
+                    <div className="idi-msg-bubble" lang="en">
+                      {line.text}
+                      <button type="button" className="idi-msg-listen" onClick={() => void speak(line.text)} aria-label="Ouvir de novo">
+                        🔊
+                      </button>
+                    </div>
+                    {line.translation ? (
+                      translated.includes(line.id) ? (
+                        <p className="idi-msg-translation">{line.translation}</p>
+                      ) : (
+                        <button type="button" className="idi-msg-translate" onClick={() => setTranslated((current) => [...current, line.id])}>
+                          <Languages className="h-3.5 w-3.5" aria-hidden /> ver em português
+                        </button>
+                      )
+                    ) : null}
                   </div>
                 </motion.div>
               ) : (

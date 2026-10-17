@@ -60,7 +60,9 @@
   }
 }
 
-.splash-item svg {
+/* só os objetos desenhados (lápis, marca-texto, clipe): os rabiscos dentro
+   dos post-its têm tamanho próprio e não podem esticar até a largura do item */
+.splash-float > svg {
   display: block;
   width: 100%;
   height: auto;
@@ -126,10 +128,10 @@
 .splash-note-star,
 .splash-note-check {
   position: absolute;
-  right: 0.7rem;
-  bottom: 0.7rem;
-  width: 2rem;
-  height: 2rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  width: 2.1rem;
+  height: 2.1rem;
   color: #e5484d;
 }
 
@@ -177,10 +179,11 @@
   height: 100%;
 }
 
-.splash-spark-a { left: 32%; top: 22%; }
-.splash-spark-b { right: 27%; top: 10%; color: rgb(var(--margin-line)); }
-.splash-spark-c { right: 30%; bottom: 20%; color: rgb(var(--margin-line)); }
-.splash-spark-d { left: 30%; bottom: 26%; }
+/* longe do caderno aberto (que ocupa o meio da mesa) */
+.splash-spark-a { left: 15%; top: 44%; }
+.splash-spark-b { right: 22%; top: 7%; color: rgb(var(--margin-line)); }
+.splash-spark-c { right: 13%; bottom: 42%; color: rgb(var(--margin-line)); }
+.splash-spark-d { left: 30%; bottom: 6%; }
 
 @media (max-width: 700px) {
   .splash-marker,
@@ -207,9 +210,13 @@
 
   .splash-eraser {
     left: auto;
-    right: 8%;
-    top: 9%;
+    right: 6%;
+    top: 17%;
     bottom: auto;
+  }
+
+  .splash-spark-b {
+    display: none;
   }
 }
 
@@ -277,6 +284,11 @@
 
 .splash-page-hello {
   font-size: clamp(2rem, 8.5vw, 3rem);
+  overflow-wrap: anywhere;
+}
+
+.splash-page-hello .is-long {
+  font-size: 0.68em;
 }
 
 .splash-page-line {
@@ -331,6 +343,141 @@
     rgb(var(--sheet));
   box-shadow: inset -10px 0 18px -14px rgb(0 0 0 / 0.35);
   backface-visibility: visible;
+}
+
+.splash-leaf {
+  transform-style: preserve-3d;
+}
+
+/* verso da última folha = página da esquerda do caderno aberto */
+.splash-leaf-back {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.15rem;
+  padding: 16% 12% 10% 14%;
+  border-radius: 1.1rem 0.4rem 0.4rem 1.1rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 27px, rgb(var(--rule)) 27px 28px) 0 12% / 100% 100% no-repeat,
+    rgb(var(--sheet));
+  box-shadow: inset -12px 0 16px -12px rgb(0 0 0 / 0.3);
+  transform: rotateY(180deg) translateZ(1px);
+  backface-visibility: hidden;
+}
+
+.splash-owner-kicker {
+  font-family: "DM Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--theme-muted));
+}
+
+.splash-owner-name {
+  font-family: "Gochi Hand", cursive;
+  font-size: clamp(1.6rem, 6vw, 2.2rem);
+  line-height: 1.1;
+  color: rgb(var(--pen));
+  border-bottom: 2px solid rgb(var(--pen) / 0.35);
+  overflow-wrap: anywhere;
+}
+
+.splash-owner-name.is-long {
+  font-size: clamp(1.15rem, 4vw, 1.5rem);
+}
+
+.splash-owner-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  font-family: "DM Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(var(--theme-muted));
+}
+
+.splash-owner-line span {
+  flex: 1;
+  border-bottom: 2px dotted rgb(var(--theme-muted) / 0.6);
+}
+
+.splash-goals {
+  position: relative;
+  justify-self: center;
+  width: 78%;
+  margin-top: 1.4rem;
+  padding: 0.9rem 0.9rem 0.7rem;
+  background: color-mix(in srgb, rgb(var(--hl-mint)) 55%, white);
+  box-shadow: 0 10px 18px -10px rgb(0 0 0 / 0.45);
+  transform: rotate(-4deg);
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #1d2bb8;
+}
+
+.splash-goals-title {
+  font-family: "DM Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #3a4a8a;
+}
+
+.splash-goals p {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.splash-goals p.is-done {
+  text-decoration: line-through;
+  text-decoration-color: rgb(229 72 77 / 0.8);
+  text-decoration-thickness: 2px;
+}
+
+.splash-goals-box,
+.splash-goals-check {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.splash-goals-box {
+  border: 2px solid #1d2bb8;
+  border-radius: 0.2rem;
+}
+
+.splash-goals-check {
+  display: grid;
+  place-items: center;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #e5484d;
+  text-decoration: none;
+}
+
+.splash-polaroid-tape {
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  width: 3rem;
+  height: 1rem;
+  background: rgb(var(--hl-yellow) / 0.75);
+  transform: translateX(-50%) rotate(3deg);
+}
+
+.splash-owner-note {
+  margin-top: auto;
+  padding-top: 0.8rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--margin-line));
+  transform: rotate(-3deg);
 }
 
 /* capa */

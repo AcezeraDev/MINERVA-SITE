@@ -63,6 +63,10 @@ export function CadernoSplash({ onSkip, name, brand }: { onSkip: () => void; nam
   const reduce = Boolean(useReducedMotion()) || (typeof document !== "undefined" && document.documentElement.classList.contains("no-motion"));
   const titleId = useId();
   const first = (name || "").trim().split(/\s+/)[0];
+  // nome comprido (ou login como "maria2026") não pode estourar a folha
+  const longName = first.length > 9;
+  // no celular o caderno aberto não cabe: fica parado e mostra a página do "Oi!"
+  const shift = typeof window !== "undefined" && window.innerWidth >= 760 ? "50%" : "0%";
   const date = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(new Date()).replace(".", "");
 
   useEffect(() => {
@@ -147,7 +151,14 @@ export function CadernoSplash({ onSkip, name, brand }: { onSkip: () => void; nam
       </div>
 
       {/* ───────── o caderno ───────── */}
-      <motion.div className="splash-book-wrap" initial={from({ y: -520, rotate: -14, scale: 0.9 })} animate={{ y: 0, rotate: -3, scale: 1 }} transition={t(spring(0.1, 120, 13))}>
+      {/* quando a capa abre, o caderno anda meia capa para a direita: aberto,
+          ele fica no centro da mesa em vez de cobrir o lápis e o post-it */}
+      <motion.div
+        className="splash-book-wrap"
+        initial={from({ y: -520, x: "0%", rotate: -14, scale: 0.9 })}
+        animate={{ y: 0, x: reduce ? shift : ["0%", "0%", shift], rotate: -3, scale: 1 }}
+        transition={reduce ? { duration: 0 } : { ...spring(0.1, 120, 13), x: { duration: 2.15, times: [0, 0.56, 1], ease: [0.55, 0, 0.25, 1] } }}
+      >
         <motion.span
           className="splash-book-shadow"
           aria-hidden
@@ -167,7 +178,7 @@ export function CadernoSplash({ onSkip, name, brand }: { onSkip: () => void; nam
               animate={{ clipPath: "inset(0 0% 0 0)" }}
               transition={t({ delay: 2.05, duration: 0.75, ease: "linear" })}
             >
-              {first ? `Oi, ${first}!` : "Oi!"}
+              <span className={longName ? "is-long" : undefined}>{first ? `Oi, ${first}!` : "Oi!"}</span>
             </motion.p>
             <motion.p
               className="splash-page-line"
@@ -194,7 +205,32 @@ export function CadernoSplash({ onSkip, name, brand }: { onSkip: () => void; nam
               initial={from({ rotateY: 0 })}
               animate={{ rotateY: -176 + index * 3 }}
               transition={t({ delay: 1.34 + index * 0.13, duration: 0.85, ease: [0.5, 0, 0.25, 1] })}
-            />
+            >
+              {/* a última folha a virar é a página da esquerda do caderno aberto */}
+              {index === 2 ? (
+                <div className="splash-leaf-back">
+                  <p className="splash-owner-kicker">este caderno pertence a</p>
+                  <p className={`splash-owner-name ${longName ? "is-long" : ""}`}>{first || "você"}</p>
+                  <p className="splash-owner-line">
+                    turma <span />
+                  </p>
+                  <div className="splash-goals">
+                    <span className="splash-polaroid-tape" />
+                    <p className="splash-goals-title">metas</p>
+                    <p className="is-done">
+                      <span className="splash-goals-check" aria-hidden>✓</span> abrir o caderno
+                    </p>
+                    <p>
+                      <span className="splash-goals-box" /> estudar um pouco
+                    </p>
+                    <p>
+                      <span className="splash-goals-box" /> perguntar à Mine
+                    </p>
+                  </div>
+                  <p className="splash-owner-note">se achar, devolva! :)</p>
+                </div>
+              ) : null}
+            </motion.div>
           ))}
 
           {/* capa */}

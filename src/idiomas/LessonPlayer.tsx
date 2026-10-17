@@ -8,7 +8,10 @@ import {
   checkExercise,
   countsAsRight,
   gradeSpeech,
+  isTeaching,
   type ChoiceExercise,
+  type LearnCard,
+  type TipCard,
   type Exercise,
   type Grade,
   type LangUnit,
@@ -23,11 +26,6 @@ import { canListen, canSpeak, listen, preloadSpeech, speak, stopSpeaking, type L
 
 type Feedback = { result: Grade; expected: string; given: string };
 
-const cheers: Record<Grade, string[]> = {
-  certo: ["Nice!", "Great job!", "Perfect!", "Isso aí!", "Well done!", "Mandou bem!"],
-  quase: ["Quase perfeito! Olha a grafia.", "Almost! Só um detalhe.", "Valeu, mas confere a letra."],
-  errado: ["Sem drama: grifei pra revisar.", "Errar faz parte da viagem.", "Anotei na margem. Bora!", "Next one is yours!"],
-};
 
 function pick<T>(list: T[], salt: number) {
   return list[Math.abs(salt) % list.length];
@@ -72,6 +70,7 @@ const choiceTitles: Record<ChoiceExercise["mode"], string> = {
   escuta: "O que você ouviu?",
   significado: "O que significa?",
   complete: "Complete a frase",
+  qual: "Qual frase está certa?",
 };
 
 function ChoiceView({ exercise, value, onChange, locked }: { exercise: ChoiceExercise; value: string | null; onChange: (value: string) => void; locked: boolean }) {
@@ -112,6 +111,14 @@ function ChoiceView({ exercise, value, onChange, locked }: { exercise: ChoiceExe
           <Listen text={exercise.audio} auto />
         </div>
       ) : null}
+      {exercise.mode === "qual" ? (
+        <div className="idi-sticker-stage">
+          <p className="idi-pt-line">
+            <MineFace className="idi-mini-face" /> “{exercise.prompt}”
+          </p>
+          <p className="idi-ex-hint">Duas delas têm um erro escondido. Ache a certinha!</p>
+        </div>
+      ) : null}
       {exercise.mode === "complete" ? (
         <div className="idi-sticker-stage">
           <p className="idi-english idi-english-lg" lang="en">
@@ -125,7 +132,7 @@ function ChoiceView({ exercise, value, onChange, locked }: { exercise: ChoiceExe
           <p className="idi-ex-hint">{exercise.hint}</p>
         </div>
       ) : null}
-      <div className="idi-options" role="radiogroup" aria-label="Opções">
+      <div className={`idi-options ${exercise.mode === "qual" ? "is-sentences" : ""}`} role="radiogroup" aria-label="Opções">
         {exercise.options.map((option, index) => (
           <button
             key={option}
@@ -290,15 +297,22 @@ function TypingView({ exercise, value, onChange, onSubmit, locked }: { exercise:
   }, [exercise]);
   return (
     <div className="idi-ex">
-      <h2 className="idi-ex-title">Escreva em inglês</h2>
-      <div className="idi-sticker-stage">
-        <span className="idi-sticker" aria-hidden>
-          {exercise.emoji}
-        </span>
-        <p className="idi-ex-hint">
-          <mark className="caderno-mark">{exercise.prompt}</mark>
-        </p>
-      </div>
+      <h2 className="idi-ex-title">{exercise.mode === "ditado" ? "Ditado: ouça e escreva" : "Escreva em inglês"}</h2>
+      {exercise.mode === "ditado" ? (
+        <div className="idi-sticker-stage">
+          <Listen text={exercise.audio || exercise.answer} auto big />
+          <p className="idi-ex-hint">Escreva a frase inteira. Pode ouvir quantas vezes quiser.</p>
+        </div>
+      ) : (
+        <div className="idi-sticker-stage">
+          <span className="idi-sticker" aria-hidden>
+            {exercise.emoji}
+          </span>
+          <p className="idi-ex-hint">
+            <mark className="caderno-mark">{exercise.prompt}</mark>
+          </p>
+        </div>
+      )}
       <form
         className="idi-type"
         onSubmit={(event) => {
@@ -315,7 +329,7 @@ function TypingView({ exercise, value, onChange, onSubmit, locked }: { exercise:
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          placeholder="type here…"
+          placeholder={exercise.mode === "ditado" ? "write what you hear…" : "type here…"}
           aria-label="Resposta em inglês"
         />
       </form>
@@ -399,39 +413,151 @@ function SpeakView({ exercise, value, onChange, locked }: { exercise: SpeakExerc
   );
 }
 
+/* ─────────────────────────── ensino ─────────────────────────── */
+
+/** A Mine apresenta as palavras antes de cobrar: figurinha, inglês, português e áudio. */
+function LearnView({ card }: { card: LearnCard }) {
+  const reduced = useSoftMotion();
+  const [heard, setHeard] = useState<string[]>([]);
+  useEffect(() => setHeard([]), [card]);
+  const hear = (en: string) => {
+    void speak(en);
+    setHeard((current) => (current.includes(en) ? current : [...current, en]));
+  };
+  return (
+    <div className="idi-ex">
+      <h2 className="idi-ex-title">Palavras novas</h2>
+      <p className="idi-ex-hint">Toque em cada figurinha para ouvir. Daqui a pouco eu pergunto!</p>
+      <div className="idi-learn-grid">
+        {card.words.map((word, index) => (
+          <motion.button
+            key={word.en}
+            type="button"
+            className={`idi-learn-card ${heard.includes(word.en) ? "is-heard" : ""}`}
+            onClick={() => hear(word.en)}
+            initial={reduced ? false : { opacity: 0, y: 30, rotate: index % 2 ? 6 : -6, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, rotate: index % 2 ? 1.5 : -1.5, scale: 1 }}
+            transition={{ delay: reduced ? 0 : 0.08 + index * 0.09, type: "spring", stiffness: 380, damping: 22 }}
+            aria-label={`${word.en}: ${word.pt}. Ouvir.`}
+          >
+            <span className="idi-learn-emoji" aria-hidden>
+              {word.emoji}
+            </span>
+            <span className="idi-learn-en" lang="en">
+              {word.en}
+            </span>
+            <span className="idi-learn-pt">{word.pt}</span>
+            <span className="idi-learn-ear" aria-hidden>
+              {heard.includes(word.en) ? <Check className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </span>
+          </motion.button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Dica de gramática da parada, no cantinho da folha, com frases para ouvir. */
+function TipView({ card }: { card: TipCard }) {
+  return (
+    <div className="idi-ex">
+      <h2 className="idi-ex-title">Dica da Mine</h2>
+      <div className="idi-tip-card">
+        <p className="idi-tip-title">
+          <mark className="caderno-mark">{card.title}</mark>
+        </p>
+        <p className="idi-tip-rule">{card.rule}</p>
+        <div className="idi-tip-example">
+          <Listen text={card.en} auto />
+          <div>
+            <p className="idi-english idi-english-lg" lang="en">
+              {card.en}
+            </p>
+            <p className="idi-ex-hint">{card.pt}</p>
+          </div>
+        </div>
+      </div>
+      <p className="caderno-note idi-tip-kicker">frases desta parada</p>
+      <ul className="idi-tip-phrases">
+        {card.phrases.map((phrase) => (
+          <li key={phrase.en}>
+            <button type="button" className="idi-tip-phrase" onClick={() => void speak(phrase.en)}>
+              <Volume2 className="h-4 w-4" aria-hidden />
+              <span lang="en">{phrase.en}</span>
+              <small>{phrase.pt}</small>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /* ─────────────────────────── a lição ─────────────────────────── */
 
-export type LessonFinish = { outcomes: Outcome[]; durationMs: number };
+export type LessonFinish = { outcomes: Outcome[]; durationMs: number; missions?: number };
+
+type QueueItem = { ex: Exercise; retry: boolean };
+
+/** Falas da Mine na lição: variadas, com o nome do aluno e, às vezes, a dica da parada. */
+function mineLine(kind: Grade | "combo" | "retry" | "learn" | "tip", { name, salt, combo, unit }: { name: string; salt: number; combo?: number; unit: LangUnit | null }) {
+  const you = name ? `, ${name}` : "";
+  const lines: Record<typeof kind, string[]> = {
+    certo: [`Nice${you}!`, "Great job!", "Perfect!", "Isso aí!", "Well done!", "Mandou bem!", "You got it!", "Exatamente!"],
+    quase: ["Quase perfeito! Olha a grafia.", "Almost! Só um detalhe.", "Valeu! Confere a letra que mudou."],
+    errado: [
+      "Sem drama: essa volta no fim e você acerta.",
+      "Errar faz parte da viagem!",
+      "Anotei na margem. Bora pra próxima!",
+      unit ? `Lembra da dica: ${unit.tip.title.toLowerCase()}.` : "Grifei pra revisar depois.",
+      "Toca em “Por quê?” que eu explico.",
+    ],
+    combo: [`${combo} seguidas${you}! You're on fire!`, `${combo} em sequência! Unstoppable!`, `Uau, ${combo} seguidas!`],
+    retry: ["Essa é aquela que escapou. Agora vai!", "Segunda chance! Respira e tenta.", "Volta da revisão: você já sabe essa."],
+    learn: ["Toca nas figurinhas pra ouvir!", "Olha só essas palavras novas.", "Primeiro eu mostro, depois eu pergunto."],
+    tip: ["Dica rápida antes das frases!", "Isso aqui ajuda muito, juro.", "Uma regrinha e a gente começa."],
+  };
+  return pick(lines[kind], salt);
+}
 
 export function LessonPlayer({
   unit,
   title,
   exercises,
+  studentName = "",
   onClose,
   onFinish,
 }: {
   unit: LangUnit | null;
   title: string;
   exercises: Exercise[];
+  studentName?: string;
   onClose: () => void;
   onFinish: (result: LessonFinish) => void;
 }) {
   const reduced = useSoftMotion();
+  const name = studentName.trim().split(/\s+/)[0] || "";
+  const [queue, setQueue] = useState<QueueItem[]>(() => exercises.map((ex) => ({ ex, retry: false })));
   const [index, setIndex] = useState(0);
   const [value, setValue] = useState<unknown>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [combo, setCombo] = useState(0);
-  const [balloon, setBalloon] = useState<{ text: string; mood: "happy" | "think" | "wow" }>({ text: unit ? `Próxima parada: ${unit.placeEn}! Let's go.` : "Hora de revisar o que ficou grifado.", mood: "happy" });
+  const [balloon, setBalloon] = useState<{ text: string; mood: "happy" | "think" | "wow" }>(() => ({
+    text: unit ? `${name ? `Oi, ${name}! ` : ""}Próxima parada: ${unit.placeEn}!` : "Hora de revisar o que ficou grifado.",
+    mood: "happy",
+  }));
   const [why, setWhy] = useState<{ loading: boolean; text: string } | null>(null);
   const startedAt = useRef(Date.now());
   const sheet = useRef<HTMLDivElement | null>(null);
-  const exercise = exercises[index];
+  const item = queue[index];
+  const exercise = item?.ex;
+  const teaching = isTeaching(exercise);
 
   useEffect(() => () => stopSpeaking(), []);
   // a voz da Mine vem do servidor: baixa a frase e as opções em inglês antes do toque
   useEffect(() => {
-    const ex = exercises[index];
+    const ex = queue[index]?.ex;
     if (!ex) return;
     const texts =
       ex.kind === "escolha"
@@ -441,10 +567,17 @@ export function LessonPlayer({
           : ex.kind === "fale"
             ? [ex.text]
             : ex.kind === "digite"
-              ? [ex.answer]
-              : ex.pairs.map((pair) => pair.en);
+              ? [ex.audio || ex.answer]
+              : ex.kind === "aprenda"
+                ? ex.words.map((word) => word.en)
+                : ex.kind === "dica"
+                  ? [ex.en, ...ex.phrases.map((phrase) => phrase.en)]
+                  : ex.pairs.map((pair) => pair.en);
     preloadSpeech(texts.filter(Boolean));
-  }, [exercises, index]);
+    if (ex.kind === "aprenda" || ex.kind === "dica") setBalloon({ text: mineLine(ex.kind === "aprenda" ? "learn" : "tip", { name, salt: index, unit }), mood: "happy" });
+    else if (queue[index]?.retry) setBalloon({ text: mineLine("retry", { name, salt: index, unit }), mood: "think" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue, index]);
   useEffect(() => {
     sheet.current?.focus({ preventScroll: true });
   }, []);
@@ -460,20 +593,25 @@ export function LessonPlayer({
           : false);
 
   const grade = (given: unknown) => {
-    if (!exercise || feedback) return;
+    if (!exercise || feedback || teaching) return;
     const checked = checkExercise(exercise, given);
-    const nextCombo = countsAsRight(checked.result) ? combo + 1 : 0;
+    const right = countsAsRight(checked.result);
+    const nextCombo = right ? combo + 1 : 0;
     setCombo(nextCombo);
-    setOutcomes((current) => [...current, { kind: exercise.kind, result: checked.result, word: exercise.word }]);
+    setOutcomes((current) => [...current, { kind: exercise.kind, result: checked.result, word: exercise.word, retry: item.retry || undefined }]);
+    // errou pela primeira vez: a mesma questão volta no fim da lição
+    if (checked.result === "errado" && !item.retry) setQueue((current) => [...current, { ex: exercise, retry: true }]);
     const shown = Array.isArray(given) ? given.join(" ") : exercise.kind === "pares" ? "" : String(given ?? "");
     setFeedback({ result: checked.result, expected: checked.expected, given: shown });
     setWhy(null);
-    if (countsAsRight(checked.result)) {
+    if (right) {
       playChime();
-      setBalloon({ text: nextCombo >= 3 && nextCombo % 3 === 0 ? `${nextCombo} seguidas! You're on fire!` : pick(cheers[checked.result], index + nextCombo), mood: nextCombo >= 3 ? "wow" : "happy" });
-      if (exercise.kind === "escolha" || exercise.kind === "digite") void speak(checked.expected);
+      const hot = nextCombo >= 3 && nextCombo % 3 === 0;
+      setBalloon({ text: mineLine(hot ? "combo" : checked.result, { name, salt: index + nextCombo, combo: nextCombo, unit }), mood: nextCombo >= 3 ? "wow" : "happy" });
+      if (exercise.kind === "escolha" && exercise.mode !== "significado") void speak(checked.expected);
+      if (exercise.kind === "digite") void speak(checked.expected);
     } else {
-      setBalloon({ text: pick(cheers.errado, index), mood: "think" });
+      setBalloon({ text: mineLine("errado", { name, salt: index, unit }), mood: "think" });
     }
   };
 
@@ -486,8 +624,8 @@ export function LessonPlayer({
 
   const advance = (skipped = false) => {
     stopSpeaking();
-    if (index >= exercises.length - 1) {
-      const finalOutcomes = skipped ? [...outcomes, { kind: exercise.kind, result: "pulou" as const, word: exercise.word }] : outcomes;
+    if (index >= queue.length - 1) {
+      const finalOutcomes = skipped && exercise ? [...outcomes, { kind: exercise.kind, result: "pulou" as const, word: exercise.word }] : outcomes;
       onFinish({ outcomes: finalOutcomes, durationMs: Date.now() - startedAt.current });
       return;
     }
@@ -501,15 +639,16 @@ export function LessonPlayer({
     if (!exercise || !feedback) return;
     setWhy({ loading: true, text: "" });
     setBalloon({ text: "Deixa eu pensar…", mood: "think" });
-    const prompt = `Tipo de exercicio: ${exercise.kind}. ${
-      exercise.kind === "escolha" ? `Enunciado: ${exercise.prompt || exercise.audio}. ` : exercise.kind === "monte" ? `Frase em portugues: ${exercise.prompt}. ` : ""
+    const prompt = `Tipo de exercicio: ${exercise.kind}${"mode" in exercise && exercise.mode ? ` (${exercise.mode})` : ""}. ${
+      exercise.kind === "escolha" ? `Enunciado: ${exercise.prompt || exercise.audio}. ` : exercise.kind === "monte" || exercise.kind === "digite" ? `Frase em portugues: ${exercise.prompt}. ` : ""
     }Resposta do estudante: "${feedback.given || "(vazia)"}". Resposta certa: "${feedback.expected}".`;
     try {
-      const text = await askLanguageMine({ task: "idioma-dica", prompt, context: unit ? `Parada ${unit.placeEn}: ${unit.theme}.` : "Revisao de vocabulario." });
+      const context = unit ? `Parada ${unit.placeEn}: ${unit.theme}. Ponto de gramatica da parada: ${unit.tip.rule}` : "Revisao de vocabulario.";
+      const text = await askLanguageMine({ task: "idioma-dica", prompt, context });
       setWhy({ loading: false, text });
       setBalloon({ text: "Explicadinho aí embaixo!", mood: "happy" });
     } catch {
-      setWhy({ loading: false, text: `A resposta certa é “${feedback.expected}”. Não consegui falar com a Mine agora, mas essa palavra volta na Revisão grifada.` });
+      setWhy({ loading: false, text: `A resposta certa é “${feedback.expected}”. ${unit ? `Dica: ${unit.tip.rule}` : "Essa palavra volta na Revisão grifada."}` });
       setBalloon({ text: "Fiquei sem sinal, mas anotei.", mood: "think" });
     }
   };
@@ -519,7 +658,7 @@ export function LessonPlayer({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
       if (event.key !== "Enter" || event.target instanceof HTMLButtonElement) return;
-      if (feedback) {
+      if (feedback || teaching) {
         event.preventDefault();
         advance();
       } else if (ready && !(event.target instanceof HTMLInputElement && exercise?.kind === "digite")) {
@@ -531,8 +670,9 @@ export function LessonPlayer({
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const progress = (index + (feedback ? 1 : 0)) / Math.max(1, exercises.length);
+  const progress = (index + (feedback || teaching ? 1 : 0)) / Math.max(1, queue.length);
   const locked = Boolean(feedback);
+  const retries = queue.length - exercises.length;
 
   return (
     <motion.div
@@ -550,12 +690,17 @@ export function LessonPlayer({
           <button type="button" className="idi-close" onClick={onClose} aria-label="Sair da lição">
             <X />
           </button>
-          <div className="idi-pencil-track" aria-label={`Exercício ${index + 1} de ${exercises.length}`}>
+          <div className="idi-pencil-track" aria-label={`Passo ${index + 1} de ${queue.length}`}>
             <span className="idi-pencil-fill" style={{ transform: `scaleX(${Math.max(0.03, progress)})` }} />
             <span className="idi-pencil-tip" style={{ transform: `translateX(calc(${progress * 100}% - 50%))` }} aria-hidden>
               ✏️
             </span>
           </div>
+          {retries > 0 ? (
+            <span className="idi-retry-count" title="Questões que voltaram para você acertar">
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden /> {retries}
+            </span>
+          ) : null}
           <span className={`idi-combo ${combo >= 3 ? "is-hot" : ""}`} aria-label={`${combo} acertos seguidos`}>
             <span aria-hidden>🔥</span>
             {combo}
@@ -582,12 +727,15 @@ export function LessonPlayer({
           <AnimatePresence mode="wait">
             <motion.div
               key={index}
-              className="idi-ex-wrap"
+              className={`idi-ex-wrap ${item?.retry ? "is-retry" : ""}`}
               initial={reduced ? { opacity: 0 } : { opacity: 0, x: 60, rotateY: -14 }}
               animate={{ opacity: 1, x: 0, rotateY: 0 }}
               exit={reduced ? { opacity: 0 } : { opacity: 0, x: -60, rotateY: 12 }}
               transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
             >
+              {item?.retry ? <p className="idi-retry-tag caderno-note">revisão: essa você errou antes</p> : null}
+              {exercise?.kind === "aprenda" ? <LearnView card={exercise} /> : null}
+              {exercise?.kind === "dica" ? <TipView card={exercise} /> : null}
               {exercise?.kind === "escolha" ? <ChoiceView exercise={exercise} value={typeof value === "string" ? value : null} onChange={setValue} locked={locked} /> : null}
               {exercise?.kind === "monte" ? <TilesView exercise={exercise} onChange={setValue} locked={locked} /> : null}
               {exercise?.kind === "pares" ? <PairsView exercise={exercise} onDone={(mistakes) => grade(mistakes)} locked={locked} /> : null}
@@ -628,6 +776,7 @@ export function LessonPlayer({
                     </span>
                   </p>
                 ) : null}
+                {feedback.result === "errado" && !item?.retry ? <p className="idi-feedback-note">essa volta no fim da lição</p> : null}
                 {why ? <p className="idi-why">{why.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : why.text}</p> : null}
               </div>
               <div className="idi-feedback-actions">
@@ -650,7 +799,11 @@ export function LessonPlayer({
               ) : (
                 <span />
               )}
-              {exercise?.kind !== "pares" ? (
+              {teaching ? (
+                <button type="button" className="idi-go" onClick={() => advance()}>
+                  <Check className="h-5 w-5" /> Entendi, bora!
+                </button>
+              ) : exercise?.kind !== "pares" ? (
                 <button type="button" className="idi-go" disabled={!ready} onClick={() => grade(value)}>
                   <Check className="h-5 w-5" /> Conferir
                 </button>
@@ -676,6 +829,7 @@ export function LessonResultSheet({
   spoke,
   wordsMissed,
   stamped,
+  missions,
   onClose,
   onRetry,
   xpRef,
@@ -688,6 +842,7 @@ export function LessonResultSheet({
   spoke: number;
   wordsMissed: string[];
   stamped: boolean;
+  missions?: { done: number; total: number };
   onClose: () => void;
   onRetry: () => void;
   xpRef?: React.Ref<HTMLParagraphElement>;
@@ -740,10 +895,19 @@ export function LessonResultSheet({
             </p>
             <p className="idi-stat-label">XP</p>
           </div>
-          <div>
-            <p className="idi-stat-num">{spoke}</p>
-            <p className="idi-stat-label">frases faladas</p>
-          </div>
+          {missions ? (
+            <div>
+              <p className="idi-stat-num">
+                {missions.done}/{missions.total}
+              </p>
+              <p className="idi-stat-label">missões</p>
+            </div>
+          ) : (
+            <div>
+              <p className="idi-stat-num">{spoke}</p>
+              <p className="idi-stat-label">frases faladas</p>
+            </div>
+          )}
         </div>
         {wordsMissed.length ? (
           <p className="idi-result-missed">

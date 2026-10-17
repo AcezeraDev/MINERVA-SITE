@@ -52,12 +52,12 @@ function canvasTexture(width: number, height: number, draw: (ctx: CanvasRenderin
 
 /** A folha pautada com margem vermelha, nos dois temas do caderno. */
 function pageTexture(dark: boolean) {
-  return canvasTexture(2048, 1170, (ctx) => {
+  return canvasTexture(2048, 1500, (ctx) => {
     ctx.fillStyle = dark ? "#151a26" : "#f7f9fb";
-    ctx.fillRect(0, 0, 2048, 1170);
+    ctx.fillRect(0, 0, 2048, 1500);
     ctx.strokeStyle = dark ? "rgba(70,88,130,.55)" : "rgba(150,178,215,.7)";
     ctx.lineWidth = 3;
-    for (let y = 70; y < 1170; y += 54) {
+    for (let y = 70; y < 1500; y += 54) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(2048, y);
@@ -67,7 +67,7 @@ function pageTexture(dark: boolean) {
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(150, 0);
-    ctx.lineTo(150, 1170);
+    ctx.lineTo(150, 1500);
     ctx.stroke();
     // rabisco de rosa dos ventos no canto, à caneta
     ctx.strokeStyle = dark ? "rgba(147,163,255,.6)" : "rgba(29,43,184,.55)";
@@ -88,7 +88,7 @@ function pageTexture(dark: boolean) {
     ctx.fillText("N", cx, cy - 125);
     ctx.font = "84px 'Gochi Hand', cursive";
     ctx.textAlign = "left";
-    ctx.fillText("London ~ my exchange trip", 220, 1110);
+    ctx.fillText("London ~ my exchange trip", 220, 1330);
   });
 }
 
@@ -230,8 +230,9 @@ export default function CidadePopUp({
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(32, 2, 0.1, 100);
-    camera.position.set(0, 8.4, 11.6);
-    camera.lookAt(0, 0.2, 0.2);
+    // mirar um pouco à frente do centro da folha sobe a cidade no quadro
+    camera.position.set(0, 8, 11.5);
+    camera.lookAt(0, 0, 0.75);
 
     scene.add(new THREE.HemisphereLight(dark ? 0x7d8cc0 : 0xffffff, dark ? 0x10131c : 0xc8d2e0, dark ? 1.1 : 1.6));
     const sun = new THREE.DirectionalLight(0xfff2dc, dark ? 1.4 : 2.2);
@@ -255,10 +256,12 @@ export default function CidadePopUp({
     scene.add(world);
 
     const page = new THREE.Mesh(
-      track(new THREE.PlaneGeometry(15, 8.6)),
+      // funda o bastante para a borda da frente sair do quadro (sem vão embaixo)
+      track(new THREE.PlaneGeometry(15, 11)),
       track(new THREE.MeshStandardMaterial({ map: track(pageTexture(dark)), roughness: 0.95 })),
     );
     page.rotation.x = -Math.PI / 2;
+    page.position.z = 1.2;
     page.receiveShadow = true;
     world.add(page);
 

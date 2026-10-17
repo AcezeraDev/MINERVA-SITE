@@ -26,7 +26,7 @@ export async function askLanguageMine(
         prompt: payload.prompt,
         context: payload.context,
         history: payload.history || [],
-        maxOutputTokens: reasoningReserve + (payload.task === "idioma-conversa" ? 260 : 220),
+        maxOutputTokens: reasoningReserve + (payload.task === "idioma-conversa" ? 420 : 240),
         fast: true,
       }),
       signal: controller.signal,

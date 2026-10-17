@@ -33,6 +33,16 @@ export const englishUnits = [
     theme: "cumprimentos e apresentações",
     role: "an airport officer checking passports",
     rolePt: "agente do aeroporto",
+    character: "Officer Jones",
+    characterPt: "o agente Jones, do aeroporto",
+    missions: ["dizer seu nome", "dizer de onde você é", "entregar o passaporte"],
+    scriptMissions: [0, 1, 2, -1],
+    tip: {
+      title: "Me apresentando",
+      rule: "Para se apresentar: \"My name is...\" ou \"I am...\". O \"I\" (eu) é sempre maiúsculo, até no meio da frase.",
+      en: "I am Davi. I am from Brazil.",
+      pt: "Eu sou o Davi. Eu sou do Brasil.",
+    },
     words: [
       { en: "hello", pt: "olá", emoji: "👋" },
       { en: "goodbye", pt: "tchau", emoji: "🙋" },
@@ -95,6 +105,16 @@ export const englishUnits = [
     theme: "comidas, bebidas e fazer um pedido",
     role: "a friendly barista in a London café",
     rolePt: "atendente da cafeteria",
+    character: "Lily",
+    characterPt: "a Lily, atendente da cafeteria",
+    missions: ["pedir uma bebida", "pedir algo para comer", "agradecer"],
+    scriptMissions: [0, 1, -1, 2],
+    tip: {
+      title: "Pedindo com educação",
+      rule: "\"I would like...\" é o jeito educado de pedir. Coloque \"please\" no fim e pronto!",
+      en: "I would like a tea, please.",
+      pt: "Eu gostaria de um chá, por favor.",
+    },
     words: [
       { en: "coffee", pt: "café", emoji: "☕" },
       { en: "water", pt: "água", emoji: "💧" },
@@ -157,6 +177,16 @@ export const englishUnits = [
     theme: "material escolar e cores",
     role: "a teacher on the first day at an English school",
     rolePt: "professora da escola",
+    character: "Ms. Clarke",
+    characterPt: "a professora Clarke",
+    missions: ["mostrar seu material", "dizer uma cor", "pedir ajuda"],
+    scriptMissions: [0, 1, 2, -1],
+    tip: {
+      title: "A cor vem antes",
+      rule: "Em inglês a cor vem ANTES da coisa: \"a blue pencil\" é \"um lápis azul\".",
+      en: "I have a red backpack.",
+      pt: "Eu tenho uma mochila vermelha.",
+    },
     words: [
       { en: "book", pt: "livro", emoji: "📕" },
       { en: "pencil", pt: "lápis", emoji: "✏️" },
@@ -219,6 +249,16 @@ export const englishUnits = [
     theme: "família e a casa",
     role: "the host mother of an exchange student",
     rolePt: "mãe da família anfitriã",
+    character: "Mrs. Brown",
+    characterPt: "a Sra. Brown, mãe da família anfitriã",
+    missions: ["falar da sua família", "elogiar a casa", "perguntar do quarto"],
+    scriptMissions: [0, 1, -1, 2],
+    tip: {
+      title: "I have e this is",
+      rule: "Use \"I have\" para o que você tem (\"I have one sister\") e \"this is\" para apresentar alguém ou algo (\"this is my dog\").",
+      en: "This is my brother. I have one brother.",
+      pt: "Este é meu irmão. Eu tenho um irmão.",
+    },
     words: [
       { en: "mother", pt: "mãe", emoji: "👩" },
       { en: "father", pt: "pai", emoji: "👨" },
@@ -281,6 +321,16 @@ export const englishUnits = [
     theme: "lugares da cidade e direções",
     role: "a helpful person on a London street",
     rolePt: "pessoa na rua",
+    character: "Tom",
+    characterPt: "o Tom, um morador de Londres",
+    missions: ["perguntar onde fica o museu", "perguntar se é longe", "agradecer a ajuda"],
+    scriptMissions: [0, 1, 2, -1],
+    tip: {
+      title: "Perguntando o caminho",
+      rule: "\"Where is the...?\" pergunta onde fica algo. Direções: left (esquerda), right (direita), straight ahead (em frente).",
+      en: "Where is the bank? Turn right.",
+      pt: "Onde fica o banco? Vire à direita.",
+    },
     words: [
       { en: "street", pt: "rua", emoji: "🛣️" },
       { en: "bus", pt: "ônibus", emoji: "🚌" },
@@ -343,6 +393,16 @@ export const englishUnits = [
     theme: "frutas, números e preços",
     role: "a fruit seller at a street market",
     rolePt: "vendedor da feira",
+    character: "Mr. Patel",
+    characterPt: "o Sr. Patel, vendedor da feira",
+    missions: ["pedir uma fruta", "perguntar o preço", "pagar"],
+    scriptMissions: [0, 1, -1, 2],
+    tip: {
+      title: "Quanto custa?",
+      rule: "\"How much is...?\" para uma coisa e \"How much are...?\" para várias. O plural quase sempre ganha -s: apple → apples.",
+      en: "How much are the apples?",
+      pt: "Quanto custam as maçãs?",
+    },
     words: [
       { en: "apple", pt: "maçã", emoji: "🍎" },
       { en: "banana", pt: "banana", emoji: "🍌" },
@@ -405,6 +465,16 @@ export const englishUnits = [
     theme: "animais, tempo e dias da semana",
     role: "a park ranger who loves animals",
     rolePt: "guarda do parque",
+    character: "Ranger Amy",
+    characterPt: "a guarda Amy, do parque",
+    missions: ["dizer de que animal gosta", "dizer onde está o gato", "falar do tempo"],
+    scriptMissions: [0, 1, 2, -1],
+    tip: {
+      title: "Falando do tempo",
+      rule: "Para o tempo use \"It is\": It is sunny (ensolarado), It is cold (frio), It is hot (quente).",
+      en: "It is very hot today.",
+      pt: "Está muito quente hoje.",
+    },
     words: [
       { en: "bird", pt: "pássaro", emoji: "🐦" },
       { en: "cat", pt: "gato", emoji: "🐱" },
@@ -467,6 +537,16 @@ export const englishUnits = [
     theme: "sentimentos, gostos e hobbies",
     role: "a new friend at the farewell party",
     rolePt: "amiga nova na festa",
+    character: "Zoe",
+    characterPt: "a Zoe, amiga nova da festa",
+    missions: ["dizer como se sente", "contar um hobby", "agradecer o presente"],
+    scriptMissions: [0, 1, 2, -1],
+    tip: {
+      title: "Do que você gosta",
+      rule: "\"I like to + verbo\" conta o que você gosta de fazer: I like to dance, I like to play soccer.",
+      en: "I like to play video games.",
+      pt: "Eu gosto de jogar videogame.",
+    },
     words: [
       { en: "happy", pt: "feliz", emoji: "😄" },
       { en: "sad", pt: "triste", emoji: "😢" },
@@ -657,9 +737,81 @@ function buildSpeak(item) {
   return { kind: "fale", text: item.en, pt: item.pt, word: item.en };
 }
 
+/** Ditado: ouve a frase e escreve. Mais difícil que montar com peças. */
+function buildDictation(phrase) {
+  return { kind: "digite", mode: "ditado", prompt: phrase.pt, emoji: "", audio: phrase.en, answer: phrase.en, word: phrase.en };
+}
+
+/** Cartões de apresentação: a Mine ensina as palavras antes de cobrar. */
+function buildLearn(words) {
+  return { kind: "aprenda", words: words.map((item) => ({ en: item.en, pt: item.pt, emoji: item.emoji })), word: "" };
+}
+
+/** Dica de gramática da parada, com duas frases-modelo para ouvir. */
+function buildTip(unit, phrases) {
+  return { kind: "dica", title: unit.tip.title, rule: unit.tip.rule, en: unit.tip.en, pt: unit.tip.pt, phrases: phrases.map((item) => ({ en: item.en, pt: item.pt })), word: "" };
+}
+
+function joinSentence(tiles, original) {
+  const end = String(original).trim().match(/[.?!]$/)?.[0] || "";
+  const text = tiles.join(" ");
+  return text.charAt(0).toUpperCase() + text.slice(1) + end;
+}
+
 /**
- * Monta uma lição de 8 exercícios. `review` são palavras grifadas (erradas
- * antes) — elas entram primeiro, que é o jeito de o erro virar acerto.
+ * Frases erradas que parecem certas, para "Qual frase está certa?": duas
+ * palavras trocadas de lugar e uma palavra trocada por outra da parada. São
+ * os erros que um brasileiro comete de verdade (ordem e escolha de palavra).
+ */
+export function sentenceDistractors(phrase, unit, random) {
+  const tiles = sentenceTiles(phrase.en);
+  const right = normalizeAnswer(phrase.en);
+  const found = [];
+  const add = (candidate) => {
+    const key = normalizeAnswer(candidate);
+    if (key && key !== right && !found.some((item) => normalizeAnswer(item) === key)) found.push(candidate);
+  };
+  if (tiles.length >= 3) {
+    const at = 1 + Math.floor(random() * (tiles.length - 2));
+    const swapped = [...tiles];
+    [swapped[at - 1], swapped[at]] = [swapped[at], swapped[at - 1]];
+    add(joinSentence(swapped, phrase.en));
+  }
+  const verbs = { am: "is", is: "are", are: "am", do: "does", have: "has" };
+  const verbAt = tiles.findIndex((tile) => verbs[tile.toLowerCase()]);
+  if (verbAt >= 0) {
+    const changed = [...tiles];
+    changed[verbAt] = verbs[tiles[verbAt].toLowerCase()];
+    add(joinSentence(changed, phrase.en));
+  }
+  const vocab = unit.words.map((item) => item.en).filter((item) => !item.includes(" "));
+  const wordAt = tiles.findIndex((tile) => vocab.some((item) => item.toLowerCase() === tile.toLowerCase()));
+  const target = wordAt >= 0 ? wordAt : tiles.length - 1;
+  for (const other of shuffle(vocab, random)) {
+    if (found.length >= 2) break;
+    if (other.toLowerCase() === String(tiles[target]).toLowerCase()) continue;
+    const changed = [...tiles];
+    changed[target] = other;
+    add(joinSentence(changed, phrase.en));
+  }
+  return found.slice(0, 2);
+}
+
+function buildChooseSentence(phrase, unit, random) {
+  const options = shuffle([phrase.en, ...sentenceDistractors(phrase, unit, random)], random);
+  return { kind: "escolha", mode: "qual", prompt: phrase.pt, emoji: "", audio: phrase.en, options, answer: phrase.en, word: phrase.en };
+}
+
+/** Itens que não valem nota: só ensinam. */
+export function isTeaching(exercise) {
+  return exercise?.kind === "aprenda" || exercise?.kind === "dica";
+}
+
+/**
+ * Monta uma lição: 8 exercícios valendo nota, com cartões de ensino antes.
+ * Palavras: a Mine apresenta 4 palavras, cobra, apresenta mais 4, cobra.
+ * Frases: dica de gramática da parada e depois as frases.
+ * `review` são palavras grifadas (erradas antes) — entram primeiro.
  */
 export function buildLesson(unit, stage, seed = Date.now(), review = []) {
   const random = seededRandom(seed);
@@ -672,29 +824,34 @@ export function buildLesson(unit, stage, seed = Date.now(), review = []) {
   if (Number(stage) === 1) {
     const words = prioritized(unit.words);
     const at = (index) => words[index % words.length];
+    const first = [at(0), at(1), at(2), at(3)];
+    const second = [at(4), at(5), at(6), at(7)];
     return [
-      wordChoice("figurinha", at(0), unit, random),
-      wordChoice("escuta", at(1), unit, random),
-      wordChoice("significado", at(2), unit, random),
-      wordChoice("figurinha", at(3), unit, random),
-      buildPairs(shuffle(words.slice(0, 6), random), random),
-      buildTyping(at(4)),
-      wordChoice("escuta", at(5), unit, random),
-      buildSpeak(at(6)),
+      buildLearn(first),
+      wordChoice("figurinha", first[0], unit, random),
+      wordChoice("escuta", first[1], unit, random),
+      wordChoice("significado", first[2], unit, random),
+      buildPairs(shuffle(first, random), random),
+      buildLearn(second),
+      wordChoice("figurinha", second[0], unit, random),
+      wordChoice("escuta", second[1], unit, random),
+      buildTyping(second[2]),
+      buildSpeak(second[3]),
     ];
   }
 
   const phrases = prioritized(unit.phrases);
   const at = (index) => phrases[index % phrases.length];
   return [
+    buildTip(unit, [at(0), at(2)]),
     buildTiles("traduza", at(0), unit, random),
     buildComplete(at(1), unit, random),
-    buildTiles("monte", at(2), unit, random),
-    wordChoice("figurinha", prioritized(unit.words)[0], unit, random),
-    buildTiles("traduza", at(3), unit, random),
-    buildComplete(at(4), unit, random),
+    buildChooseSentence(at(2), unit, random),
+    buildTiles("monte", at(3), unit, random),
+    buildDictation(at(4)),
+    buildTiles("traduza", at(5), unit, random),
     buildPairs(shuffle(unit.words, random), random),
-    buildSpeak(at(5)),
+    buildSpeak(at(0)),
   ];
 }
 
@@ -775,14 +932,15 @@ export function editDistance(a, b) {
 
 /**
  * Resposta digitada: igual = certo; uma letra fora em palavra de 4+ letras
- * (ou duas em 8+) = quase, que conta como acerto com a grafia corrigida.
+ * (duas em 8+, três numa frase de ditado de 20+) = quase, que conta como
+ * acerto com a grafia corrigida.
  */
 export function gradeTyped(expected, given) {
   const want = normalizeAnswer(expected);
   const got = normalizeAnswer(given);
   if (!got) return "errado";
   if (want === got) return "certo";
-  const allowed = want.length >= 8 ? 2 : want.length >= 4 ? 1 : 0;
+  const allowed = want.length >= 20 ? 3 : want.length >= 8 ? 2 : want.length >= 4 ? 1 : 0;
   return editDistance(want, got) <= allowed ? "quase" : "errado";
 }
 
@@ -820,7 +978,7 @@ export function gradeSpeech(expected, heard) {
  * fale → o que o reconhecedor ouviu; pares → quantos erros a pessoa cometeu.
  */
 export function checkExercise(exercise, value) {
-  if (!exercise) return { result: "errado", expected: "" };
+  if (!exercise || isTeaching(exercise)) return { result: "errado", expected: "" };
   if (exercise.kind === "escolha") {
     return { result: String(value) === exercise.answer ? "certo" : "errado", expected: exercise.answer };
   }
@@ -857,6 +1015,8 @@ function field(text, name) {
  *   CORRECAO: versão corrigida da fala do aluno, ou OK
  *   DICA: dica curta em português
  *   NOTA: 0, 1 ou 2
+ *   MISSOES: números das missões já cumpridas (ex.: 1, 3) ou 0
+ *   TRADUCAO: a fala da Mine em português
  *   SUGESTOES: a | b | c
  * Devolve null quando não há fala nenhuma — aí a tela cai no roteiro.
  */
@@ -865,7 +1025,10 @@ export function parseConversationReply(text) {
   let mine = field(raw, "MINE");
   if (!mine) {
     // modelo que esqueceu os rótulos: a primeira linha com texto vira a fala
-    const first = raw.split("\n").map((line) => line.trim()).find((line) => line && !/^(CORRE[CÇ][AÃ]O|DICA|NOTA|SUGEST[OÕ]ES)\s*:/i.test(line));
+    const first = raw
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line && !/^\**\s*(CORRE[CÇ][AÃ]O|DICA|NOTA|SUGEST[OÕ]ES|MISS[OÕ]ES|TRADU[CÇ][AÃ]O)\s*\**\s*:/i.test(line));
     mine = first || "";
   }
   if (!mine) return null;
@@ -878,20 +1041,35 @@ export function parseConversationReply(text) {
     .map((item) => item.trim().replace(/^["“]|["”]$/g, "").trim())
     .filter((item) => item.length > 1 && item.length <= 80)
     .slice(0, 3);
-  return { mine: mine.slice(0, 280), correction: correction.slice(0, 200), tip: field(raw, "DICA").slice(0, 240), score, suggestions };
+  // missões vêm numeradas a partir de 1; viram índices 0, 1, 2
+  const missions = [...new Set((field(raw, "MISS[OÕ]ES").match(/[1-9]/g) || []).map((item) => Number(item) - 1))].sort((a, b) => a - b);
+  return {
+    mine: mine.slice(0, 280),
+    correction: correction.slice(0, 200),
+    tip: field(raw, "DICA").slice(0, 240),
+    score,
+    suggestions,
+    missions,
+    translation: field(raw, "TRADU[CÇ][AÃ]O").slice(0, 280),
+  };
 }
 
 /** Contexto enviado à Mine para o roleplay de uma parada. */
-export function conversationContext(unit, level) {
+export function conversationContext(unit, level, studentName = "") {
   return [
     `Cenario: intercambio em Londres, parada "${unit.placeEn}" (${unit.place}).`,
-    `Seu papel: ${unit.role}.`,
+    `Seu personagem: ${unit.character}, ${unit.role}. Apresente-se pelo nome na primeira fala.`,
+    studentName ? `Nome do estudante: ${studentName}. Use o nome dele de vez em quando, com naturalidade.` : "",
     `Tema da parada: ${unit.theme}.`,
     `Nivel do estudante: ${level.code} (${level.label}).`,
     `Palavras da parada: ${unit.words.map((item) => item.en).join(", ")}.`,
     `Frases modelo: ${unit.phrases.map((item) => item.en).join(" / ")}.`,
-    `A conversa tem ${conversationTurns} falas do estudante. Conduza para usar as palavras da parada.`,
-  ].join("\n");
+    `Missoes do estudante nesta cena (conduza a conversa para que ele consiga cumprir cada uma): ${unit.missions.map((item, index) => `${index + 1}. ${item}`).join("; ")}.`,
+    `Ponto de gramatica da parada: ${unit.tip.rule}`,
+    `A conversa tem ${conversationTurns} falas do estudante.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /* ───────────────────────────── progresso ───────────────────────────── */
@@ -951,7 +1129,29 @@ export function languageProgress(sessions, units = englishUnits, lang = "en") {
       .map((item) => String(item).toLowerCase())
       .filter((item) => vocab.has(item)),
   );
-  return { path, best, done, unlocked, next, stamps, totals, learnedWords: learned.size, level: languageLevel(done.size) };
+  return { path, best, done, unlocked, next, stamps, totals, learnedWords: learned.size, level: languageLevel(done.size), ...languageStreak(own) };
+}
+
+function dayIndex(timestamp) {
+  const date = new Date(Number(timestamp) || 0);
+  return Math.floor((date.getTime() - date.getTimezoneOffset() * 60000) / 86400000);
+}
+
+/**
+ * Ofensiva da aba: dias seguidos com pelo menos uma lição. Hoje ainda sem
+ * lição não quebra a sequência de ontem (o dia não acabou) — como no Duolingo.
+ */
+export function languageStreak(sessions, now = Date.now()) {
+  const days = new Set((Array.isArray(sessions) ? sessions : []).filter((item) => item?.kind === "Idiomas").map((item) => dayIndex(item.createdAt)));
+  const today = dayIndex(now);
+  const todayLessons = (Array.isArray(sessions) ? sessions : []).filter((item) => item?.kind === "Idiomas" && dayIndex(item.createdAt) === today).length;
+  let cursor = days.has(today) ? today : today - 1;
+  let streak = 0;
+  while (days.has(cursor)) {
+    streak += 1;
+    cursor -= 1;
+  }
+  return { streak, todayLessons };
 }
 
 /** Nível pelo número de etapas feitas. São 24 na trilha de inglês. */
@@ -987,7 +1187,9 @@ export function wordsToReview(sessions, lang = "en", units = englishUnits) {
 
 /** Resultado final de uma lição: o que vai para a sessão salva. */
 export function lessonResult(outcomes) {
-  const list = Array.isArray(outcomes) ? outcomes.filter((item) => item && item.result !== "pulou") : [];
+  // a repetição de um erro (no fim da lição) ajuda a aprender, mas a nota é a
+  // da primeira tentativa: refazer não pode apagar o erro do histórico
+  const list = Array.isArray(outcomes) ? outcomes.filter((item) => item && item.result !== "pulou" && !item.retry) : [];
   const correct = list.filter((item) => countsAsRight(item.result)).length;
   const total = list.length;
   const accuracy = total ? correct / total : 0;

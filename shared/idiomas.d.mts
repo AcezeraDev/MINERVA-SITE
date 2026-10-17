@@ -11,6 +11,13 @@ export type LangUnit = {
   theme: string;
   role: string;
   rolePt: string;
+  /** Nome do personagem que a Mine interpreta na conversa. */
+  character: string;
+  characterPt: string;
+  /** Três missões da conversa; scriptMissions diz qual fala do roteiro cumpre cada uma (-1 = nenhuma). */
+  missions: string[];
+  scriptMissions: number[];
+  tip: { title: string; rule: string; en: string; pt: string };
   words: LangWord[];
   phrases: LangPhrase[];
   script: LangScriptTurn[];
@@ -18,7 +25,7 @@ export type LangUnit = {
 
 export type ChoiceExercise = {
   kind: "escolha";
-  mode: "figurinha" | "escuta" | "significado" | "complete";
+  mode: "figurinha" | "escuta" | "significado" | "complete" | "qual";
   prompt: string;
   hint?: string;
   emoji: string;
@@ -29,14 +36,16 @@ export type ChoiceExercise = {
 };
 export type TilesExercise = { kind: "monte"; mode: "traduza" | "monte"; prompt: string; audio: string; tiles: string[]; answer: string[]; word: string };
 export type PairsExercise = { kind: "pares"; pairs: Array<{ en: string; pt: string }>; left: string[]; right: string[]; word: string };
-export type TypingExercise = { kind: "digite"; prompt: string; emoji: string; answer: string; word: string };
+export type TypingExercise = { kind: "digite"; mode?: "ditado"; prompt: string; emoji: string; audio?: string; answer: string; word: string };
 export type SpeakExercise = { kind: "fale"; text: string; pt: string; word: string };
-export type Exercise = ChoiceExercise | TilesExercise | PairsExercise | TypingExercise | SpeakExercise;
+export type LearnCard = { kind: "aprenda"; words: LangWord[]; word: string };
+export type TipCard = { kind: "dica"; title: string; rule: string; en: string; pt: string; phrases: LangPhrase[]; word: string };
+export type Exercise = ChoiceExercise | TilesExercise | PairsExercise | TypingExercise | SpeakExercise | LearnCard | TipCard;
 
 export type Grade = "certo" | "quase" | "errado";
-export type Outcome = { kind: Exercise["kind"] | "conversa"; result: Grade | "pulou"; word: string };
+export type Outcome = { kind: Exercise["kind"] | "conversa" | "missao"; result: Grade | "pulou"; word: string; retry?: boolean };
 
-export type ConversationReply = { mine: string; correction: string; tip: string; score: number; suggestions: string[] };
+export type ConversationReply = { mine: string; correction: string; tip: string; score: number; suggestions: string[]; missions: number[]; translation: string };
 export type LangLevel = { code: string; label: string };
 
 export type LessonStep = { key: string; unitId: string; stage: number };
@@ -51,6 +60,8 @@ export type LanguageProgress = {
   totals: { lessons: number; correct: number; answered: number; spoke: number; xp: number };
   learnedWords: number;
   level: LangLevel;
+  streak: number;
+  todayLessons: number;
 };
 
 export type LessonResult = {
@@ -88,6 +99,9 @@ export function lessonPath(units?: LangUnit[]): LessonStep[];
 export function seededRandom(seed: number): () => number;
 export function sentenceTiles(sentence: string): string[];
 export function buildLesson(unit: LangUnit, stage: number, seed?: number, review?: string[]): Exercise[];
+export function sentenceDistractors(phrase: LangPhrase, unit: LangUnit, random: () => number): string[];
+export function isTeaching(exercise: Exercise | null | undefined): boolean;
+export function languageStreak(sessions: SessionLike[], now?: number): { streak: number; todayLessons: number };
 export function buildReviewLesson(missed: string[], seed?: number, units?: LangUnit[]): Exercise[];
 export function normalizeAnswer(text: string): string;
 export function editDistance(a: string, b: string): number;
@@ -97,7 +111,7 @@ export function gradeSpeech(expected: string, heard: string): Grade;
 export function checkExercise(exercise: Exercise, value: unknown): { result: Grade; expected: string };
 export function countsAsRight(result: Grade | "pulou"): boolean;
 export function parseConversationReply(text: string): ConversationReply | null;
-export function conversationContext(unit: LangUnit, level: LangLevel): string;
+export function conversationContext(unit: LangUnit, level: LangLevel, studentName?: string): string;
 export function vocabulary(units?: LangUnit[]): Set<string>;
 export function starsFor(accuracy: number): number;
 export function languageProgress(sessions: SessionLike[], units?: LangUnit[], lang?: string): LanguageProgress;
