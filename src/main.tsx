@@ -154,6 +154,7 @@ import { MineSourcesButton, MineSourcesProvider, MineThought, MineWorking, type 
 import { MineAnswerActions, VersionSwitch } from "./chat/MineAnswerActions";
 import { branchSlice, switchBranch, versionInfo } from "./chat/branches";
 import { MineImageGallery } from "./chat/MineImageGallery";
+import { MineGeneratedImage } from "./chat/MineGeneratedImage";
 import "./chat/mine-gallery.css";
 import { inThread, threadsOf, type ChatThread } from "./chat/threads";
 import "./chat/mine-rich-text.css";
@@ -8707,7 +8708,9 @@ function MineMessageText({ text, streaming = false }: { text: string; streaming?
   return (
     <div className="mine-answer">
       {segments.map((segment, index) =>
-        segment.type === "image" ? (
+        segment.type === "generate" ? (
+          <MineGeneratedImage key={`gen-${segment.edit ? "e" : "n"}-${segment.prompt}`} prompt={segment.prompt} caption={segment.caption} edit={segment.edit} streaming={streaming} />
+        ) : segment.type === "image" ? (
           <MineImageGallery key={`image-${index}-${segment.style || ""}-${segment.query}`} query={segment.query} caption={segment.caption} style={segment.style} />
         ) : (
           <MineRichText key={`text-${index}`} text={segment.text} streaming={streaming} />

@@ -1,6 +1,7 @@
 export type MessageSegment =
   | { type: "text"; text: string }
-  | { type: "image"; query: string; caption: string; style?: ImageStyle };
+  | { type: "image"; query: string; caption: string; style?: ImageStyle }
+  | { type: "generate"; prompt: string; caption: string; edit: boolean };
 
 export type ImageStyle = "icone" | "wallpaper" | "desenho" | "logo";
 export const IMAGE_STYLES: ImageStyle[];
@@ -21,3 +22,5 @@ export function asksForImage(text: string): boolean;
 export function extractSuggestions(text: string): { text: string; suggestions: string[] };
 export function describeImageMarkers(text: string): string;
 export function continuesGallery(text: string, history?: Array<{ role?: string; text?: string; content?: string }>): string;
+export function asksToGenerateImage(text: string): boolean;
+export function continuesGeneration(text: string, history?: Array<{ role?: string; text?: string; content?: string }>): string;

@@ -7,6 +7,7 @@ import { loadLocalEnv } from "./gemini-server.mjs";
 import { gamificationStats, levelFromXp, rankingWindows, totalXp, unlockedAchievements, xpSince } from "./shared/xp.mjs";
 import { dailyChallengeKey, leagueFromPoints, seasonPoints } from "./shared/game-meta.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
+import { MINE_IMAGE_DAILY_LIMIT, MineImageError, generateMineImage } from "./mine/image-gen.mjs";
 import { MINE_VOICE_DAILY_LIMIT, MineVoiceError, synthesizeVoice } from "./mine/voice.mjs";
 
 const { Pool } = pg;
@@ -491,6 +492,34 @@ async function handleAtelieIa(req, res) {
 }
 
 /**
+ * Imagem criada pela Mine no chat ([[gerar_imagem: ...]]). GET devolve o uso
+ * do dia; POST { prompt, reference? } cria. Falha não conta na cota.
+ */
+async function handleMineImage(req, res) {
+  const session = await requireSession(req, res);
+  if (!session) return;
+  if (req.method === "GET") {
+    sendJson(req, res, 200, { used: await quotaUsed(session.userId, "mine-imagem"), limit: MINE_IMAGE_DAILY_LIMIT });
+    return;
+  }
+  const body = await readJson(req);
+  const used = await takeQuota(session.userId, "mine-imagem", MINE_IMAGE_DAILY_LIMIT);
+  if (used === null) {
+    sendJson(req, res, 429, { error: `Hoje você já criou as ${MINE_IMAGE_DAILY_LIMIT} imagens do dia. Amanhã tem mais!`, code: "quota", used: MINE_IMAGE_DAILY_LIMIT, limit: MINE_IMAGE_DAILY_LIMIT });
+    return;
+  }
+  try {
+    const result = await generateMineImage({ prompt: body.prompt, reference: body.reference });
+    sendJson(req, res, 200, { image: result.image, ms: result.ms, used, limit: MINE_IMAGE_DAILY_LIMIT });
+  } catch (error) {
+    await giveBackQuota(session.userId, "mine-imagem").catch(() => undefined);
+    const status = error instanceof MineImageError ? error.status : 502;
+    if (!(error instanceof MineImageError)) console.error("[mine-imagem]", error);
+    sendJson(req, res, status, { error: error instanceof MineImageError ? error.message : "A Mine não conseguiu desenhar agora.", used: used - 1, limit: MINE_IMAGE_DAILY_LIMIT });
+  }
+}
+
+/**
  * Voz da Mine na aba Idiomas. POST { text, slow? } devolve o MP3. Áudio que
  * já estava no cache do servidor não conta na cota. Qualquer falha responde
  * JSON com erro e a tela usa a voz do navegador.
@@ -940,6 +969,11 @@ export async function handleDataRequest(req, res) {
       const body = await readJson(req);
       const nextData = await mutateData((currentData) => mergeUserData(currentData, body.data || body, session));
       sendJson(req, res, 200, { data: dataForSession(nextData, session), database: pool ? "postgres" : "local-file" });
+      return true;
+    }
+
+    if (url.pathname === "/api/mine-imagem" && (req.method === "POST" || req.method === "GET")) {
+      await handleMineImage(req, res);
       return true;
     }
 

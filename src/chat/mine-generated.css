@@ -1,0 +1,239 @@
+/* Imagem criada pela Mine (MineGeneratedImage.tsx). */
+.mine-gen-card,
+.mine-gen-figure {
+  width: min(26rem, 100%);
+  margin: 0.9rem 0;
+}
+
+.mine-gen-card {
+  position: relative;
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 1.5px solid rgb(var(--theme-text) / 0.7);
+  border-radius: 1.1rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--line-step, 32px) - 1px), rgb(var(--rule) / 0.55) calc(var(--line-step, 32px) - 1px) var(--line-step, 32px)),
+    rgb(var(--sheet));
+}
+
+.mine-gen-card.is-loading {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+/* rabisco a lápis: cada traço se desenha, segura e some, em ciclo */
+.mine-gen-sketch {
+  width: 58%;
+  height: 58%;
+  overflow: visible;
+}
+
+.mine-gen-sketch :is(path, circle) {
+  fill: none;
+  stroke: rgb(var(--pen));
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: mine-gen-draw 3.2s ease-in-out infinite;
+}
+
+.mine-gen-sketch :nth-child(2) { animation-delay: 0.5s; }
+.mine-gen-sketch :nth-child(3) { animation-delay: 0.9s; }
+.mine-gen-sketch :nth-child(4) { animation-delay: 0.2s; stroke-dasharray: 1; opacity: 0.45; }
+
+@keyframes mine-gen-draw {
+  0% { stroke-dashoffset: 1; }
+  45%, 70% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -1; }
+}
+
+.mine-gen-pencil {
+  position: absolute;
+  top: 34%;
+  left: 52%;
+  font-size: 1.9rem;
+  animation: mine-gen-pencil 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes mine-gen-pencil {
+  from { transform: translate(-18px, 6px) rotate(-8deg); }
+  to { transform: translate(22px, -10px) rotate(6deg); }
+}
+
+/* brilho correndo pelo papel, como o "criando imagem" dos chats grandes */
+.mine-gen-card.is-drawing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.35) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: mine-gen-shine 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+html:not(.theme-light) .mine-gen-card.is-drawing::after {
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.07) 50%, transparent 70%);
+}
+
+@keyframes mine-gen-shine {
+  to { transform: translateX(100%); }
+}
+
+.mine-gen-status {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.9rem;
+  left: 1rem;
+  display: grid;
+  gap: 0.15rem;
+  color: rgb(var(--pen));
+  font-family: "Kalam", cursive;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.mine-gen-status small,
+.mine-gen-card.is-note small {
+  color: rgb(var(--theme-muted));
+  font-family: "DM Mono", monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* aviso: imagem de outro aparelho ou erro */
+.mine-gen-card.is-note {
+  aspect-ratio: auto;
+  gap: 0.8rem;
+  min-height: 9rem;
+  padding: 1.2rem;
+  border-style: dashed;
+  text-align: center;
+}
+
+.mine-gen-card.is-note p {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  color: rgb(var(--theme-text) / 0.8);
+  font-size: 0.92rem;
+}
+
+.mine-gen-card.is-error p {
+  color: rgb(var(--margin-line));
+}
+
+.mine-gen-card.is-note button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.4rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+  font-weight: 800;
+  font-size: 0.88rem;
+}
+
+/* a imagem pronta */
+.mine-gen-frame {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 1.5px solid rgb(var(--theme-text) / 0.7);
+  border-radius: 1.1rem;
+  background: rgb(var(--sheet));
+  cursor: zoom-in;
+  animation: mine-gen-reveal 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes mine-gen-reveal {
+  from { opacity: 0; transform: scale(0.97); }
+}
+
+.mine-gen-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.mine-gen-figure figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  padding: 0 0.2rem;
+  color: rgb(var(--theme-muted));
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+}
+
+.mine-gen-actions {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.mine-gen-actions :is(button, a) {
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border-radius: 0.6rem;
+  color: rgb(var(--theme-text) / 0.7);
+  transition: background-color 140ms, color 140ms;
+}
+
+.mine-gen-actions :is(button, a):is(:hover, :focus-visible) {
+  background: rgb(var(--theme-text) / 0.08);
+  color: rgb(var(--pen));
+}
+
+.mine-gen-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgb(8 10 16 / 0.86);
+  cursor: zoom-out;
+}
+
+.mine-gen-lightbox img {
+  max-width: min(92vw, 1024px);
+  max-height: 88vh;
+  border-radius: 0.8rem;
+  cursor: default;
+}
+
+.mine-gen-close {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mine-gen-sketch :is(path, circle),
+  .mine-gen-pencil,
+  .mine-gen-card.is-drawing::after,
+  .mine-gen-frame {
+    animation: none;
+  }
+
+  .mine-gen-sketch :is(path, circle) {
+    stroke-dashoffset: 0;
+  }
+}

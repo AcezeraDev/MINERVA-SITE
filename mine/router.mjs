@@ -1,7 +1,7 @@
 import { MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
-import { buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
-import { asksForImage, continuesGallery, extractSuggestions, imageStyleFrom, previousGalleryStyle, withImageStyle } from "../shared/chat-media.mjs";
+import { buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
+import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, extractSuggestions, imageStyleFrom, previousGalleryStyle, withImageStyle } from "../shared/chat-media.mjs";
 import { replyQualityIssue } from "./quality.mjs";
 import { buildSearchQuery, cleanQueries, freshenQueries, matchesSearchTopic, matchesSourceScope, planSearchQueries, resultLimit, searchMany, searchSourcePolicy, searchWeb, WEB_SEARCH_TOOL, webSearchFailedInstruction, webSearchInstruction, webSearchMode } from "./web.mjs";
 import { readTopPages } from "./page-reader.mjs";
@@ -312,15 +312,21 @@ export async function runMineRequest({
   let web = mode === "force" ? await prepareWebContext({ prompt, history, signal, deadline, onStatus }) : empty;
   let offerTool = mode === "auto" && toolsSupported();
 
-  const previousGallery = cleanTask ? "" : continuesGallery(prompt, history);
+  // Criar imagem ("cria um gato astronauta") ou ajustar a que acabou de ser
+  // criada ("deixa o fundo azul") vence a busca de fotos: o verbo de criação
+  // diz que a imagem ainda não existe.
+  const previousGenerated = cleanTask ? "" : continuesGeneration(prompt, history);
+  const wantsGeneration = !cleanTask && (asksToGenerateImage(prompt) || Boolean(previousGenerated));
+  const previousGallery = cleanTask || wantsGeneration ? "" : continuesGallery(prompt, history);
   // "Icons da Ellie": o estilo pedido vai para o marcador. Vale tambem para
   // "manda mais" depois de uma galeria de icones.
-  const wantsImage = !cleanTask && (photos || asksForImage(prompt) || Boolean(previousGallery));
+  const wantsImage = !cleanTask && !wantsGeneration && (photos || asksForImage(prompt) || Boolean(previousGallery));
   const imageStyle = wantsImage ? imageStyleFrom(prompt) || (previousGallery ? previousGalleryStyle(history) : "") : "";
   const baseSystem = [
+    ...(wantsGeneration ? [buildImageGenerationInstruction({ previousPrompt: previousGenerated })] : []),
     // Modo fotos e do chat livre: uma task (simulado, mapa, jogo) tem formato
     // proprio, e um marcador de imagem no meio dela quebraria o parser.
-    ...(cleanTask ? [] : photos ? [buildPhotoModeInstruction()] : asksForImage(prompt) || previousGallery ? [buildImageRequestInstruction()] : []),
+    ...(cleanTask || wantsGeneration ? [] : photos ? [buildPhotoModeInstruction()] : asksForImage(prompt) || previousGallery ? [buildImageRequestInstruction()] : []),
     // "Manda mais" depois de uma galeria: o mesmo termo devolveria as mesmas
     // fotos (a galeria fica em cache por termo), então a Mine varia o termo.
     ...(cleanTask || !previousGallery ? [] : [buildMorePhotosInstruction(previousGallery)]),
