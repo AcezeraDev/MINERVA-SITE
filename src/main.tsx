@@ -162,6 +162,7 @@ import "./chat/mine-rich-text.css";
 import "./chat/mine-chat.css";
 // Caderno vivo por último: é a identidade que vence as camadas anteriores.
 import "./caderno.css";
+import { MineCodeDesktopButton, MineCodeDesktopPanel, MineCodeNews } from "./chat/MineCodeDesktop";
 import {
   Doodle,
   InkCheck,
@@ -3472,6 +3473,7 @@ function HomeView({
       </div>
 
       <div className="grid gap-7">
+        <MineCodeNews />
         <StudyNowPanel
           nextTask={primaryTask}
           subject={primarySubject}
@@ -7556,7 +7558,7 @@ function MineView({
   const sendRef = useRef(send);
   // Aba MineCode: editor de código do chat. Abre pelas abas do cabeçalho ou
   // pelo botão "MineCode" de um bloco de código de uma resposta.
-  const [codeTab, setCodeTab] = useState(false);
+  const [codeTab, setCodeTab] = useState(() => window.location.hash === "#/mine/code");
   const [codeIncoming, setCodeIncoming] = useState<{ code: string; lang: string; at: number } | null>(null);
   useEffect(() => {
     const onOpen = (event: Event) => {
@@ -7932,7 +7934,7 @@ function MineView({
       </aside>
 
       <div className="mine-main relative flex h-full min-h-0 min-w-0 flex-col bg-[#111310]">
-        <header className="mine-header relative flex min-h-[3.75rem] shrink-0 items-center justify-between gap-2 px-3 py-2 sm:gap-3 md:px-5">
+        <header className="caderno-minecode-chat-header mine-header relative flex min-h-[3.75rem] shrink-0 items-center justify-between gap-2 px-3 py-2 sm:gap-3 md:px-5">
           <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <button
               type="button"
@@ -7953,6 +7955,7 @@ function MineView({
               </p>
             </div>
           </div>
+          <div className="caderno-minecode-chat-tools">
           <div className="mine-tabs" role="tablist" aria-label="Modo do chat">
             <button type="button" role="tab" aria-selected={!codeTab} className={!codeTab ? "is-on" : ""} onClick={() => setCodeTab(false)}>
               <MessageCircle className="h-4 w-4" aria-hidden />
@@ -7962,6 +7965,8 @@ function MineView({
               <Code2 className="h-4 w-4" aria-hidden />
               <span>MineCode</span>
             </button>
+          </div>
+          <MineCodeDesktopButton />
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <HandwritingToggle />
@@ -13484,5 +13489,6 @@ rootHost.__minervaRoot = appRoot;
 appRoot.render(
   <React.StrictMode>
     <App />
+    <MineCodeDesktopPanel />
   </React.StrictMode>,
 );

@@ -9,5 +9,7 @@ dist/
 useful-ai-prompts/
 skills-lock.json
 *.docx
-.codex-tmp*/
+.codex-tmp*
+/Projeto_MINERVA_ODS_ONU_atualizado.pdf
+/Relatorio_MINERVA.pdf
 .playwright-mcp/

@@ -1,0 +1,87 @@
+.caderno-minecode-news,
+.caderno-minecode-dialog {
+  color: rgb(var(--theme-text));
+  font-family: "Atkinson Hyperlegible Next Variable", sans-serif;
+  background-color: rgb(var(--sheet));
+  background-image: linear-gradient(90deg, transparent 27px, rgb(var(--margin-line) / .5) 27px, rgb(var(--margin-line) / .5) 28px, transparent 28px), repeating-linear-gradient(transparent 0 31px, rgb(var(--rule) / .65) 31px 32px);
+  border: 1px solid rgb(var(--rule));
+  box-shadow: var(--card-shadow);
+}
+.caderno-minecode-logo { width: 68px; height: 68px; flex: none; }
+.caderno-minecode-wordmark { font: 800 1em/1.1 "Atkinson Hyperlegible Next Variable", sans-serif; letter-spacing: -.055em; color: rgb(var(--theme-text)); }
+.caderno-minecode-wordmark > span { color: #2FD483; }
+.caderno-minecode-hand { font: 400 22px/1.2 "Gochi Hand", cursive; color: rgb(var(--pen)); margin: 0 0 6px; }
+.caderno-minecode-news { position: relative; border-radius: 4px 14px 14px 4px; padding: 28px 42px 28px 48px; margin: 8px 0 26px; }
+.caderno-minecode-tape { position: absolute; top: -9px; left: 42%; width: 80px; height: 23px; background: rgb(var(--hl-yellow) / .45); transform: rotate(-5deg); }
+.caderno-minecode-news-title { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; }
+.caderno-minecode-news-title > div { min-width: 0; }
+.caderno-minecode-news h2 { font-size: 28px; line-height: 1.2; margin: 0; }
+.caderno-minecode-news h2 > span:last-child { font: 400 24px "Gochi Hand", cursive; }
+.caderno-minecode-news-copy p { margin: 4px 0; line-height: 1.5; }
+.caderno-minecode-news-copy strong { color: rgb(var(--pen)); }
+.caderno-minecode-close { position: absolute; top: 12px; right: 12px; width: 42px; height: 42px; display: grid; place-items: center; color: rgb(var(--theme-muted)); background: rgb(var(--sheet)); border: 1px solid rgb(var(--rule)); border-radius: 50%; cursor: pointer; }
+.caderno-minecode-close:hover { color: rgb(var(--pen)); border-color: rgb(var(--pen)); }
+.caderno-minecode-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.caderno-minecode-button { display: inline-flex; justify-content: center; align-items: center; gap: 9px; padding: 12px 18px; min-height: 46px; border-radius: 6px 9px 7px 5px; border: 1px solid rgb(var(--pen)); background: rgb(var(--pen)); color: rgb(var(--pen-ink)); font: 700 16px/1.3 "Atkinson Hyperlegible Next Variable", sans-serif; text-decoration: none; cursor: pointer; transition: transform 140ms ease; }
+.caderno-minecode-button:hover { transform: translateY(-2px); }
+.caderno-minecode-secondary { color: rgb(var(--pen)); background: rgb(var(--sheet)); }
+.caderno-minecode-entry { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 8px 14px; background: rgb(var(--hl-mint) / .12); color: rgb(var(--theme-text)); border: 1px dashed rgb(var(--hl-mint) / .65); border-radius: 5px 9px 6px 8px; font: 700 13px/1.3 "Atkinson Hyperlegible Next Variable", sans-serif; cursor: pointer; }
+.caderno-minecode-entry small { font-size: inherit; font-weight: 400; }
+.caderno-minecode-entry:hover { background: rgb(var(--hl-mint) / .22); }
+.caderno-minecode-chat-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.caderno-minecode-dialog { padding: 0; width: min(760px, calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 40px); margin: auto; border-radius: 6px 18px 12px 5px; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.caderno-minecode-dialog::backdrop { background: rgb(0 0 0 / .72); }
+body:has(.caderno-minecode-dialog[open]) { overflow: hidden; }
+.caderno-minecode-page { position: relative; padding: 36px 34px 24px 52px; }
+.caderno-minecode-intro { padding-right: 22px; }
+.caderno-minecode-intro .caderno-minecode-logo { width: 80px; height: 80px; margin-bottom: 16px; }
+.caderno-minecode-intro h2 { font-size: clamp(28px, 6vw, 42px); line-height: 1.2; margin: 0 0 12px; }
+.caderno-minecode-intro h2 > span:last-child { font: 400 .8em "Gochi Hand", cursive; margin-left: 8px; }
+.caderno-minecode-intro > p:not(.caderno-minecode-hand):not(.caderno-minecode-meta) { font-size: 20px; line-height: 1.4; max-width: 440px; margin: 0 0 22px; }
+.caderno-minecode-meta { color: rgb(var(--theme-muted)); font-size: 13px; line-height: 1.6; margin: 12px 0 0; overflow-wrap: anywhere; }
+.caderno-minecode-section { margin-top: 30px; }
+.caderno-minecode-section h3 { font: 400 29px/1.2 "Gochi Hand", cursive; color: rgb(var(--pen)); margin: 0 0 10px; }
+.caderno-minecode-section p { font-size: 15px; line-height: 1.65; margin: 6px 0 16px; }
+.caderno-minecode-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; line-height: 1.5; }
+.caderno-minecode-table caption { text-align: left; font-weight: 700; margin: 16px 0 10px; }
+.caderno-minecode-table caption span { display: block; color: rgb(var(--theme-muted)); font-size: 12px; font-weight: 400; }
+.caderno-minecode-table th, .caderno-minecode-table td { border-bottom: 1px solid rgb(var(--rule)); padding: 11px 7px; overflow-wrap: anywhere; }
+.caderno-minecode-table th { text-align: left; font-weight: 500; }
+.caderno-minecode-table thead th { font-weight: 700; color: rgb(var(--pen)); }
+.caderno-minecode-table th:first-child { width: 66%; padding-left: 0; }
+.caderno-minecode-table th:not(:first-child), .caderno-minecode-table td { text-align: center; }
+.caderno-minecode-table td:last-child { color: rgb(var(--pen)); font-weight: 800; font-size: 20px; }
+.caderno-minecode-table mark { color: inherit; background: rgb(var(--hl-mint) / .22); padding: 1px 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.caderno-minecode-steps { padding-left: 22px; margin-top: 14px; }
+.caderno-minecode-steps li { padding-left: 6px; margin-bottom: 18px; }
+.caderno-minecode-steps li::marker { color: rgb(var(--pen)); font: 400 24px "Gochi Hand", cursive; }
+.caderno-minecode-steps p { margin: 4px 0 0; }
+.caderno-minecode-section details { border-bottom: 1px solid rgb(var(--rule)); padding: 13px 0; }
+.caderno-minecode-section summary { cursor: pointer; color: rgb(var(--pen)); font-weight: 700; min-height: 24px; }
+.caderno-minecode-section details p { margin: 10px 0 0; }
+.caderno-minecode-footer { display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; border-top: 1px solid rgb(var(--margin-line) / .4); margin-top: 26px; padding-top: 18px; font-size: 13px; }
+.caderno-minecode-footer a { color: rgb(var(--pen)); display: inline-flex; gap: 5px; align-items: center; text-decoration: underline; text-underline-offset: 3px; }
+.caderno-minecode-footer > span { font: 400 19px "Gochi Hand", cursive; color: rgb(var(--theme-muted)); }
+:is(.caderno-minecode-dialog, .caderno-minecode-news, .caderno-minecode-chat-tools) :focus-visible { outline: 3px solid rgb(var(--pen)); outline-offset: 4px; }
+@media (max-width: 640px) {
+  .caderno-minecode-chat-header { display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px !important; }
+  .caderno-minecode-chat-tools { display: contents; }
+  .caderno-minecode-entry { grid-row: 2; grid-column: 1 / -1; padding: 8px 10px; font-size: 13px; }
+  .caderno-minecode-entry small { display: inline; }
+  .caderno-minecode-news { padding: 26px 20px 24px 40px; }
+  .caderno-minecode-news-title { gap: 8px; padding-right: 30px; }
+  .caderno-minecode-news-title .caderno-minecode-logo { width: 48px; height: 48px; }
+  .caderno-minecode-news h2 { font-size: 24px; }
+  .caderno-minecode-news h2 > span:last-child { display: block; font-size: 20px; }
+  .caderno-minecode-hand { font-size: 19px; }
+  .caderno-minecode-actions { flex-direction: column; align-items: stretch; }
+  .caderno-minecode-dialog { width: calc(100% - 16px); max-height: calc(100dvh - 16px); }
+  .caderno-minecode-page { padding: 28px 18px 24px 40px; }
+  .caderno-minecode-table { font-size: 12px; }
+  .caderno-minecode-table th:first-child { width: 61%; }
+  .caderno-minecode-table th, .caderno-minecode-table td { padding: 10px 3px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .caderno-minecode-button { transition: none; }
+  .caderno-minecode-button:hover { transform: none; }
+}
