@@ -1,5 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { createPortal } from "react-dom";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
@@ -7998,19 +7999,23 @@ function MineView({
           </div>
         </header>
 
-        {codeTab ? (
+        {/* o MineCode cobre a tela inteira, como um editor (portal no body:
+            nenhum ancestral com transform prende o position: fixed) */}
+        {codeTab ? createPortal(
           <div className="mine-minecode-layer">
             <React.Suspense fallback={<PageLoading />}>
               <MineCode
                 incoming={codeIncoming}
                 busy={loading}
+                onExit={() => setCodeTab(false)}
                 onAsk={(text) => {
                   setCodeTab(false);
                   void sendRef.current(text, selectedSubjectId);
                 }}
               />
             </React.Suspense>
-          </div>
+          </div>,
+          document.body,
         ) : null}
 
         <div className="relative min-h-0 flex-1">

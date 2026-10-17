@@ -37,13 +37,13 @@
   }
 }
 
-/* a aba MineCode cobre a conversa e a barra de escrever, abaixo do cabeçalho */
+/* a aba MineCode cobre a tela inteira, como um editor (Claude Code/Codex) */
 .mine-minecode-layer {
-  position: absolute;
-  inset: 3.75rem 0 0 0;
-  z-index: 30;
+  position: fixed;
+  inset: 0;
+  z-index: 95;
   overflow-y: auto;
-  background: rgb(var(--sheet));
+  background: #070b09;
 }
 
 /* ───────────── bloco com Executar ───────────── */

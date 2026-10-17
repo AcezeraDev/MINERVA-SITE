@@ -13,18 +13,93 @@
   --mc-amber: #ffd27a;
   --mc-red: #ff8a8f;
   --mc-mono: "DM Mono", ui-monospace, "Cascadia Code", monospace;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.6rem;
   height: 100%;
-  max-width: 96rem;
-  margin: 0 auto;
-  padding: 1rem;
+  min-height: 32rem;
+  padding: 0.6rem 0.75rem 0.75rem;
+  color: var(--mc-text);
+}
+
+/* barra do topo: o MineCode ocupa a tela inteira, como um editor */
+.mc-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  font-family: var(--mc-mono);
+}
+.mc-top-back,
+.mc-top-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.2rem;
+  padding: 0 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--mc-mono);
+  font-size: 0.8rem;
+  color: var(--mc-text);
+  transition: border-color 160ms cubic-bezier(0.2, 0.8, 0.2, 1), color 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mc-top-back:hover,
+.mc-top-toggle:hover {
+  border-color: var(--mc-green);
+  color: var(--mc-green);
+}
+.mc-top-back svg,
+.mc-top-toggle svg,
+.mc-top-brand svg {
+  width: 1rem;
+  height: 1rem;
+}
+.mc-top-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--mc-green);
+}
+.mc-top-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: var(--mc-dim);
+}
+.mc-top-status i {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--mc-green);
+}
+.mc-top-status.is-busy i {
+  background: var(--mc-amber);
+  animation: mc-pulse 900ms ease-in-out infinite alternate;
+}
+.mc-top-toggle {
+  margin-left: auto;
+}
+.mc-top-toggle.is-on {
+  color: var(--mc-dim);
 }
 
 .mc-desk {
   display: grid;
-  grid-template-columns: minmax(20rem, 0.9fr) minmax(0, 1.25fr);
-  gap: 1.25rem;
-  height: 100%;
-  min-height: 36rem;
+  grid-template-columns: minmax(24rem, 36%) minmax(0, 1fr);
+  gap: 0.75rem;
+  min-height: 0;
+}
+.mc-desk.is-solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* sem prévia, o terminal não estica as linhas além do confortável */
+.mc-desk.is-solo .mc-log,
+.mc-desk.is-solo .mc-input {
+  padding-inline: max(1rem, calc((100% - 64rem) / 2));
 }
 
 /* ───────────── terminal ───────────── */
@@ -804,17 +879,21 @@
 @media (max-width: 900px) {
   .minecode {
     height: auto;
-    padding: 0.75rem;
+    padding: 0.5rem;
   }
   .mc-desk {
     grid-template-columns: minmax(0, 1fr);
-    height: auto;
   }
   .mc-term {
-    height: 34rem;
+    height: calc(100dvh - 3.9rem);
+    min-height: 28rem;
   }
   .mc-monitor {
-    height: 30rem;
+    height: 78dvh;
+    min-height: 26rem;
+  }
+  .mc-top-status {
+    display: none;
   }
   .mc-neck,
   .mc-base {
@@ -825,6 +904,8 @@
   }
 }
 @media (max-width: 520px) {
+  .mc-top-back span,
+  .mc-top-toggle span,
   .mc-screen-btn.is-full-btn span,
   .mc-actions .minecode-run kbd {
     display: none;

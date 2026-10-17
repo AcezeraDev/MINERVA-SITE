@@ -1,8 +1,13 @@
 // Carregado sob demanda (React.lazy) pela aba MineCode do chat da Mine.
 import React, { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
+  ArrowLeft,
   Bug,
   Check,
+  Code2,
+  Minus,
+  PanelRightClose,
+  PanelRightOpen,
   FileCode2,
   Lightbulb,
   Loader2,
@@ -25,7 +30,7 @@ import { SiteFrame } from "./SitePreview";
 import { MineRichText } from "./MineRichText";
 import { MineFace } from "../caderno/MineFace";
 import { streamMineCode } from "./minecode-api";
-import { mineCodeLanguage, readCodeReply } from "../../shared/code-run.mjs";
+import { isSitePage, mineCodeLanguage, readCodeReply } from "../../shared/code-run.mjs";
 import "./minecode.css";
 
 /*
@@ -119,13 +124,18 @@ function loadChat(): ChatMessage[] {
   }
 }
 
+const PREVIEW_STORAGE = "minerva-minecode-preview-v1";
+
 export function MineCode({
   incoming,
+  onExit,
 }: {
   /** Código vindo de uma resposta da Mine (botão "MineCode"). */
   incoming: { code: string; lang: string; at: number } | null;
   onAsk?: (text: string) => void;
   busy?: boolean;
+  /** Volta para a conversa normal (o MineCode ocupa a tela inteira). */
+  onExit?: () => void;
 }) {
   const saved = useMemo(loadSaved, []);
   const [language, setLanguage] = useState<MineCodeLanguage>(saved.language);
@@ -135,7 +145,18 @@ export function MineCode({
     html: saved.code.html ?? EXAMPLES.html[0].code,
   }));
   const [stdin, setStdin] = useState("");
-  const [htmlRun, setHtmlRun] = useState<string | null>(null);
+  // ao abrir, o monitor já mostra o site que estava no editor
+  const [htmlRun, setHtmlRun] = useState<string | null>(() => {
+    const html = saved.code.html ?? "";
+    return saved.language === "html" && isSitePage(html, "html") ? html : null;
+  });
+  const [previewOpen, setPreviewOpen] = useState(() => {
+    try {
+      return localStorage.getItem(PREVIEW_STORAGE) !== "fechada";
+    } catch {
+      return true;
+    }
+  });
   const [messages, setMessages] = useState<ChatMessage[]>(loadChat);
   const [draft, setDraft] = useState("");
   const [live, setLive] = useState<string | null>(null);
@@ -164,6 +185,22 @@ export function MineCode({
       // idem
     }
   }, [messages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PREVIEW_STORAGE, previewOpen ? "aberta" : "fechada");
+    } catch {
+      // idem
+    }
+  }, [previewOpen]);
+
+  // trocar para HTML mostra no monitor o site que já está no editor
+  useEffect(() => {
+    if (language !== "html" || htmlRun || writing) return;
+    const html = codes.html ?? "";
+    if (isSitePage(html, "html")) setHtmlRun(html);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
 
   useEffect(() => () => abort.current?.abort(), []);
 
@@ -246,6 +283,7 @@ export function MineCode({
         applied = { lang, lines: read.code.trimEnd().split("\n").length, previous: before[lang] ?? "" };
         runner.clear();
         // roda sozinho para mostrar o resultado (se o programa não pedir input)
+        setPreviewOpen(true);
         if (lang === "html") setHtmlRun(read.code);
         else if (!usesInput(lang, read.code)) void runner.run(lang, read.code, []);
         else setHtmlRun(null);
@@ -302,7 +340,24 @@ export function MineCode({
 
   return (
     <section className="minecode" aria-label="MineCode">
-      <div className="mc-desk">
+      <header className="mc-top">
+        {onExit ? (
+          <button type="button" className="mc-top-back" onClick={onExit} title="Voltar para a conversa com a Mine">
+            <ArrowLeft aria-hidden /> <span>Conversa</span>
+          </button>
+        ) : null}
+        <span className="mc-top-brand">
+          <Code2 aria-hidden /> MineCode
+        </span>
+        <span className={`mc-top-status ${writing ? "is-busy" : ""}`}>
+          <i aria-hidden /> {writing ? "a Mine está escrevendo…" : "pronta"}
+        </span>
+        <button type="button" className={`mc-top-toggle ${previewOpen ? "is-on" : ""}`} onClick={() => setPreviewOpen((open) => !open)} aria-pressed={previewOpen} title={previewOpen ? "Minimizar a prévia" : "Mostrar a prévia"}>
+          {previewOpen ? <PanelRightClose aria-hidden /> : <PanelRightOpen aria-hidden />}
+          <span>{previewOpen ? "Minimizar prévia" : "Mostrar prévia"}</span>
+        </button>
+      </header>
+      <div className={`mc-desk ${previewOpen ? "" : "is-solo"}`}>
         {/* ───────── terminal: conversa com a Mine + editor ───────── */}
         <div className={`mc-term ${writing ? "is-writing" : ""}`}>
           <div className="mc-term-bar">
@@ -551,7 +606,9 @@ export function MineCode({
         </div>
 
         {/* ───────── monitor: o site pronto ou a saída do programa ───────── */}
+        {previewOpen ? (
         <MineMonitor
+          onMinimize={() => setPreviewOpen(false)}
           file={meta.file}
           isHtml={language === "html"}
           html={htmlRun}
@@ -565,6 +622,7 @@ export function MineCode({
           }
           emptyHint={language === "html" ? "Peça um site no terminal ou toque em ▶ para ver a página aqui." : `Toque em ▶ para rodar o programa. O que ele imprimir com ${language === "python" ? "print()" : "console.log()"} aparece aqui.`}
         />
+        ) : null}
       </div>
     </section>
   );
@@ -576,6 +634,7 @@ export function MineCode({
  * O iframe continua sendo o SiteFrame isolado (sandbox sem same-origin).
  */
 function MineMonitor({
+  onMinimize,
   file,
   isHtml,
   html,
@@ -585,6 +644,7 @@ function MineMonitor({
   output,
   emptyHint,
 }: {
+  onMinimize: () => void;
   file: string;
   isHtml: boolean;
   html: string | null;
@@ -673,6 +733,11 @@ function MineMonitor({
             {expanded ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
             <span>{expanded ? "Sair" : "Tela cheia"}</span>
           </button>
+          {!expanded ? (
+            <button type="button" className="mc-screen-btn" onClick={onMinimize} title="Minimizar a prévia">
+              <Minus aria-hidden />
+            </button>
+          ) : null}
         </div>
         <div className="mc-screen">
           {isHtml && html ? (
