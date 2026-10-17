@@ -7,6 +7,8 @@ export type XpStatKey =
   | "provas"
   | "games"
   | "gameXp"
+  | "idiomas"
+  | "idiomaXp"
   | "mineMessages"
   | "cardReviews"
   | "mastered"
@@ -36,10 +38,11 @@ export type XpScope = {
 
 export const dayMs: number;
 export const xpPerAction: Record<
-  "subject" | "material" | "studied" | "taskDone" | "focus" | "prova" | "game" | "mineMessage" | "cardReview" | "drawing",
+  "subject" | "material" | "studied" | "taskDone" | "focus" | "prova" | "game" | "mineMessage" | "cardReview" | "drawing" | "idioma",
   number
 >;
 export const drawingsPerDay: number;
+export const idiomaPerfectBonus: number;
 export const xpActions: Array<[string, number]>;
 export const levelTitles: ReadonlyArray<{ level: number; title: string }>;
 export const achievementList: ReadonlyArray<AchievementRule>;
@@ -53,3 +56,4 @@ export function levelFromXp(xp: number): { level: number; levelXp: number; level
 export function xpSince(scope: XpScope, since: number): number;
 export function rankingWindows(now?: number): { day: number; week: number };
 export function gameXpFromCorrectAnswers(correctAnswers: number): number;
+export function lessonXp(correct: number, total: number): number;

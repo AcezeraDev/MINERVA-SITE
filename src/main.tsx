@@ -227,6 +227,7 @@ import {
 const AdminView = React.lazy(() => import("./admin/AdminPanel").then((m) => ({ default: m.AdminView })));
 const GamesView = React.lazy(() => import("./games/GamesPanel").then((m) => ({ default: m.GamesView })));
 const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({ default: m.AtelieView })));
+const IdiomasView = React.lazy(() => import("./idiomas/IdiomasView").then((m) => ({ default: m.IdiomasView })));
 const MesaDeEstudo = React.lazy(() => import("./caderno/MesaDeEstudo"));
 
 /**
@@ -417,6 +418,7 @@ type View =
   | "mine"
   | "games"
   | "atelie"
+  | "idiomas"
   | "search"
   | "plan"
   | "comments"
@@ -711,6 +713,12 @@ export type Session = {
   mode?: "standard" | "daily" | "review";
   reviewedErrorIds?: string[];
   reviewCount?: number;
+  /** Aba Idiomas: idioma, etapa da trilha e palavras acertadas/erradas. */
+  lang?: string;
+  lessonKey?: string;
+  wordsRight?: string[];
+  wordsMissed?: string[];
+  spoke?: number;
 };
 
 type Flashcard = {
@@ -882,6 +890,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
   { view: "mine", label: "Mine", icon: Bot },
   { view: "games", label: "Games com a Mine", icon: Gamepad2 },
   { view: "atelie", label: "Ateliê da Mine", icon: Palette },
+  { view: "idiomas", label: "Idiomas com a Mine", icon: Languages },
   { view: "search", label: "Busca", icon: Search },
   { view: "plan", label: "Plano de estudos", icon: CalendarPlus },
   { view: "comments", label: "Comentários", icon: MessageCircle },
@@ -895,7 +904,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
 /** A barra lateral agrupa os destinos em quatro blocos para virar uma lista escaneável. */
 const navGroups: Array<{ label: string; views: View[] }> = [
   { label: "Estudo", views: ["home", "agenda", "foco", "progress", "ranking"] },
-  { label: "Inteligência", views: ["mine", "games", "atelie", "search", "plan"] },
+  { label: "Inteligência", views: ["mine", "games", "idiomas", "atelie", "search", "plan"] },
   { label: "Comunidade", views: ["comments", "suggestions"] },
   { label: "Conta", views: ["como-usar", "about", "perfil", "admin"] },
 ];
@@ -2480,6 +2489,7 @@ function App() {
     }
     if (route.view === "games") return <React.Suspense fallback={<PageLoading />}><GamesView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "atelie") return <React.Suspense fallback={<PageLoading />}><AtelieView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "idiomas") return <React.Suspense fallback={<PageLoading />}><IdiomasView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "search") return <SearchView data={userData} user={user} query={query} setQuery={setQuery} update={update} notify={notify} />;
     if (route.view === "plan") return <PlanView data={userData} update={update} user={user} notify={notify} />;
     if (route.view === "comments") return <CommentsView data={userData} user={user} update={update} notify={notify} setModal={setModal} />;
@@ -5913,6 +5923,8 @@ const achievementIcons: Record<string, LucideIcon> = {
   "games-25": Trophy,
   "arte-1": Palette,
   "arte-10": Star,
+  "idioma-1": Languages,
+  "idioma-12": Globe,
 };
 
 function buildAchievements(stats: XpStats): Achievement[] {
@@ -13281,7 +13293,7 @@ function applyAssistantActions(data: AppData, userId: string, actions: Assistant
     }
 
     if (action.type === "navigate") {
-      const allowed: View[] = ["home", "agenda", "progress", "ranking", "mine", "games", "atelie", "search", "plan", "comments", "suggestions", "about", "perfil"];
+      const allowed: View[] = ["home", "agenda", "progress", "ranking", "mine", "games", "atelie", "idiomas", "search", "plan", "comments", "suggestions", "about", "perfil"];
       if (action.view === "subject") {
         const subject = findSubject(next.subjects.filter((item) => item.userId === userId), action);
         if (subject) route = { view: "subject", id: subject.id };

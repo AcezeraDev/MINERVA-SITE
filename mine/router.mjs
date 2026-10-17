@@ -94,7 +94,9 @@ export function logMineCall(entry) {
  */
 const GAME_TASKS = new Set(["vf", "pares", "forca", "caca", "sequencia"]);
 // O titulo da conversa tambem vai pela reserva rapida: e uma linha so.
-const FAST_TASKS = new Set([...GAME_TASKS, "title"]);
+// A conversa da aba Idiomas tambem: cada fala do roleplay precisa chegar em
+// poucos segundos, e a dica do "Por que?" sao tres frases.
+const FAST_TASKS = new Set([...GAME_TASKS, "title", "idioma-conversa", "idioma-dica"]);
 
 // Medido em producao em 2026-09-04, `caca` com 6 perguntas no gpt-5-mini:
 // 14,4 s para o pedido antigo e 17,0 s com a folga de ineditismo. O padrao de

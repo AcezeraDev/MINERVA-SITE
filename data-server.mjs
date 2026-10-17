@@ -7,6 +7,7 @@ import { loadLocalEnv } from "./gemini-server.mjs";
 import { gamificationStats, levelFromXp, rankingWindows, totalXp, unlockedAchievements, xpSince } from "./shared/xp.mjs";
 import { dailyChallengeKey, leagueFromPoints, seasonPoints } from "./shared/game-meta.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
+import { MINE_VOICE_DAILY_LIMIT, MineVoiceError, synthesizeVoice } from "./mine/voice.mjs";
 
 const { Pool } = pg;
 const scrypt = promisify(scryptCallback);
@@ -489,6 +490,39 @@ async function handleAtelieIa(req, res) {
   }
 }
 
+/**
+ * Voz da Mine na aba Idiomas. POST { text, slow? } devolve o MP3. Áudio que
+ * já estava no cache do servidor não conta na cota. Qualquer falha responde
+ * JSON com erro e a tela usa a voz do navegador.
+ */
+async function handleMineVoice(req, res) {
+  const session = await requireSession(req, res);
+  if (!session) return;
+  const body = await readJson(req);
+  const used = await takeQuota(session.userId, "mine-voz", MINE_VOICE_DAILY_LIMIT);
+  if (used === null) {
+    sendJson(req, res, 429, { error: "A voz da Mine descansou por hoje.", code: "quota" });
+    return;
+  }
+  try {
+    const result = await synthesizeVoice({ text: body.text, slow: body.slow === true });
+    if (result.cached) await giveBackQuota(session.userId, "mine-voz").catch(() => undefined);
+    const origin = process.env.PUBLIC_APP_ORIGIN || req.headers.origin || "*";
+    res.writeHead(200, {
+      "content-type": result.type,
+      "content-length": String(result.audio.length),
+      "cache-control": "private, max-age=86400",
+      "access-control-allow-origin": origin,
+      vary: "Origin",
+    });
+    res.end(result.audio);
+  } catch (error) {
+    await giveBackQuota(session.userId, "mine-voz").catch(() => undefined);
+    if (!(error instanceof MineVoiceError)) console.error("[mine-voz]", error);
+    sendJson(req, res, error instanceof MineVoiceError ? error.status : 502, { error: error instanceof MineVoiceError ? error.message : "A voz da Mine falhou agora." });
+  }
+}
+
 async function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
   const hash = await scrypt(password, salt, 64);
@@ -906,6 +940,11 @@ export async function handleDataRequest(req, res) {
       const body = await readJson(req);
       const nextData = await mutateData((currentData) => mergeUserData(currentData, body.data || body, session));
       sendJson(req, res, 200, { data: dataForSession(nextData, session), database: pool ? "postgres" : "local-file" });
+      return true;
+    }
+
+    if (url.pathname === "/api/mine-voz" && req.method === "POST") {
+      await handleMineVoice(req, res);
       return true;
     }
 

@@ -137,6 +137,9 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
     const valid = parseSequencePuzzles(text).length;
     return valid >= minimum ? "" : `sequencias incompletas (${valid}/${minimum})`;
   }
+  if (cleanTask === "idioma-conversa") {
+    return /^\s*MINE\s*:\s*\S/im.test(text) ? "" : "fala do roleplay sem o rotulo MINE";
+  }
   if (cleanTask === "mindmap") {
     const branches = matches(text, /^RAMO:\s*.+$/gim).length;
     const items = matches(text, /^-\s+.+:\s+.+$/gim).length;

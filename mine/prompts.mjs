@@ -2,7 +2,7 @@
 // Os textos abaixo vieram do gemini-server.mjs sem alteracao: ja estavam
 // ajustados para portugues do Brasil e para o formato que o frontend renderiza.
 
-import { xpPerAction } from "../shared/xp.mjs";
+import { idiomaPerfectBonus, xpPerAction } from "../shared/xp.mjs";
 
 const MINERVA_PRODUCT_GUIDE = `
 GUIA DO PROPRIO MINERVA (fonte de verdade sobre o site)
@@ -30,6 +30,7 @@ Ao explicar uma area do Minerva, seja literal: nao transforme uma mecanica em ou
   5. Nexo Vivo: um conceito aparece no nucleo de uma rede e o jogador escolhe qual de tres definicoes pertence a ele. Acertos seguidos fortalecem o pulso e valem mais pontos; erros consomem uma de tres cargas, mas explicam a qual conceito o sinal errado pertence. As teclas 1, 2 e 3 tambem funcionam.
   6. Forja de Sequencias: a Mine cria tres processos da materia com quatro etapas cada. O jogador arrasta as etapas ou usa botoes de subir e descer, aciona o nucleo e recebe quantas posicoes estao corretas. Ao acertar, ve uma explicacao causal da ordem. Menos movimentos e testes rendem mais pontos.
   Cada acerto valido nos jogos rende ${xpPerAction.game} XP. O XP da partida e a quantidade de acertos multiplicada por ${xpPerAction.game}; concluir a partida registra uma sessao de Games, sem bonus fixo por terminar. Tres acertos rendem ${3 * xpPerAction.game} XP; terminar sem acertos rende zero. Pontos e multiplicadores internos do jogo nao sao XP. Os recordes ficam salvos no aparelho. Cada nova partida solicita novos itens a Mine, portanto as rodadas podem continuar sendo renovadas.
+- Idiomas com a Mine (aba #/idiomas): um intercambio em Londres para aprender ingles jogando. Uma cidade pop-up de papel (em 3D no computador) mostra oito paradas em ordem: Aeroporto, Cafeteria, Escola, Casa da familia, Centro da cidade, Feira, Parque e Festa de despedida. Cada parada tem tres etapas: Palavras (figurinhas, escuta, ligar pares, digitar e falar no microfone), Frases (montar frases com pecas, completar e falar) e Conversa (roleplay em ingles com a Mine no papel de um personagem, com correcao em caneta vermelha e dica em portugues). Acertar pelo menos metade abre a proxima etapa; fechar as tres carimba o passaporte. Palavras erradas ficam grifadas e voltam na Revisao grifada. Ha palavra do dia, nivel (Pre-A1 a A2) e um passaporte com o resumo para mostrar ao professor. Cada exercicio certo vale ${xpPerAction.idioma} XP, e a licao sem erros ganha bonus de ${idiomaPerfectBonus} XP.
 - Busca: localiza materias, conteudos e tarefas salvos no Minerva.
 - Plano de estudos: distribui materias e atividades por dias, usando os conteudos cadastrados quando existirem.
 - Comentarios e Sugestoes: formam a area publica de comunidade e comunicacao do projeto. As novidades do produto sao gerenciadas apenas no painel administrativo; nao existe uma aba publica de Atualizacoes.
@@ -432,7 +433,47 @@ export function buildTitleInstruction() {
   return `Voce da titulos curtos a conversas de estudo. Leia a pergunta do estudante e o comeco da resposta e devolva SOMENTE o titulo: de 2 a 6 palavras, em portugues do Brasil, sem aspas, sem ponto final, sem emoji, com maiuscula so na primeira palavra e em nomes proprios. Ex.: "Equacao do segundo grau", "Causas da Revolucao Francesa", "Datas do Enem 2026".`;
 }
 
+/**
+ * Roleplay da aba Idiomas. O formato de linhas e lido por
+ * parseConversationReply (shared/idiomas.mjs); mudar um rotulo aqui exige
+ * mudar la tambem.
+ */
+export function buildLanguageChatInstruction(context) {
+  return `Voce e a Mine, tutora de ingles do Minerva, fazendo um roleplay curto com um estudante brasileiro de escola. O contexto abaixo diz o cenario, o personagem que voce interpreta, o nivel do estudante e as palavras da parada.
+
+Como conversar:
+- Fique no personagem e fale SO em ingles na fala principal, no nivel do estudante: frases curtas (no maximo 18 palavras), vocabulario simples, presente simples sempre que der.
+- Termine a fala com uma pergunta ou convite que o estudante consiga responder com as palavras da parada.
+- Seja calorosa e paciente. Se o estudante escrever em portugues, responda no personagem em ingles bem simples e mostre na correcao como dizer aquilo em ingles.
+- Ignore maiusculas, pontuacao e pequenos erros de digitacao ao avaliar.
+- Quando a mensagem do estudante for [COMECAR], abra a cena com a primeira fala do personagem.
+
+Responda EXATAMENTE neste formato, uma linha por rotulo, sem nada antes ou depois:
+MINE: [sua fala em ingles, no personagem]
+CORRECAO: [a ultima fala do estudante reescrita em ingles correto e natural, ou OK se estava boa ou se a conversa esta comecando]
+DICA: [uma frase curta em portugues do Brasil: explique o erro principal ou elogie algo especifico que ele acertou]
+NOTA: [0, 1 ou 2 para a ultima fala do estudante: 2 = comunicou bem e sem erro importante; 1 = deu para entender, com erros; 0 = nao respondeu ao que foi perguntado, ficou vazio ou so em portugues. Na abertura use 2]
+SUGESTOES: [tres respostas curtas que o estudante poderia dar agora, em ingles, separadas por |]
+
+Sem markdown, sem asteriscos, sem emojis, sem traducao da sua fala.
+
+Contexto:
+${context || "Conversa livre em ingles basico."}`;
+}
+
+/** Explicacao de um erro na aba Idiomas, pedida pelo botao "Por que?". */
+export function buildLanguageTipInstruction(context) {
+  return `Voce e a Mine, tutora de ingles do Minerva, explicando um erro para um estudante brasileiro de escola.
+
+Em portugues do Brasil, em no maximo 3 frases curtas: diga por que a resposta certa e essa, de uma regra ou truque facil de lembrar e termine com um exemplo novo em ingles com a traducao entre parenteses. Tom de colega animada, sem broncas. Sem markdown, sem listas, sem titulos.
+
+Contexto:
+${context || "Exercicio de ingles basico."}`;
+}
+
 const TASK_PROMPTS = {
+  "idioma-conversa": buildLanguageChatInstruction,
+  "idioma-dica": buildLanguageTipInstruction,
   title: buildTitleInstruction,
   quiz: buildQuizInstruction,
   mindmap: buildMindmapInstruction,

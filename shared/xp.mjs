@@ -25,7 +25,11 @@ export const xpPerAction = {
   mineMessage: 3,
   cardReview: 5,
   drawing: 15,
+  idioma: 4,
 };
+
+/** Bônus de quem fecha uma lição de idioma sem errar nada. */
+export const idiomaPerfectBonus = 10;
 
 /**
  * Desenhos do Ateliê que valem XP por dia. O resto ainda é guardado, só não
@@ -45,6 +49,8 @@ export const xpActions = [
   ["Acertar uma pergunta nos jogos", xpPerAction.game],
   ["Conversar com a Mine", xpPerAction.mineMessage],
   ["Revisar um flashcard", xpPerAction.cardReview],
+  ["Acertar um exercício na aba Idiomas", xpPerAction.idioma],
+  ["Fechar uma lição de idioma sem errar (bônus)", idiomaPerfectBonus],
   [`Guardar um desenho pintado no Ateliê (até ${drawingsPerDay} por dia)`, xpPerAction.drawing],
 ];
 
@@ -87,6 +93,8 @@ export const achievementList = [
   { id: "streak-7", title: "Semana perfeita", text: "Estude 7 dias seguidos.", xp: 100, target: 7, stat: "streakDays" },
   { id: "games-5", title: "Jogador de plantão", text: "Termine 5 partidas nos jogos da Mine.", xp: 40, target: 5, stat: "games" },
   { id: "games-25", title: "Veterano da arena", text: "Termine 25 partidas nos jogos da Mine.", xp: 80, target: 25, stat: "games" },
+  { id: "idioma-1", title: "Hello, world!", text: "Termine sua primeira lição na aba Idiomas.", xp: 20, target: 1, stat: "idiomas" },
+  { id: "idioma-12", title: "Passaporte carimbado", text: "Termine 12 lições de idioma.", xp: 80, target: 12, stat: "idiomas" },
   { id: "arte-1", title: "Primeira obra", text: "Guarde seu primeiro desenho pintado no Ateliê.", xp: 20, target: 1, stat: "drawings" },
   { id: "arte-10", title: "Artista da Minerva", text: "Guarde 10 desenhos pintados no Ateliê.", xp: 60, target: 10, stat: "drawings" },
 ];
@@ -144,6 +152,10 @@ export function gamificationStats(scope, now = Date.now()) {
     gameXp: sessions
       .filter((item) => item.kind === "Games")
       .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0),
+    idiomas: sessions.filter((item) => item.kind === "Idiomas").length,
+    idiomaXp: sessions
+      .filter((item) => item.kind === "Idiomas")
+      .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0),
     mineMessages: list(scope?.chats).filter((item) => item.role === "user").length,
     cardReviews: flashcards.reduce((sum, card) => sum + (Number(card.reps) || 0), 0),
     mastered: flashcards.filter((card) => (Number(card.level) || 0) >= 4).length,
@@ -165,6 +177,7 @@ export function totalXp(stats) {
     stats.focus * xpPerAction.focus +
     stats.provas * xpPerAction.prova +
     (Number(stats.gameXp) || 0) +
+    (Number(stats.idiomaXp) || 0) +
     stats.mineMessages * xpPerAction.mineMessage +
     stats.cardReviews * xpPerAction.cardReview +
     (Number(stats.drawings) || 0) * xpPerAction.drawing;
@@ -208,6 +221,9 @@ export function xpSince(scope, since) {
     sessions
       .filter((item) => item.kind === "Games" && after(item.createdAt))
       .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0) +
+    sessions
+      .filter((item) => item.kind === "Idiomas" && after(item.createdAt))
+      .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0) +
     list(scope?.chats).filter((item) => item.role === "user" && after(item.createdAt)).length * xpPerAction.mineMessage +
     list(scope?.flashcards).filter((item) => after(item.lastReviewedAt)).length * xpPerAction.cardReview +
     countedDrawings(sessions, from) * xpPerAction.drawing
@@ -217,6 +233,17 @@ export function xpSince(scope, since) {
 /** Jogos premiam apenas respostas corretas; concluir ou errar não rende XP. */
 export function gameXpFromCorrectAnswers(correctAnswers) {
   return Math.max(0, Math.floor(Number(correctAnswers) || 0)) * xpPerAction.game;
+}
+
+/**
+ * Lição de idioma: só acerto rende, como nos jogos, mais um bônus pequeno
+ * para a lição perfeita. O teto protege o ranking de uma sessão adulterada.
+ */
+export function lessonXp(correct, total) {
+  const right = Math.max(0, Math.floor(Number(correct) || 0));
+  const count = Math.max(0, Math.floor(Number(total) || 0));
+  const bonus = count > 0 && right >= count ? idiomaPerfectBonus : 0;
+  return Math.min(60, right * xpPerAction.idioma + bonus);
 }
 
 /** Começo do dia de hoje e dos últimos 7 dias — os dois recortes do ranking. */
