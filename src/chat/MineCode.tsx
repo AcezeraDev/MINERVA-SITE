@@ -1,6 +1,25 @@
 // Carregado sob demanda (React.lazy) pela aba MineCode do chat da Mine.
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Bug, Check, Code2, Lightbulb, Loader2, Play, RotateCcw, Send, Square, Trash2, Undo2, Wand2 } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  Bug,
+  Check,
+  FileCode2,
+  Lightbulb,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Monitor as MonitorIcon,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  Smartphone,
+  Square,
+  Terminal as TerminalIcon,
+  Trash2,
+  Undo2,
+  Wand2,
+} from "lucide-react";
 import { RunOutput, useRunner, usesInput } from "./CodeRunner";
 import { SiteFrame } from "./SitePreview";
 import { MineRichText } from "./MineRichText";
@@ -10,12 +29,13 @@ import { mineCodeLanguage, readCodeReply } from "../../shared/code-run.mjs";
 import "./minecode.css";
 
 /*
- * MineCode: o caderno de programação do chat. Um editor simples (textarea com
- * números de linha, Tab vira espaços, Ctrl+Enter executa), a saída do
- * programa ou, para HTML, a página ao vivo — e, ao lado, o chat com a Mine:
- * você pede, ela escreve o arquivo inteiro direto no editor (ao vivo, pelo
- * streaming), e o resultado roda sozinho. Cada resposta tem Desfazer. O
- * código de qualquer resposta da conversa abre aqui pelo botão "MineCode".
+ * MineCode: um terminal e um monitor. No terminal, a aba "conversa" é o chat
+ * com a Mine (você pede, ela escreve o arquivo inteiro, ao vivo pelo
+ * streaming) e a aba do arquivo é o editor (números de linha, Tab vira
+ * espaços, Ctrl+Enter executa). O monitor ao lado mostra o site pronto ou a
+ * saída do programa, com visão de celular e tela cheia. Cada resposta tem
+ * Desfazer. O código de qualquer resposta da conversa abre aqui pelo botão
+ * "MineCode".
  */
 
 export type MineCodeLanguage = "python" | "javascript" | "html";
@@ -119,6 +139,7 @@ export function MineCode({
   const [messages, setMessages] = useState<ChatMessage[]>(loadChat);
   const [draft, setDraft] = useState("");
   const [live, setLive] = useState<string | null>(null);
+  const [pane, setPane] = useState<"chat" | "code">("chat");
   const runner = useRunner();
   const gutter = useRef<HTMLDivElement | null>(null);
   const chatScroll = useRef<HTMLDivElement | null>(null);
@@ -157,6 +178,7 @@ export function MineCode({
     setLanguage(target);
     setCodes((current) => ({ ...current, [target]: incoming.code.replace(/\s+$/, "") + "\n" }));
     runner.clear();
+    setPane("code");
     setHtmlRun(target === "html" ? incoming.code : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incoming?.at]);
@@ -227,6 +249,10 @@ export function MineCode({
         if (lang === "html") setHtmlRun(read.code);
         else if (!usesInput(lang, read.code)) void runner.run(lang, read.code, []);
         else setHtmlRun(null);
+        // no celular o monitor fica embaixo do terminal: desce até ele
+        if (window.matchMedia("(max-width: 900px)").matches) {
+          window.setTimeout(() => document.querySelector(".mc-monitor")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+        }
       }
       setMessages((current) => [...current, { id: `a${Date.now()}`, role: "assistant", text: read.explanation || "Pronto! Coloquei o código no editor.", applied }]);
     } catch (error) {
@@ -270,246 +296,402 @@ export function MineCode({
     }
   };
 
+
   const liveRead = live !== null ? readCodeReply(live) : null;
+  const liveTail = liveRead?.code ? liveRead.code.replace(/\s+$/, "").split("\n").slice(-8).join("\n") : "";
 
   return (
     <section className="minecode" aria-label="MineCode">
-      <header className="minecode-head">
-        <div className="minecode-brand">
-          <span className="minecode-logo" aria-hidden>
-            <Code2 />
-          </span>
-          <div>
-            <p className="minecode-title">MineCode</p>
-            <p className="minecode-sub">peça e a Mine programa com você</p>
+      <div className="mc-desk">
+        {/* ───────── terminal: conversa com a Mine + editor ───────── */}
+        <div className={`mc-term ${writing ? "is-writing" : ""}`}>
+          <div className="mc-term-bar">
+            <span className="mc-dots" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="mc-term-title">
+              <TerminalIcon aria-hidden /> mine@minecode: ~/{meta.file}
+            </span>
+            <span className="mc-langs" role="tablist" aria-label="Linguagem">
+              {LANGUAGES.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={language === item.id}
+                  className={language === item.id ? "is-on" : ""}
+                  disabled={writing}
+                  onClick={() => {
+                    setLanguage(item.id);
+                    runner.clear();
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </span>
           </div>
-        </div>
-        <div className="minecode-langs" role="tablist" aria-label="Linguagem">
-          {LANGUAGES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={language === item.id}
-              className={language === item.id ? "is-on" : ""}
-              disabled={writing}
-              onClick={() => {
-                setLanguage(item.id);
-                runner.clear();
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </header>
 
-      <div className="minecode-body">
-        <div className="minecode-work">
-          <div className={`minecode-editor ${writing ? "is-writing" : ""}`}>
-            <div className="minecode-tabbar">
-              <span className="minecode-file">{meta.file}</span>
-              {writing ? (
-                <span className="minecode-writing">
-                  <Loader2 className="animate-spin" aria-hidden /> a Mine está escrevendo…
-                </span>
-              ) : (
-                <label className="minecode-examples">
-                  <Lightbulb aria-hidden />
-                  <select
-                    value=""
-                    onChange={(event) => {
-                      const example = EXAMPLES[language].find((item) => item.title === event.target.value);
-                      if (example) {
-                        setCode(example.code);
-                        runner.clear();
-                        setHtmlRun(null);
-                      }
-                    }}
-                    aria-label="Carregar um exemplo"
-                  >
-                    <option value="">exemplos…</option>
-                    {EXAMPLES[language].map((item) => (
-                      <option key={item.title} value={item.title}>
-                        {item.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-            <div className="minecode-code">
-              <div className="minecode-gutter" ref={gutter} aria-hidden>
-                {Array.from({ length: lineCount }, (_, index) => (
-                  <span key={index}>{index + 1}</span>
-                ))}
-              </div>
-              <textarea
-                className="minecode-textarea"
-                value={code}
-                readOnly={writing}
-                onChange={(event) => setCode(event.target.value)}
-                onKeyDown={onKeyDown}
-                onScroll={(event) => {
-                  if (gutter.current) gutter.current.scrollTop = event.currentTarget.scrollTop;
-                }}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoComplete="off"
-                aria-label={`Código ${meta.label}`}
-              />
-            </div>
-            <div className="minecode-actions">
-              <button type="button" className="minecode-run" onClick={run} disabled={runner.status !== "idle" || writing}>
-                {runner.status !== "idle" ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
-                {language === "html" ? "Ver página" : runner.status !== "idle" ? "Rodando…" : "Executar"}
-                <kbd>Ctrl ↵</kbd>
+          <div className="mc-tabs" role="tablist" aria-label="Painel do terminal">
+            <button type="button" role="tab" aria-selected={pane === "chat"} className={pane === "chat" ? "is-on" : ""} onClick={() => setPane("chat")}>
+              <span className="mc-prompt-glyph" aria-hidden>
+                ❯
+              </span>{" "}
+              conversa
+            </button>
+            <button type="button" role="tab" aria-selected={pane === "code"} className={pane === "code" ? "is-on" : ""} onClick={() => setPane("code")}>
+              <FileCode2 aria-hidden /> {meta.file}
+              {writing ? <i className="mc-tab-dot" aria-label="sendo escrito" /> : null}
+            </button>
+            {pane === "chat" && messages.length && !writing ? (
+              <button type="button" className="mc-tab-tool" onClick={() => setMessages([])} title="Limpar conversa">
+                <Trash2 aria-hidden /> <span>clear</span>
               </button>
-              <button
-                type="button"
-                className="minecode-ghost"
-                disabled={writing}
-                onClick={() => {
-                  setCode(EXAMPLES[language][0].code);
-                  runner.clear();
-                  setHtmlRun(null);
-                }}
-                title="Voltar ao exemplo"
-              >
-                <RotateCcw aria-hidden /> Recomeçar
-              </button>
-            </div>
-            {language !== "html" && usesInput(language, code) ? (
-              <label className="minecode-stdin">
-                <span>Entradas para {language === "python" ? "input()" : "prompt()"} — uma por linha</span>
-                <textarea value={stdin} onChange={(event) => setStdin(event.target.value)} rows={2} spellCheck={false} placeholder="ex.: 7" />
+            ) : null}
+            {pane === "code" && !writing ? (
+              <label className="mc-tab-tool mc-examples">
+                <Lightbulb aria-hidden />
+                <select
+                  value=""
+                  onChange={(event) => {
+                    const example = EXAMPLES[language].find((item) => item.title === event.target.value);
+                    if (example) {
+                      setCode(example.code);
+                      runner.clear();
+                      setHtmlRun(null);
+                    }
+                  }}
+                  aria-label="Carregar um exemplo"
+                >
+                  <option value="">exemplos…</option>
+                  {EXAMPLES[language].map((item) => (
+                    <option key={item.title} value={item.title}>
+                      {item.title}
+                    </option>
+                  ))}
+                </select>
               </label>
             ) : null}
           </div>
 
-          {language === "html" ? (
-            htmlRun ? (
-              <div className="minecode-preview">
-                <SiteFrame code={htmlRun} title={meta.file} device="desktop" />
+          {pane === "chat" ? (
+            <>
+              <div className="mc-log" ref={chatScroll} aria-live="polite">
+                <div className="mc-welcome">
+                  <MineFace thinking={writing} className="mc-face" />
+                  <div>
+                    <p className="mc-welcome-title">MineCode · Mine programadora</p>
+                    <p className="mc-dim">{writing ? "escrevendo o código…" : "diga o que quer criar; o resultado aparece no monitor ao lado"}</p>
+                  </div>
+                </div>
+                {!messages.length && !writing ? (
+                  <div className="mc-starters">
+                    <p className="mc-dim"># tente um destes:</p>
+                    {STARTERS[language].map((item) => (
+                      <button key={item} type="button" onClick={() => void ask(item)}>
+                        <span className="mc-ps">$</span> {item}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {messages.map((message) =>
+                  message.role === "user" ? (
+                    <p key={message.id} className="mc-cmd">
+                      <span className="mc-ps">aluno@minerva ~ $</span> {message.text}
+                    </p>
+                  ) : (
+                    <div key={message.id} className={`mc-out ${message.error ? "is-error" : ""}`}>
+                      <span className="mc-who">{message.error ? "erro" : "mine"}</span>
+                      <MineRichText text={message.text} />
+                      {message.applied ? (
+                        <div className={`mc-applied ${message.applied.undone ? "is-undone" : ""}`}>
+                          <Check aria-hidden />
+                          <span>
+                            {message.applied.undone ? "desfeito" : `${message.applied.lines} linhas →`} {LANGUAGES.find((item) => item.id === message.applied!.lang)?.file}
+                          </span>
+                          {!message.applied.undone ? (
+                            <>
+                              <button type="button" onClick={() => setPane("code")}>
+                                ver código
+                              </button>
+                              <button type="button" onClick={() => undo(message)} disabled={writing}>
+                                <Undo2 aria-hidden /> desfazer
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ),
+                )}
+                {liveRead ? (
+                  <div className="mc-out is-live">
+                    <span className="mc-who">mine</span>
+                    {liveRead.explanation ? <MineRichText text={liveRead.explanation} streaming /> : null}
+                    {liveRead.code ? (
+                      <>
+                        <p className="mc-dim">
+                          <Loader2 className="animate-spin" aria-hidden /> escrevendo {meta.file}… {liveRead.code.split("\n").length} linhas
+                        </p>
+                        <pre className="mc-stream">
+                          {liveTail}
+                          <span className="mc-caret" aria-hidden />
+                        </pre>
+                      </>
+                    ) : (
+                      <p className="mc-dim">
+                        <Loader2 className="animate-spin" aria-hidden /> pensando…
+                      </p>
+                    )}
+                  </div>
+                ) : null}
               </div>
-            ) : (
-              <p className="minecode-empty">Toque em “Ver página” para ver o site funcionando aqui.</p>
-            )
-          ) : runner.lines.length || runner.status !== "idle" || runner.elapsed !== null ? (
-            <RunOutput lines={runner.lines} status={runner.status} elapsed={runner.elapsed} onClear={runner.clear} />
+
+              <div className="mc-input">
+                <div className="mc-quick">
+                  <button type="button" onClick={() => void ask("Me explica este código parte por parte, como se eu estivesse começando.")} disabled={writing}>
+                    <Lightbulb aria-hidden /> explicar
+                  </button>
+                  <button type="button" className={failed ? "is-hot" : ""} onClick={() => void ask("Corrige o erro do meu código e me explica o que estava errado.")} disabled={writing}>
+                    <Bug aria-hidden /> corrigir
+                  </button>
+                  <button type="button" onClick={() => void ask("Melhora este código e me conta o que mudou.")} disabled={writing}>
+                    <Wand2 aria-hidden /> melhorar
+                  </button>
+                </div>
+                <form
+                  className="mc-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void ask(draft);
+                  }}
+                >
+                  <span className="mc-ps" aria-hidden>
+                    ❯
+                  </span>
+                  <textarea
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void ask(draft);
+                      }
+                    }}
+                    rows={1}
+                    placeholder={language === "html" ? "faz um site da minha banda com galeria" : "faz um jogo de perguntas com placar"}
+                    aria-label="Pedido para a Mine"
+                    disabled={writing}
+                  />
+                  {writing ? (
+                    <button type="button" className="mc-send is-stop" onClick={() => abort.current?.abort()} aria-label="Parar">
+                      <Square aria-hidden />
+                    </button>
+                  ) : (
+                    <button type="submit" className="mc-send" disabled={!draft.trim()} aria-label="Enviar pedido">
+                      <Send aria-hidden />
+                    </button>
+                  )}
+                </form>
+              </div>
+            </>
           ) : (
-            <p className="minecode-empty">A saída do programa aparece aqui. Use print() {language === "javascript" ? "(ou console.log())" : ""} para ver resultados.</p>
+            <>
+              <div className="mc-code">
+                <div className="mc-gutter" ref={gutter} aria-hidden>
+                  {Array.from({ length: lineCount }, (_, index) => (
+                    <span key={index}>{index + 1}</span>
+                  ))}
+                </div>
+                <textarea
+                  className="mc-textarea"
+                  value={code}
+                  readOnly={writing}
+                  onChange={(event) => setCode(event.target.value)}
+                  onKeyDown={onKeyDown}
+                  onScroll={(event) => {
+                    if (gutter.current) gutter.current.scrollTop = event.currentTarget.scrollTop;
+                  }}
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  aria-label={`Código ${meta.label}`}
+                />
+              </div>
+              {language !== "html" && usesInput(language, code) ? (
+                <label className="mc-stdin">
+                  <span>Entradas para {language === "python" ? "input()" : "prompt()"} — uma por linha</span>
+                  <textarea value={stdin} onChange={(event) => setStdin(event.target.value)} rows={2} spellCheck={false} placeholder="ex.: 7" />
+                </label>
+              ) : null}
+              <div className="mc-actions">
+                <button type="button" className="minecode-run" onClick={run} disabled={runner.status !== "idle" || writing}>
+                  {runner.status !== "idle" ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
+                  {language === "html" ? "Ver no monitor" : runner.status !== "idle" ? "Rodando…" : "Executar"}
+                  <kbd>Ctrl ↵</kbd>
+                </button>
+                <button
+                  type="button"
+                  className="mc-ghost"
+                  disabled={writing}
+                  onClick={() => {
+                    setCode(EXAMPLES[language][0].code);
+                    runner.clear();
+                    setHtmlRun(null);
+                  }}
+                  title="Voltar ao exemplo"
+                >
+                  <RotateCcw aria-hidden /> Recomeçar
+                </button>
+              </div>
+            </>
           )}
         </div>
 
-        <aside className="minecode-chat" aria-label="Chat com a Mine">
-          <div className="minecode-chat-head">
-            <MineFace thinking={writing} className="minecode-chat-face" />
-            <div>
-              <p className="minecode-chat-title">Mine programadora</p>
-              <p className="minecode-chat-sub">{writing ? "escrevendo o código…" : "diz o que você quer e eu escrevo"}</p>
-            </div>
-            {messages.length && !writing ? (
-              <button type="button" className="minecode-chat-clear" onClick={() => setMessages([])} title="Limpar conversa">
-                <Trash2 aria-hidden />
-              </button>
-            ) : null}
-          </div>
-
-          <div className="minecode-chat-log" ref={chatScroll} aria-live="polite">
-            {!messages.length && !writing ? (
-              <div className="minecode-chat-empty">
-                <p>Me pede um programa e eu escrevo direto no editor. Depois é só rodar, mexer e me pedir ajustes.</p>
-                <div className="minecode-starters">
-                  {STARTERS[language].map((item) => (
-                    <button key={item} type="button" onClick={() => void ask(item)}>
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {messages.map((message) =>
-              message.role === "user" ? (
-                <p key={message.id} className="minecode-msg is-user">
-                  {message.text}
-                </p>
-              ) : (
-                <div key={message.id} className={`minecode-msg is-mine ${message.error ? "is-error" : ""}`}>
-                  <MineRichText text={message.text} />
-                  {message.applied ? (
-                    <div className={`minecode-applied ${message.applied.undone ? "is-undone" : ""}`}>
-                      <Check aria-hidden />
-                      <span>
-                        {message.applied.undone ? "desfeito" : `${message.applied.lines} linhas no editor`} · {LANGUAGES.find((item) => item.id === message.applied!.lang)?.file}
-                      </span>
-                      {!message.applied.undone ? (
-                        <button type="button" onClick={() => undo(message)} disabled={writing}>
-                          <Undo2 aria-hidden /> Desfazer
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              ),
-            )}
-            {liveRead ? (
-              <div className="minecode-msg is-mine is-live">
-                {liveRead.explanation ? <MineRichText text={liveRead.explanation} streaming /> : null}
-                <p className="minecode-live">
-                  <Loader2 className="animate-spin" aria-hidden />
-                  {liveRead.code ? `escrevendo no editor… ${liveRead.code.split("\n").length} linhas` : "pensando…"}
-                </p>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="minecode-chat-input">
-            <div className="minecode-quick">
-              <button type="button" onClick={() => void ask("Me explica este código parte por parte, como se eu estivesse começando.")} disabled={writing}>
-                <Lightbulb aria-hidden /> Explicar
-              </button>
-              <button type="button" className={failed ? "is-hot" : ""} onClick={() => void ask("Corrige o erro do meu código e me explica o que estava errado.")} disabled={writing}>
-                <Bug aria-hidden /> Corrigir erro
-              </button>
-              <button type="button" onClick={() => void ask("Melhora este código e me conta o que mudou.")} disabled={writing}>
-                <Wand2 aria-hidden /> Melhorar
-              </button>
-            </div>
-            <form
-              className="minecode-chat-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void ask(draft);
-              }}
-            >
-              <textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void ask(draft);
-                  }
-                }}
-                rows={2}
-                placeholder={language === "html" ? "Ex.: faz um site da minha banda com galeria" : "Ex.: faz um jogo de perguntas com placar"}
-                aria-label="Pedido para a Mine"
-                disabled={writing}
-              />
-              {writing ? (
-                <button type="button" className="minecode-send is-stop" onClick={() => abort.current?.abort()} aria-label="Parar">
-                  <Square aria-hidden />
-                </button>
-              ) : (
-                <button type="submit" className="minecode-send" disabled={!draft.trim()} aria-label="Enviar pedido">
-                  <Send aria-hidden />
-                </button>
-              )}
-            </form>
-          </div>
-        </aside>
+        {/* ───────── monitor: o site pronto ou a saída do programa ───────── */}
+        <MineMonitor
+          file={meta.file}
+          isHtml={language === "html"}
+          html={htmlRun}
+          writing={writing}
+          busy={runner.status !== "idle"}
+          onRun={run}
+          output={
+            runner.lines.length || runner.status !== "idle" || runner.elapsed !== null ? (
+              <RunOutput lines={runner.lines} status={runner.status} elapsed={runner.elapsed} onClear={runner.clear} />
+            ) : null
+          }
+          emptyHint={language === "html" ? "Peça um site no terminal ou toque em ▶ para ver a página aqui." : `Toque em ▶ para rodar o programa. O que ele imprimir com ${language === "python" ? "print()" : "console.log()"} aparece aqui.`}
+        />
       </div>
     </section>
+  );
+}
+
+/*
+ * O monitor ao lado do terminal. Tela cheia de verdade (Fullscreen API) na
+ * moldura inteira; onde o navegador não deixa (iPhone), vira um overlay fixo.
+ * O iframe continua sendo o SiteFrame isolado (sandbox sem same-origin).
+ */
+function MineMonitor({
+  file,
+  isHtml,
+  html,
+  writing,
+  busy,
+  onRun,
+  output,
+  emptyHint,
+}: {
+  file: string;
+  isHtml: boolean;
+  html: string | null;
+  writing: boolean;
+  busy: boolean;
+  onRun: () => void;
+  output: React.ReactNode;
+  emptyHint: string;
+}) {
+  const frame = useRef<HTMLDivElement | null>(null);
+  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
+  const [reload, setReload] = useState(0);
+  const [full, setFull] = useState(false);
+  const [fakeFull, setFakeFull] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => setFull(document.fullscreenElement === frame.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!fakeFull) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFakeFull(false);
+    };
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [fakeFull]);
+
+  const expanded = full || fakeFull;
+  const toggleFull = async () => {
+    if (expanded) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
+      setFakeFull(false);
+      return;
+    }
+    const node = frame.current;
+    if (node?.requestFullscreen) {
+      // alguns navegadores embutidos nunca resolvem o pedido: depois de um
+      // instante sem tela cheia, cai no overlay
+      const ok = await Promise.race([
+        node.requestFullscreen().then(
+          () => true,
+          () => false,
+        ),
+        new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), 700)),
+      ]);
+      if (ok || document.fullscreenElement === node) return;
+    }
+    setFakeFull(true);
+  };
+
+  const showing = isHtml ? Boolean(html) : Boolean(output);
+
+  return (
+    <div className="mc-monitor">
+      <div ref={frame} className={`mc-screen-frame ${fakeFull ? "is-fake-full" : ""} ${expanded ? "is-full" : ""}`}>
+        <div className="mc-screen-bar">
+          <span className={`mc-led ${writing || busy ? "is-busy" : showing ? "is-on" : ""}`} aria-hidden />
+          <span className="mc-url">{isHtml ? `minerva.app/${file}` : `saída de ${file}`}</span>
+          {isHtml ? (
+            <span className="mc-devices" role="group" aria-label="Tamanho da tela">
+              <button type="button" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")} title="Computador">
+                <MonitorIcon aria-hidden />
+              </button>
+              <button type="button" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")} title="Celular">
+                <Smartphone aria-hidden />
+              </button>
+            </span>
+          ) : null}
+          <button type="button" className="mc-screen-btn" onClick={onRun} disabled={busy || writing} title={isHtml ? "Atualizar com o código do editor" : "Rodar o programa"}>
+            {isHtml ? <RefreshCw aria-hidden /> : <Play aria-hidden />}
+          </button>
+          {isHtml && html ? (
+            <button type="button" className="mc-screen-btn" onClick={() => setReload((value) => value + 1)} title="Recarregar a página">
+              <RotateCcw aria-hidden />
+            </button>
+          ) : null}
+          <button type="button" className="mc-screen-btn is-full-btn" onClick={() => void toggleFull()} title={expanded ? "Sair da tela cheia (Esc)" : "Tela cheia"}>
+            {expanded ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
+            <span>{expanded ? "Sair" : "Tela cheia"}</span>
+          </button>
+        </div>
+        <div className="mc-screen">
+          {isHtml && html ? (
+            <SiteFrame key={reload} code={html} title={file} device={device} />
+          ) : !isHtml && output ? (
+            output
+          ) : (
+            <div className="mc-standby">
+              {writing ? <Loader2 className="animate-spin" aria-hidden /> : <MonitorIcon aria-hidden />}
+              <p>{writing ? "A Mine está escrevendo… o resultado aparece aqui quando ela terminar." : emptyHint}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="mc-chin" aria-hidden>
+        <span>MineView</span>
+      </div>
+      <div className="mc-neck" aria-hidden />
+      <div className="mc-base" aria-hidden />
+    </div>
   );
 }

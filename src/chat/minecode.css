@@ -1,313 +1,576 @@
-/* Aba MineCode do chat (MineCode.tsx). Editor escuro, como um caderno de programação. */
+/* Aba MineCode do chat (MineCode.tsx): um terminal (conversa + editor) e,
+   ao lado, um monitor com o site pronto ou a saída do programa. O terminal e o
+   monitor são sempre escuros, nos dois temas do caderno. */
 
 .minecode {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 1rem;
-  max-width: 76rem;
-  min-height: 100%;
+  --mc-bg: #0b100e;
+  --mc-bar: #111915;
+  --mc-line: rgba(255, 255, 255, 0.08);
+  --mc-text: #d9e6df;
+  --mc-dim: rgba(217, 230, 223, 0.52);
+  --mc-green: #2fd483;
+  --mc-cyan: #7cc8ff;
+  --mc-amber: #ffd27a;
+  --mc-red: #ff8a8f;
+  --mc-mono: "DM Mono", ui-monospace, "Cascadia Code", monospace;
+  height: 100%;
+  max-width: 96rem;
   margin: 0 auto;
-  padding: 1rem 1rem 2rem;
-}
-.minecode-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-}
-.minecode-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-}
-.minecode-logo {
-  display: grid;
-  place-items: center;
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 0.8rem;
-  background: #0b100e;
-  color: #2fd483;
-  box-shadow: inset 0 0 0 1px rgba(47, 212, 131, 0.35);
-}
-.minecode-title {
-  font-family: "Anybody Variable", sans-serif;
-  font-weight: 900;
-  font-size: 1.35rem;
-  line-height: 1;
-}
-.minecode-sub {
-  font-family: "Gochi Hand", cursive;
-  font-size: 1.05rem;
-  color: rgb(var(--theme-muted));
-}
-.minecode-langs {
-  display: inline-flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border-radius: 0.8rem;
-  background: rgb(var(--panel));
-  box-shadow: inset 0 0 0 1px rgb(var(--line));
-}
-.minecode-langs button {
-  padding: 0.45rem 0.85rem;
-  border-radius: 0.6rem;
-  font-weight: 800;
-  font-size: 0.85rem;
-  color: rgb(var(--theme-muted));
-}
-.minecode-langs button.is-on {
-  background: rgb(var(--pen));
-  color: rgb(var(--pen-ink));
+  padding: 1rem;
 }
 
-.minecode-body {
+.mc-desk {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: 1rem;
-  align-items: start;
+  grid-template-columns: minmax(20rem, 0.9fr) minmax(0, 1.25fr);
+  gap: 1.25rem;
+  height: 100%;
+  min-height: 36rem;
 }
-.minecode-editor {
-  display: grid;
+
+/* ───────────── terminal ───────────── */
+.mc-term {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  border-radius: 1rem;
-  background: #0b100e;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  color: #d9e6df;
+  border-radius: 0.9rem;
+  background: var(--mc-bg);
+  color: var(--mc-text);
+  font-family: var(--mc-mono);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 24px 48px -24px rgba(0, 0, 0, 0.55);
+  transition: box-shadow 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.minecode-tabbar {
+.mc-term.is-writing {
+  box-shadow: 0 0 0 1px rgba(47, 212, 131, 0.55), 0 0 32px -8px rgba(47, 212, 131, 0.45);
+}
+.mc-term-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--mc-bar);
+  border-bottom: 1px solid var(--mc-line);
+}
+.mc-dots {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex: none;
+}
+.mc-dots i {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+.mc-dots i:nth-child(2) {
+  background: #febc2e;
+}
+.mc-dots i:nth-child(3) {
+  background: #28c840;
+}
+.mc-term-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.78rem;
+  color: var(--mc-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mc-term-title svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
+  color: var(--mc-green);
+}
+.mc-langs {
+  display: inline-flex;
+  gap: 0.2rem;
+  margin-left: auto;
+  padding: 0.15rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+.mc-langs button {
+  padding: 0.25rem 0.55rem;
+  border-radius: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--mc-dim);
+}
+.mc-langs button:hover:not(:disabled) {
+  color: var(--mc-text);
+}
+.mc-langs button.is-on {
+  background: var(--mc-green);
+  color: #06120c;
+}
+.mc-langs button:disabled {
+  opacity: 0.5;
+}
+
+.mc-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0.1rem;
+  padding: 0 0.5rem;
+  border-bottom: 1px solid var(--mc-line);
+  background: #0d1411;
+}
+.mc-tabs > button[role="tab"] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0f1512;
+  font-size: 0.78rem;
+  color: var(--mc-dim);
 }
-.minecode-file {
-  padding: 0.25rem 0.65rem;
-  border-radius: 0.45rem 0.45rem 0 0;
-  border-bottom: 2px solid #2fd483;
-  font-family: "DM Mono", ui-monospace, monospace;
-  font-size: 0.8rem;
+.mc-tabs > button[role="tab"] svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
-.minecode-examples {
+.mc-tabs > button[role="tab"]:hover {
+  color: var(--mc-text);
+}
+.mc-tabs > button.is-on {
+  color: var(--mc-text);
+  background: var(--mc-bg);
+  box-shadow: inset 0 2px 0 var(--mc-green);
+}
+.mc-prompt-glyph {
+  color: var(--mc-green);
+}
+.mc-tab-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--mc-green);
+  animation: mc-blink 1s steps(2, start) infinite;
+}
+.mc-tab-tool {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  color: rgba(217, 230, 223, 0.6);
+  margin-left: auto;
+  padding: 0 0.4rem;
+  font-size: 0.74rem;
+  color: var(--mc-dim);
 }
-.minecode-examples svg {
+.mc-tab-tool:hover {
+  color: var(--mc-text);
+}
+.mc-tab-tool svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.mc-examples select {
+  padding: 0.2rem 0.35rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--mc-mono);
+  font-size: 0.74rem;
+}
+
+/* conversa como saída de terminal */
+.mc-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  flex: 1;
+  min-height: 0;
+  padding: 0.9rem 1rem;
+  overflow-y: auto;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.mc-welcome {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--mc-line);
+}
+.mc-face {
+  width: 2.3rem;
+  height: 2.3rem;
+  flex: none;
+}
+/* a Mine em versão terminal: traço verde sobre o fundo escuro, nos dois temas */
+.mc-face.caderno-mineface .f-stroke {
+  fill: none;
+  stroke: var(--mc-green);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mc-face.caderno-mineface .f-head {
+  fill: #13201a;
+}
+.mc-face.caderno-mineface .f-visor {
+  fill: #050807;
+}
+.mc-face.caderno-mineface .f-ear,
+.mc-face.caderno-mineface .f-bulb {
+  fill: rgba(47, 212, 131, 0.35);
+}
+.mc-face.caderno-mineface .f-eye {
+  fill: var(--mc-green);
+}
+.mc-welcome-title {
+  font-weight: 700;
+  color: var(--mc-green);
+}
+.mc-dim {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--mc-dim);
+  font-size: 0.8rem;
+}
+.mc-dim svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.mc-ps {
+  color: var(--mc-green);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.mc-starters {
+  display: grid;
+  gap: 0.3rem;
+}
+.mc-starters button {
+  justify-self: start;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.35rem;
+  font-family: var(--mc-mono);
+  font-size: 0.84rem;
+  color: var(--mc-text);
+  text-align: left;
+}
+.mc-starters button:hover {
+  background: rgba(47, 212, 131, 0.1);
+}
+.mc-cmd {
+  color: #f2fbf6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mc-out {
+  position: relative;
+  padding-left: 0.85rem;
+  border-left: 2px solid rgba(124, 200, 255, 0.45);
+}
+.mc-out.is-error {
+  border-left-color: var(--mc-red);
+}
+.mc-who {
+  display: inline-block;
+  margin-bottom: 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mc-cyan);
+}
+.mc-out.is-error .mc-who {
+  color: var(--mc-red);
+}
+/* o markdown da Mine sobre fundo escuro */
+.mc-out :where(p, li, strong, em, span, h2, h3, h4, blockquote) {
+  color: var(--mc-text);
+}
+.mc-out :where(p, li) {
+  font-family: var(--mc-mono);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+.mc-out.is-error :where(p, li) {
+  color: var(--mc-red);
+}
+.mc-out :where(strong) {
+  color: #ffffff;
+}
+.mc-out :where(code):not(pre code) {
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.3rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: #9ff0c4;
+}
+.mc-out :where(a) {
+  color: var(--mc-cyan);
+}
+.mc-out :where(li)::marker {
+  color: var(--mc-green);
+}
+.mc-applied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--mc-green);
+}
+.mc-applied svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.mc-applied.is-undone {
+  color: var(--mc-dim);
+}
+.mc-applied button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.3rem;
+  font-family: var(--mc-mono);
+  color: var(--mc-text);
+  text-decoration: underline;
+  text-decoration-color: rgba(217, 230, 223, 0.3);
+  text-underline-offset: 3px;
+}
+.mc-applied button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+.mc-stream {
+  margin: 0.35rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.04);
+  font-family: var(--mc-mono);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: #9ff0c4;
+  white-space: pre;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent, #000 40%);
+}
+.mc-caret {
+  display: inline-block;
+  width: 0.5rem;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--mc-green);
+  animation: mc-blink 1s steps(2, start) infinite;
+}
+@keyframes mc-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* linha de comando */
+.mc-input {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem 0.75rem;
+  border-top: 1px solid var(--mc-line);
+  background: #0d1411;
+}
+.mc-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.mc-quick button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--mc-mono);
+  font-size: 0.74rem;
+  color: var(--mc-text);
+}
+.mc-quick button:hover:not(:disabled) {
+  border-color: var(--mc-green);
+  color: var(--mc-green);
+}
+.mc-quick button svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.mc-quick button.is-hot {
+  border-color: var(--mc-red);
+  color: var(--mc-red);
+}
+.mc-quick button:disabled {
+  opacity: 0.45;
+}
+.mc-form {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.45rem 0.45rem 0.45rem 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--mc-bg);
+  transition: border-color 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mc-form:focus-within {
+  border-color: rgba(47, 212, 131, 0.7);
+}
+.mc-form .mc-ps {
+  padding-top: 0.32rem;
+}
+.mc-form textarea {
+  flex: 1;
+  min-height: 1.9rem;
+  max-height: 8rem;
+  padding: 0.3rem 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  font-family: var(--mc-mono);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  field-sizing: content;
+}
+.mc-send {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  border-radius: 0.45rem;
+  background: var(--mc-green);
+  color: #06120c;
+}
+.mc-send svg {
   width: 0.95rem;
   height: 0.95rem;
 }
-.minecode-examples select {
-  padding: 0.25rem 0.4rem;
-  border-radius: 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: #0b100e;
-  color: #d9e6df;
-  font-size: 0.8rem;
+.mc-send:disabled {
+  opacity: 0.35;
 }
-.minecode-code {
+.mc-send.is-stop {
+  background: #e5484d;
+  color: #fff;
+}
+
+/* editor */
+.mc-code {
   display: grid;
   grid-template-columns: auto 1fr;
-  height: min(28rem, 55vh);
+  flex: 1;
+  min-height: 0;
 }
-.minecode-gutter {
+.mc-gutter {
   overflow: hidden;
   padding: 0.75rem 0.55rem 0.75rem 0.75rem;
   border-right: 1px solid rgba(255, 255, 255, 0.07);
   text-align: right;
   user-select: none;
-  font-family: "DM Mono", ui-monospace, monospace;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   line-height: 1.6;
-  color: rgba(217, 230, 223, 0.32);
+  color: rgba(217, 230, 223, 0.3);
 }
-.minecode-gutter span {
+.mc-gutter span {
   display: block;
 }
-.minecode-textarea {
+.mc-textarea {
   width: 100%;
   height: 100%;
   padding: 0.75rem 0.9rem;
   border: 0;
   outline: none;
   resize: none;
-  background: transparent;
-  color: #e6f2ea;
-  caret-color: #2fd483;
-  font-family: "DM Mono", ui-monospace, monospace;
-  font-size: 0.86rem;
+  caret-color: var(--mc-green);
+  font-family: var(--mc-mono);
+  font-size: 0.84rem;
   line-height: 1.6;
   tab-size: 4;
   white-space: pre;
   overflow: auto;
 }
-.minecode-textarea::selection {
+.mc-textarea::selection {
   background: rgba(47, 212, 131, 0.3);
 }
-.minecode-actions {
+.mc-stdin {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--mc-line);
+  font-size: 0.72rem;
+  color: var(--mc-dim);
+}
+.mc-stdin textarea {
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--mc-mono);
+  font-size: 0.84rem;
+  resize: vertical;
+}
+.mc-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.6rem 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0f1512;
+  border-top: 1px solid var(--mc-line);
+  background: #0d1411;
 }
-.minecode-run kbd {
+.mc-actions .minecode-run kbd {
   margin-left: 0.2rem;
   padding: 0.05rem 0.35rem;
   border-radius: 0.3rem;
   background: rgba(11, 16, 14, 0.18);
-  font-family: "DM Mono", monospace;
+  font-family: var(--mc-mono);
   font-size: 0.7rem;
   font-weight: 700;
 }
-.minecode-ghost {
+.mc-ghost {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   padding: 0.5rem 0.8rem;
-  border-radius: 0.7rem;
-  color: rgba(217, 230, 223, 0.7);
-  font-weight: 800;
-  font-size: 0.84rem;
+  border-radius: 0.6rem;
+  color: var(--mc-dim);
+  font-weight: 700;
+  font-size: 0.82rem;
 }
-.minecode-ghost svg {
+.mc-ghost svg {
   width: 0.95rem;
   height: 0.95rem;
 }
-.minecode-ghost:hover {
+.mc-ghost:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.07);
-}
-.minecode-stdin {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0 0.75rem 0.75rem;
-  background: #0f1512;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: rgba(217, 230, 223, 0.6);
-}
-.minecode-stdin textarea {
-  padding: 0.45rem 0.6rem;
-  border-radius: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: #0b100e;
-  color: #d9e6df;
-  font-family: "DM Mono", ui-monospace, monospace;
-  font-size: 0.85rem;
-  resize: vertical;
+  color: var(--mc-text);
 }
 
-.minecode-side {
-  display: grid;
-  gap: 1rem;
-}
-.minecode-side .mcr-out {
-  overflow: hidden;
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-}
-.minecode-side .mcr-out__pre {
-  max-height: 24rem;
-  min-height: 8rem;
-}
-.minecode-preview {
-  overflow: hidden;
-  border-radius: 1rem;
-  border: 1px solid rgb(var(--line));
-}
-.minecode-preview .msp-frame {
-  height: min(28rem, 55vh);
-}
-.minecode-empty {
-  display: grid;
-  place-items: center;
-  min-height: 10rem;
-  padding: 1.2rem;
-  border-radius: 1rem;
-  border: 2px dashed rgb(var(--line));
-  font-family: "Gochi Hand", cursive;
-  font-size: 1.1rem;
-  text-align: center;
-  color: rgb(var(--theme-muted));
-}
-.minecode-mine {
-  padding: 0.9rem 1rem;
-  border-radius: 1rem;
-  background: rgb(var(--panel));
-  box-shadow: inset 0 0 0 1px rgb(var(--line));
-}
-.minecode-mine-title {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.6rem;
-  font-weight: 900;
-}
-.minecode-mine-title svg {
-  width: 1rem;
-  height: 1rem;
-  color: rgb(var(--pen));
-}
-.minecode-mine-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-.minecode-mine-actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.5rem 0.85rem;
-  border-radius: 0.7rem;
-  border: 1.5px solid rgb(var(--pen) / 0.4);
-  color: rgb(var(--pen));
-  font-weight: 800;
-  font-size: 0.84rem;
-}
-.minecode-mine-actions button svg {
-  width: 0.95rem;
-  height: 0.95rem;
-}
-.minecode-mine-actions button.is-hot {
-  border-color: #e5484d;
-  background: rgb(229 72 77 / 0.12);
-  color: #e5484d;
-}
-.minecode-mine-actions button:disabled {
-  opacity: 0.5;
-}
-
-@media (max-width: 900px) {
-  .minecode-body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .minecode-code {
-    height: 20rem;
-  }
-}
-
-/* O editor é sempre escuro: as regras de campo de texto do tema claro do
-   caderno pintariam a letra de escuro (sobre fundo escuro). */
-.minecode .minecode-textarea,
-.minecode .minecode-stdin textarea,
-.minecode .minecode-examples select {
+/* Campos escuros nos dois temas: as regras de campo do tema claro do caderno
+   pintariam a letra de escuro sobre o fundo escuro. */
+.minecode .mc-textarea,
+.minecode .mc-form textarea,
+.minecode .mc-stdin textarea,
+.minecode .mc-examples select {
   color: #e6f2ea !important;
   -webkit-text-fill-color: #e6f2ea;
   background-color: transparent !important;
 }
-.minecode .minecode-stdin textarea,
-.minecode .minecode-examples select {
-  background-color: #0b100e !important;
+.minecode .mc-stdin textarea,
+.minecode .mc-examples select {
+  background-color: var(--mc-bg) !important;
 }
-.minecode .minecode-examples option {
+.minecode .mc-examples option {
   color: #16181d;
   background: #fff;
+}
+.minecode .mc-form textarea::placeholder,
+.minecode .mc-stdin textarea::placeholder,
+.mcr-stdin textarea::placeholder {
+  color: rgba(217, 230, 223, 0.35);
+  -webkit-text-fill-color: rgba(217, 230, 223, 0.35);
 }
 .mcr-stdin textarea {
   color: #d9e6df !important;
@@ -315,293 +578,258 @@
   background-color: #0b100e !important;
 }
 
-@media (max-width: 640px) {
-  .minecode-run kbd {
+/* ───────────── monitor ───────────── */
+.mc-monitor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+.mc-screen-frame {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.7rem 0.7rem 0;
+  border-radius: 1.1rem 1.1rem 0 0;
+  background: linear-gradient(180deg, #1c2220, #121715);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.mc-screen-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.55rem 0.55rem 0 0;
+  background: #0d1110;
+  color: var(--mc-dim);
+  font-family: var(--mc-mono);
+}
+.mc-led {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  margin: 0 0.25rem;
+  border-radius: 50%;
+  background: #3a4440;
+}
+.mc-led.is-on {
+  background: var(--mc-green);
+  box-shadow: 0 0 8px var(--mc-green);
+}
+.mc-led.is-busy {
+  background: var(--mc-amber);
+  box-shadow: 0 0 8px var(--mc-amber);
+  animation: mc-pulse 900ms ease-in-out infinite alternate;
+}
+@keyframes mc-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+.mc-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.74rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mc-devices {
+  display: inline-flex;
+  padding: 0.12rem;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+.mc-devices button,
+.mc-screen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0 0.4rem;
+  border-radius: 0.4rem;
+  color: var(--mc-dim);
+  font-family: var(--mc-mono);
+  font-size: 0.74rem;
+}
+.mc-devices button svg,
+.mc-screen-btn svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.mc-devices button:hover,
+.mc-screen-btn:hover:not(:disabled) {
+  color: var(--mc-text);
+  background: rgba(255, 255, 255, 0.07);
+}
+.mc-devices button[aria-pressed="true"] {
+  color: #06120c;
+  background: var(--mc-green);
+}
+.mc-screen-btn:disabled {
+  opacity: 0.4;
+}
+.mc-screen-btn.is-full-btn {
+  padding: 0 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--mc-text);
+}
+.mc-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #050807;
+}
+.mc-screen .msp-stage {
+  flex: 1;
+  min-height: 0;
+  background: #050807;
+}
+.mc-screen .msp-frame {
+  height: 100%;
+}
+.mc-screen .msp-stage.is-mobile {
+  align-content: center;
+  padding: 1rem 0;
+}
+.mc-screen .msp-stage.is-mobile .msp-frame {
+  height: min(100%, 44rem);
+}
+.mc-screen .mcr-out {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 0;
+  background: #050807;
+}
+.mc-screen .mcr-out__pre {
+  flex: 1;
+  max-height: none;
+  font-size: 0.9rem;
+}
+.mc-standby {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.8rem;
+  flex: 1;
+  padding: 2rem;
+  text-align: center;
+  color: var(--mc-dim);
+  font-family: var(--mc-mono);
+  font-size: 0.85rem;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(47, 212, 131, 0.07), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+    #050807;
+}
+.mc-standby p {
+  max-width: 26rem;
+}
+.mc-standby svg {
+  width: 2.2rem;
+  height: 2.2rem;
+  color: rgba(47, 212, 131, 0.55);
+}
+.mc-chin {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 1.7rem;
+  border-radius: 0 0 1.1rem 1.1rem;
+  background: linear-gradient(180deg, #121715, #0c100f);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.mc-chin span {
+  font-family: "Anybody Variable", sans-serif;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(217, 230, 223, 0.35);
+}
+.mc-neck {
+  width: 4.5rem;
+  height: 1.6rem;
+  background: linear-gradient(90deg, #0f1412, #222a27 50%, #0f1412);
+}
+.mc-base {
+  width: 13rem;
+  height: 0.55rem;
+  border-radius: 0.6rem 0.6rem 0.3rem 0.3rem;
+  background: linear-gradient(180deg, #2a3330, #121715);
+  box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.55);
+}
+
+/* tela cheia: a moldura vira a tela inteira */
+.mc-screen-frame.is-full {
+  padding: 0;
+  border-radius: 0;
+}
+.mc-screen-frame.is-full .mc-screen-bar {
+  border-radius: 0;
+}
+.mc-screen-frame.is-fake-full {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+}
+.mc-screen-frame:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-caret,
+  .mc-tab-dot,
+  .mc-led.is-busy {
+    animation: none;
+  }
+}
+
+/* celular e tablet: terminal em cima, monitor embaixo, sem pé */
+@media (max-width: 900px) {
+  .minecode {
+    height: auto;
+    padding: 0.75rem;
+  }
+  .mc-desk {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .mc-term {
+    height: 34rem;
+  }
+  .mc-monitor {
+    height: 30rem;
+  }
+  .mc-neck,
+  .mc-base {
+    display: none;
+  }
+  .mc-term-title {
     display: none;
   }
 }
-
-/* ───────────── v2: editor + chat com a Mine ───────────── */
-.minecode-body {
-  grid-template-columns: minmax(0, 1.35fr) minmax(19rem, 0.85fr);
-  align-items: stretch;
-}
-.minecode-work {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
-  min-width: 0;
-}
-.minecode-work > .mcr-out {
-  overflow: hidden;
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-}
-.minecode-work > .mcr-out .mcr-out__pre {
-  max-height: 16rem;
-  min-height: 6rem;
-}
-.minecode-editor.is-writing {
-  box-shadow: 0 0 0 2px rgba(47, 212, 131, 0.55), 0 0 28px -6px rgba(47, 212, 131, 0.45);
-}
-.minecode-writing {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #2fd483;
-}
-.minecode-writing svg {
-  width: 0.9rem;
-  height: 0.9rem;
-}
-
-.minecode-chat {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 34rem;
-  max-height: calc(100vh - 9rem);
-  overflow: hidden;
-  border-radius: 1rem;
-  background: rgb(var(--panel));
-  box-shadow: inset 0 0 0 1px rgb(var(--line)), var(--card-shadow);
-}
-.minecode-chat-head {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.75rem 0.9rem;
-  border-bottom: 1px solid rgb(var(--line) / 0.8);
-}
-.minecode-chat-face {
-  width: 2.4rem;
-  height: 2.4rem;
-  flex: none;
-}
-.minecode-chat-title {
-  font-weight: 900;
-  line-height: 1.1;
-}
-.minecode-chat-sub {
-  font-family: "Gochi Hand", cursive;
-  font-size: 0.98rem;
-  color: rgb(var(--theme-muted));
-}
-.minecode-chat-clear {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  margin-left: auto;
-  border-radius: 0.5rem;
-  color: rgb(var(--theme-muted));
-}
-.minecode-chat-clear:hover {
-  background: rgb(var(--line) / 0.5);
-}
-.minecode-chat-clear svg {
-  width: 1rem;
-  height: 1rem;
-}
-.minecode-chat-log {
-  display: grid;
-  align-content: start;
-  gap: 0.75rem;
-  min-height: 0;
-  padding: 0.9rem;
-  overflow-y: auto;
-}
-.minecode-chat-empty {
-  display: grid;
-  gap: 0.75rem;
-  padding: 0.4rem 0.2rem;
-  font-size: 0.92rem;
-  color: rgb(var(--theme-muted));
-}
-.minecode-starters {
-  display: grid;
-  gap: 0.45rem;
-}
-.minecode-starters button {
-  padding: 0.55rem 0.75rem;
-  border-radius: 0.75rem;
-  border: 1.5px dashed rgb(var(--pen) / 0.45);
-  color: rgb(var(--pen));
-  font-weight: 800;
-  font-size: 0.86rem;
-  text-align: left;
-}
-.minecode-starters button:hover {
-  background: rgb(var(--pen) / 0.08);
-}
-.minecode-msg {
-  max-width: 100%;
-  font-size: 0.92rem;
-  line-height: 1.5;
-}
-.minecode-msg.is-user {
-  justify-self: end;
-  max-width: 88%;
-  padding: 0.55rem 0.8rem;
-  border-radius: 1rem 1rem 0.3rem 1rem;
-  background: rgb(var(--pen));
-  color: rgb(var(--pen-ink));
-  font-weight: 600;
-  white-space: pre-wrap;
-}
-.minecode-msg.is-mine {
-  padding: 0.65rem 0.8rem;
-  border-radius: 1rem 1rem 1rem 0.3rem;
-  background: rgb(var(--sheet));
-  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.8);
-}
-.minecode-msg.is-mine .mrt-body,
-.minecode-msg.is-mine p {
-  font-size: 0.92rem;
-}
-.minecode-msg.is-error {
-  box-shadow: inset 0 0 0 1px rgb(229 72 77 / 0.5);
-  color: #c4252f;
-}
-.minecode-applied {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.5rem;
-  padding: 0.35rem 0.55rem;
-  border-radius: 0.6rem;
-  background: rgb(47 212 131 / 0.14);
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: #1d8a55;
-}
-.minecode-applied svg {
-  width: 0.9rem;
-  height: 0.9rem;
-}
-.minecode-applied.is-undone {
-  background: rgb(var(--line) / 0.5);
-  color: rgb(var(--theme-muted));
-}
-.minecode-applied button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
-  padding: 0.15rem 0.5rem;
-  border-radius: 0.45rem;
-  font-weight: 800;
-  color: rgb(var(--theme-text));
-}
-.minecode-applied button:hover {
-  background: rgb(var(--line) / 0.6);
-}
-.minecode-live {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.3rem;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #1d8a55;
-}
-.minecode-live svg {
-  width: 0.9rem;
-  height: 0.9rem;
-}
-.minecode-chat-input {
-  display: grid;
-  gap: 0.5rem;
-  padding: 0.65rem 0.75rem 0.8rem;
-  border-top: 1px solid rgb(var(--line) / 0.8);
-}
-.minecode-quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-.minecode-quick button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 999px;
-  border: 1.5px solid rgb(var(--pen) / 0.35);
-  color: rgb(var(--pen));
-  font-size: 0.76rem;
-  font-weight: 800;
-}
-.minecode-quick button svg {
-  width: 0.85rem;
-  height: 0.85rem;
-}
-.minecode-quick button.is-hot {
-  border-color: #e5484d;
-  background: rgb(229 72 77 / 0.1);
-  color: #e5484d;
-}
-.minecode-quick button:disabled {
-  opacity: 0.5;
-}
-.minecode-chat-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.5rem;
-}
-.minecode-chat-form textarea {
-  flex: 1;
-  min-height: 2.6rem;
-  max-height: 8rem;
-  padding: 0.55rem 0.75rem;
-  border-radius: 0.8rem;
-  border: 1.5px solid rgb(var(--line));
-  background: rgb(var(--sheet));
-  color: rgb(var(--theme-text));
-  font: inherit;
-  font-size: 0.9rem;
-  resize: vertical;
-}
-.minecode-chat-form textarea:focus {
-  outline: none;
-  border-color: rgb(var(--pen));
-}
-.minecode-send {
-  display: grid;
-  place-items: center;
-  width: 2.6rem;
-  height: 2.6rem;
-  flex: none;
-  border-radius: 0.8rem;
-  background: rgb(var(--pen));
-  color: rgb(var(--pen-ink));
-}
-.minecode-send svg {
-  width: 1.05rem;
-  height: 1.05rem;
-}
-.minecode-send:disabled {
-  opacity: 0.4;
-}
-.minecode-send.is-stop {
-  background: #e5484d;
-  color: #fff;
-}
-
-@media (max-width: 900px) {
-  .minecode-body {
-    grid-template-columns: minmax(0, 1fr);
+@media (max-width: 520px) {
+  .mc-screen-btn.is-full-btn span,
+  .mc-actions .minecode-run kbd {
+    display: none;
   }
-  .minecode-chat {
-    min-height: 26rem;
-    max-height: none;
+  .mc-screen-frame {
+    padding: 0.45rem 0.45rem 0;
   }
-}
-
-/* o texto de exemplo das Entradas não pode parecer digitado */
-.minecode .minecode-stdin textarea::placeholder,
-.mcr-stdin textarea::placeholder {
-  color: rgba(217, 230, 223, 0.35);
-  -webkit-text-fill-color: rgba(217, 230, 223, 0.35);
 }
