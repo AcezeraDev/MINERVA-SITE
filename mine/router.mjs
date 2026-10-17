@@ -1,4 +1,4 @@
-import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
+import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_SITE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
 import { pickCodeSkills } from "./minecode-skills.mjs";
 import { buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
@@ -121,15 +121,15 @@ function gameAttemptMs() {
 // ineditismo no cliente.
 
 /**
- * Cadeia do MineCode. Sites (skill de front-end) vao primeiro para o modelo
- * principal: medido em 17/out/2026 com o mesmo pedido de hero 3D, o GLM em
- * "low" entregava pagina generica e em "high" estourou 150 s sem terminar,
- * enquanto o gpt-6-luna fez um site bonito em 70 s. Python/JS seguem no GLM,
- * mais barato e rapido para codigo curto.
+ * Cadeia do MineCode. Sites (skill de front-end) vao para o modelo forte
+ * (MINE_SITE_MODEL, GPT-6.1 Sol) com o gpt-6-luna de reserva. Medido em
+ * 17/out/2026 com o mesmo pedido de hero 3D: o GLM em "low" entregava pagina
+ * generica e em "high" estourou 150 s; o luna fez um site bonito em 57-70 s.
+ * Python/JS seguem no GLM, mais barato e rapido para codigo curto.
  */
 function codeChainFor({ prompt, context, history }) {
   const site = pickCodeSkills({ prompt, context, history }).includes("frontend");
-  return site ? [MINE_TASK_MODEL, MINE_CODE_MODEL] : [MINE_CODE_MODEL, MINE_TASK_MODEL];
+  return site ? [MINE_SITE_MODEL, MINE_TASK_MODEL] : [MINE_CODE_MODEL, MINE_TASK_MODEL];
 }
 
 /**

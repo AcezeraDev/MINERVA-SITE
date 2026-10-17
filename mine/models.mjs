@@ -65,6 +65,25 @@ export const MINE_CODE_MODEL = {
 };
 
 /**
+ * Out/2026: sites do MineCode (pedidos com a skill de front-end) e a revisao
+ * visual vao para um modelo forte. GPT-6.1 Sol custa US$ 2/10 por milhao, uns
+ * 12 centavos de dolar por site; le imagem, entao tambem revisa a foto da
+ * pagina. NANOGPT_SITE_MODEL / MINE_SITE_REASONING_EFFORT trocam.
+ */
+export const MINE_SITE_MODEL = {
+  alias: "mine",
+  displayName: "Mine",
+  provider: "nanogpt",
+  get providerModel() {
+    return envModel("NANOGPT_SITE_MODEL", "openai/gpt-6.1-sol");
+  },
+  get providerParams() {
+    return { reasoning_effort: envEffort("MINE_SITE_REASONING_EFFORT", "low") };
+  },
+  capabilities: CAPABILITIES,
+};
+
+/**
  * Reserva interna, nunca escolhivel: entra quando o principal falha e abre os
  * jogos, que precisam de uma rodada em poucos segundos. Para o usuario a
  * resposta continua sendo "da Mine".

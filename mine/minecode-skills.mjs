@@ -12,7 +12,13 @@ export const CODE_CDN = {
   threeAddons: "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
   gsap: "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js",
   scrollTrigger: "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js",
+  tailwind: "https://cdn.tailwindcss.com/3.4.16",
+  lucide: "https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js",
 };
+
+/** Imagens geradas pela Mine: o cliente troca cada marcador por uma foto de verdade. */
+export const SITE_IMAGE_ATTR = "data-mine-imagem";
+export const SITE_IMAGE_LIMIT = 4;
 
 export const FRONTEND_SKILL = `SKILL FRONT-END (sites e paginas). O padrao e site de estudio de design premiado, nao de template.
 
@@ -23,21 +29,26 @@ export const FRONTEND_SKILL = `SKILL FRONT-END (sites e paginas). O padrao e sit
 - POP ESCOLAR (criancas, jogos educativos, feiras, clubes): fundo #fff7e0, texto #1d1d1b, blocos #ff6b6b, #4ecdc4, #ffd93d, #5b8def. Fontes "Baloo 2" + "Nunito". Assinatura: contorno preto de 2-3px e sombra deslocada solida (box-shadow: 6px 6px 0 #1d1d1b), cartoes coloridos inclinados de leve.
 - ESPACO PREMIUM (astronomia, 3D, fisica, startups): fundo #05060a, superficie rgba(255,255,255,.04), texto #e9ecf5, apagado #8a90a6, destaques #5ce1ff e #ffb86b. Fontes "Sora" + "Inter". Assinatura: vidro (superficie + borda 1px rgba(255,255,255,.08)), brilho radial SO atras do elemento principal, numeros em destaque.
 - SUICO MINIMAL (negocios, apresentacao, matematica, dados): fundo #ffffff, texto #111111, apagado #6e6e6e, destaque #0047ff. Fonte "Inter Tight" (pesos 400 e 800). Assinatura: grade rigida de 12 colunas, tipografia gigante, muito branco, um unico bloco de cor forte.
+Ferramentas liberadas (use!):
+- Tailwind CSS: <script src="${CODE_CDN.tailwind}"></script> e logo depois <script>tailwind.config = { theme: { extend: { colors: { bg: "...", surface: "...", ink: "...", muted: "...", accent: "...", accent2: "..." }, fontFamily: { display: ["..."], body: ["..."] } } } }</script> com as cores e fontes da direcao escolhida. Monte o layout com classes do Tailwind (grid, flex, gap, max-w-6xl, rounded-3xl, ring-1, backdrop-blur, hover:-translate-y-1, transition, md:grid-cols-2...). Um <style> curto so para o que o Tailwind nao faz (keyframes, grao, ::selection).
+- Icones Lucide: <script src="${CODE_CDN.lucide}"></script>, use <i data-lucide="sparkles" class="w-5 h-5"></i> (nomes do lucide.dev: arrow-right, rocket, book-open, music, leaf, star, code-2, mail, github, instagram, play, check, map-pin...) e no fim do JS chame lucide.createIcons(). Nada de emoji como icone.
+- Fotos de verdade geradas pela Mine: escreva <img ${SITE_IMAGE_ATTR}="descricao detalhada da foto em portugues" alt="texto curto" class="w-full h-full object-cover"> SEM src; o editor cria a imagem e coloca no lugar. Descreva como um fotografo: assunto, enquadramento, luz e as cores da direcao (ex.: "foto de estudio de um violao acustico em fundo escuro, luz lateral verde-limao, close"). No maximo ${SITE_IMAGE_LIMIT} fotos por pagina, so onde fazem diferenca: visual do hero, galeria, cartoes de destaque. Sempre dentro de um container com tamanho e proporcao definidos (aspect-[4/3], aspect-square, h-[70svh]), com cantos e sombra da direcao.
+
 Proibido como identidade principal: gradiente roxo/violeta para azul, fundo azul-marinho com roxo, "glassmorphism" em tudo, emoji como icone de titulo. Se o arquivo atual for so o exemplo inicial do editor (o cartao "Ola, eu sou a Ana"), NAO herde as cores nem o layout dele: comece do zero numa direcao acima (pode manter o nome da pessoa).
 
 2. Composicao do hero (a primeira tela decide tudo)
 - Ocupa a tela: min-height: 100svh, conteudo centralizado na vertical. Nunca metade da tela vazia: ou divide em 2 colunas (texto 55% + elemento visual 45%) ou centraliza com o visual grande ATRAS do texto.
 - Titulo gigante e curto: font-size: clamp(2.8rem, 7.5vw, 7rem); line-height: .95; letter-spacing: -0.03em; 2 ou 3 linhas no maximo; destaque UMA palavra (cor, italico ou sublinhado desenhado).
 - Acima do titulo um rotulo pequeno (ex.: "PORTFOLIO — 2026"); abaixo um subtitulo de 1-2 frases (max 34ch) e 2 botoes (um cheio, um contornado).
-- Um elemento visual protagonista e GRANDE (40 a 60% da tela): objeto 3D, ilustracao SVG detalhada, pilha de cartoes inclinados, mockup de celular/janela desenhado em CSS. Formas soltas pequenas espalhadas NAO contam como visual.
+- Um elemento visual protagonista e GRANDE (40 a 60% da tela): foto gerada, objeto 3D, ilustracao SVG detalhada, pilha de cartoes inclinados, mockup de celular/janela desenhado em CSS. Formas soltas pequenas espalhadas NAO contam como visual.
 - Uma faixa de prova abaixo do hero: 3 numeros grandes com legenda, ou uma fila de selos/tags.
 
 3. Resto da pagina
 - Hero + pelo menos 3 secoes, cada uma com layout DIFERENTE: grade de cartoes (com numero ou icone SVG e titulo forte), bloco dividido texto + visual, linha do tempo ou passos numerados, citacao grande, faixa final de chamada (CTA) com fundo de cor de destaque. Feche com rodape simples.
 - Container max-width 1200px, padding lateral clamp(16px, 4vw, 48px), espaco entre secoes clamp(72px, 10vw, 140px). Mobile-first; nunca rolagem horizontal.
-- Tokens em :root (--bg, --surface, --text, --muted, --accent, --accent-2, --radius, --line) e use so eles.
+- As cores e fontes vem do tailwind.config (ou de tokens em :root se nao usar Tailwind); nada de cor solta fora da paleta.
 - Detalhes que mostram capricho: ::selection com a cor de destaque, rotulos de secao numerados, filetes 1px, um grao sutil (SVG feTurbulence com opacity .05 sobre o fundo) nas direcoes escuras, transicoes de hover em tudo que e clicavel, :focus-visible visivel.
-- Imagens: nada de arquivo externo. Desenhe com SVG inline (ilustracoes com varias formas e cores da paleta), CSS ou canvas. Icones em SVG de traco simples.
+- Imagens: nada de URL externa. Use as fotos geradas (marcador acima), SVG inline, CSS ou canvas.
 
 4. Conteudo e JS
 - Textos reais, especificos e com personalidade em portugues do Brasil sobre o tema; nunca lorem ipsum nem frases vazias ("bem-vindo ao meu site").
@@ -65,7 +76,7 @@ export const THREE_SKILL = `SKILL 3D (three.js):
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 </script>
-- Esqueleto obrigatorio: Scene, PerspectiveCamera(50 a 60, aspect, 0.1, 1000), WebGLRenderer({ antialias: true }), renderer.setPixelRatio(Math.min(devicePixelRatio, 2)), renderer.setSize(innerWidth, innerHeight), canvas fixo cobrindo a tela (body { margin:0; overflow:hidden }), e um listener de resize que atualiza camera.aspect, camera.updateProjectionMatrix() e renderer.setSize.
+- Esqueleto obrigatorio: Scene, PerspectiveCamera(50 a 60, aspect, 0.1, 1000), WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }) (o preserveDrawingBuffer deixa a Mine fotografar a cena na revisao), renderer.setPixelRatio(Math.min(devicePixelRatio, 2)), renderer.setSize(innerWidth, innerHeight), canvas fixo cobrindo a tela (body { margin:0; overflow:hidden }), e um listener de resize que atualiza camera.aspect, camera.updateProjectionMatrix() e renderer.setSize.
 - Loop com renderer.setAnimationLoop(animar) e THREE.Clock: movimento = velocidade * clock.getDelta(). Nunca setInterval.
 - Luz: AmbientLight ou HemisphereLight fraca + uma DirectionalLight principal. Materiais MeshStandardMaterial (roughness/metalness) ou MeshPhysicalMaterial; MeshBasicMaterial so para coisas que brilham sozinhas (estrelas, sol).
 - Sem modelos ou texturas externas: monte os objetos com geometrias (Box, Sphere, Torus, Cylinder, Cone, Icosahedron) agrupadas em THREE.Group; texturas procedurais com CanvasTexture se precisar. Estrelas/particulas com BufferGeometry + Points.

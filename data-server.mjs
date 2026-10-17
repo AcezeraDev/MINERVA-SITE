@@ -495,27 +495,37 @@ async function handleAtelieIa(req, res) {
  * Imagem criada pela Mine no chat ([[gerar_imagem: ...]]). GET devolve o uso
  * do dia; POST { prompt, reference? } cria. Falha não conta na cota.
  */
+// Fotos dos sites do MineCode ({ uso: "site" }) têm cota própria: um site
+// pede até 4 de uma vez e não pode comer as imagens do chat.
+const MINE_SITE_IMAGE_DAILY_LIMIT = Math.max(0, Number(process.env.MINE_SITE_IMAGE_DAILY_LIMIT || 24) || 24);
+
 async function handleMineImage(req, res) {
   const session = await requireSession(req, res);
   if (!session) return;
+  const site = req.method === "GET" ? new URL(req.url, "http://x").searchParams.get("uso") === "site" : false;
   if (req.method === "GET") {
-    sendJson(req, res, 200, { used: await quotaUsed(session.userId, "mine-imagem"), limit: MINE_IMAGE_DAILY_LIMIT });
+    const bucket = site ? "minecode-imagem" : "mine-imagem";
+    sendJson(req, res, 200, { used: await quotaUsed(session.userId, bucket), limit: site ? MINE_SITE_IMAGE_DAILY_LIMIT : MINE_IMAGE_DAILY_LIMIT });
     return;
   }
   const body = await readJson(req);
-  const used = await takeQuota(session.userId, "mine-imagem", MINE_IMAGE_DAILY_LIMIT);
+  const forSite = body.uso === "site";
+  const bucket = forSite ? "minecode-imagem" : "mine-imagem";
+  const limit = forSite ? MINE_SITE_IMAGE_DAILY_LIMIT : MINE_IMAGE_DAILY_LIMIT;
+  const used = await takeQuota(session.userId, bucket, limit);
   if (used === null) {
-    sendJson(req, res, 429, { error: `Hoje você já criou as ${MINE_IMAGE_DAILY_LIMIT} imagens do dia. Amanhã tem mais!`, code: "quota", used: MINE_IMAGE_DAILY_LIMIT, limit: MINE_IMAGE_DAILY_LIMIT });
+    const error = forSite ? `Hoje os seus sites já usaram as ${limit} fotos do dia. Amanhã tem mais!` : `Hoje você já criou as ${limit} imagens do dia. Amanhã tem mais!`;
+    sendJson(req, res, 429, { error, code: "quota", used: limit, limit });
     return;
   }
   try {
     const result = await generateMineImage({ prompt: body.prompt, reference: body.reference });
-    sendJson(req, res, 200, { image: result.image, ms: result.ms, used, limit: MINE_IMAGE_DAILY_LIMIT });
+    sendJson(req, res, 200, { image: result.image, ms: result.ms, used, limit });
   } catch (error) {
-    await giveBackQuota(session.userId, "mine-imagem").catch(() => undefined);
+    await giveBackQuota(session.userId, bucket).catch(() => undefined);
     const status = error instanceof MineImageError ? error.status : 502;
     if (!(error instanceof MineImageError)) console.error("[mine-imagem]", error);
-    sendJson(req, res, status, { error: error instanceof MineImageError ? error.message : "A Mine não conseguiu desenhar agora.", used: used - 1, limit: MINE_IMAGE_DAILY_LIMIT });
+    sendJson(req, res, status, { error: error instanceof MineImageError ? error.message : "A Mine não conseguiu desenhar agora.", used: used - 1, limit });
   }
 }
 

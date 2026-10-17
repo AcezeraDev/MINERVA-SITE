@@ -7,13 +7,13 @@
 export type MineCodeTurn = { role: "user" | "assistant"; text: string };
 
 export async function streamMineCode(
-  payload: { prompt: string; context: string; history: MineCodeTurn[] },
+  payload: { prompt: string; context: string; history: MineCodeTurn[]; attachments?: Array<{ name: string; type: string; dataUrl: string }> },
   options: { signal: AbortSignal; onText: (text: string) => void },
 ): Promise<string> {
   const response = await fetch("/api/mine/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ task: "minecode", prompt: payload.prompt, context: payload.context, history: payload.history, stream: true, maxOutputTokens: 16000 }),
+    body: JSON.stringify({ task: "minecode", prompt: payload.prompt, context: payload.context, history: payload.history, attachments: payload.attachments, stream: true, maxOutputTokens: 16000 }),
     signal: options.signal,
   });
   const type = response.headers.get("content-type") || "";

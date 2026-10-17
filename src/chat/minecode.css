@@ -914,3 +914,36 @@
     padding: 0.45rem 0.45rem 0;
   }
 }
+
+/* fotos sendo criadas / revisão visual, na barra do monitor */
+.mc-screen-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 210, 122, 0.12);
+  color: var(--mc-amber);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.mc-screen-status svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.mc-top-review {
+  margin-left: auto;
+}
+.mc-top-review + .mc-top-toggle {
+  margin-left: 0;
+}
+.mc-top-review[aria-pressed="true"] {
+  color: var(--mc-green);
+  border-color: rgba(47, 212, 131, 0.45);
+}
+@media (max-width: 640px) {
+  .mc-screen-status {
+    display: none;
+  }
+}

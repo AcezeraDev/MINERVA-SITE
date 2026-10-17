@@ -298,7 +298,7 @@ test("MineCode no router: erro de sintaxe depois do streaming é refeito pelo se
     assert.equal(streamed, reply(broken));
     assert.equal(result.reply, reply(goodSite));
   });
-  assert.deepEqual(calls.map((call) => [call.model, Boolean(call.stream)]), [["openai/gpt-6-luna", true], ["z-ai/glm-5.3-flash", false]]); // site/3D: luna primeiro, GLM refaz
+  assert.deepEqual(calls.map((call) => [call.model, Boolean(call.stream)]), [["openai/gpt-6.1-sol", true], ["openai/gpt-6-luna", false]]); // site/3D: Sol primeiro, luna refaz
   assert.match(JSON.stringify(calls[1].messages), /versao anterior deste arquivo saiu com defeito/);
 });
 
@@ -313,4 +313,22 @@ test("MineCode no router: se ninguém refizer, o aluno recebe a primeira versão
     const result = await runMineRequest({ task: "minecode", prompt: "faz um planeta 3d", onDelta: () => {} });
     assert.equal(result.reply, reply(broken));
   });
+});
+
+test("fotos do site: marcadores viram src e só os 4 primeiros pedem foto", async () => {
+  const { sitePhotoPrompts, withSiteImages } = await import("../src/chat/site-images.ts").catch(() => ({}));
+  if (!sitePhotoPrompts) return; // o node sem suporte a .ts pula este teste
+  const html = `<img data-mine-imagem="violão em estúdio" alt="a" class="w-full"><img class="x" data-mine-imagem="palco &quot;neon&quot;" alt="b">`;
+  assert.deepEqual(sitePhotoPrompts(html), ["violão em estúdio", 'palco "neon"']);
+  const out = withSiteImages(html, { "violão em estúdio": "data:image/jpeg;base64,AAA" });
+  assert.match(out, /<img src="data:image\/jpeg;base64,AAA" alt="a" class="w-full" data-mine-imagem="violão em estúdio"|<img src="data:image\/jpeg;base64,AAA"[^>]*data-mine-imagem="violão em estúdio"/);
+  assert.match(out, /<img src="data:image\/svg\+xml[^"]*"[^>]*data-mine-imagem="palco &quot;neon&quot;"/);
+});
+
+test("skill de front-end libera Tailwind, Lucide e fotos geradas", async () => {
+  const { FRONTEND_SKILL, THREE_SKILL } = await import("../mine/minecode-skills.mjs");
+  assert.match(FRONTEND_SKILL, /cdn\.tailwindcss\.com\/3\.4\.16/);
+  assert.match(FRONTEND_SKILL, /lucide@0\.468\.0/);
+  assert.match(FRONTEND_SKILL, /data-mine-imagem/);
+  assert.match(THREE_SKILL, /preserveDrawingBuffer: true/);
 });

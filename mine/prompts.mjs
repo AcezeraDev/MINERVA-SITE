@@ -549,7 +549,7 @@ Formato da resposta, nesta ordem:
 Regras do codigo:
 - Python roda no navegador (Pyodide): use so a biblioteca padrao (random, math, datetime...) e numpy; nada de tkinter, turtle, pygame, requests ou arquivos. Mostre resultados com print(). input() funciona: as respostas vem do campo "Entradas", uma por linha.
 - JavaScript roda sem pagina (sem DOM, sem document): use console.log para mostrar resultados.
-- HTML: arquivo completo com <!doctype html>, <meta charset>, <meta name="viewport">, <title>, CSS em <style> e JS em <script>, sem imagens de fora (use gradientes, emojis e SVG inline). De fora so entram Google Fonts e as bibliotecas que as skills abaixo liberam (three.js e GSAP, nas versoes indicadas); nada de React, Vue, Tailwind ou jQuery. Capriche no design: moderno, responsivo, cores harmonicas, botoes com hover, textos de verdade em portugues.
+- HTML: arquivo completo com <!doctype html>, <meta charset>, <meta name="viewport">, <title>, CSS em <style> e JS em <script>, sem imagens por URL de fora (use as fotos geradas pelo marcador da skill, SVG inline ou CSS). De fora so entram Google Fonts e as bibliotecas que as skills abaixo liberam (Tailwind, Lucide, three.js e GSAP, nas versoes indicadas); nada de React, Vue ou jQuery. Capriche no design: moderno, responsivo, cores harmonicas, botoes com hover, textos de verdade em portugues.
 - Nomes de variaveis claros (em portugues tudo bem) e comentarios curtos em portugues nas partes importantes. Codigo no nivel de um estudante: claro antes de esperto.
 - Se a ultima saida mostra um erro, explique a causa em uma frase e corrija.
 

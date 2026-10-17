@@ -5,6 +5,8 @@ import {
   Bug,
   Check,
   Code2,
+  Eye,
+  EyeOff,
   Minus,
   PanelRightClose,
   PanelRightOpen,
@@ -27,6 +29,7 @@ import {
 } from "lucide-react";
 import { RunOutput, useRunner, usesInput } from "./CodeRunner";
 import { SiteFrame } from "./SitePreview";
+import { SitePhotoError, sitePhoto, sitePhotoPrompts, withSiteImages } from "./site-images";
 import { MineRichText } from "./MineRichText";
 import { MineFace } from "../caderno/MineFace";
 import { streamMineCode } from "./minecode-api";
@@ -125,6 +128,13 @@ function loadChat(): ChatMessage[] {
 }
 
 const PREVIEW_STORAGE = "minerva-minecode-preview-v1";
+const REVIEW_STORAGE = "minerva-minecode-revisao-v1";
+
+/** Pedido da revisão visual: vai junto com a foto da página (anexo). */
+const REVIEW_PROMPT = `REVISAO VISUAL. A imagem anexada e a foto da pagina que voce acabou de fazer (do topo ate cerca de 3 telas), do jeito que aparece no monitor do estudante. Olhe como um diretor de arte exigente e procure problemas REAIS: texto ilegivel ou com pouco contraste, elementos sobrepostos ou cortados, hero vazia ou desequilibrada, visual protagonista pequeno, espacamentos estranhos, cores fora da direcao de arte, icones faltando (quadrados vazios), fotos deformadas, secoes parecidas demais, cara de template.
+Se achar algo, devolva o ARQUIVO COMPLETO corrigido (mesma direcao e o mesmo conteudo; mantenha cada data-mine-imagem exatamente igual, para nao criar as fotos de novo) e diga em ate 3 bullets curtos o que melhorou.
+Se estiver realmente bom, responda so "Revisei a pagina e esta tudo certo." sem bloco de codigo.
+Observacao: o canvas 3D pode sair vazio ou preto na foto; isso e limite da foto, nao erro do site.`;
 
 export function MineCode({
   incoming,
@@ -150,6 +160,19 @@ export function MineCode({
     const html = saved.code.html ?? "";
     return saved.language === "html" && isSitePage(html, "html") ? html : null;
   });
+  const [photos, setPhotos] = useState<Record<string, string>>({});
+  const [photoFail, setPhotoFail] = useState<Record<string, boolean>>({});
+  const [photoJob, setPhotoJob] = useState<{ total: number; done: number } | null>(null);
+  const [autoReview, setAutoReview] = useState(() => {
+    try {
+      return localStorage.getItem(REVIEW_STORAGE) !== "desligada";
+    } catch {
+      return true;
+    }
+  });
+  const [reviewWanted, setReviewWanted] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const captureRef = useRef<(() => Promise<string>) | null>(null);
   const [previewOpen, setPreviewOpen] = useState(() => {
     try {
       return localStorage.getItem(PREVIEW_STORAGE) !== "fechada";
@@ -194,6 +217,76 @@ export function MineCode({
     }
   }, [previewOpen]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(REVIEW_STORAGE, autoReview ? "ligada" : "desligada");
+    } catch {
+      // idem
+    }
+  }, [autoReview]);
+
+  // fotos de verdade: cada marcador data-mine-imagem do site vira uma foto
+  useEffect(() => {
+    if (!htmlRun) return undefined;
+    const wanted = sitePhotoPrompts(htmlRun).filter((prompt) => !photos[prompt] && !photoFail[prompt]);
+    if (!wanted.length) return undefined;
+    let alive = true;
+    let done = 0;
+    let warned = false;
+    setPhotoJob({ total: wanted.length, done: 0 });
+    void Promise.all(
+      wanted.map((prompt) =>
+        sitePhoto(prompt)
+          .then((url) => {
+            if (alive) setPhotos((current) => ({ ...current, [prompt]: url }));
+          })
+          .catch((error) => {
+            if (!alive) return;
+            setPhotoFail((current) => ({ ...current, [prompt]: true }));
+            if (!warned) {
+              warned = true;
+              const message = error instanceof SitePhotoError ? error.message : "Não consegui criar uma das fotos agora.";
+              setMessages((current) => [...current, { id: `f${Date.now()}`, role: "assistant", text: message, error: true }]);
+            }
+          })
+          .finally(() => {
+            done += 1;
+            if (alive) setPhotoJob(done >= wanted.length ? null : { total: wanted.length, done });
+          }),
+      ),
+    );
+    return () => {
+      alive = false;
+      setPhotoJob(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [htmlRun]);
+
+  // revisão visual: com as fotos prontas, fotografa a página e manda para a Mine
+  useEffect(() => {
+    if (!reviewWanted || reviewWanted !== htmlRun || photoJob || writing || !previewOpen) return undefined;
+    let alive = true;
+    const timer = window.setTimeout(async () => {
+      setReviewWanted(null);
+      setReviewing(true);
+      try {
+        const shot = await captureRef.current?.();
+        if (!alive || !shot) return;
+        setReviewing(false);
+        await ask(REVIEW_PROMPT, { attachments: [{ name: "pagina.jpg", type: "image/jpeg", dataUrl: shot }], label: "mine, olha a foto do site e corrige o que estiver feio", review: true });
+      } catch {
+        // sem foto, sem revisão: o site continua como está
+      } finally {
+        if (alive) setReviewing(false);
+      }
+    }, 3500);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewWanted, htmlRun, photoJob, writing, previewOpen]);
+
   // trocar para HTML mostra no monitor o site que já está no editor
   useEffect(() => {
     if (language !== "html" || htmlRun || writing) return;
@@ -235,7 +328,10 @@ export function MineCode({
   const failed = runner.lines.some((line) => line.kind === "error");
 
   /** Manda um pedido para a Mine; a resposta escreve o código no editor. */
-  const ask = async (request: string) => {
+  const ask = async (
+    request: string,
+    options: { attachments?: Array<{ name: string; type: string; dataUrl: string }>; label?: string; review?: boolean } = {},
+  ) => {
     const text = request.trim();
     if (!text || writing) return;
     const fence = language;
@@ -250,14 +346,14 @@ export function MineCode({
     const history = messages.slice(-8).map((item) => ({ role: item.role, text: item.text }));
     const before = { ...codes };
     let switched: MineCodeLanguage | null = null;
-    setMessages((current) => [...current, { id: `u${Date.now()}`, role: "user", text }]);
+    setMessages((current) => [...current, { id: `u${Date.now()}`, role: "user", text: options.label || text }]);
     setDraft("");
     setLive("");
     const controller = new AbortController();
     abort.current = controller;
     try {
       const reply = await streamMineCode(
-        { prompt: text, context, history },
+        { prompt: text, context, history, attachments: options.attachments },
         {
           signal: controller.signal,
           onText: (partial) => {
@@ -284,8 +380,11 @@ export function MineCode({
         runner.clear();
         // roda sozinho para mostrar o resultado (se o programa não pedir input)
         setPreviewOpen(true);
-        if (lang === "html") setHtmlRun(read.code);
-        else if (!usesInput(lang, read.code)) void runner.run(lang, read.code, []);
+        if (lang === "html") {
+          setHtmlRun(read.code);
+          // site novo: depois das fotos, a Mine olha a página e corrige
+          if (!options.review && autoReview) setReviewWanted(read.code);
+        } else if (!usesInput(lang, read.code)) void runner.run(lang, read.code, []);
         else setHtmlRun(null);
         // no celular o monitor fica embaixo do terminal: desce até ele
         if (window.matchMedia("(max-width: 900px)").matches) {
@@ -352,6 +451,16 @@ export function MineCode({
         <span className={`mc-top-status ${writing ? "is-busy" : ""}`}>
           <i aria-hidden /> {writing ? "a Mine está escrevendo…" : "pronta"}
         </span>
+        <button
+          type="button"
+          className="mc-top-toggle mc-top-review"
+          onClick={() => setAutoReview((on) => !on)}
+          aria-pressed={autoReview}
+          title={autoReview ? "Depois de cada site, a Mine fotografa a página e corrige o que estiver feio" : "Revisão visual desligada"}
+        >
+          {autoReview ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
+          <span>{autoReview ? "Revisão ligada" : "Revisão desligada"}</span>
+        </button>
         <button type="button" className={`mc-top-toggle ${previewOpen ? "is-on" : ""}`} onClick={() => setPreviewOpen((open) => !open)} aria-pressed={previewOpen} title={previewOpen ? "Minimizar a prévia" : "Mostrar a prévia"}>
           {previewOpen ? <PanelRightClose aria-hidden /> : <PanelRightOpen aria-hidden />}
           <span>{previewOpen ? "Minimizar prévia" : "Mostrar prévia"}</span>
@@ -611,7 +720,9 @@ export function MineCode({
           onMinimize={() => setPreviewOpen(false)}
           file={meta.file}
           isHtml={language === "html"}
-          html={htmlRun}
+          html={htmlRun ? withSiteImages(htmlRun, photos, photoFail) : null}
+          captureRef={captureRef}
+          status={photoJob ? `criando fotos ${photoJob.done}/${photoJob.total}…` : reviewing ? "a Mine está olhando o site…" : ""}
           writing={writing}
           busy={runner.status !== "idle"}
           onRun={run}
@@ -635,6 +746,8 @@ export function MineCode({
  */
 function MineMonitor({
   onMinimize,
+  captureRef,
+  status,
   file,
   isHtml,
   html,
@@ -645,6 +758,10 @@ function MineMonitor({
   emptyHint,
 }: {
   onMinimize: () => void;
+  /** O editor chama para fotografar a página (revisão visual). */
+  captureRef: React.MutableRefObject<(() => Promise<string>) | null>;
+  /** Linha de estado no monitor (fotos sendo criadas, revisão). */
+  status: string;
   file: string;
   isHtml: boolean;
   html: string | null;
@@ -655,6 +772,34 @@ function MineMonitor({
   emptyHint: string;
 }) {
   const frame = useRef<HTMLDivElement | null>(null);
+  const iframe = useRef<HTMLIFrameElement | null>(null);
+
+  // foto da página: pede ao iframe (script CAPTURE do SiteFrame) e espera a resposta dele
+  useEffect(() => {
+    captureRef.current = () =>
+      new Promise<string>((resolve, reject) => {
+        const target = iframe.current?.contentWindow;
+        if (!target) return reject(new Error("sem prévia"));
+        const id = Math.random().toString(36).slice(2);
+        const timer = window.setTimeout(() => {
+          window.removeEventListener("message", onMessage);
+          reject(new Error("a foto demorou demais"));
+        }, 20000);
+        function onMessage(event: MessageEvent) {
+          const data = event.data as { type?: string; id?: string; image?: string; error?: string } | null;
+          if (event.source !== target || data?.type !== "mc-capture-result" || data.id !== id) return;
+          window.clearTimeout(timer);
+          window.removeEventListener("message", onMessage);
+          if (data.image) resolve(data.image);
+          else reject(new Error(data.error || "sem foto"));
+        }
+        window.addEventListener("message", onMessage);
+        target.postMessage({ type: "mc-capture", id }, "*");
+      });
+    return () => {
+      captureRef.current = null;
+    };
+  }, [captureRef]);
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [reload, setReload] = useState(0);
   const [full, setFull] = useState(false);
@@ -711,6 +856,11 @@ function MineMonitor({
         <div className="mc-screen-bar">
           <span className={`mc-led ${writing || busy ? "is-busy" : showing ? "is-on" : ""}`} aria-hidden />
           <span className="mc-url">{isHtml ? `minerva.app/${file}` : `saída de ${file}`}</span>
+          {status ? (
+            <span className="mc-screen-status" role="status">
+              <Loader2 className="animate-spin" aria-hidden /> {status}
+            </span>
+          ) : null}
           {isHtml ? (
             <span className="mc-devices" role="group" aria-label="Tamanho da tela">
               <button type="button" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")} title="Computador">
@@ -741,7 +891,7 @@ function MineMonitor({
         </div>
         <div className="mc-screen">
           {isHtml && html ? (
-            <SiteFrame key={reload} code={html} title={file} device={device} />
+            <SiteFrame key={reload} code={html} title={file} device={device} capture frameRef={iframe} />
           ) : !isHtml && output ? (
             output
           ) : (
