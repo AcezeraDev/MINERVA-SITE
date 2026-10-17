@@ -46,6 +46,25 @@ export const MINE_TASK_MODEL = {
 };
 
 /**
+ * Out/2026: o MineCode tem modelo proprio, feito para programar. GLM-5.3 Flash
+ * custa US$ 0,10/0,30 por milhao (entrada/saida), abaixo do principal na
+ * saida, que e quase todo o custo de gerar codigo. Ele so aceita raciocinio
+ * low/high/max. Se falhar, o principal assume.
+ */
+export const MINE_CODE_MODEL = {
+  alias: "mine",
+  displayName: "Mine",
+  provider: "nanogpt",
+  get providerModel() {
+    return envModel("NANOGPT_CODE_MODEL", "z-ai/glm-5.3-flash");
+  },
+  get providerParams() {
+    return { reasoning_effort: envEffort("MINE_CODE_REASONING_EFFORT", "low") };
+  },
+  capabilities: CAPABILITIES,
+};
+
+/**
  * Reserva interna, nunca escolhivel: entra quando o principal falha e abre os
  * jogos, que precisam de uma rodada em poucos segundos. Para o usuario a
  * resposta continua sendo "da Mine".

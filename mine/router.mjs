@@ -1,4 +1,4 @@
-import { MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
+import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
 import { buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
 import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, extractSuggestions, imageStyleFrom, previousGalleryStyle, withImageStyle } from "../shared/chat-media.mjs";
@@ -292,7 +292,11 @@ export async function runMineRequest({
   const minAttemptMs = gameTask ? 3_500 : MIN_ATTEMPT_MS;
 
   const principal = cleanTask ? MINE_TASK_MODEL : MINE_MODEL;
-  const candidates = gameTask ? [MINE_FAST_MODEL, MINE_TASK_MODEL] : [principal, MINE_FAST_MODEL];
+  const candidates = gameTask
+    ? [MINE_FAST_MODEL, MINE_TASK_MODEL]
+    : cleanTask === "minecode"
+      ? [MINE_CODE_MODEL, MINE_TASK_MODEL]
+      : [principal, MINE_FAST_MODEL];
   const seen = new Set();
   const chain = candidates.filter((model) => {
     const key = `${model.provider}:${model.providerModel}:${model.providerParams?.reasoning_effort || ""}`;
