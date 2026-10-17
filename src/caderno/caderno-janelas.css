@@ -1,0 +1,252 @@
+/*
+  Janelas (modais) e busca rápida no caderno.
+
+  Elas ficam fora do <div class="workspace-shell"> principal, então ganham a
+  classe também (e .caderno-modal) para herdar toda a tradução de cores do
+  papel. A janela em si é uma folha solta: papel, pauta leve, fita no topo.
+*/
+
+.caderno-modal {
+  background: rgb(22 24 29 / 0.42);
+  animation: caderno-scrim-in 200ms ease both;
+}
+
+html:not(.theme-light) .caderno-modal {
+  background: rgb(5 7 12 / 0.7);
+}
+
+@keyframes caderno-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.caderno-modal > .glass-deep,
+.caderno-modal .glass-deep:first-of-type {
+  border-radius: 1.1rem !important;
+}
+
+.caderno-modal .glass-deep {
+  background-color: rgb(var(--sheet)) !important;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 31px, rgb(var(--rule) / 0.35) 31px 32px) !important;
+  border: 1px solid rgb(var(--line)) !important;
+  box-shadow: 0 40px 80px -40px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(var(--line)) !important;
+}
+
+/* textos e superfícies internas herdam o papel */
+.caderno-modal :is(h1, h2, h3).font-display {
+  font-variation-settings: "wdth" 114;
+}
+
+.caderno-modal input,
+.caderno-modal textarea,
+.caderno-modal select {
+  color: rgb(var(--theme-text));
+}
+
+.caderno-modal :is(input, textarea, select):focus {
+  border-color: rgb(var(--pen) / 0.7) !important;
+  box-shadow: 0 0 0 3px rgb(var(--pen) / 0.12) !important;
+}
+
+/* ───────── Flashcards: a ficha pautada ───────── */
+.caderno-flash-stage {
+  position: relative;
+  padding: 0.4rem 0.2rem 0.8rem;
+}
+
+.caderno-flash-pile {
+  position: absolute;
+  inset: 0.9rem -0.2rem 0.2rem 0.6rem;
+  border-radius: 0.6rem;
+  background: rgb(var(--panel-2));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+  transform: rotate(2.5deg);
+}
+
+.caderno-flash {
+  position: relative;
+  display: block;
+  width: 100%;
+  perspective: 1200px;
+  text-align: left;
+}
+
+.caderno-flash-inner {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 560ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.caderno-flash-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.caderno-flash-face {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 13rem;
+  padding: 1.4rem 1.4rem 1.1rem;
+  border-radius: 0.6rem;
+  background:
+    linear-gradient(to bottom, transparent 3.1rem, rgb(var(--margin-line) / 0.55) 3.1rem, rgb(var(--margin-line) / 0.55) calc(3.1rem + 2px), transparent calc(3.1rem + 2px)),
+    repeating-linear-gradient(to bottom, transparent 0 calc(2rem - 1px), rgb(var(--rule) / 0.75) calc(2rem - 1px) 2rem) 0 3.2rem / 100% 100% no-repeat,
+    rgb(var(--panel));
+  box-shadow: 0 16px 26px -16px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(var(--line));
+  backface-visibility: hidden;
+}
+
+.caderno-flash-face.is-back {
+  transform: rotateY(180deg);
+  background:
+    linear-gradient(to bottom, transparent 3.1rem, rgb(var(--margin-line) / 0.55) 3.1rem, rgb(var(--margin-line) / 0.55) calc(3.1rem + 2px), transparent calc(3.1rem + 2px)),
+    repeating-linear-gradient(to bottom, transparent 0 calc(2rem - 1px), rgb(var(--rule) / 0.75) calc(2rem - 1px) 2rem) 0 3.2rem / 100% 100% no-repeat,
+    color-mix(in srgb, rgb(var(--mint)) 18%, rgb(var(--panel)));
+}
+
+.caderno-flash-label {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.2rem;
+  color: rgb(var(--margin-line));
+  height: 1.8rem;
+}
+
+.caderno-flash-text {
+  margin-top: 0.3rem;
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  color: rgb(var(--pen));
+}
+
+.caderno-flash-text.is-answer {
+  font-weight: 400;
+  font-size: 1.2rem;
+}
+
+.caderno-flash-hint {
+  margin-top: auto;
+  padding-top: 0.8rem;
+  align-self: flex-end;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-flash:hover .caderno-flash-inner:not(.is-flipped) {
+  transform: rotateY(-8deg) rotateX(3deg);
+}
+
+.caderno-grade {
+  padding: 0.8rem 0.6rem;
+  border-radius: 0.9rem;
+  font-weight: 900;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 140ms ease;
+}
+
+.caderno-grade:hover {
+  transform: translateY(-3px) rotate(-1.5deg);
+}
+
+.caderno-grade.is-miss {
+  background: color-mix(in srgb, rgb(var(--hl-pink)) 70%, white);
+  color: #7a1024;
+}
+
+.caderno-grade.is-hard {
+  background: color-mix(in srgb, rgb(var(--hl-yellow)) 75%, white);
+  color: #5c4a00;
+}
+
+.caderno-grade.is-easy {
+  background: rgb(var(--mint));
+  color: #0b3d22;
+}
+
+/* ───────── Prova: folha de gabarito ───────── */
+.caderno-bubble-opt {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--theme-muted) / 0.7);
+  font-family: "DM Mono", monospace;
+  font-size: 0.85rem;
+  color: rgb(var(--theme-muted));
+  background: transparent !important;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.caderno-bubble-opt::before {
+  /* o preenchimento a lápis */
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: rgb(var(--pen));
+  transform: scale(0);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-bubble-opt.is-filled {
+  border-color: rgb(var(--pen));
+  color: rgb(var(--pen-ink)) !important;
+}
+
+.caderno-bubble-opt.is-filled::before {
+  transform: scale(1);
+}
+
+.caderno-bubble-opt {
+  z-index: 0;
+}
+
+.caderno-bubble-opt::before {
+  z-index: -1;
+}
+
+.caderno-quiz-opt {
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 160ms ease, border-color 160ms ease !important;
+}
+
+.caderno-quiz-opt:not(:disabled):hover {
+  transform: translateX(4px) rotate(-0.3deg);
+}
+
+.caderno-quiz-opt.is-right {
+  background: color-mix(in srgb, rgb(var(--mint)) 28%, rgb(var(--panel))) !important;
+  border-color: #1f9a57 !important;
+  color: rgb(var(--theme-text)) !important;
+  animation: caderno-pop-in 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-quiz-opt.is-wrong {
+  background: color-mix(in srgb, rgb(var(--hl-pink)) 30%, rgb(var(--panel))) !important;
+  border-color: rgb(var(--margin-line)) !important;
+  color: rgb(var(--theme-text)) !important;
+  animation: caderno-shake 380ms ease;
+}
+
+.caderno-quiz-mark.is-right {
+  color: #1f9a57;
+}
+
+.caderno-quiz-mark.is-wrong {
+  color: rgb(var(--margin-line));
+}
+
+@keyframes caderno-shake {
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}

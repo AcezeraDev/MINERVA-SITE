@@ -1,0 +1,435 @@
+/*
+  Mapa mental no caderno: o mapa é uma página quadriculada, o tema central é
+  escrito à caneta e marcado com marca-texto, e cada ramo é uma ficha presa
+  com fita. As ligações são traços de caneta que se desenham na entrada.
+
+  Os seletores levam .workspace-shell.caderno-modal para vencer as regras
+  antigas do index.css (inclusive as de .theme-light) sem !important.
+*/
+
+/* ───────── Cabeçalho da janela ───────── */
+.caderno-mm-badge {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-yellow) / 0.55);
+  rotate: -6deg;
+}
+
+.caderno-mm-close {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--theme-muted));
+  border: 1.5px dashed rgb(var(--line));
+  transition: rotate 220ms cubic-bezier(0.34, 1.56, 0.64, 1), color 160ms ease;
+}
+
+.caderno-mm-close:hover {
+  color: rgb(var(--theme-text));
+  rotate: 90deg;
+}
+
+/* ───────── Carregando: a Mine desenha o mapa ───────── */
+.caderno-mm-loading {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: 2.5rem 1rem 3rem;
+  text-align: center;
+}
+
+.caderno-mm-sketch {
+  width: min(21rem, 90%);
+  height: auto;
+  color: rgb(var(--pen));
+}
+
+.caderno-mm-sketch path,
+.caderno-mm-sketch ellipse,
+.caderno-mm-sketch rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: caderno-mm-draw 3.6s cubic-bezier(0.6, 0, 0.3, 1) infinite;
+}
+
+.caderno-mm-sketch .is-branch {
+  color: var(--c);
+  stroke: var(--c);
+}
+
+.caderno-mm-sketch .is-hl {
+  stroke: rgb(var(--hl-yellow));
+  stroke-width: 14;
+  opacity: 0.7;
+}
+
+@keyframes caderno-mm-draw {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  45%,
+  82% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.caderno-mm-loading .caderno-mm-face {
+  width: 4.2rem;
+  height: 4.2rem;
+}
+
+.caderno-mm-loading p {
+  font-family: "Kalam", cursive;
+  font-size: 1.2rem;
+  color: rgb(var(--pen));
+}
+
+.caderno-mm-loading small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* ───────── Barra de comando: uma tira de papel ───────── */
+.workspace-shell.caderno-modal .mindmap-command-bar {
+  border: 1.5px dashed rgb(var(--line));
+  border-radius: 0.9rem;
+  background: rgb(var(--panel));
+  box-shadow: none;
+}
+
+.workspace-shell.caderno-modal .mindmap-command-icon {
+  border: 0;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-mint) / 0.6);
+  rotate: -5deg;
+}
+
+.workspace-shell.caderno-modal .mindmap-command-copy strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.workspace-shell.caderno-modal .mindmap-command-copy div > span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+.workspace-shell.caderno-modal .mindmap-summary-pill {
+  border: 0;
+  border-radius: 0.3rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--hl-lilac) / 0.45);
+  font-family: "DM Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  rotate: 1.5deg;
+}
+
+.workspace-shell.caderno-modal .mindmap-summary-pill--primary {
+  background: rgb(var(--hl-yellow) / 0.7);
+  rotate: -1.5deg;
+}
+
+.workspace-shell.caderno-modal .mindmap-overview-button,
+.workspace-shell.caderno-modal .mindmap-zoom-button {
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 999px;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--sheet));
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 160ms ease;
+}
+
+.workspace-shell.caderno-modal .mindmap-overview-button:hover:not(:disabled),
+.workspace-shell.caderno-modal .mindmap-zoom-button:hover {
+  border-color: rgb(var(--pen) / 0.6);
+  background: rgb(var(--hl-yellow) / 0.4);
+  transform: translateY(-2px) rotate(-2deg);
+}
+
+.workspace-shell.caderno-modal .mindmap-toolbar-separator {
+  background: rgb(var(--line));
+}
+
+/* ───────── A página do mapa: papel quadriculado ───────── */
+.workspace-shell.caderno-modal .mindmap-viewport {
+  border: 1px solid rgb(var(--line));
+  border-radius: 0.9rem;
+  background: rgb(var(--sheet));
+  scrollbar-color: rgb(var(--pen) / 0.35) transparent;
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.4), 0 22px 40px -32px rgb(0 0 0 / 0.55);
+}
+
+.workspace-shell.caderno-modal .mindmap-knowledge-plane {
+  border-radius: 0;
+  background:
+    linear-gradient(to right, transparent 46px, rgb(var(--margin-line) / 0.5) 46px 48px, transparent 48px),
+    repeating-linear-gradient(to right, rgb(var(--rule) / 0.4) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(to bottom, rgb(var(--rule) / 0.4) 0 1px, transparent 1px 28px),
+    rgb(var(--sheet));
+}
+
+.workspace-shell.caderno-modal .mindmap-link-underlay {
+  stroke-width: 12;
+  opacity: 0.1;
+}
+
+.workspace-shell.caderno-modal .mindmap-link {
+  stroke-width: 2.6;
+  stroke-dasharray: none;
+}
+
+.workspace-shell.caderno-modal .mindmap-link.is-active {
+  stroke-width: 3.8;
+}
+
+/* tema central: escrito à caneta e circulado */
+.workspace-shell.caderno-modal .mindmap-central-node {
+  border: 0;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: transparent;
+  box-shadow: none;
+}
+
+.workspace-shell.caderno-modal .mindmap-central-node::before {
+  /* o borrão de marca-texto por trás do título */
+  content: "";
+  position: absolute;
+  inset: 22% 8%;
+  z-index: -1;
+  border-radius: 40% 55% 45% 60% / 60% 45% 55% 40%;
+  background: rgb(var(--hl-yellow) / 0.75);
+  mix-blend-mode: var(--hl-blend, multiply);
+  rotate: -2deg;
+  transform-origin: left center;
+  animation: caderno-mm-swipe 700ms 250ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes caderno-mm-swipe {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.workspace-shell.caderno-modal .mindmap-central-ring {
+  position: absolute;
+  left: -9%;
+  top: -26%;
+  width: 118%;
+  height: 152%;
+  color: rgb(var(--pen));
+  pointer-events: none;
+}
+
+.workspace-shell.caderno-modal .mindmap-central-ring path {
+  vector-effect: non-scaling-stroke;
+}
+
+.workspace-shell.caderno-modal .mindmap-central-node small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--margin-line));
+}
+
+.workspace-shell.caderno-modal .mindmap-central-node strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.workspace-shell.caderno-modal .mindmap-central-node span {
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* ramos: fichas presas com fita */
+.workspace-shell.caderno-modal .mindmap-card {
+  border: 0;
+  border-top: 5px solid var(--mindmap-branch-color);
+  border-radius: 0.35rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 1px 0 rgb(var(--line)), 0 14px 22px -16px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(var(--line));
+  rotate: var(--mm-tilt, 0deg);
+  transition: rotate 260ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease;
+}
+
+.workspace-shell.caderno-modal .mindmap-card.is-active {
+  rotate: 0deg;
+  box-shadow:
+    0 0 0 2px var(--mindmap-branch-color),
+    0 22px 34px -18px color-mix(in srgb, var(--mindmap-branch-color) 60%, transparent);
+}
+
+.mindmap-card__tape {
+  position: absolute;
+  top: -0.85rem;
+  left: 50%;
+  width: 4.6rem;
+  height: 1.3rem;
+  translate: -50% 0;
+  rotate: calc(var(--mm-tilt, 0deg) * -3);
+  background: color-mix(in srgb, var(--mindmap-branch-color) 32%, rgb(255 255 255 / 0.55));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+  clip-path: polygon(3% 0, 97% 4%, 100% 50%, 96% 100%, 4% 96%, 0 50%);
+  pointer-events: none;
+}
+
+html:not(.theme-light) .mindmap-card__tape {
+  background: color-mix(in srgb, var(--mindmap-branch-color) 45%, rgb(255 255 255 / 0.15));
+}
+
+.workspace-shell.caderno-modal .mindmap-card__header {
+  color: rgb(var(--theme-text));
+}
+
+.workspace-shell.caderno-modal .mindmap-card__index {
+  border-radius: 50%;
+  color: white;
+  background: var(--mindmap-branch-color);
+  font-family: "Kalam", cursive;
+  font-size: 1rem;
+  rotate: -8deg;
+}
+
+.workspace-shell.caderno-modal .mindmap-card__title strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.workspace-shell.caderno-modal .mindmap-card__title small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.92rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+.workspace-shell.caderno-modal .mindmap-card__items::before {
+  background: repeating-linear-gradient(to bottom, var(--mindmap-branch-color) 0 5px, transparent 5px 9px);
+  opacity: 0.55;
+}
+
+.workspace-shell.caderno-modal .mindmap-card__items li {
+  color: rgb(var(--theme-text) / 0.9);
+}
+
+.workspace-shell.caderno-modal .mindmap-card__items li::before {
+  box-shadow: 0 0 0 3px rgb(var(--panel));
+}
+
+.workspace-shell.caderno-modal .mindmap-card__items li strong {
+  display: inline;
+  padding: 0 0.2em;
+  color: rgb(var(--theme-text));
+  background: linear-gradient(transparent 58%, color-mix(in srgb, var(--mindmap-branch-color) 26%, transparent) 58% 96%, transparent 96%);
+}
+
+.workspace-shell.caderno-modal .mindmap-card__items li strong::after {
+  content: "\A";
+  white-space: pre;
+}
+
+.workspace-shell.caderno-modal .mindmap-hint {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+/* ───────── Celular: fichas empilhadas ───────── */
+.workspace-shell.caderno-modal .mindmap-mobile-topic {
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgb(var(--hl-yellow) / 0.55);
+  rotate: -1deg;
+}
+
+.workspace-shell.caderno-modal .mindmap-mobile-topic > span {
+  border-radius: 50%;
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--pen));
+}
+
+.workspace-shell.caderno-modal .mindmap-mobile-topic small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--theme-text) / 0.7);
+}
+
+.workspace-shell.caderno-modal .mindmap-mobile-topic h3,
+.workspace-shell.caderno-modal .mindmap-mobile-branch__title strong {
+  font-family: "Kalam", cursive;
+  color: rgb(var(--pen));
+}
+
+.workspace-shell.caderno-modal .mindmap-mobile-branch {
+  border: 0;
+  border-left: 5px solid var(--mindmap-branch-color);
+  border-radius: 0.35rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 10px 18px -16px rgb(0 0 0 / 0.5);
+}
+
+.workspace-shell.caderno-modal .mindmap-mobile-branch__index {
+  border-radius: 50%;
+  color: white;
+  font-family: "Kalam", cursive;
+}
+
+.workspace-shell.caderno-modal .mindmap-mobile-branch__content article {
+  border: 0;
+  border-bottom: 1px solid rgb(var(--rule) / 0.7);
+  border-radius: 0;
+  background: transparent;
+}
+
+.workspace-shell.caderno-modal .mindmap-mobile-branch__content article strong {
+  color: rgb(var(--theme-text));
+  background: linear-gradient(transparent 58%, color-mix(in srgb, var(--mindmap-branch-color) 26%, transparent) 58% 96%, transparent 96%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caderno-mm-sketch path,
+  .caderno-mm-sketch ellipse,
+  .caderno-mm-sketch rect {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .workspace-shell.caderno-modal .mindmap-central-node::before {
+    animation: none;
+  }
+}

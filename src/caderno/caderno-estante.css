@@ -1,0 +1,370 @@
+/*
+  Estante de matérias (Estante.tsx).
+
+  Cada caderno é uma caixa 3D: lombada na frente, capa no lado direito e o
+  topo das folhas em cima. Só transform e opacity animam. A prateleira é
+  desenhada no fundo da lista, uma tábua a cada linha de 212px, por isso cada
+  vaga tem exatamente essa altura.
+*/
+.caderno-estante {
+  --row: 244px;
+  --plank: 12px;
+  --d: 118px; /* largura da capa = profundidade do caderno */
+  --ink-line: rgb(var(--theme-text) / 0.82);
+}
+
+.caderno-estante-shelf {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0 6px;
+  margin: 0;
+  padding: 0 4px;
+  list-style: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--row) - var(--plank) - 2px),
+    var(--ink-line) calc(var(--row) - var(--plank) - 2px) calc(var(--row) - var(--plank)),
+    rgb(var(--panel-2)) calc(var(--row) - var(--plank)) calc(var(--row) - 2px),
+    var(--ink-line) calc(var(--row) - 2px) var(--row)
+  );
+}
+
+.caderno-estante-slot {
+  display: flex;
+  align-items: flex-end;
+  height: var(--row);
+  padding-bottom: var(--plank);
+  animation: caderno-book-drop 560ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes caderno-book-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-34px) rotate(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ───────────── o caderno ───────────── */
+.caderno-book {
+  position: relative;
+  display: block;
+  width: var(--w);
+  height: var(--h);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  perspective: 900px;
+  /* olho um pouco acima da prateleira: dá para ver o topo das folhas */
+  perspective-origin: 40% -30%;
+  transform-origin: 0 100%;
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.caderno-book:focus-visible {
+  outline: none;
+}
+
+.caderno-book-box {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.caderno-book-spine,
+.caderno-book-cover,
+.caderno-book-top {
+  position: absolute;
+  backface-visibility: hidden;
+  border: 1.5px solid #161a22;
+}
+
+.caderno-book-spine {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 12px;
+  border-radius: 4px 7px 7px 4px;
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 0.18), transparent 22%, rgb(255 255 255 / 0.22) 48%, transparent 70%, rgb(0 0 0 / 0.16)),
+    var(--c);
+  transform: translateZ(calc(var(--d) / 2));
+}
+
+.caderno-book-icon {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1.5px solid #161a22;
+  border-radius: 999px;
+  background: #fffdf6;
+  color: #161a22;
+}
+
+.caderno-book-label {
+  position: relative;
+  z-index: 2;
+  max-height: calc(100% - 56px);
+  overflow: hidden;
+  padding: 7px 3px;
+  border: 1.5px solid #161a22;
+  border-radius: 3px;
+  background: #fffdf6;
+  color: #161a22;
+  font-family: "Gochi Hand", cursive;
+  font-size: 14.5px;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  writing-mode: vertical-rl;
+}
+
+/* quanto da matéria já foi estudado: marca-texto subindo pela lombada */
+.caderno-book-fill {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  border-radius: 0 0 6px 3px;
+  background: repeating-linear-gradient(135deg, rgb(255 255 255 / 0.34) 0 4px, transparent 4px 9px);
+  transform-origin: bottom;
+  animation: caderno-book-fill 900ms 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes caderno-book-fill {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+.caderno-book-star {
+  position: absolute;
+  bottom: 8px;
+  z-index: 2;
+  color: #fffdf6;
+  font-size: 14px;
+  text-shadow: 0 0 0 #161a22, 1px 1px 0 #161a22;
+}
+
+/* tarefa atrasada: aba vermelha de fichário saindo do topo */
+.caderno-book-tab {
+  position: absolute;
+  top: -16px;
+  right: 5px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0 3px;
+  border: 1.5px solid #161a22;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  background: #ff5a5f;
+  color: #fff;
+  font: 500 10px/1 "DM Mono", monospace;
+}
+
+/* revisões para hoje: post-it amarelo enfiado entre as folhas */
+.caderno-book-postit {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  display: grid;
+  width: 22px;
+  height: 20px;
+  place-items: start center;
+  padding-top: 2px;
+  border: 1.5px solid #161a22;
+  border-bottom: 0;
+  background: #f7ee6b;
+  color: #161a22;
+  font: 500 10px/1 "DM Mono", monospace;
+  transform: translateX(-50%) rotate(-7deg);
+}
+
+/* capa: o lado direito da caixa */
+.caderno-book-cover {
+  top: 0;
+  left: calc((var(--w) - var(--d)) / 2);
+  display: flex;
+  width: var(--d);
+  height: 100%;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 12px 12px 14px;
+  border-radius: 3px 8px 8px 3px;
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 0.22) 0 7px, transparent 7px),
+    radial-gradient(circle at 70% 18%, rgb(255 255 255 / 0.28), transparent 46%),
+    var(--c);
+  color: #161a22;
+  transform: rotateY(90deg) translateZ(calc(var(--w) / 2));
+}
+
+.caderno-book-cover-tag {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  margin-bottom: auto;
+  place-items: center;
+  border: 1.5px solid #161a22;
+  border-radius: 8px;
+  background: #fffdf6;
+}
+
+.caderno-book-cover-name {
+  font-family: "Anybody Variable", sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.05;
+  hyphens: auto;
+  overflow-wrap: break-word;
+}
+
+.caderno-book-cover-meta {
+  font: 500 10px/1.2 "DM Mono", monospace;
+  opacity: 0.8;
+}
+
+/* topo: folhas pautadas vistas de cima */
+.caderno-book-top {
+  top: calc(var(--d) / -2);
+  left: 0;
+  width: var(--w);
+  height: var(--d);
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 3px, rgb(22 26 34 / 0.14) 3px 4px),
+    #f6f3ea;
+  transform: rotateX(90deg);
+}
+
+/* ───────────── gestos ───────────── */
+.caderno-estante-slot:has(.caderno-book:is(:hover, :focus-visible)) {
+  position: relative;
+  z-index: 3;
+}
+
+.caderno-book:is(:hover, :focus-visible) .caderno-book-box {
+  transform: translate3d(0, -18px, 46px) rotateY(-36deg);
+}
+
+.caderno-book:focus-visible .caderno-book-spine {
+  box-shadow: 0 0 0 3px rgb(var(--pen));
+}
+
+/* os vizinhos tombam um pouco para o espaço que abriu */
+.caderno-estante-slot:has(.caderno-book:hover) + .caderno-estante-slot .caderno-book {
+  transform: rotate(-4deg);
+}
+
+.caderno-estante-slot:has(+ .caderno-estante-slot .caderno-book:hover) .caderno-book {
+  transform-origin: 100% 100%;
+  transform: rotate(3deg);
+}
+
+/* abrir: o caderno sai da estante e mostra a capa inteira */
+.caderno-estante-slot:has(.is-opening) {
+  position: relative;
+  z-index: 5;
+}
+
+.caderno-book.is-opening .caderno-book-box {
+  transform: translate3d(calc(var(--d) / 2), -26px, 110px) rotateY(-90deg) scale(1.06);
+  transition-duration: 460ms;
+}
+
+/* ───────────── nova matéria ───────────── */
+.caderno-book-new {
+  display: grid;
+  width: var(--w);
+  height: var(--h);
+  place-items: center;
+  border: 2px dashed rgb(var(--theme-text) / 0.4);
+  border-radius: 4px 7px 7px 4px;
+  background: transparent;
+  color: rgb(var(--theme-text) / 0.55);
+  font-family: "Gochi Hand", cursive;
+  font-size: 30px;
+  cursor: pointer;
+  transition:
+    transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 140ms,
+    border-color 140ms;
+}
+
+.caderno-book-new:is(:hover, :focus-visible) {
+  border-color: rgb(var(--pen));
+  color: rgb(var(--pen));
+  transform: translateY(-8px) rotate(-3deg);
+}
+
+/* ───────────── sem 3D (movimento reduzido / aparelho fraco) ───────────── */
+.caderno-estante.is-flat .caderno-book-cover,
+.caderno-estante.is-flat .caderno-book-top {
+  display: none;
+}
+
+.caderno-estante.is-flat .caderno-book-spine {
+  transform: none;
+}
+
+.caderno-estante.is-flat .caderno-book:is(:hover, :focus-visible) .caderno-book-box {
+  transform: translateY(-8px);
+}
+
+.caderno-estante.is-flat .caderno-estante-slot,
+.caderno-estante.is-flat .caderno-book-fill {
+  animation: none;
+}
+
+.caderno-estante.is-flat .caderno-estante-slot .caderno-book {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caderno-estante-slot,
+  .caderno-book-fill {
+    animation: none;
+  }
+}
+
+/* ───────────── botão Estante | Cartões (cabeçalho da biblioteca) ───────────── */
+.caderno-library-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1.5px solid rgb(var(--theme-text) / 0.7);
+  border-radius: 999px;
+}
+
+.caderno-library-switch button {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: rgb(var(--theme-text) / 0.7);
+  font-family: "Gochi Hand", cursive;
+  font-size: 16px;
+  transition:
+    background-color 140ms,
+    color 140ms;
+}
+
+.caderno-library-switch button[aria-pressed="true"] {
+  background: rgb(var(--hl-mint));
+  color: #161a22;
+  mix-blend-mode: var(--hl-blend);
+}

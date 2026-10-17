@@ -30,3 +30,18 @@ test("XP dos jogos usa o valor persistido por acertos no total e no ranking", ()
   assert.equal(totalXp(stats), 25);
   assert.equal(xpSince({ sessions }, 1_500), 10);
 });
+
+test("desenhos do Ateliê valem XP com teto diário", async () => {
+  const { drawingsPerDay, xpPerAction } = await import("../shared/xp.mjs");
+  const dia = new Date(2026, 8, 30, 10).getTime();
+  const outroDia = new Date(2026, 9, 1, 10).getTime();
+  const sessions = [
+    ...Array.from({ length: drawingsPerDay + 3 }, (_, i) => ({ kind: "Arte", createdAt: dia + i * 1000 })),
+    { kind: "Arte", createdAt: outroDia },
+  ];
+  const stats = gamificationStats({ sessions }, outroDia);
+  assert.equal(stats.drawings, drawingsPerDay + 1);
+  // Conquistas "arte-1" (20) entram no total; "arte-10" ainda não.
+  assert.equal(totalXp(stats) - 20, (drawingsPerDay + 1) * xpPerAction.drawing);
+  assert.equal(xpSince({ sessions }, outroDia), xpPerAction.drawing);
+});

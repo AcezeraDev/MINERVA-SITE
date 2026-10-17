@@ -1,0 +1,732 @@
+/*
+ * Respostas da Mine com cara de caderno de estudo (src/chat/MineRichText.tsx).
+ *
+ * Regra de largura: texto corrido fica na medida de leitura (~70 caracteres);
+ * tabela, código e fórmula usam a largura toda do balão, porque apertá-los na
+ * coluna de texto quebraria linha de código e coluna de tabela.
+ *
+ * Cores sempre pelos tokens do app (--theme-text, --mint, --cyan, --amber,
+ * --rose, --violet) para acompanhar o tema claro e o destaque escolhido.
+ */
+
+.mine-answer:has(.mrt) {
+  max-width: none;
+}
+
+.mrt {
+  --mrt-measure: 62ch;
+  --mrt-gap: 0.85em;
+  --mrt-panel: rgb(var(--theme-text) / 0.035);
+  --mrt-border: rgb(var(--theme-text) / 0.09);
+  --mrt-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", "JetBrains Mono", "Liberation Mono", monospace;
+  font-size: inherit;
+}
+
+.mrt > * + * {
+  margin-top: var(--mrt-gap);
+}
+
+.mrt > :first-child {
+  margin-top: 0;
+}
+
+.mrt-p,
+.mrt-h2,
+.mrt-h3,
+.mrt-list,
+.mrt-quote {
+  max-width: var(--mrt-measure);
+}
+
+.mrt-p {
+  color: rgb(var(--theme-text) / 0.84);
+  letter-spacing: 0.003em;
+  text-wrap: pretty;
+}
+
+.mrt strong {
+  color: rgb(var(--theme-text) / 0.98);
+  font-weight: 800;
+}
+
+.mrt em {
+  color: rgb(var(--theme-text) / 0.9);
+}
+
+.mrt del {
+  color: rgb(var(--theme-text) / 0.45);
+}
+
+/* Rótulo ("Resposta:", "Passo 2:") vira uma etiqueta: é onde o olho procura. */
+.mrt-label {
+  display: inline-block;
+  margin-right: 0.15em;
+  padding: 0.02em 0.5em 0.06em;
+  border-radius: 0.45em;
+  background: rgb(var(--theme-text) / 0.07);
+  color: rgb(var(--theme-text) / 0.96);
+  font-size: 0.86em;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+/* ---------------------------------------------------------------- títulos */
+
+.mrt-h2 {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55em;
+  margin-top: 1.55em !important;
+  padding-bottom: 0.38em;
+  font-family: "Anybody Variable", "Atkinson Hyperlegible Next Variable", sans-serif;
+  font-size: 1.24em;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+  color: rgb(var(--theme-text) / 0.97);
+  text-wrap: balance;
+}
+
+/* Fio que some para a direita: separa a seção sem virar uma linha pesada. */
+.mrt-h2::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgb(var(--mint) / 0.45), rgb(var(--theme-text) / 0.08) 38%, transparent);
+}
+
+.mrt-h2__mark {
+  flex: 0 0 auto;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 0.14em;
+  background: rgb(var(--mint));
+  box-shadow: 0 0 0 0.2em rgb(var(--mint) / 0.14);
+  transform: translateY(-0.08em) rotate(45deg);
+}
+
+.mrt-h3 {
+  margin-top: 1.2em !important;
+  font-family: "Anybody Variable", "Atkinson Hyperlegible Next Variable", sans-serif;
+  font-size: 1.04em;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: rgb(var(--theme-text) / 0.9);
+}
+
+.mrt-h2 + *,
+.mrt-h3 + * {
+  margin-top: 0.5em !important;
+}
+
+.mrt-rule {
+  height: 1px;
+  margin-block: 1.4em !important;
+  border: 0;
+  background: repeating-linear-gradient(90deg, rgb(var(--theme-text) / 0.16) 0 6px, transparent 6px 12px);
+}
+
+/* ------------------------------------------------------------------ inline */
+
+.mrt-code-inline {
+  padding: 0.08em 0.38em;
+  border: 1px solid rgb(var(--mint) / 0.18);
+  border-radius: 0.4rem;
+  background: rgb(var(--mint) / 0.09);
+  color: rgb(var(--mint));
+  font-family: var(--mrt-mono);
+  font-size: 0.88em;
+  word-break: break-word;
+}
+
+.theme-light .mrt-code-inline {
+  color: color-mix(in srgb, rgb(var(--mint)) 55%, rgb(var(--theme-text)));
+}
+
+/* Marca-texto: traço inclinado de caneta atrás do texto, não um fundo chapado. */
+.mrt-mark {
+  padding: 0 0.12em;
+  border-radius: 0.18em;
+  background: linear-gradient(104deg, transparent 0.4em, rgb(var(--amber) / 0.34) 0.5em, rgb(var(--amber) / 0.26) 92%, transparent 100%);
+  color: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.mrt-link {
+  color: rgb(var(--mint));
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--mint) / 0.35);
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 150ms ease;
+}
+
+.mrt-link:hover {
+  text-decoration-color: rgb(var(--mint));
+}
+
+.mrt-link__icon {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-left: 0.2em;
+  vertical-align: -0.02em;
+  opacity: 0.7;
+}
+
+.mrt-math-inline .katex {
+  font-size: 1.06em;
+}
+
+.mrt-tex-raw {
+  font-family: var(--mrt-mono);
+  font-size: 0.88em;
+  color: rgb(var(--theme-text) / 0.7);
+  white-space: pre-wrap;
+}
+
+/* --------------------------------------------------------------- listas */
+
+.mrt-list {
+  display: grid;
+  gap: 0.42em;
+  margin-block: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mrt-list__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.7em;
+  align-items: start;
+}
+
+.mrt-list__content {
+  min-width: 0;
+}
+
+.mrt-p--bare {
+  margin: 0;
+}
+
+.mrt-list__bullet {
+  width: 0.4em;
+  height: 0.4em;
+  margin: 0.66em 0.18em 0;
+  border-radius: 0.1em;
+  background: rgb(var(--mint));
+  transform: rotate(45deg);
+}
+
+.mrt-list--nested {
+  margin-top: 0.36em;
+}
+
+.mrt-list--nested .mrt-list__bullet {
+  border: 1.5px solid rgb(var(--mint) / 0.8);
+  border-radius: 50%;
+  background: transparent;
+  transform: none;
+}
+
+/* Passos numerados: círculos ligados por um fio, como uma trilha. */
+.mrt-list__marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 1.75em;
+  height: 1.75em;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(150deg, rgb(var(--mint)), rgb(var(--mint-deep)));
+  color: #04120c;
+  font-family: "Anybody Variable", sans-serif;
+  font-size: 0.8em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 0.25em rgb(var(--mint) / 0.1);
+  transform: translateY(0.12em);
+}
+
+.mrt-list--steps > .mrt-list__item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 1.9em;
+  bottom: -0.55em;
+  left: calc(0.875em * 0.8 - 1px);
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(rgb(var(--mint) / 0.4), rgb(var(--mint) / 0.08));
+}
+
+.mrt-list--steps {
+  gap: 0.7em;
+}
+
+.mrt-list--nested .mrt-list__marker {
+  width: 1.5em;
+  height: 1.5em;
+  background: rgb(var(--mint) / 0.14);
+  color: rgb(var(--mint));
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------- citação */
+
+.mrt-quote {
+  margin-inline: 0;
+  padding: 0.2em 0 0.2em 1em;
+  border-left: 3px solid rgb(var(--theme-text) / 0.18);
+  color: rgb(var(--theme-text) / 0.72);
+  font-style: italic;
+}
+
+/* ----------------------------------------------------------- cartões */
+
+.mrt-callout {
+  --tone: var(--mint);
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85em;
+  padding: 0.95em 1.1em 1em 0.95em;
+  border: 1px solid rgb(var(--tone) / 0.22);
+  border-radius: 1.1em;
+  background:
+    linear-gradient(135deg, rgb(var(--tone) / 0.1), rgb(var(--tone) / 0.03) 55%),
+    rgb(var(--theme-text) / 0.02);
+  overflow: hidden;
+}
+
+/* Fita na borda: o tipo do cartão é lido antes do texto. */
+.mrt-callout::before {
+  content: "";
+  position: absolute;
+  inset: 0.8em auto 0.8em 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: rgb(var(--tone));
+}
+
+.mrt-callout--tip { --tone: var(--mint); }
+.mrt-callout--warning { --tone: var(--amber); }
+.mrt-callout--important { --tone: var(--rose); }
+.mrt-callout--example { --tone: var(--cyan); }
+.mrt-callout--definition { --tone: var(--violet); }
+.mrt-callout--summary { --tone: var(--mint); }
+.mrt-callout--fun { --tone: var(--violet); }
+.mrt-callout--mistake { --tone: var(--rose); }
+.mrt-callout--note { --tone: var(--cyan); }
+
+.mrt-callout__icon {
+  display: grid;
+  width: 2em;
+  height: 2em;
+  place-items: center;
+  border-radius: 0.7em;
+  background: rgb(var(--tone) / 0.16);
+  color: rgb(var(--tone));
+}
+
+.mrt-callout__icon svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+.mrt-callout__body {
+  min-width: 0;
+}
+
+.mrt-callout__body > * + * {
+  margin-top: 0.45em;
+}
+
+.mrt-callout__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35em;
+  margin-bottom: 0.2em;
+  color: rgb(var(--tone));
+  font-size: 0.74em;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.9;
+  text-transform: uppercase;
+}
+
+.mrt-callout__subtitle {
+  color: rgb(var(--theme-text) / 0.92);
+  font-size: 1.28em;
+  letter-spacing: -0.005em;
+  text-transform: none;
+}
+
+.mrt-callout__sep {
+  opacity: 0.5;
+}
+
+.mrt-callout .mrt-p {
+  color: rgb(var(--theme-text) / 0.86);
+}
+
+.theme-light .mrt-callout__title,
+.theme-light .mrt-callout__icon {
+  color: color-mix(in srgb, rgb(var(--tone)) 60%, rgb(var(--theme-text)));
+}
+
+/* Definição com cara de verbete: o termo pesa, o texto respira. */
+.mrt-callout--definition .mrt-p:first-of-type strong:first-child {
+  font-family: "Anybody Variable", sans-serif;
+  font-size: 1.08em;
+}
+
+/* ----------------------------------------------------------- tabela */
+
+.mrt-table {
+  overflow-x: auto;
+  border: 1px solid var(--mrt-border);
+  border-radius: 1em;
+  background: var(--mrt-panel);
+  scrollbar-width: thin;
+}
+
+.mrt-table:focus-visible {
+  outline: 2px solid rgb(var(--mint));
+  outline-offset: 2px;
+}
+
+.mrt-table table {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.92em;
+}
+
+.mrt-table th,
+.mrt-table td {
+  padding: 0.62em 0.95em;
+  text-align: left;
+  vertical-align: top;
+}
+
+.mrt-table th {
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, rgb(var(--mint)) 11%, rgb(var(--theme-text) / 0.04));
+  color: rgb(var(--theme-text) / 0.95);
+  font-size: 0.8em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 1px solid rgb(var(--mint) / 0.3);
+}
+
+.mrt-table td {
+  color: rgb(var(--theme-text) / 0.84);
+  border-bottom: 1px solid rgb(var(--theme-text) / 0.06);
+}
+
+.mrt-table tbody tr:nth-child(even) td {
+  background: rgb(var(--theme-text) / 0.025);
+}
+
+.mrt-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.mrt-table tbody tr:hover td {
+  background: rgb(var(--mint) / 0.06);
+}
+
+.mrt-table td:first-child {
+  color: rgb(var(--theme-text) / 0.95);
+  font-weight: 700;
+}
+
+.mrt-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- fórmula */
+
+.mrt-formula {
+  margin-inline: 0;
+  border: 1px solid rgb(var(--cyan) / 0.2);
+  border-radius: 1.05em;
+  overflow: hidden;
+  /* Papel quadriculado de caderno de exatas. */
+  background:
+    linear-gradient(rgb(var(--cyan) / 0.06) 1px, transparent 1px) 0 0 / 1.1em 1.1em,
+    linear-gradient(90deg, rgb(var(--cyan) / 0.06) 1px, transparent 1px) 0 0 / 1.1em 1.1em,
+    rgb(var(--theme-text) / 0.02);
+}
+
+.mrt-formula__bar,
+.mrt-codebox__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.5em 0.6em 0.5em 0.75em;
+}
+
+.mrt-formula__bar {
+  border-bottom: 1px dashed rgb(var(--cyan) / 0.18);
+}
+
+.mrt-formula__body {
+  overflow-x: auto;
+  padding: 1.1em 1.2em 1.25em;
+  color: rgb(var(--theme-text) / 0.97);
+  text-align: center;
+  scrollbar-width: thin;
+}
+
+.mrt-formula__body .katex-display {
+  margin: 0;
+}
+
+.mrt-formula__body .katex {
+  font-size: 1.28em;
+}
+
+.mrt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.18em 0.62em 0.2em 0.5em;
+  border-radius: 999px;
+  background: rgb(var(--cyan) / 0.12);
+  color: rgb(var(--cyan));
+  font-size: 0.7em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.theme-light .mrt-chip {
+  color: color-mix(in srgb, rgb(var(--cyan)) 50%, rgb(var(--theme-text)));
+}
+
+.mrt-chip svg {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.mrt-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-left: auto;
+  padding: 0.3em 0.62em;
+  border-radius: 0.6em;
+  color: rgb(var(--theme-text) / 0.55);
+  font-size: 0.72em;
+  font-weight: 800;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.mrt-copy:hover,
+.mrt-copy:focus-visible {
+  background: rgb(var(--theme-text) / 0.08);
+  color: rgb(var(--theme-text) / 0.95);
+}
+
+.mrt-copy svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+/* ------------------------------------------------------------- código */
+
+/* Sempre escuro, nos dois temas: é um editor, e é assim que a pessoa vai ver o
+   código quando abrir o dela. */
+.mrt-codebox {
+  margin-inline: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.05em;
+  background: #0b100e;
+  box-shadow: 0 18px 40px -30px rgba(0, 0, 0, 0.9);
+  color: #d9e6df;
+}
+
+.mrt-codebox__bar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.mrt-codebox__dots {
+  display: flex;
+  gap: 0.32em;
+}
+
+.mrt-codebox__dots i {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.mrt-codebox__dots i:first-child { background: rgb(var(--rose) / 0.75); }
+.mrt-codebox__dots i:nth-child(2) { background: rgb(var(--amber) / 0.75); }
+.mrt-codebox__dots i:last-child { background: rgb(var(--mint) / 0.75); }
+
+.mrt-codebox .mrt-chip {
+  background: rgba(57, 245, 154, 0.1);
+  color: #39f59a;
+}
+
+.mrt-codebox__meta {
+  color: rgba(255, 255, 255, 0.32);
+  font-size: 0.7em;
+  font-weight: 700;
+}
+
+.mrt-codebox .mrt-copy {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.mrt-codebox .mrt-copy:hover,
+.mrt-codebox .mrt-copy:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.mrt-codebox__scroll {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.mrt-codebox__gutter {
+  position: sticky;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.95em 0.7em 0.95em 0.95em;
+  background: #0b100e;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.22);
+  font-family: var(--mrt-mono);
+  font-size: 0.82em;
+  line-height: 1.65;
+  text-align: right;
+  user-select: none;
+}
+
+.mrt-codebox__pre {
+  flex: 1;
+  margin: 0;
+  padding: 0.95em 1.1em;
+  font-family: var(--mrt-mono);
+  font-size: 0.82em;
+  line-height: 1.65;
+  tab-size: 4;
+  white-space: pre;
+}
+
+.mrt-codebox__pre code {
+  font-family: inherit;
+}
+
+/* Tema de sintaxe próprio, na paleta da Minerva. */
+.mrt-codebox .hljs-keyword,
+.mrt-codebox .hljs-selector-tag,
+.mrt-codebox .hljs-meta .hljs-keyword { color: #c09bff; }
+.mrt-codebox .hljs-string,
+.mrt-codebox .hljs-regexp,
+.mrt-codebox .hljs-addition { color: #7ef0b6; }
+.mrt-codebox .hljs-number,
+.mrt-codebox .hljs-literal,
+.mrt-codebox .hljs-attr,
+.mrt-codebox .hljs-attribute { color: #ffc45c; }
+.mrt-codebox .hljs-title,
+.mrt-codebox .hljs-title.function_,
+.mrt-codebox .hljs-section,
+.mrt-codebox .hljs-name { color: #45dfff; }
+.mrt-codebox .hljs-built_in,
+.mrt-codebox .hljs-type,
+.mrt-codebox .hljs-title.class_,
+.mrt-codebox .hljs-selector-class { color: #ff9eb0; }
+.mrt-codebox .hljs-comment,
+.mrt-codebox .hljs-quote { color: rgba(217, 230, 223, 0.42); font-style: italic; }
+.mrt-codebox .hljs-variable,
+.mrt-codebox .hljs-template-variable,
+.mrt-codebox .hljs-params { color: #e6efe9; }
+.mrt-codebox .hljs-meta,
+.mrt-codebox .hljs-tag { color: #8fb8a6; }
+.mrt-codebox .hljs-deletion { color: #ff7a72; }
+
+@media (max-width: 640px) {
+  .mrt-callout {
+    padding: 0.85em 0.9em 0.9em 0.85em;
+  }
+
+  .mrt-codebox__meta {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mrt-link,
+  .mrt-copy {
+    transition: none;
+  }
+}
+
+/* Fórmula curta: só o quadriculado, sem barra. O Σ no canto diz o que é, e o
+   copiar aparece ao passar o mouse (no toque, fica sempre discreto). */
+.mrt-formula--compact {
+  position: relative;
+}
+
+.mrt-formula--compact .mrt-formula__body {
+  padding: 0.7em 2.6em;
+}
+
+.mrt-formula--compact .mrt-formula__body .katex {
+  font-size: 1.18em;
+}
+
+.mrt-formula__mark {
+  position: absolute;
+  top: 0.55em;
+  left: 0.65em;
+  width: 0.95em;
+  height: 0.95em;
+  color: rgb(var(--cyan) / 0.55);
+}
+
+.mrt-formula__copy {
+  position: absolute;
+  top: 50%;
+  right: 0.35em;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 150ms ease;
+}
+
+.mrt-formula--compact:hover .mrt-formula__copy,
+.mrt-formula__copy:focus-within {
+  opacity: 1;
+}
+
+.mrt-formula__copy .mrt-copy span {
+  display: none;
+}
+
+@media (hover: none) {
+  .mrt-formula__copy {
+    opacity: 0.6;
+  }
+}

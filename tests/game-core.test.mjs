@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import {
   connectionReward,
   correctSequencePositions,
+  mergeSeen,
   moveSequenceItem,
+  noveltyKey,
   parseSequencePuzzles,
+  pickUnseen,
   sequenceReward,
 } from "../shared/game-core.mjs";
 
@@ -47,3 +50,58 @@ test("diagnóstico informa quantas etapas ocupam a posição certa", () => {
   assert.equal(correctSequencePositions(["a", "c", "b", "d"], ["a", "b", "c", "d"]), 2);
 });
 
+
+test("ineditismo ignora acento, caixa e pontuacao ao comparar", () => {
+  assert.equal(noveltyKey("Fotossíntese"), noveltyKey("FOTOSSINTESE"));
+  assert.equal(noveltyKey("Ciclo celular."), noveltyKey("ciclo  celular"));
+  assert.notEqual(noveltyKey("Mitose"), noveltyKey("Meiose"));
+  assert.equal(noveltyKey("   "), "");
+});
+
+test("o filtro descarta o que ja saiu e o que se repete dentro do lote", () => {
+  const lote = [
+    { term: "Mitose" },
+    { term: "FOTOSSINTESE" },
+    { term: "Meiose" },
+    { term: "mitose" },
+    { term: "Osmose" },
+  ];
+  const vistos = new Set([noveltyKey("Fotossíntese")]);
+  const novos = pickUnseen(lote, (item) => item.term, vistos);
+
+  assert.deepEqual(
+    novos.map((item) => item.term),
+    ["Mitose", "Meiose", "Osmose"],
+    "o termo ja visto sai, e a segunda Mitose do proprio lote tambem",
+  );
+});
+
+test("o filtro preserva a ordem de chegada e aceita memoria vazia", () => {
+  const lote = [{ w: "beta" }, { w: "alfa" }, { w: "gama" }];
+  assert.deepEqual(
+    pickUnseen(lote, (item) => item.w, []).map((item) => item.w),
+    ["beta", "alfa", "gama"],
+  );
+});
+
+test("um item sem chave util nunca entra na partida", () => {
+  const lote = [{ w: "" }, { w: "  ." }, { w: "Valido" }];
+  assert.deepEqual(
+    pickUnseen(lote, (item) => item.w, []).map((item) => item.w),
+    ["Valido"],
+  );
+});
+
+test("a memoria guarda o mais recente na frente, sem duplicata e com teto", () => {
+  const memoria = mergeSeen(["Mitose", "Meiose"], ["Osmose", "mitose"], 3);
+  assert.deepEqual(memoria, ["Osmose", "mitose", "Meiose"], "o novo entra na frente e a Mitose antiga sai por ser a mesma");
+  assert.equal(mergeSeen([], [], 10).length, 0);
+});
+
+test("a memoria nao cresce alem do teto mesmo com lotes grandes", () => {
+  const anteriores = Array.from({ length: 90 }, (_, index) => `antigo-${index}`);
+  const novos = Array.from({ length: 20 }, (_, index) => `novo-${index}`);
+  const memoria = mergeSeen(anteriores, novos, 90);
+  assert.equal(memoria.length, 90);
+  assert.equal(memoria[0], "novo-0", "o lote recente ocupa o topo, que e o que vai para o prompt");
+});

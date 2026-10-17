@@ -1,0 +1,282 @@
+/*
+  Painel do professor como um planner: a lateral é a capa azul do caderno com
+  a espiral, o conteúdo é papel pautado com margem vermelha, os números vivem
+  em fichas presas com fita e as tabelas são listas de chamada.
+  Seletores com html + .admin-control-room vencem o index.css sem !important
+  (quando o index.css usa !important, repetimos o !important aqui).
+*/
+
+.caderno-admin {
+  background: rgb(var(--paper));
+}
+
+html .admin-control-room {
+  --admin-canvas: rgb(var(--paper));
+  --admin-ink: rgb(var(--theme-text));
+  --admin-muted: rgb(var(--theme-muted));
+  --admin-line: rgb(var(--line));
+  --admin-accent: rgb(var(--pen));
+  color: rgb(var(--theme-text));
+  background:
+    linear-gradient(to right, transparent calc(276px + 3.2rem), rgb(var(--margin-line) / 0.45) calc(276px + 3.2rem) calc(276px + 3.2rem + 2px), transparent 0),
+    repeating-linear-gradient(to bottom, transparent 0 calc(2rem - 1px), rgb(var(--rule) / 0.5) calc(2rem - 1px) 2rem),
+    rgb(var(--paper));
+}
+
+@media (max-width: 1023px) {
+  html .admin-control-room {
+    background:
+      repeating-linear-gradient(to bottom, transparent 0 calc(2rem - 1px), rgb(var(--rule) / 0.5) calc(2rem - 1px) 2rem),
+      rgb(var(--paper));
+  }
+}
+
+html .admin-control-room::before {
+  display: none;
+}
+
+/* capa azul com a espiral na borda */
+html .admin-control-room .admin-sidebar {
+  background:
+    radial-gradient(circle at 20% 0%, rgb(255 255 255 / 0.12), transparent 18rem),
+    repeating-linear-gradient(135deg, rgb(255 255 255 / 0.025) 0 6px, transparent 6px 12px),
+    #1c2a8c;
+  box-shadow: 6px 0 0 #15206c, 0 18px 55px -30px rgb(0 0 0 / 0.6);
+}
+
+@media (min-width: 1024px) {
+  /* a espiral prende a folha na capa */
+  html .admin-control-room .admin-main::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2.5rem;
+    background: var(--spiral) repeat-y 0 0 / 2.5rem 2.25rem;
+    pointer-events: none;
+  }
+}
+
+html .admin-control-room .admin-sidebar-atmosphere {
+  display: none;
+}
+
+html .admin-control-room .admin-brand-seal {
+  background: #fff;
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 0.25);
+  rotate: -6deg;
+}
+
+html .admin-control-room .admin-brand-seal::before {
+  border-color: rgb(255 255 255 / 0.4);
+}
+
+html .admin-control-room .admin-nav-group-label {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(255 255 255 / 0.6);
+}
+
+html .admin-control-room .admin-nav-active-pill {
+  border-radius: 0.3rem 0.9rem 0.9rem 0.3rem;
+  background: #fff3a0;
+  box-shadow: 0 8px 14px -10px rgb(0 0 0 / 0.6);
+}
+
+html .admin-control-room .admin-nav-button[data-active="true"] {
+  color: #1d2bb8;
+}
+
+html .admin-control-room .admin-nav-button[data-active="true"] > span > span:first-child {
+  color: #1d2bb8;
+  background: rgb(255 255 255 / 0.7);
+}
+
+/* título da página */
+html .admin-control-room .admin-kicker {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.1rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--margin-line));
+}
+
+html .admin-control-room .admin-hero h1 {
+  font-variation-settings: "wdth" 116;
+  color: rgb(var(--theme-text));
+}
+
+html .admin-control-room .admin-system-status {
+  border: 0;
+  border-radius: 0.2rem 0.2rem 1rem 0.2rem;
+  background: #fff3a0;
+  color: #2b2410;
+  box-shadow: 0 12px 18px -14px rgb(0 0 0 / 0.55);
+  rotate: 1.2deg;
+}
+
+html .admin-control-room .admin-system-status::before {
+  display: none;
+}
+
+html .admin-control-room .admin-system-status p {
+  color: #2b2410;
+}
+
+html .admin-control-room .admin-system-status .font-display {
+  font-family: "Kalam", cursive;
+  color: #1d2bb8;
+}
+
+html .admin-control-room .admin-system-orbit {
+  border-radius: 50%;
+  color: #1d2bb8;
+  background: rgb(255 255 255 / 0.6);
+}
+
+/* números em fichas presas com fita */
+html .admin-control-room .admin-stat-card {
+  overflow: visible;
+  border: 0;
+  border-radius: 0.3rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 14px 22px -18px rgb(0 0 0 / 0.5);
+}
+
+html .admin-control-room .admin-stat-card::after {
+  display: none;
+}
+
+html .admin-control-room .admin-stat-card::before {
+  /* fita adesiva no lugar da faixa colorida */
+  inset: -0.55rem auto auto 50%;
+  width: 4.2rem;
+  height: 1.15rem;
+  translate: -50% 0;
+  rotate: -3deg;
+  opacity: 1;
+  background: rgb(var(--hl-yellow) / 0.7);
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+html .admin-control-room .admin-stat-card:nth-child(2)::before { background: rgb(var(--hl-pink) / 0.65); rotate: 3deg; }
+html .admin-control-room .admin-stat-card:nth-child(3)::before { background: rgb(var(--hl-lilac) / 0.7); }
+html .admin-control-room .admin-stat-card:nth-child(4)::before { background: rgb(var(--hl-mint) / 0.75); rotate: 2deg; }
+
+html .admin-control-room .admin-stat-card:nth-child(odd) { rotate: -0.6deg; }
+html .admin-control-room .admin-stat-card:nth-child(even) { rotate: 0.6deg; }
+
+html .admin-control-room .admin-stat-icon,
+html .admin-control-room .admin-stat-card:nth-child(n) .admin-stat-icon {
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-mint) / 0.5);
+}
+
+html .admin-control-room .admin-stat-card:nth-child(2) .admin-stat-icon { background: rgb(var(--hl-pink) / 0.5); }
+html .admin-control-room .admin-stat-card:nth-child(3) .admin-stat-icon { background: rgb(var(--hl-lilac) / 0.55); }
+html .admin-control-room .admin-stat-card:nth-child(4) .admin-stat-icon { background: rgb(var(--hl-yellow) / 0.6); }
+
+html .admin-control-room .admin-stat-card > p.font-display {
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: rgb(var(--pen));
+}
+
+/* painéis: folhas soltas */
+html .admin-control-room .admin-panel-card {
+  border-color: rgb(var(--line)) !important;
+  border-radius: 0.5rem !important;
+  background: rgb(var(--panel)) !important;
+}
+
+html .admin-control-room .admin-panel-card::before {
+  inset: -0.5rem auto auto 1.5rem;
+  width: 3.6rem;
+  height: 1.1rem;
+  border-radius: 0;
+  opacity: 1;
+  rotate: -4deg;
+  background: rgb(var(--hl-yellow) / 0.6);
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+/* tabelas: lista de chamada */
+html .admin-control-room thead {
+  background: rgb(var(--panel-2)) !important;
+  color: rgb(var(--theme-muted)) !important;
+  letter-spacing: 0.02em;
+}
+
+html .admin-control-room thead th {
+  border-block: 1px solid rgb(var(--line));
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-transform: none;
+}
+
+html .admin-control-room tbody {
+  border-color: rgb(var(--rule)) !important;
+}
+
+html .admin-control-room tbody tr:hover {
+  background: rgb(var(--hl-yellow) / 0.18) !important;
+}
+
+html .admin-control-room textarea,
+html .admin-control-room select,
+html .admin-control-room input:not([type="color"]):not([type="checkbox"]):not([type="radio"]) {
+  border-color: rgb(var(--line)) !important;
+  background-color: rgb(var(--sheet)) !important;
+  color: rgb(var(--theme-text)) !important;
+}
+
+html .admin-control-room textarea:focus,
+html .admin-control-room select:focus,
+html .admin-control-room input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):focus {
+  border-color: rgb(var(--pen) / 0.7) !important;
+  box-shadow: 0 0 0 4px rgb(var(--pen) / 0.1);
+}
+
+html .admin-control-room .admin-data-row,
+html .admin-control-room .admin-activity-row,
+html .admin-control-room .admin-client-card {
+  box-shadow: none;
+}
+
+html .admin-control-room .admin-empty-state {
+  font-family: "Gochi Hand", cursive;
+  background-image: none;
+}
+
+html .admin-control-room :focus-visible {
+  outline-color: rgb(var(--pen));
+}
+
+/* rótulos em caixa alta viram anotação à mão */
+html .admin-control-room [class*="uppercase"][class*="tracking-"] {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html .admin-control-room .admin-stat-card:hover,
+  html .admin-control-room .admin-stat-card:focus-visible {
+    rotate: 0deg;
+    transform: translateY(-3px);
+    box-shadow: 0 0 0 1.5px rgb(var(--pen) / 0.5), 0 20px 28px -18px rgb(0 0 0 / 0.5);
+  }
+
+  html .admin-control-room .admin-panel-card:hover {
+    border-color: rgb(var(--pen) / 0.35) !important;
+  }
+}

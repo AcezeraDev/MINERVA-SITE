@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { handleGeminiRequest, loadLocalEnv } from "./gemini-server.mjs";
 // @ts-expect-error Server middleware is authored as an ESM helper.
 import { handleDataRequest } from "./data-server.mjs";
+// @ts-expect-error Server middleware is authored as an ESM helper.
+import { handleEducationRequest } from "./education-server.mjs";
 
 loadLocalEnv();
 
@@ -32,6 +34,7 @@ export default defineConfig({
             next();
             return;
           }
+          if (await handleEducationRequest(req, res)) return;
           await handleDataRequest(req, res);
         });
       },
@@ -41,15 +44,12 @@ export default defineConfig({
     port: 5174,
   },
   build: {
-    // Three.js fica em um chunk sob demanda de ~507 KB; o pacote inicial permanece bem abaixo disso.
     chunkSizeWarningLimit: 520,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
           if (id.includes("pdfjs-dist")) return "pdf";
-          if (id.includes("three")) return "three";
-          if (id.includes("ogl")) return "ogl";
           if (id.includes("react") || id.includes("framer-motion") || id.includes("lucide-react")) return "ui-vendor";
           return undefined;
         },

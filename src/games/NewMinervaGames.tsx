@@ -23,6 +23,7 @@ import {
 } from "../../shared/game-core.mjs";
 import type { GameAnswer } from "../../shared/game-meta.mjs";
 import { useSoftMotion } from "../motion";
+import { celebrateFrom } from "../caderno";
 import "./new-games.css";
 
 export type ConceptPair = { term: string; definition: string };
@@ -90,6 +91,7 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
       answersRef.current = [...answersRef.current, { id: answerId(), prompt: `Qual definição pertence a “${current.term}”?`, userAnswer: option.definition, correctAnswer: current.definition, explanation: `${current.term} — ${current.definition}`, correct: eligibleForXp }];
       setResolved(true);
       setFeedback(`Conexão formada: ${current.term} — ${current.definition}`);
+      celebrateFrom(document.querySelector(".nexus-core"), { count: 22 });
       return;
     }
 
@@ -144,8 +146,8 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
       <div className="nexus-stage">
         <div className="nexus-grid" aria-hidden />
         <motion.div
-          className="nexus-core"
-          animate={reduced ? undefined : resolved ? { scale: [1, 1.08, 1], boxShadow: ["0 0 0 rgba(57,245,154,0)", "0 0 58px rgba(57,245,154,.55)", "0 0 30px rgba(57,245,154,.25)"] } : { y: [0, -5, 0] }}
+          className={`nexus-core ${resolved ? "is-linked" : ""}`}
+          animate={reduced ? undefined : resolved ? { scale: [1, 1.12, 1], rotate: [0, -6, 4, 0] } : { y: [0, -5, 0], rotate: [0, 1.5, 0] }}
           transition={resolved ? { duration: 0.55 } : { duration: 3.4, repeat: Infinity, ease: "easeInOut" }}
         >
           <Orbit aria-hidden />
@@ -239,6 +241,7 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
       answersRef.current = [...answersRef.current, { id: answerId(), prompt: `Ordene o processo: ${puzzle.title}`, userAnswer: order.join(" → "), correctAnswer: puzzle.steps.join(" → "), explanation: puzzle.explanation, correct: eligibleForXp }];
       setSolved(true);
       setFeedback(puzzle.explanation);
+      celebrateFrom(document.querySelector(".forge-reactor-core"), { count: 26 });
       return;
     }
     setEligibleForXp(false);

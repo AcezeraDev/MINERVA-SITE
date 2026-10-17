@@ -1,7 +1,7 @@
 // Camada HTTP da Mine.
 //
-// O nome do arquivo e legado (a IA ja foi Gemini, depois NVIDIA, agora
-// OpenRouter). O endpoint continua sendo /api/gemini para nao quebrar o que ja
+// O nome do arquivo e legado (a IA ja foi Gemini, NVIDIA, OpenRouter e Azure;
+// desde set/2026 e a NanoGPT). O endpoint continua sendo /api/gemini para nao quebrar o que ja
 // esta no ar; /api/mine/chat aponta para o mesmo handler.
 //
 // Toda a inteligencia de modelos vive em ./mine/*. Aqui so tem HTTP:
@@ -9,7 +9,6 @@
 
 import { loadLocalEnv, redactSecrets } from "./mine/env.mjs";
 import { checkRateLimit, resolveIdentity, validateChatPayload } from "./mine/limits.mjs";
-import { DEFAULT_MINE_ALIAS, TASK_DEFAULT_ALIAS, isMineAlias, publicModelCatalog } from "./mine/models.mjs";
 import { runMineRequest } from "./mine/router.mjs";
 import { webSearchEnabled } from "./mine/web.mjs";
 
@@ -49,13 +48,6 @@ function clampNumber(value, min, max, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.max(min, Math.min(max, Math.round(number)));
-}
-
-// O cliente pode mandar qualquer coisa. So alias da allowlist passam; qualquer
-// outra coisa cai no nivel padrao em vez de virar erro (documento, secao 39).
-function pickAlias(value, task) {
-  if (isMineAlias(value)) return value;
-  return task ? TASK_DEFAULT_ALIAS : DEFAULT_MINE_ALIAS;
 }
 
 function openEventStream(res) {
@@ -130,11 +122,10 @@ function respondWithError(res, error) {
 }
 
 export async function handleGeminiRequest(req, res) {
-  // GET devolve o catalogo publico: nomes de marca, sem ID tecnico de modelo.
+  // GET diz a interface o que o servidor oferece. Nao ha mais catalogo de
+  // modelos: a Mine e um modelo so, e o ID tecnico nunca sai do servidor.
   if (req.method === "GET") {
     writeJson(res, 200, {
-      models: publicModelCatalog(),
-      default: DEFAULT_MINE_ALIAS,
       // A interface so mostra o botao de pesquisar na web se o servidor tiver
       // a busca ligada — botao que sempre falha e pior que botao nenhum.
       webSearch: webSearchEnabled(),
@@ -168,30 +159,41 @@ export async function handleGeminiRequest(req, res) {
     }
 
     const task = String(payload.task || "").trim();
-    const alias = pickAlias(payload.model, task);
-    const maxTokens = clampNumber(payload.maxOutputTokens || process.env.MINE_MAX_OUTPUT_TOKENS, 256, 4096, 1024);
+    // O cliente pode pedir menos, nunca ultrapassar o teto do servidor. Isso e
+    // importante porque tokens de raciocinio tambem sao cobrados como saida e
+    // contam dentro de max_tokens.
+    // O chat comum pede 1500 tokens no cliente. O teto maior existe para
+    // artefatos estruturados (mapa mental, simulado e jogos), que precisam
+    // terminar todas as linhas para passar pelo controle de qualidade.
+    // Out/2026: o teto subiu de 2600 para 8000. Com raciocinio "medium" o
+    // modelo gastava boa parte dos 1500 pedidos pelo chat so pensando, e
+    // explicacoes longas saiam cortadas ou encurtadas.
+    const serverTokenCap = clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
+    const requestedTokens = clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
+    const maxTokens = Math.min(requestedTokens, serverTokenCap);
     const wantsStream = payload.stream === true;
 
     if (wantsStream) {
-      await streamResponse(req, res, { alias, task, payload, maxTokens });
+      await streamResponse(req, res, { task, payload, maxTokens });
       return true;
     }
 
     const result = await runMineRequest({
-      alias,
       task,
       prompt: payload.prompt,
       context: payload.context,
       history: payload.history,
       attachments: payload.attachments,
       webSearch: payload.webSearch === true,
+      photos: payload.photos === true,
+      tutor: payload.tutor === true,
       maxTokens,
     });
 
     writeJson(res, 200, {
       reply: result.reply,
       actions: [],
-      suggestions: [],
+      suggestions: result.suggestions || [],
       model: result.alias,
       modelDisplayName: result.displayName,
       notice: result.notice || "",
@@ -203,7 +205,7 @@ export async function handleGeminiRequest(req, res) {
   return true;
 }
 
-async function streamResponse(req, res, { alias, task, payload, maxTokens }) {
+async function streamResponse(req, res, { task, payload, maxTokens }) {
   // Se o usuario fechar a aba ou apertar parar, o fetch para o provedor cai
   // junto em vez de continuar consumindo cota.
   //
@@ -223,6 +225,11 @@ async function streamResponse(req, res, { alias, task, payload, maxTokens }) {
   req.on("aborted", onClose);
 
   let opened = false;
+  const open = () => {
+    if (opened) return;
+    openEventStream(res);
+    opened = true;
+  };
   // Jogos e geradores estruturados precisam de um lote completo e validado.
   // Enviar o primeiro fragmento fazia a interface congelar dicas como ":" ou
   // definicoes como "C" antes de o modelo terminar a linha.
@@ -230,22 +237,34 @@ async function streamResponse(req, res, { alias, task, payload, maxTokens }) {
 
   try {
     const result = await runMineRequest({
-      alias,
       task,
       prompt: payload.prompt,
       context: payload.context,
       history: payload.history,
       attachments: payload.attachments,
       webSearch: payload.webSearch === true,
+      photos: payload.photos === true,
+      tutor: payload.tutor === true,
       maxTokens,
       signal: controller.signal,
       onDelta: deliverDeltas
         ? (text) => {
-            if (!opened) {
-              openEventStream(res);
-              opened = true;
-            }
+            open();
             sendEvent(res, { type: "delta", text });
+          }
+        : undefined,
+      // Etapas da pesquisa e o raciocinio vao para a tela enquanto acontecem,
+      // como nos chats grandes ("Pesquisando...", "Lendo 6 fontes").
+      onStatus: deliverDeltas
+        ? (status) => {
+            open();
+            sendEvent(res, { type: "status", ...status });
+          }
+        : undefined,
+      onReasoning: deliverDeltas
+        ? (text) => {
+            open();
+            sendEvent(res, { type: "reasoning", text });
           }
         : undefined,
     });
@@ -262,6 +281,9 @@ async function streamResponse(req, res, { alias, task, payload, maxTokens }) {
       modelDisplayName: result.displayName,
       notice: result.notice || "",
       sources: result.sources || [],
+      queries: result.queries || [],
+      reasoning: String(result.reasoning || "").slice(0, 20_000),
+      suggestions: result.suggestions || [],
     });
     res.end();
   } catch (error) {

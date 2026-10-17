@@ -1,0 +1,500 @@
+/* Movimento do caderno vivo: rabiscos, virada de página, confete, a Mine na
+   margem e a capa de abertura. Tokens em ../caderno.css. */
+
+.caderno-tabs {
+  scrollbar-width: none;
+}
+
+.caderno-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* ───────────────────────── rabiscos ───────────────────────── */
+.caderno-doodle {
+  display: inline-block;
+  overflow: visible;
+  color: rgb(var(--pen));
+}
+
+.caderno-doodle path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.caderno-doodle.is-drawn path {
+  animation: caderno-draw var(--doodle-dur, 900ms) cubic-bezier(0.45, 0, 0.2, 1) forwards;
+}
+
+@keyframes caderno-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.caderno-margin-doodles {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 1.95rem;
+  width: 1.4rem;
+  overflow: hidden;
+  pointer-events: none;
+  display: none;
+}
+
+.caderno-margin-doodles > span {
+  position: absolute;
+  left: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  opacity: 0.55;
+}
+
+.caderno-margin-doodles .caderno-doodle {
+  width: 100%;
+  height: 100%;
+}
+
+@media (min-width: 1024px) {
+  .caderno-margin-doodles {
+    display: block;
+  }
+}
+
+.caderno-title-doodle {
+  width: 0.62em;
+  height: 0.62em;
+  margin-left: 0.18em;
+  vertical-align: 0.55em;
+  color: rgb(var(--pen));
+}
+
+.caderno-ink-underline {
+  display: block;
+  width: min(11rem, 70%);
+  height: 0.7rem;
+  margin-top: 0.15rem;
+  color: rgb(var(--mint));
+}
+
+.theme-light .caderno-ink-underline {
+  color: rgb(var(--pen) / 0.75);
+}
+
+/* ───────────────────────── virada de página ───────────────────────── */
+.caderno-turn-shade {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 28vw;
+  z-index: 30;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(var(--pen) / 0.07) 40%, rgb(255 255 255 / 0.35) 55%, transparent);
+  mix-blend-mode: var(--hl-blend);
+}
+
+/* ───────────────────────── confete e XP ───────────────────────── */
+.caderno-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.caderno-confetti i {
+  position: absolute;
+  display: block;
+  background: var(--c);
+  will-change: transform, opacity;
+}
+
+.caderno-confetti i.is-strip {
+  width: 7px;
+  height: 13px;
+  border-radius: 2px;
+}
+
+.caderno-confetti i.is-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.caderno-confetti i.is-star {
+  width: 14px;
+  height: 14px;
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+/* ───────────────────────── a Mine na margem ───────────────────────── */
+.caderno-buddy {
+  position: fixed;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  z-index: 45;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+@media (max-width: 1023px) {
+  .caderno-buddy {
+    bottom: calc(5.4rem + env(safe-area-inset-bottom));
+    right: 0.7rem;
+  }
+
+  .caderno-buddy-face {
+    transform: scale(0.82);
+    transform-origin: bottom right;
+  }
+}
+
+.caderno-buddy > * {
+  pointer-events: auto;
+}
+
+.caderno-buddy-face {
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 1.4rem;
+  display: grid;
+  place-items: center;
+  background: rgb(var(--sheet));
+  box-shadow: var(--card-shadow), 0 0 0 1px rgb(var(--line));
+  animation: caderno-bob 4.2s ease-in-out infinite;
+}
+
+.caderno-buddy-face svg {
+  width: 3.6rem;
+  height: 3.6rem;
+  overflow: visible;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-buddy-face:hover svg {
+  transform: translateY(-3px) rotate(-6deg) scale(1.06);
+}
+
+.caderno-buddy .b-stroke {
+  fill: none;
+  stroke: rgb(var(--theme-text));
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.caderno-buddy .b-thin {
+  stroke-width: 4;
+}
+
+.caderno-buddy .b-head {
+  fill: rgb(var(--panel));
+}
+
+.caderno-buddy .b-visor {
+  fill: rgb(var(--paper));
+}
+
+.caderno-buddy .b-ear,
+.caderno-buddy .b-bulb {
+  fill: rgb(var(--mint));
+}
+
+.caderno-buddy .b-eye {
+  fill: rgb(var(--theme-text));
+}
+
+.caderno-buddy[data-mood="happy"] .caderno-buddy-face,
+.caderno-buddy[data-mood="wow"] .caderno-buddy-face {
+  animation: caderno-hop 620ms cubic-bezier(0.3, 1.6, 0.5, 1) 2, caderno-bob 4.2s ease-in-out 1.3s infinite;
+}
+
+.caderno-buddy.is-talking .b-bulb {
+  animation: caderno-bulb 700ms ease-in-out infinite alternate;
+}
+
+@keyframes caderno-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(1.5deg);
+  }
+}
+
+@keyframes caderno-hop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-16px) scale(1.06, 0.96);
+  }
+  70% {
+    transform: translateY(0) scale(1.08, 0.92);
+  }
+}
+
+@keyframes caderno-bulb {
+  from {
+    fill: rgb(var(--mint));
+  }
+  to {
+    fill: rgb(var(--hl-yellow));
+  }
+}
+
+.caderno-buddy-bubble {
+  position: relative;
+  max-width: 13.5rem;
+  margin-bottom: 2.6rem;
+  padding: 0.6rem 1.9rem 0.6rem 0.85rem;
+  border-radius: 1rem 1rem 0.2rem 1rem;
+  background: rgb(var(--sheet));
+  color: rgb(var(--pen));
+  box-shadow: var(--card-shadow), 0 0 0 1px rgb(var(--line));
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.12rem;
+  line-height: 1.15;
+}
+
+.caderno-buddy-close {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.35rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0.5rem;
+  font: 700 1rem/1 system-ui, sans-serif;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-buddy-close:hover {
+  background: rgb(var(--pen) / 0.08);
+}
+
+/* ───────────────────────── capa do caderno (abertura) ───────────────────────── */
+.caderno-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+  perspective: 1600px;
+  background: radial-gradient(ellipse at 50% 70%, rgb(var(--pen) / 0.1), transparent 60%), rgb(var(--paper));
+}
+
+.caderno-splash-skip {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 3;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+  color: rgb(var(--pen));
+  box-shadow: 0 0 0 1.5px rgb(var(--pen) / 0.4);
+}
+
+.caderno-book {
+  position: relative;
+  width: min(22rem, 72vw);
+  aspect-ratio: 0.74;
+  transform-style: preserve-3d;
+}
+
+.caderno-book-page,
+.caderno-book-cover {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.4rem 1rem 1rem 0.4rem;
+}
+
+.caderno-book-page {
+  padding: 18% 10% 10% 22%;
+  background:
+    linear-gradient(to right, transparent 15%, rgb(var(--margin-line) / 0.55) 15%, rgb(var(--margin-line) / 0.55) calc(15% + 2px), transparent calc(15% + 2px)),
+    repeating-linear-gradient(to bottom, transparent 0 27px, rgb(var(--rule)) 27px 28px),
+    rgb(var(--sheet));
+  box-shadow: 0 40px 60px -30px rgb(0 0 0 / 0.45), inset 8px 0 14px -10px rgb(0 0 0 / 0.3);
+}
+
+.caderno-book-hello,
+.caderno-book-line {
+  font-family: "Gochi Hand", cursive;
+  color: rgb(var(--pen));
+  line-height: 1.1;
+}
+
+.caderno-book-hello {
+  font-size: clamp(2rem, 9vw, 3rem);
+}
+
+.caderno-book-line {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-size: clamp(1.3rem, 5vw, 1.8rem);
+  background: linear-gradient(rgb(var(--mint) / 0.7), rgb(var(--mint) / 0.7)) no-repeat 0 85% / 100% 45%;
+}
+
+.caderno-book-star {
+  position: absolute;
+  right: 12%;
+  bottom: 14%;
+  width: 3.4rem;
+  height: 3.4rem;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-book-cover {
+  transform-origin: 0% 50%;
+  transform-style: preserve-3d;
+}
+
+.caderno-book-cover-front,
+.caderno-book-cover-back {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  backface-visibility: hidden;
+}
+
+.caderno-book-cover-front {
+  display: grid;
+  align-content: space-between;
+  padding: 12% 11%;
+  background:
+    repeating-linear-gradient(135deg, rgb(255 255 255 / 0.05) 0 6px, transparent 6px 14px),
+    linear-gradient(160deg, rgb(29 43 184), rgb(21 31 140));
+  box-shadow: 0 40px 70px -30px rgb(0 0 0 / 0.55), inset 10px 0 0 rgb(0 0 0 / 0.18);
+  color: white;
+}
+
+.caderno-book-cover-back {
+  transform: rotateY(180deg);
+  background: linear-gradient(90deg, rgb(21 31 140), rgb(29 43 184 / 0.8));
+}
+
+.caderno-book-brand {
+  display: grid;
+  width: 3.4rem;
+  height: 3.4rem;
+  padding: 0.45rem;
+  border-radius: 1rem;
+  background: white;
+  color: #0b1a12;
+}
+
+.caderno-book-label {
+  padding: 0.9rem 1rem;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.95);
+  color: #16181d;
+  transform: rotate(-2deg);
+  box-shadow: 0 6px 14px -8px rgb(0 0 0 / 0.5);
+}
+
+.caderno-book-title {
+  font-family: "Anybody Variable", sans-serif;
+  font-weight: 900;
+  font-size: clamp(1.8rem, 7vw, 2.4rem);
+  font-variation-settings: "wdth" 125;
+  line-height: 1;
+}
+
+.caderno-book-owner {
+  margin-top: 0.35rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.25rem;
+  color: rgb(29 43 184);
+}
+
+.caderno-book-band {
+  position: absolute;
+  top: -2%;
+  bottom: -2%;
+  right: 14%;
+  width: 0.7rem;
+  border-radius: 0.3rem;
+  background: rgb(var(--hl-pink));
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.1);
+  transform: translateZ(2px);
+}
+
+/* Fita adesiva em alguns cartões: parecem colados na folha. */
+.workspace-shell .studio-card:nth-of-type(3n + 2)::before {
+  content: "";
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  z-index: 3;
+  width: 4.6rem;
+  height: 1.3rem;
+  transform: translateX(-50%) rotate(-3deg);
+  background: rgb(var(--hl-yellow) / 0.55);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  pointer-events: none;
+}
+
+.no-motion .caderno-buddy-face {
+  animation: none;
+}
+
+/* ───────────────────────── caixinha e risco de caneta ───────────────────────── */
+.caderno-inkcheck {
+  width: 1.6rem;
+  height: 1.6rem;
+  overflow: visible;
+}
+
+.caderno-inkcheck path {
+  fill: none;
+  stroke: rgb(var(--pen));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.caderno-inkcheck .box {
+  stroke-width: 2;
+  stroke: rgb(var(--theme-muted));
+  transition: stroke 160ms ease;
+}
+
+.caderno-inkcheck .tick {
+  stroke-width: 3;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 320ms cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+.caderno-inkcheck.is-checked .box {
+  stroke: rgb(var(--pen));
+}
+
+.caderno-inkcheck.is-checked .tick {
+  stroke-dashoffset: 0;
+}
+
+.caderno-strike {
+  position: relative;
+  display: inline;
+  background-image: linear-gradient(rgb(var(--pen)), rgb(var(--pen)));
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 0% 2px;
+  transition: background-size 380ms cubic-bezier(0.45, 0, 0.2, 1) 120ms, color 200ms ease;
+}
+
+.caderno-strike.is-struck {
+  background-size: 100% 2px;
+  color: rgb(var(--theme-muted));
+}

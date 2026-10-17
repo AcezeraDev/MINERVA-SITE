@@ -24,7 +24,15 @@ export const xpPerAction = {
   game: 5,
   mineMessage: 3,
   cardReview: 5,
+  drawing: 15,
 };
+
+/**
+ * Desenhos do Ateliê que valem XP por dia. O resto ainda é guardado, só não
+ * rende: pintar é pausa boa, mas não pode virar o jeito mais rápido de subir
+ * no ranking de um site de estudos.
+ */
+export const drawingsPerDay = 5;
 
 /** A mesma tabela em forma de lista, para a tela "Como ganhar XP". */
 export const xpActions = [
@@ -37,6 +45,7 @@ export const xpActions = [
   ["Acertar uma pergunta nos jogos", xpPerAction.game],
   ["Conversar com a Mine", xpPerAction.mineMessage],
   ["Revisar um flashcard", xpPerAction.cardReview],
+  [`Guardar um desenho pintado no Ateliê (até ${drawingsPerDay} por dia)`, xpPerAction.drawing],
 ];
 
 export const levelTitles = [
@@ -78,6 +87,8 @@ export const achievementList = [
   { id: "streak-7", title: "Semana perfeita", text: "Estude 7 dias seguidos.", xp: 100, target: 7, stat: "streakDays" },
   { id: "games-5", title: "Jogador de plantão", text: "Termine 5 partidas nos jogos da Mine.", xp: 40, target: 5, stat: "games" },
   { id: "games-25", title: "Veterano da arena", text: "Termine 25 partidas nos jogos da Mine.", xp: 80, target: 25, stat: "games" },
+  { id: "arte-1", title: "Primeira obra", text: "Guarde seu primeiro desenho pintado no Ateliê.", xp: 20, target: 1, stat: "drawings" },
+  { id: "arte-10", title: "Artista da Minerva", text: "Guarde 10 desenhos pintados no Ateliê.", xp: 60, target: 10, stat: "drawings" },
 ];
 
 export function startOfDay(timestamp) {
@@ -102,6 +113,19 @@ function list(value) {
   return Array.isArray(value) ? value : [];
 }
 
+/** Desenhos do Ateliê que contam, respeitando o teto diário. */
+function countedDrawings(sessions, since = 0) {
+  const perDay = new Map();
+  for (const item of sessions) {
+    if (item?.kind !== "Arte" || !(Number(item.createdAt) >= since)) continue;
+    const day = startOfDay(item.createdAt);
+    perDay.set(day, (perDay.get(day) || 0) + 1);
+  }
+  let total = 0;
+  for (const count of perDay.values()) total += Math.min(drawingsPerDay, count);
+  return total;
+}
+
 /**
  * `scope` são as coleções já filtradas para uma única conta.
  * O servidor filtra por userId antes de chamar; o frontend já recebe assim.
@@ -123,6 +147,7 @@ export function gamificationStats(scope, now = Date.now()) {
     mineMessages: list(scope?.chats).filter((item) => item.role === "user").length,
     cardReviews: flashcards.reduce((sum, card) => sum + (Number(card.reps) || 0), 0),
     mastered: flashcards.filter((card) => (Number(card.level) || 0) >= 4).length,
+    drawings: countedDrawings(sessions),
     streakDays: streakDays(sessions, now),
   };
 }
@@ -141,7 +166,8 @@ export function totalXp(stats) {
     stats.provas * xpPerAction.prova +
     (Number(stats.gameXp) || 0) +
     stats.mineMessages * xpPerAction.mineMessage +
-    stats.cardReviews * xpPerAction.cardReview;
+    stats.cardReviews * xpPerAction.cardReview +
+    (Number(stats.drawings) || 0) * xpPerAction.drawing;
   return base + unlockedAchievements(stats).reduce((sum, item) => sum + item.xp, 0);
 }
 
@@ -183,7 +209,8 @@ export function xpSince(scope, since) {
       .filter((item) => item.kind === "Games" && after(item.createdAt))
       .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0) +
     list(scope?.chats).filter((item) => item.role === "user" && after(item.createdAt)).length * xpPerAction.mineMessage +
-    list(scope?.flashcards).filter((item) => after(item.lastReviewedAt)).length * xpPerAction.cardReview
+    list(scope?.flashcards).filter((item) => after(item.lastReviewedAt)).length * xpPerAction.cardReview +
+    countedDrawings(sessions, from) * xpPerAction.drawing
   );
 }
 

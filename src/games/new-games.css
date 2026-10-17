@@ -1,3 +1,10 @@
+/*
+  Nexo Vivo e Forja de Sequências no caderno: a rede é desenhada a caneta em
+  papel quadriculado; as definições são fichas; a forja é uma lista de passos
+  numerados que se reorganiza. Cores do tema (--pen, --sheet...) valem para o
+  dia e a noite.
+*/
+
 .new-game-heading {
   display: flex;
   align-items: flex-start;
@@ -7,57 +14,75 @@
 }
 
 .new-game-heading > div:first-child > p {
-  color: rgb(var(--mint));
-  font-size: .65rem;
-  font-weight: 900;
-  letter-spacing: .18em;
-  text-transform: uppercase;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  color: rgb(var(--margin-line));
 }
 
 .new-game-heading h2 {
-  margin-top: .25rem;
-  font-family: "Space Grotesk", "Plus Jakarta Sans", sans-serif;
-  font-size: clamp(1.55rem, 4vw, 2.45rem);
+  margin-top: 0.1rem;
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 114;
+  font-size: clamp(1.55rem, 4vw, 2.3rem);
   font-weight: 900;
-  letter-spacing: -.045em;
+  letter-spacing: -0.03em;
 }
 
 .game-inline-error {
   padding: 2rem;
-  color: rgba(255,255,255,.62);
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  color: rgb(var(--theme-muted));
   text-align: center;
 }
 
-/* Nexo Vivo — uma rede semântica, não uma grade de cartões. */
+/* ───────── Nexo Vivo ───────── */
 .nexus-game {
-  --nexus: #f472d0;
-  --nexus-soft: rgba(244, 114, 208, .16);
+  --nexus: #e5487f;
   position: relative;
-  overflow: hidden;
 }
 
 .nexus-hud {
   display: grid;
   grid-template-columns: repeat(4, minmax(4.4rem, 1fr));
+  gap: 0.5rem;
   min-width: min(100%, 27rem);
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,.09);
-  border-radius: .9rem;
-  background: rgba(255,255,255,.025);
 }
 
 .nexus-hud span {
   display: grid;
   min-height: 3.6rem;
   place-content: center;
-  padding: .45rem .7rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.2rem 0.2rem 0.7rem 0.2rem;
   text-align: center;
+  background: #fff1a6;
+  box-shadow: 0 8px 12px -10px rgb(0 0 0 / 0.5);
 }
 
-.nexus-hud span + span { border-left: 1px solid rgba(255,255,255,.08); }
-.nexus-hud strong { font-family: "Space Grotesk", "Plus Jakarta Sans", sans-serif; font-size: 1.05rem; font-weight: 900; }
-.nexus-hud small { color: rgba(255,255,255,.38); font-size: .56rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
-.nexus-hud .is-alert strong { color: #fda4af; }
+.nexus-hud span:nth-child(2) { background: #c8f7dc; rotate: 1deg; }
+.nexus-hud span:nth-child(3) { background: #e2d9ff; rotate: -1deg; }
+.nexus-hud span:nth-child(4) { background: #ffd3e0; rotate: 0.8deg; }
+.nexus-hud span:nth-child(1) { rotate: -0.8deg; }
+
+.nexus-hud strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #1d2bb8;
+}
+
+.nexus-hud small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.9rem;
+  color: #4a4a5a;
+}
+
+.nexus-hud .is-alert strong {
+  color: #c2185b;
+  animation: caderno-shake 420ms ease;
+}
 
 .nexus-stage {
   position: relative;
@@ -65,12 +90,9 @@
   min-height: 31rem;
   place-items: center;
   overflow: hidden;
-  border: 1px solid rgba(244,114,208,.2);
-  border-radius: 1.4rem;
-  background:
-    radial-gradient(circle at 50% 44%, rgba(244,114,208,.18), transparent 12rem),
-    radial-gradient(circle at 22% 25%, rgba(57,245,154,.07), transparent 13rem),
-    #050b09;
+  border-radius: 0.5rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
   isolation: isolate;
 }
 
@@ -78,28 +100,36 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  opacity: .28;
   background-image:
-    linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px);
-  background-size: 38px 38px;
-  mask-image: radial-gradient(circle, #000 20%, transparent 76%);
+    linear-gradient(rgb(var(--rule) / 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--rule) / 0.5) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
+/* órbitas desenhadas a lápis em volta do conceito */
 .nexus-stage::before,
 .nexus-stage::after {
   position: absolute;
   width: min(72vw, 31rem);
   aspect-ratio: 1;
-  border: 1px solid rgba(244,114,208,.14);
+  border: 2px dashed rgb(var(--pen) / 0.18);
   border-radius: 50%;
   content: "";
   pointer-events: none;
+  animation: nexus-orbit 60s linear infinite;
 }
 
 .nexus-stage::after {
   width: min(50vw, 21rem);
-  border-color: rgba(57,245,154,.12);
+  border-color: color-mix(in srgb, var(--nexus) 30%, transparent);
+  animation-direction: reverse;
+  animation-duration: 45s;
+}
+
+@keyframes nexus-orbit {
+  to {
+    rotate: 360deg;
+  }
 }
 
 .nexus-core {
@@ -110,18 +140,22 @@
   min-height: 9rem;
   place-items: center;
   align-content: center;
-  gap: .3rem;
+  gap: 0.2rem;
   padding: 1.25rem;
-  border: 1px solid rgba(244,114,208,.45);
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 25%, rgba(255,255,255,.11), transparent 35%), rgba(12,5,13,.94);
-  box-shadow: 0 0 30px rgba(244,114,208,.2), inset 0 0 28px rgba(244,114,208,.08);
+  border: 2.5px solid rgb(var(--pen));
+  border-radius: 48% 52% 50% 50% / 55% 45% 55% 45%;
+  background: rgb(var(--hl-yellow) / 0.75);
+  box-shadow: 4px 5px 0 rgb(var(--pen) / 0.25);
   text-align: center;
 }
 
-.nexus-core svg { width: 1.25rem; color: var(--nexus); }
-.nexus-core span { color: rgba(255,255,255,.38); font-size: .58rem; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; }
-.nexus-core strong { max-width: 11rem; font-family: "Space Grotesk", "Plus Jakarta Sans", sans-serif; font-size: clamp(1rem, 2.4vw, 1.4rem); font-weight: 900; line-height: 1.05; }
+.nexus-core svg { width: 1.3rem; color: rgb(var(--pen)); }
+.nexus-core span { font-family: "Gochi Hand", cursive; font-size: 0.95rem; color: rgb(var(--theme-text) / 0.7); }
+.nexus-core strong { max-width: 11rem; font-family: "Kalam", cursive; font-size: clamp(1.1rem, 2.4vw, 1.5rem); font-weight: 700; line-height: 1.1; color: rgb(var(--pen)); }
+
+.nexus-core.is-linked {
+  background: rgb(var(--hl-mint) / 0.85);
+}
 
 .nexus-options {
   position: absolute;
@@ -132,36 +166,35 @@
   position: absolute;
   z-index: 3;
   display: grid;
-  grid-template-columns: 1.5rem 1.2rem 1fr;
+  grid-template-columns: 1.6rem 1.2rem 1fr;
   width: clamp(11.5rem, 27vw, 16rem);
   min-height: 4.6rem;
   align-items: center;
-  gap: .55rem;
-  padding: .75rem .9rem;
-  border: 1px solid rgba(255,255,255,.13);
-  border-radius: 1rem;
-  background: rgba(11,18,16,.93);
-  box-shadow: 0 16px 32px rgba(0,0,0,.32);
-  color: rgba(255,255,255,.72);
-  font-size: .76rem;
-  font-weight: 760;
+  gap: 0.55rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.3rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 12px 18px -14px rgb(0 0 0 / 0.5);
+  color: rgb(var(--theme-text));
+  font-size: 0.8rem;
+  font-weight: 700;
   line-height: 1.35;
   text-align: left;
-  transition: border-color 160ms ease-out, background-color 160ms ease-out, color 160ms ease-out, transform 160ms ease-out;
+  transition: box-shadow 160ms ease-out, background-color 160ms ease-out, rotate 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.nexus-node:nth-child(1) { left: 4%; top: 11%; }
-.nexus-node:nth-child(2) { right: 4%; top: 11%; }
-.nexus-node:nth-child(3) { bottom: 8%; left: 50%; transform: translateX(-50%); }
-.nexus-node:hover:not(:disabled) { border-color: rgba(244,114,208,.58); background: rgba(244,114,208,.09); color: #fff; }
-.nexus-node:focus-visible { outline: 3px solid rgba(57,245,154,.42); outline-offset: 3px; }
+.nexus-node:nth-child(1) { left: 4%; top: 11%; rotate: -1.5deg; }
+.nexus-node:nth-child(2) { right: 4%; top: 11%; rotate: 1.5deg; }
+.nexus-node:nth-child(3) { bottom: 8%; left: 50%; transform: translateX(-50%); rotate: -0.6deg; }
+.nexus-node:hover:not(:disabled) { rotate: 0deg; box-shadow: 0 0 0 2px rgb(var(--pen)), 0 14px 20px -14px rgb(0 0 0 / 0.5); }
+.nexus-node:focus-visible { outline: 3px solid rgb(var(--pen) / 0.6); outline-offset: 3px; }
 .nexus-node:disabled { cursor: default; }
-.nexus-node.is-wrong { border-color: rgba(251,113,133,.42); background: rgba(251,113,133,.09); color: rgba(255,255,255,.38); }
-.nexus-node.is-correct { border-color: rgba(57,245,154,.6); background: rgba(57,245,154,.12); box-shadow: 0 0 30px rgba(57,245,154,.16); color: #fff; }
-.nexus-node svg { width: 1rem; }
-.nexus-node.is-correct svg { color: rgb(var(--mint)); }
-.nexus-node.is-wrong svg { color: #fb7185; }
-.nexus-node-key { display: grid; width: 1.45rem; aspect-ratio: 1; place-items: center; border-radius: 50%; background: rgba(255,255,255,.08); color: rgba(255,255,255,.55); font-size: .65rem; font-weight: 900; }
+.nexus-node.is-wrong { background: color-mix(in srgb, rgb(var(--hl-pink)) 35%, rgb(var(--panel))); color: rgb(var(--theme-muted)); text-decoration: line-through; text-decoration-color: rgb(var(--margin-line)); animation: caderno-shake 380ms ease; }
+.nexus-node.is-correct { background: color-mix(in srgb, rgb(var(--hl-mint)) 55%, rgb(var(--panel))); box-shadow: 0 0 0 2px #1f9a57, 0 14px 22px -14px rgb(0 0 0 / 0.5); animation: caderno-pop-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.nexus-node svg { width: 1rem; color: rgb(var(--theme-muted)); }
+.nexus-node.is-correct svg { color: #1f9a57; }
+.nexus-node.is-wrong svg { color: rgb(var(--margin-line)); }
+.nexus-node-key { display: grid; width: 1.55rem; aspect-ratio: 1; place-items: center; border: 1.8px solid rgb(var(--pen)); border-radius: 50%; color: rgb(var(--pen)); font-family: "Kalam", cursive; font-size: 0.85rem; font-weight: 700; }
 
 .nexus-feedback,
 .forge-feedback {
@@ -170,51 +203,71 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-top: .85rem;
-  padding: .9rem 1rem;
-  border: 1px solid rgba(255,255,255,.09);
-  border-radius: 1rem;
-  background: rgba(255,255,255,.03);
+  margin-top: 0.85rem;
+  padding: 0.9rem 1rem;
+  border: 1.5px dashed rgb(var(--line));
+  border-radius: 0.6rem;
+  background: rgb(var(--panel));
 }
 
-.nexus-feedback > svg { width: 1.1rem; flex: 0 0 auto; color: var(--nexus); }
-.nexus-feedback p { flex: 1; color: rgba(255,255,255,.58); font-size: .78rem; font-weight: 720; line-height: 1.45; }
-.nexus-feedback.is-success { border-color: rgba(57,245,154,.24); background: rgba(57,245,154,.055); }
+.nexus-feedback > svg { width: 1.1rem; flex: 0 0 auto; color: rgb(var(--pen)); }
+.nexus-feedback p,
+.forge-feedback p { flex: 1; font-family: "Kalam", cursive; font-size: 1rem; line-height: 1.45; color: rgb(var(--theme-text) / 0.85); }
+.nexus-feedback.is-success,
+.forge-feedback.is-success { border-style: solid; border-color: #1f9a57; background: color-mix(in srgb, rgb(var(--hl-mint)) 25%, rgb(var(--panel))); }
+
 .nexus-feedback button,
 .forge-feedback button {
   display: inline-flex;
   min-height: 2.75rem;
   align-items: center;
   justify-content: center;
-  gap: .45rem;
-  padding: .65rem 1rem;
-  border-radius: .75rem;
-  background: rgb(var(--mint));
-  color: #03100a;
-  font-size: .72rem;
+  gap: 0.45rem;
+  padding: 0.65rem 1.1rem;
+  border-radius: 999px;
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+  font-size: 0.8rem;
   font-weight: 900;
+  box-shadow: 0 3px 0 rgb(var(--pen) / 0.45);
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.nexus-feedback button svg,
-.forge-feedback button svg { width: .95rem; }
 
-/* Forja de Sequências — oficina mecânica para relações de causa e ordem. */
-.forge-game { --forge: #fb923c; }
-.forge-score { display: grid; grid-template-columns: auto auto; align-items: center; column-gap: .4rem; padding: .6rem .9rem; border: 1px solid rgba(251,146,60,.22); border-radius: .9rem; background: rgba(251,146,60,.075); }
-.forge-score svg { grid-row: 1 / 3; width: 1.1rem; color: var(--forge); }
-.forge-score strong { font-family: "Space Grotesk", "Plus Jakarta Sans", sans-serif; font-size: 1rem; }
-.forge-score span { color: rgba(255,255,255,.38); font-size: .55rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.nexus-feedback button:hover,
+.forge-feedback button:hover { transform: translateY(-2px) rotate(-1deg); }
+
+.nexus-feedback button svg,
+.forge-feedback button svg { width: 0.95rem; }
+
+/* ───────── Forja de Sequências ───────── */
+.forge-game { --forge: #f07a2b; }
+
+.forge-score {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 0.45rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: 0.2rem 0.2rem 0.7rem 0.2rem;
+  background: #ffd9b8;
+  box-shadow: 0 8px 12px -10px rgb(0 0 0 / 0.5);
+  rotate: 1.5deg;
+}
+
+.forge-score svg { grid-row: 1 / 3; width: 1.15rem; color: #1d2bb8; }
+.forge-score strong { font-family: "Kalam", cursive; font-size: 1.3rem; font-weight: 700; color: #1d2bb8; line-height: 1.05; }
+.forge-score span { font-family: "Gochi Hand", cursive; font-size: 0.9rem; color: #4a4a5a; }
 
 .forge-layout {
   display: grid;
-  grid-template-columns: minmax(13rem, .72fr) minmax(0, 1.5fr);
-  gap: .85rem;
+  grid-template-columns: minmax(13rem, 0.72fr) minmax(0, 1.5fr);
+  gap: 0.9rem;
 }
 
 .forge-reactor,
 .forge-track {
-  border: 1px solid rgba(255,255,255,.09);
-  border-radius: 1.25rem;
-  background: rgba(5,10,8,.7);
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0 1px rgb(var(--line));
 }
 
 .forge-reactor {
@@ -225,63 +278,109 @@
   padding: 1.4rem;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 36%, rgba(251,146,60,.18), transparent 8rem),
-    linear-gradient(155deg, rgba(251,146,60,.045), transparent 54%),
-    rgba(5,10,8,.8);
+    repeating-linear-gradient(to right, rgb(var(--rule) / 0.4) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(to bottom, rgb(var(--rule) / 0.4) 0 1px, transparent 1px 26px),
+    rgb(var(--sheet));
   text-align: center;
 }
 
 .forge-reactor-core {
   display: grid;
-  width: 7rem;
+  width: 6.5rem;
   aspect-ratio: 1;
   place-items: center;
-  border: 1px solid rgba(251,146,60,.48);
-  border-radius: 1.5rem;
-  background: rgba(251,146,60,.1);
-  box-shadow: 0 0 38px rgba(251,146,60,.18), inset 0 0 24px rgba(251,146,60,.08);
-  transform: rotate(45deg);
+  border: 2.5px solid rgb(var(--pen));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--forge) 35%, rgb(var(--sheet)));
+  box-shadow: 4px 5px 0 rgb(var(--pen) / 0.25);
 }
-.forge-reactor-core svg { width: 2.1rem; color: var(--forge); transform: rotate(-45deg); }
-.forge-reactor-core.is-solved { border-color: rgba(57,245,154,.6); background: rgba(57,245,154,.12); box-shadow: 0 0 45px rgba(57,245,154,.25); }
-.forge-reactor-core.is-solved svg { color: rgb(var(--mint)); }
-.forge-reactor > p { margin-top: 2.1rem; color: var(--forge); font-size: .57rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
-.forge-reactor h3 { margin-top: .5rem; max-width: 15rem; font-family: "Space Grotesk", "Plus Jakarta Sans", sans-serif; font-size: 1.35rem; font-weight: 900; line-height: 1.1; }
-.forge-metrics { display: flex; gap: 1.4rem; margin-top: 1.5rem; }
-.forge-metrics span { display: grid; color: rgba(255,255,255,.36); font-size: .58rem; font-weight: 850; text-transform: uppercase; }
-.forge-metrics strong { color: #fff; font-family: "Space Grotesk", "Plus Jakarta Sans", sans-serif; font-size: 1.1rem; }
 
-.forge-track { display: grid; align-content: center; gap: .65rem; min-height: 26rem; padding: 1rem; background-image: linear-gradient(90deg, rgba(251,146,60,.08) 1px, transparent 1px); background-size: 25% 100%; }
-.forge-step { display: grid; grid-template-columns: 2.4rem 1fr auto; min-height: 4.75rem; align-items: center; gap: .75rem; padding: .72rem; border: 1px solid rgba(255,255,255,.1); border-radius: .95rem; background: rgba(17,24,21,.96); box-shadow: 0 10px 22px rgba(0,0,0,.24); }
+.forge-reactor-core svg { width: 2.1rem; color: rgb(var(--pen)); }
+.forge-reactor-core.is-solved { background: rgb(var(--hl-mint)); border-color: #1f9a57; }
+.forge-reactor-core.is-solved svg { color: #1f9a57; }
+.forge-reactor > p { margin-top: 1.8rem; font-family: "Gochi Hand", cursive; font-size: 1.05rem; color: rgb(var(--margin-line)); }
+.forge-reactor h3 { margin-top: 0.3rem; max-width: 15rem; font-family: "Kalam", cursive; font-size: 1.45rem; font-weight: 700; line-height: 1.15; color: rgb(var(--pen)); }
+.forge-metrics { display: flex; gap: 1.4rem; margin-top: 1.4rem; }
+.forge-metrics span { display: grid; font-family: "Gochi Hand", cursive; font-size: 0.95rem; color: rgb(var(--theme-muted)); }
+.forge-metrics strong { font-family: "Kalam", cursive; font-size: 1.4rem; font-weight: 700; color: rgb(var(--pen)); }
+
+.forge-track {
+  display: grid;
+  align-content: center;
+  gap: 0.7rem;
+  min-height: 26rem;
+  padding: 1rem 1rem 1rem 2.6rem;
+  background:
+    linear-gradient(to right, transparent 1.7rem, rgb(var(--margin-line) / 0.5) 1.7rem calc(1.7rem + 2px), transparent calc(1.7rem + 2px)),
+    rgb(var(--panel-2));
+}
+
+.forge-step {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr auto;
+  min-height: 4.6rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem;
+  border-radius: 0.3rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 10px 16px -14px rgb(0 0 0 / 0.5);
+}
+
 .forge-step[draggable="true"] { cursor: grab; }
-.forge-step[draggable="true"]:active { cursor: grabbing; }
-.forge-step.is-solved { border-color: rgba(57,245,154,.35); background: rgba(57,245,154,.065); }
-.forge-number { display: grid; width: 2.25rem; aspect-ratio: 1; place-items: center; border: 1px solid rgba(251,146,60,.28); border-radius: .7rem; background: rgba(251,146,60,.09); color: var(--forge); font-family: "Space Grotesk", "Plus Jakarta Sans", sans-serif; font-weight: 900; }
-.forge-step.is-solved .forge-number { border-color: rgba(57,245,154,.36); background: rgba(57,245,154,.1); color: rgb(var(--mint)); }
-.forge-step p { color: rgba(255,255,255,.75); font-size: .79rem; font-weight: 760; line-height: 1.4; }
-.forge-controls { display: flex; gap: .35rem; }
-.forge-controls button { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 1px solid rgba(255,255,255,.1); border-radius: .72rem; color: rgba(255,255,255,.56); transition: border-color 140ms ease-out, background-color 140ms ease-out, color 140ms ease-out; }
-.forge-controls button:hover:not(:disabled) { border-color: rgba(251,146,60,.38); background: rgba(251,146,60,.09); color: #fff; }
-.forge-controls button:disabled { opacity: .2; }
+.forge-step[draggable="true"]:active { cursor: grabbing; rotate: -1.5deg; }
+.forge-step.is-solved { background: color-mix(in srgb, rgb(var(--hl-mint)) 35%, rgb(var(--sheet))); }
+
+.forge-number {
+  display: grid;
+  width: 2.2rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid rgb(var(--pen));
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: color-mix(in srgb, var(--forge) 25%, rgb(var(--sheet)));
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.forge-step.is-solved .forge-number { border-color: #1f9a57; background: rgb(var(--hl-mint)); color: #1f6b41; }
+.forge-step p { font-size: 0.85rem; font-weight: 700; line-height: 1.4; color: rgb(var(--theme-text) / 0.9); }
+.forge-controls { display: flex; gap: 0.35rem; }
+
+.forge-controls button {
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  place-items: center;
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  transition: background-color 140ms ease-out, transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.forge-controls button:hover:not(:disabled) { background: rgb(var(--hl-yellow) / 0.6); transform: scale(1.08); }
+.forge-controls button:disabled { opacity: 0.25; }
+
 .forge-controls button:focus-visible,
 .forge-feedback button:focus-visible,
-.nexus-feedback button:focus-visible { outline: 3px solid rgba(57,245,154,.4); outline-offset: 2px; }
+.nexus-feedback button:focus-visible { outline: 3px solid rgb(var(--pen) / 0.5); outline-offset: 2px; }
+
 .forge-controls svg { width: 1rem; }
 
-.forge-feedback > div:first-child { display: flex; flex: 1; align-items: center; gap: .75rem; }
-.forge-feedback > div:first-child svg { width: 1.1rem; flex: 0 0 auto; color: var(--forge); }
-.forge-feedback p { color: rgba(255,255,255,.58); font-size: .78rem; font-weight: 720; line-height: 1.45; }
-.forge-feedback.is-success { border-color: rgba(57,245,154,.24); background: rgba(57,245,154,.055); }
-.forge-feedback.is-success > div:first-child svg { color: rgb(var(--mint)); }
-.forge-actions { display: flex; gap: .5rem; }
-.forge-feedback .is-quiet { border: 1px solid rgba(255,255,255,.1); background: transparent; color: rgba(255,255,255,.56); }
+.forge-feedback > div:first-child { display: flex; flex: 1; align-items: center; gap: 0.75rem; }
+.forge-feedback > div:first-child svg { width: 1.1rem; flex: 0 0 auto; color: rgb(var(--pen)); }
+.forge-feedback.is-success > div:first-child svg { color: #1f9a57; }
+.forge-actions { display: flex; gap: 0.5rem; }
+.forge-feedback .is-quiet { border: 1.6px solid rgb(var(--theme-text) / 0.3); background: rgb(var(--sheet)); color: rgb(var(--theme-text)); box-shadow: none; }
 
 @media (max-width: 880px) {
   .new-game-heading { display: grid; }
   .nexus-hud { width: 100%; min-width: 0; }
   .nexus-stage { min-height: 38rem; padding: 1rem; }
   .nexus-core { margin-top: -6rem; }
-  .nexus-options { position: absolute; inset: auto .85rem .85rem; display: grid; gap: .55rem; }
+  .nexus-options { position: absolute; inset: auto 0.85rem 0.85rem; display: grid; gap: 0.55rem; }
   .nexus-node { position: static; width: 100%; min-height: 4rem; transform: none !important; }
   .nexus-stage::before { width: 25rem; transform: translateY(-3rem); }
   .nexus-stage::after { width: 16rem; transform: translateY(-3rem); }
@@ -292,29 +391,22 @@
 
 @media (max-width: 560px) {
   .nexus-hud { grid-template-columns: repeat(2, 1fr); }
-  .nexus-hud span:nth-child(3) { border-left: 0; border-top: 1px solid rgba(255,255,255,.08); }
-  .nexus-hud span:nth-child(4) { border-top: 1px solid rgba(255,255,255,.08); }
   .nexus-feedback,
   .forge-feedback { align-items: stretch; flex-direction: column; }
   .nexus-feedback button,
   .forge-feedback button { width: 100%; }
   .forge-step { grid-template-columns: 2.2rem 1fr; }
   .forge-controls { grid-column: 1 / -1; }
-  .forge-controls button { flex: 1; width: auto; }
+  .forge-controls button { flex: 1; width: auto; border-radius: 999px; }
   .forge-actions { width: 100%; flex-direction: column-reverse; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .nexus-node,
   .forge-controls button { transition-duration: 0.01ms; }
+  .nexus-stage::before,
+  .nexus-stage::after,
+  .nexus-node.is-wrong,
+  .nexus-node.is-correct,
+  .nexus-hud .is-alert strong { animation: none; }
 }
-
-.theme-light .nexus-stage,
-.theme-light .forge-reactor,
-.theme-light .forge-track { background-color: rgba(255,255,255,.66); }
-.theme-light .nexus-node,
-.theme-light .forge-step { background: rgba(255,255,255,.9); color: rgb(22,34,30); }
-.theme-light .nexus-node { color: rgba(22,34,30,.74); }
-.theme-light .forge-step p,
-.theme-light .nexus-feedback p,
-.theme-light .forge-feedback p { color: rgba(22,34,30,.7); }

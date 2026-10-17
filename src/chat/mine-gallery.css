@@ -1,0 +1,495 @@
+/*
+ * Galeria de fotos da Mine e visualizador em tela cheia
+ * (src/chat/MineImageGallery.tsx).
+ */
+
+/* A galeria usa a largura do balão, não a medida de leitura do texto. O
+   espaçamento em volta dela mora em index.css, com o resto do .mine-answer. */
+.mine-answer:has(.mine-gallery) {
+  max-width: none;
+}
+
+.mine-gallery {
+  margin: 0.25rem 0 0;
+  max-width: 44rem;
+}
+
+.mine-gallery__grid {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.mine-gallery__grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mine-gallery__grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 32rem;
+}
+
+.mine-gallery__grid--1 {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 24rem;
+}
+
+.mine-gallery__tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: rgb(var(--theme-text) / 0.05);
+  aspect-ratio: 5 / 4;
+}
+
+.mine-gallery__grid--1 .mine-gallery__tile {
+  aspect-ratio: 4 / 3;
+}
+
+/* Cantos externos arredondados, internos quase retos: o conjunto lê como um
+   álbum só, e não como três cartões soltos. */
+.mine-gallery__grid--3 .mine-gallery__tile:nth-child(2),
+.mine-gallery__grid--3 .mine-gallery__tile:first-child:not(:last-child),
+.mine-gallery__grid--2 .mine-gallery__tile:first-child {
+  border-top-right-radius: 0.35rem;
+  border-bottom-right-radius: 0.35rem;
+}
+
+.mine-gallery__grid--3 .mine-gallery__tile:nth-child(2),
+.mine-gallery__grid--3 .mine-gallery__tile:last-child:not(:first-child),
+.mine-gallery__grid--2 .mine-gallery__tile:last-child {
+  border-top-left-radius: 0.35rem;
+  border-bottom-left-radius: 0.35rem;
+}
+
+.mine-gallery__open {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: zoom-in;
+}
+
+.mine-gallery__open img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 260ms cubic-bezier(0.2, 0, 0, 1), filter 200ms ease;
+}
+
+.mine-gallery__open:hover img,
+.mine-gallery__open:focus-visible img {
+  transform: scale(1.035);
+  filter: brightness(1.05);
+}
+
+.mine-gallery__open:focus-visible {
+  outline: 2px solid rgb(var(--mint));
+  outline-offset: -2px;
+  border-radius: inherit;
+}
+
+/* "+N" no canto da última foto, como nos chats de IA. */
+.mine-gallery__more {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.mine-gallery__more svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mine-gallery__download {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-3px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 150ms ease;
+}
+
+.mine-gallery__download svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mine-gallery__tile:hover .mine-gallery__download,
+.mine-gallery__download:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.mine-gallery__download:hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* No toque não há hover: três botões sempre visíveis poluíam as miniaturas.
+   Tocar na foto abre o visualizador, que tem o "Baixar" em destaque. */
+@media (hover: none) {
+  .mine-gallery__download {
+    display: none;
+  }
+}
+
+.mine-gallery__caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.2rem 0.8rem;
+  margin-top: 0.45rem;
+  padding: 0 0.15rem;
+  color: rgb(var(--theme-text) / 0.62);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.mine-gallery__sources {
+  color: rgb(var(--theme-text) / 0.36);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mine-gallery__skeleton {
+  display: block;
+  border-radius: 1rem;
+  aspect-ratio: 5 / 4;
+  background: linear-gradient(100deg, rgb(var(--theme-text) / 0.04) 30%, rgb(var(--theme-text) / 0.09) 50%, rgb(var(--theme-text) / 0.04) 70%);
+  background-size: 250% 100%;
+  animation: mine-gallery-wait 1.4s ease-in-out infinite;
+}
+
+@keyframes mine-gallery-wait {
+  from { background-position: 100% 0; }
+  to { background-position: -50% 0; }
+}
+
+@media (max-width: 640px) {
+  .mine-gallery__grid {
+    gap: 0.3rem;
+  }
+
+  .mine-gallery__tile {
+    border-radius: 0.8rem;
+  }
+
+  .mine-gallery__more {
+    right: 0.35rem;
+    bottom: 0.35rem;
+    padding: 0.2rem 0.45rem;
+    font-size: 12px;
+  }
+
+  .mine-gallery__download {
+    width: 1.8rem;
+    height: 1.8rem;
+    top: 0.3rem;
+    right: 0.3rem;
+  }
+}
+
+/* ------------------------------------------------------------ tela cheia */
+
+.mine-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: rgba(4, 7, 6, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+}
+
+.mine-lightbox__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: max(0.75rem, env(safe-area-inset-top)) 1rem 0.75rem 1.1rem;
+}
+
+.mine-lightbox__count {
+  flex-shrink: 0;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.mine-lightbox__title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mine-lightbox__actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mine-lightbox__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 13rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  font-weight: 800;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.mine-lightbox__button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mine-lightbox__button svg,
+.mine-lightbox__icon svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.mine-lightbox__button:hover,
+.mine-lightbox__button:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.mine-lightbox__button--primary {
+  background: #39f59a;
+  color: #04120c;
+}
+
+.mine-lightbox__button--primary:hover,
+.mine-lightbox__button--primary:focus-visible {
+  background: #6cf8b5;
+  color: #04120c;
+}
+
+.mine-lightbox__icon {
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  place-items: center;
+  border-radius: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  transition: background-color 150ms ease;
+}
+
+.mine-lightbox__icon:hover,
+.mine-lightbox__icon:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.mine-lightbox__stage {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  padding: 0.5rem 4.5rem;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.mine-lightbox__image {
+  max-width: 100%;
+  /* Porcentagem de altura dentro da grade não segura a foto em todo
+     navegador; o teto explícito desconta a barra de cima e as miniaturas. */
+  max-height: calc(100vh - 10.5rem);
+  max-height: calc(100dvh - 10.5rem);
+  border-radius: 0.9rem;
+  object-fit: contain;
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.9);
+}
+
+.mine-lightbox__nav {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transform: translateY(-50%);
+  transition: background-color 150ms ease, transform 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.mine-lightbox__nav svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mine-lightbox__nav:hover,
+.mine-lightbox__nav:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mine-lightbox__nav--prev {
+  left: 1rem;
+}
+
+.mine-lightbox__nav--next {
+  right: 1rem;
+}
+
+.mine-lightbox__strip {
+  display: flex;
+  justify-content: safe center;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.7rem 1rem max(0.9rem, env(safe-area-inset-bottom));
+  scrollbar-width: none;
+}
+
+.mine-lightbox__thumb {
+  flex: 0 0 auto;
+  width: 4rem;
+  height: 3rem;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  opacity: 0.45;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: opacity 150ms ease, outline-color 150ms ease;
+}
+
+.mine-lightbox__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mine-lightbox__thumb:hover {
+  opacity: 0.8;
+}
+
+.mine-lightbox__thumb.is-active {
+  opacity: 1;
+  outline-color: #39f59a;
+}
+
+@media (max-width: 640px) {
+  .mine-lightbox__bar {
+    gap: 0.5rem;
+    padding-inline: 0.75rem 0.5rem;
+  }
+
+  .mine-lightbox__title {
+    display: none;
+  }
+
+  .mine-lightbox__actions {
+    margin-left: auto;
+  }
+
+  /* Só o ícone da fonte no celular; "Baixar" continua com texto. */
+  .mine-lightbox__button:not(.mine-lightbox__button--primary) span {
+    display: none;
+  }
+
+  .mine-lightbox__stage {
+    padding: 0.25rem 0.5rem;
+  }
+
+  .mine-lightbox__image {
+    max-height: calc(100vh - 9rem);
+    max-height: calc(100dvh - 9rem);
+  }
+
+  .mine-lightbox__nav {
+    display: none;
+  }
+
+  .mine-lightbox__thumb {
+    width: 3.3rem;
+    height: 2.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mine-gallery__open img,
+  .mine-gallery__download,
+  .mine-lightbox__nav,
+  .mine-lightbox__thumb {
+    transition: none;
+  }
+
+  .mine-gallery__open:hover img {
+    transform: none;
+  }
+
+  .mine-gallery__skeleton {
+    animation: none;
+  }
+}
+
+.no-motion .mine-gallery__skeleton {
+  animation: none;
+}
+
+/* Estilos pedidos (out/2026): ícone em quadrado, como foto de perfil;
+   wallpaper em paisagem larga. */
+.mine-gallery--icone .mine-gallery__tile,
+.mine-gallery--icone .mine-gallery__grid--1 .mine-gallery__tile,
+.mine-gallery--logo .mine-gallery__tile {
+  aspect-ratio: 1 / 1;
+}
+
+.mine-gallery--icone .mine-gallery__grid--1,
+.mine-gallery--logo .mine-gallery__grid--1 {
+  max-width: 16rem;
+}
+
+.mine-gallery--logo .mine-gallery__tile img {
+  object-fit: contain;
+  padding: 0.75rem;
+  background: rgb(255 255 255 / 0.92);
+}
+
+.mine-gallery--wallpaper .mine-gallery__tile,
+.mine-gallery--wallpaper .mine-gallery__grid--1 .mine-gallery__tile {
+  aspect-ratio: 16 / 10;
+}

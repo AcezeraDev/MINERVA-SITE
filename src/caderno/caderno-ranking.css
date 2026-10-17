@@ -1,0 +1,516 @@
+/*
+  Ranking no caderno: o boletim com a posição carimbada, a classificação como
+  uma lista de chamada (linhas pautadas, número à caneta, pontuação sublinhada
+  com marca-texto) e os indicadores como post-its na margem.
+*/
+
+html .workspace-shell .ranking-arena {
+  --ranking-line: rgb(var(--line));
+  --ranking-surface: rgb(var(--panel));
+  --ranking-surface-strong: rgb(var(--panel-2));
+}
+
+html .workspace-shell .ranking-intro::before {
+  display: none;
+}
+
+html .workspace-shell .ranking-intro {
+  padding-left: 0.35rem;
+}
+
+.ranking-refresh-pencil {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 1rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+/* ───────── Boletim: sua posição ───────── */
+.caderno-rank-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.2rem;
+  align-items: center;
+  height: 100%;
+  padding: 1.5rem 1.4rem 1.3rem;
+  border-radius: 0.4rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(1.9rem - 1px), rgb(var(--rule) / 0.55) calc(1.9rem - 1px) 1.9rem),
+    rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 22px 36px -28px rgb(0 0 0 / 0.55);
+  rotate: 0.5deg;
+}
+
+@media (min-width: 640px) {
+  .caderno-rank-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
+.caderno-rank-tape {
+  position: absolute;
+  top: -0.7rem;
+  left: 2.5rem;
+  width: 5rem;
+  height: 1.35rem;
+  rotate: -5deg;
+  background: rgb(var(--hl-pink) / 0.55);
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+.caderno-rank-stamp {
+  display: grid;
+  width: 5.6rem;
+  height: 5.6rem;
+  place-items: center;
+  align-content: center;
+  border: 3px double rgb(var(--margin-line));
+  border-radius: 50%;
+  color: rgb(var(--margin-line));
+  rotate: -12deg;
+  animation: caderno-sn-stamp 520ms 200ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.caderno-rank-stamp strong {
+  font-family: "Kalam", cursive;
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.caderno-rank-stamp small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.9rem;
+}
+
+.caderno-rank-score {
+  margin-top: 0.2rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  color: rgb(var(--pen));
+}
+
+.caderno-rank-score mark {
+  padding: 0 0.2em;
+  color: inherit;
+  font-weight: 700;
+  background: linear-gradient(transparent 45%, rgb(var(--hl-yellow)) 45% 92%, transparent 92%);
+}
+
+.caderno-rank-bar {
+  position: relative;
+  height: 0.7rem;
+  margin: 0.7rem 2.4rem 0 0;
+  border-radius: 999px;
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+}
+
+.caderno-rank-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: rgb(var(--hl-mint));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--pen) / 0.35);
+  transform-origin: left center;
+  animation: caderno-subj-fill 1000ms 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.caderno-rank-bar em {
+  position: absolute;
+  right: -2.4rem;
+  top: 50%;
+  translate: 0 -50%;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  font-style: normal;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-rank-target {
+  margin-top: 0.7rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  color: rgb(var(--theme-text) / 0.8);
+}
+
+.caderno-rank-target strong {
+  font-family: "Kalam", cursive;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-rank-side {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+@media (min-width: 640px) {
+  .caderno-rank-side {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.caderno-rank-level,
+.caderno-rank-streak {
+  display: grid;
+  justify-items: center;
+  padding: 0.45rem 0.8rem;
+  border-radius: 0.2rem 0.2rem 0.7rem 0.2rem;
+  box-shadow: 0 8px 12px -10px rgb(0 0 0 / 0.5);
+}
+
+.caderno-rank-level {
+  background: #e2d9ff;
+  rotate: 2deg;
+}
+
+.caderno-rank-level small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.9rem;
+  color: #4a4a5a;
+}
+
+.caderno-rank-level strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #1d2bb8;
+}
+
+.caderno-rank-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #ffd9b8;
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  color: #9a3412;
+  rotate: -2deg;
+}
+
+/* ───────── Painéis: papel ───────── */
+html .workspace-shell .ranking-podium-panel,
+html .workspace-shell .ranking-board,
+html .workspace-shell .ranking-insight-card {
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 18px 30px -26px rgb(0 0 0 / 0.5);
+}
+
+html .workspace-shell .ranking-section-heading p,
+html .workspace-shell .ranking-board-top > div:first-child p {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--margin-line));
+}
+
+html .workspace-shell .ranking-section-heading p svg,
+html .workspace-shell .ranking-board-top > div:first-child p svg {
+  display: none;
+}
+
+html .workspace-shell .ranking-section-heading h2,
+html .workspace-shell .ranking-board-top h2 {
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 112;
+  font-weight: 900;
+  color: rgb(var(--theme-text));
+}
+
+html .workspace-shell .ranking-section-heading > span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* abas de período e de escopo: divisórias */
+html .workspace-shell .ranking-range-tabs,
+html .workspace-shell .ranking-scope-tabs {
+  border: 0;
+  border-radius: 999px;
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1px rgb(var(--line));
+}
+
+html .workspace-shell .ranking-range-tabs button,
+html .workspace-shell .ranking-scope-tabs button {
+  border-radius: 999px;
+  font-family: "Kalam", cursive;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .ranking-range-tabs button > span {
+  border-radius: 999px;
+  background: rgb(var(--hl-yellow));
+  box-shadow: none;
+}
+
+html .workspace-shell .ranking-range-tabs button.is-active,
+html .workspace-shell .ranking-scope-tabs button.is-active {
+  color: rgb(var(--theme-text));
+}
+
+html .workspace-shell .ranking-scope-tabs button.is-active {
+  background: rgb(var(--hl-mint) / 0.8);
+}
+
+html .workspace-shell .ranking-search {
+  border: 0;
+  border-bottom: 2px solid rgb(var(--pen) / 0.4);
+  border-radius: 0;
+  background: transparent;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .ranking-search:focus-within {
+  border-color: rgb(var(--pen));
+  color: rgb(var(--pen));
+}
+
+html .workspace-shell .ranking-search input {
+  font-family: "Kalam", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-text));
+}
+
+html .workspace-shell .ranking-search input::placeholder {
+  color: rgb(var(--theme-muted));
+}
+
+/* ───────── Lista de chamada ───────── */
+html .workspace-shell .ranking-rows {
+  gap: 0;
+  margin-top: 0.8rem;
+  padding-left: 0.2rem;
+  background: linear-gradient(to right, transparent 2.9rem, rgb(var(--margin-line) / 0.45) 2.9rem calc(2.9rem + 2px), transparent calc(2.9rem + 2px));
+}
+
+html .workspace-shell .ranking-row {
+  border: 0;
+  border-bottom: 1px solid rgb(var(--rule) / 0.8);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .workspace-shell .ranking-row:hover {
+  background: rgb(var(--hl-yellow) / 0.18);
+  transform: none;
+}
+
+html .workspace-shell .ranking-row.is-you {
+  background: rgb(var(--hl-mint) / 0.28);
+}
+
+html .workspace-shell .ranking-row-position {
+  border-radius: 50%;
+  background: transparent;
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+html .workspace-shell .ranking-row-position.is-medal {
+  color: #11151e;
+  box-shadow: 0 0 0 2px rgb(var(--pen));
+  rotate: -8deg;
+}
+
+html .workspace-shell .ranking-row-name {
+  font-family: "Kalam", cursive;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+html .workspace-shell .ranking-row-name > span:last-child:not(:first-child) {
+  padding: 0 0.45rem;
+  border: 1.5px solid rgb(var(--margin-line));
+  border-radius: 0.3rem;
+  background: transparent;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--margin-line));
+  rotate: -4deg;
+}
+
+html .workspace-shell .ranking-row-meta {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .ranking-row-score {
+  color: rgb(var(--theme-text));
+}
+
+html .workspace-shell .ranking-row-score strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+html .workspace-shell .ranking-row-score small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .ranking-row-friend {
+  border-radius: 50%;
+  color: rgb(var(--theme-muted) / 0.6);
+}
+
+html .workspace-shell .ranking-row-friend:hover {
+  background: rgb(var(--hl-yellow) / 0.5);
+  color: rgb(var(--pen));
+}
+
+html .workspace-shell .ranking-row-friend.is-friend {
+  color: #e0a100;
+}
+
+html .workspace-shell .ranking-loading,
+html .workspace-shell .ranking-privacy-note {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .ranking-privacy-note {
+  border-top: 1.5px dashed rgb(var(--line));
+}
+
+/* ───────── Indicadores: post-its na margem ───────── */
+html .workspace-shell .ranking-insight-card {
+  border-radius: 0.2rem 0.2rem 1rem 0.2rem;
+}
+
+html .workspace-shell .ranking-insights > :nth-child(1) .ranking-insight-card {
+  background: #fff3a0;
+  rotate: -1deg;
+}
+
+html .workspace-shell .ranking-insights > :nth-child(2) .ranking-insight-card {
+  background: #d9f8e6;
+  rotate: 1deg;
+}
+
+html .workspace-shell .ranking-insights > :nth-child(3) .ranking-insight-card {
+  background: #ffe0ea;
+  rotate: -0.6deg;
+}
+
+html .workspace-shell .ranking-insight-title {
+  color: #1d2bb8;
+}
+
+html .workspace-shell .ranking-insight-title h2 {
+  font-family: "Kalam", cursive;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1d2bb8;
+}
+
+html .workspace-shell .ranking-stat-list > div {
+  border-bottom: 1.5px dashed rgb(43 36 16 / 0.2);
+  border-radius: 0;
+  background: transparent;
+}
+
+html .workspace-shell .ranking-stat-list dt {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #4a3f17;
+}
+
+html .workspace-shell .ranking-stat-list dt svg {
+  color: #1d2bb8;
+}
+
+html .workspace-shell .ranking-stat-list dd {
+  font-family: "Kalam", cursive;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1d2bb8;
+}
+
+html .workspace-shell .ranking-chase-card p,
+html .workspace-shell .ranking-rules-card ul {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+  font-weight: 400;
+  color: #2f3b33;
+}
+
+html .workspace-shell .ranking-chase-card p strong {
+  font-family: "Kalam", cursive;
+  color: #1d2bb8;
+}
+
+html .workspace-shell .ranking-chase-person {
+  border: 0;
+  border-radius: 0.3rem;
+  background: rgb(255 255 255 / 0.55);
+}
+
+html .workspace-shell .ranking-chase-person strong {
+  font-family: "Kalam", cursive;
+  font-size: 1rem;
+  color: #1d2bb8;
+}
+
+html .workspace-shell .ranking-chase-person small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.85rem;
+  text-transform: none;
+  color: #4a4a5a;
+}
+
+html .workspace-shell .ranking-rules-card li::before {
+  content: "✓";
+  width: auto;
+  height: auto;
+  top: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  color: #1f9a57;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caderno-rank-stamp,
+  .caderno-rank-bar span {
+    animation: none;
+  }
+}
+
+html .workspace-shell .ranking-intro > p.caderno-note {
+  font-size: 1.15rem;
+  color: rgb(var(--pen));
+}

@@ -1,0 +1,10 @@
+export function normalizeIntentText(value: string): string;
+export function isMindMapRequest(value: string): boolean;
+export function isQuizRequest(value: string): boolean;
+export function isFlashcardRequest(value: string): boolean;
+export function topicAfter(value: string, gatilho: RegExp): string;
+export function mindMapTopicFromPrompt(value: string): string;
+export function quizTopicFromPrompt(value: string): string;
+export function flashcardTopicFromPrompt(value: string): string;
+export function countFromPrompt(value: string, fallback: number, ceiling: number): number;
+export function difficultyFromPrompt(value: string): "facil" | "medio" | "dificil";

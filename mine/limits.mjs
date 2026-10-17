@@ -6,6 +6,8 @@
 // abuso — nao substitui o limite do provedor, complementa. Para um limite
 // exato entre instancias, trocar `buckets` por Redis mantendo esta interface.
 
+import { MAX_CHAT_PROMPT_CHARS } from "../shared/chat-limits.mjs";
+
 const buckets = new Map();
 
 const WINDOWS = [
@@ -66,7 +68,7 @@ export function checkRateLimit(identity) {
 
 export const MAX_ATTACHMENTS = 6;
 export const MAX_ATTACHMENT_BYTES = 8_000_000;
-export const MAX_PROMPT_LENGTH = 12_000;
+export const MAX_PROMPT_LENGTH = MAX_CHAT_PROMPT_CHARS;
 
 const ALLOWED_MIME_PREFIXES = ["image/", "text/", "application/pdf", "application/vnd.openxmlformats", "application/msword"];
 

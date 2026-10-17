@@ -8,8 +8,12 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "Plus Jakarta Sans", "sans-serif"],
+        // Caderno vivo: letra de leitura feita para legibilidade, título largo
+        // e variável, a mão da caneta para anotações e números em máquina.
+        sans: ["Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible", "system-ui", "sans-serif"],
+        display: ["Anybody Variable", "Atkinson Hyperlegible Next Variable", "system-ui", "sans-serif"],
+        hand: ["Gochi Hand", "Comic Sans MS", "cursive"],
+        mono: ["DM Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
         ink: "rgb(var(--ink) / <alpha-value>)",
@@ -23,6 +27,15 @@ export default {
         violetGlow: "rgb(var(--violet) / <alpha-value>)",
         amberGlow: "rgb(var(--amber) / <alpha-value>)",
         roseGlow: "rgb(var(--rose) / <alpha-value>)",
+        pen: "rgb(var(--pen) / <alpha-value>)",
+        paper: "rgb(var(--paper) / <alpha-value>)",
+        sheet: "rgb(var(--sheet) / <alpha-value>)",
+        rule: "rgb(var(--rule) / <alpha-value>)",
+        margin: "rgb(var(--margin-line) / <alpha-value>)",
+        hlYellow: "rgb(var(--hl-yellow) / <alpha-value>)",
+        hlPink: "rgb(var(--hl-pink) / <alpha-value>)",
+        hlLilac: "rgb(var(--hl-lilac) / <alpha-value>)",
+        hlMint: "rgb(var(--hl-mint) / <alpha-value>)",
       },
       boxShadow: {
         glow: "0 18px 44px -24px rgb(var(--mint) / 0.66)",

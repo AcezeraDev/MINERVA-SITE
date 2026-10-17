@@ -1,7 +1,7 @@
 {
   "name": "minerva-web",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -10,28 +10,35 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "test": "node --test tests/*.test.mjs",
+    "test:mine:live": "node scripts/evaluate-mine.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "start": "node server.mjs"
   },
   "dependencies": {
-    "@types/three": "^0.185.4",
+    "@fontsource-variable/anybody": "^5.3.0",
+    "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
+    "@fontsource/dm-mono": "^5.3.0",
+    "@fontsource/gochi-hand": "^5.3.0",
+    "@fontsource/kalam": "^5.3.0",
+    "@fontsource/patrick-hand": "^5.3.0",
+    "@types/three": "^0.170.0",
     "@vitejs/plugin-react": "^4.3.4",
     "framer-motion": "^11.15.0",
-    "gsap": "^3.15.0",
+    "highlight.js": "^11.12.0",
+    "katex": "^0.16.47",
     "lucide-react": "^0.468.0",
-    "ogl": "^1.0.11",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.22.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.185.1"
+    "three": "^0.170.0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.26",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
     "vite": "^6.0.5"

@@ -10,6 +10,7 @@ export type XpStatKey =
   | "mineMessages"
   | "cardReviews"
   | "mastered"
+  | "drawings"
   | "streakDays";
 
 export type XpStats = Record<XpStatKey, number>;
@@ -35,9 +36,10 @@ export type XpScope = {
 
 export const dayMs: number;
 export const xpPerAction: Record<
-  "subject" | "material" | "studied" | "taskDone" | "focus" | "prova" | "game" | "mineMessage" | "cardReview",
+  "subject" | "material" | "studied" | "taskDone" | "focus" | "prova" | "game" | "mineMessage" | "cardReview" | "drawing",
   number
 >;
+export const drawingsPerDay: number;
 export const xpActions: Array<[string, number]>;
 export const levelTitles: ReadonlyArray<{ level: number; title: string }>;
 export const achievementList: ReadonlyArray<AchievementRule>;

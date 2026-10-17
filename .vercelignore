@@ -8,3 +8,6 @@ dist/
 .agents/
 useful-ai-prompts/
 skills-lock.json
+*.docx
+.codex-tmp*/
+.playwright-mcp/

@@ -1,0 +1,813 @@
+/*
+  Caderno da matéria: um caderno aberto. Índice numerado à esquerda, folha
+  pautada com margem no meio (o texto cai em cima das linhas) e um post-it da
+  Mine colado na borda direita.
+*/
+
+.caderno-sn {
+  container-type: inline-size;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 22px 40px -32px rgb(0 0 0 / 0.55);
+}
+
+.caderno-sn-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1.5px dashed rgb(var(--line));
+}
+
+@media (min-width: 640px) {
+  .caderno-sn-head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.caderno-sn-count {
+  flex: none;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-sn-spread {
+  display: grid;
+  min-height: 26rem;
+}
+
+@container (min-width: 40rem) {
+  .caderno-sn-spread {
+    grid-template-columns: 14rem minmax(0, 1fr);
+  }
+
+  .caderno-sn-postit {
+    grid-column: 1 / -1;
+    justify-self: end;
+    width: min(22rem, calc(100% - 2.4rem));
+  }
+}
+
+@container (min-width: 62rem) {
+  .caderno-sn-spread {
+    grid-template-columns: 15rem minmax(0, 1fr) 17rem;
+  }
+
+  .caderno-sn-postit {
+    grid-column: auto;
+    justify-self: stretch;
+    width: auto;
+    align-self: start;
+  }
+}
+
+.caderno-sn-label {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--margin-line));
+}
+
+/* ───────── índice ───────── */
+.caderno-sn-index {
+  padding: 0.9rem 0.8rem;
+  background: rgb(var(--panel-2));
+  border-bottom: 1px solid rgb(var(--line));
+}
+
+@container (min-width: 40rem) {
+  .caderno-sn-index {
+    border-bottom: 0;
+    /* a dobra do caderno aberto */
+    box-shadow: inset -14px 0 18px -16px rgb(0 0 0 / 0.35);
+  }
+}
+
+.caderno-sn-add {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px dashed rgb(var(--pen) / 0.6);
+  color: rgb(var(--pen));
+  transition: rotate 220ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 160ms ease;
+}
+
+.caderno-sn-add:hover {
+  rotate: 90deg;
+  background: rgb(var(--hl-yellow) / 0.5);
+}
+
+.caderno-sn-entry {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  width: 100%;
+  min-width: 12rem;
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px dotted rgb(var(--theme-muted) / 0.45);
+  text-align: left;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@container (min-width: 40rem) {
+  .caderno-sn-entry {
+    min-width: 0;
+  }
+}
+
+.caderno-sn-entry:hover {
+  transform: translateX(3px);
+}
+
+.caderno-sn-entry::before {
+  /* marca-texto que passa por trás da entrada ativa */
+  content: "";
+  position: absolute;
+  inset: 0.3rem 0;
+  z-index: 0;
+  border-radius: 0.3rem 0.8rem 0.4rem 0.9rem;
+  background: rgb(var(--hl-yellow) / 0.6);
+  mix-blend-mode: var(--hl-blend, multiply);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.caderno-sn-entry.is-active::before {
+  transform: scaleX(1);
+}
+
+.caderno-sn-entry > * {
+  position: relative;
+  z-index: 1;
+}
+
+.caderno-sn-entry-num {
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-sn-entry-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Kalam", cursive;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.caderno-sn-entry-state {
+  display: block;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.85rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* ───────── a folha ───────── */
+.caderno-sn-page {
+  --sn-line: 1.75rem;
+  min-width: 0;
+  padding: 1.25rem 1.4rem 1.4rem 3.2rem;
+  background:
+    linear-gradient(to right, transparent 2.3rem, rgb(var(--margin-line) / 0.55) 2.3rem calc(2.3rem + 2px), transparent calc(2.3rem + 2px)),
+    rgb(var(--sheet));
+  border-bottom: 1px solid rgb(var(--line));
+}
+
+@container (min-width: 40rem) {
+  .caderno-sn-page {
+    border-bottom: 0;
+  }
+}
+
+.caderno-sn-icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-mint) / 0.6);
+  rotate: -6deg;
+}
+
+.caderno-sn-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Kalam", cursive;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: rgb(var(--pen));
+}
+
+.caderno-sn-open {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+  padding: 0 0.85rem;
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 999px;
+  font-family: "Kalam", cursive;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text));
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 160ms ease;
+}
+
+.caderno-sn-open:hover {
+  transform: rotate(-2deg) translateY(-2px);
+  background: rgb(var(--hl-yellow) / 0.45);
+}
+
+.caderno-sn-text {
+  max-height: calc(var(--sn-line) * 10);
+  margin-top: 1rem;
+  overflow-y: auto;
+  padding-right: 0.4rem;
+  font-size: 0.95rem;
+  line-height: var(--sn-line);
+  color: rgb(var(--theme-text) / 0.86);
+  background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--sn-line) - 1px), rgb(var(--rule) / 0.8) calc(var(--sn-line) - 1px) var(--sn-line));
+  background-attachment: local;
+}
+
+.caderno-sn-text p + p {
+  margin-top: var(--sn-line);
+}
+
+.caderno-sn-photo {
+  margin-top: 1rem;
+  padding: 0.6rem 0.6rem 1.8rem;
+  background: white;
+  box-shadow: 0 10px 20px -14px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(var(--line));
+  rotate: -1.2deg;
+}
+
+.caderno-sn-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--pen));
+  font-weight: 900;
+  font-size: 0.8rem;
+  box-shadow: 0 3px 0 rgb(var(--pen) / 0.45);
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-sn-done:hover {
+  transform: translateY(-2px) rotate(-1deg);
+}
+
+.caderno-sn-done:active {
+  transform: translateY(2px);
+}
+
+.caderno-sn-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.8rem;
+  border: 2px solid #1f9a57;
+  border-radius: 0.4rem;
+  font-family: "Kalam", cursive;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f9a57;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  rotate: -5deg;
+  animation: caderno-sn-stamp 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+html:not(.theme-light) .caderno-sn-stamp {
+  color: #5fe3a1;
+  border-color: #5fe3a1;
+}
+
+@keyframes caderno-sn-stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+/* ───────── post-it da Mine ───────── */
+.caderno-sn-postit {
+  position: relative;
+  margin: 1.2rem;
+  padding: 1.2rem 1rem 1rem;
+  border-radius: 0.2rem 0.2rem 0.9rem 0.2rem;
+  color: #2b2410;
+  background: linear-gradient(180deg, #fff3a0, #ffe86b);
+  box-shadow: 0 16px 22px -16px rgb(0 0 0 / 0.55);
+  rotate: 1.4deg;
+  transition: rotate 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-sn-postit:hover {
+  rotate: 0deg;
+}
+
+.caderno-sn-tape {
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  width: 4.5rem;
+  height: 1.3rem;
+  translate: -50% 0;
+  rotate: -3deg;
+  background: rgb(255 255 255 / 0.55);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+.caderno-sn-postit-title {
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1d2bb8;
+}
+
+.caderno-sn-postit-sub {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.9rem;
+  color: #5a4c1a;
+}
+
+.caderno-sn-postit-text {
+  margin-top: 0.8rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+  line-height: 1.35;
+  color: #3d3312;
+}
+
+.caderno-sn-ask {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.5rem 0.2rem;
+  border-bottom: 1.5px dashed rgb(43 36 16 / 0.25);
+  text-align: left;
+  font-family: "Kalam", cursive;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #1d2bb8;
+  transition: background-color 160ms ease;
+}
+
+.caderno-sn-ask:hover {
+  background: linear-gradient(transparent 55%, rgb(255 143 177 / 0.55) 55% 92%, transparent 92%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caderno-sn-stamp {
+    animation: none;
+  }
+}
+
+/* ───────── Agenda: ficha "Cronograma até a prova" ───────── */
+.caderno-plan-cta {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1.3rem 1.4rem;
+  border-radius: 0.3rem;
+  text-align: left;
+  color: rgb(var(--theme-text));
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(1.6rem - 1px), rgb(var(--rule) / 0.55) calc(1.6rem - 1px) 1.6rem),
+    rgb(var(--hl-yellow) / 0.32),
+    rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 18px 26px -20px rgb(0 0 0 / 0.55);
+  rotate: 0.5deg;
+}
+
+.caderno-plan-tape {
+  position: absolute;
+  top: -0.7rem;
+  left: 2rem;
+  width: 5rem;
+  height: 1.35rem;
+  rotate: -4deg;
+  background: rgb(var(--hl-pink) / 0.55);
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+.caderno-plan-cal {
+  position: relative;
+  display: grid;
+  width: 4.2rem;
+  flex: none;
+  overflow: visible;
+  border-radius: 0.4rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 6px 10px -8px rgb(0 0 0 / 0.5);
+  text-align: center;
+  rotate: -5deg;
+  transition: rotate 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-plan-cta:hover .caderno-plan-cal {
+  rotate: 3deg;
+}
+
+.caderno-plan-cal-top {
+  border-radius: 0.4rem 0.4rem 0 0;
+  padding: 0.1rem 0;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.9rem;
+  color: white;
+  background: rgb(var(--margin-line));
+}
+
+.caderno-plan-cal-day {
+  padding: 0.1rem 0 0.3rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: rgb(var(--pen));
+}
+
+.caderno-plan-cal-ring {
+  position: absolute;
+  left: 8%;
+  top: 30%;
+  width: 84%;
+  height: 72%;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-plan-cal-ring path,
+.caderno-plan-arrow path {
+  vector-effect: non-scaling-stroke;
+}
+
+.caderno-plan-title {
+  display: block;
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 114;
+  font-size: clamp(1.35rem, 2.6vw, 1.8rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.caderno-plan-sub {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-plan-arrow {
+  width: 3.4rem;
+  height: 3.4rem;
+  flex: none;
+  color: rgb(var(--pen));
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-plan-cta:hover .caderno-plan-arrow {
+  transform: translateX(6px);
+}
+
+.caderno-sn-list {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.caderno-sn-list > li {
+  flex: none;
+}
+
+@container (min-width: 40rem) {
+  .caderno-sn-list {
+    flex-direction: column;
+    gap: 0;
+    max-height: 22rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+
+  .caderno-sn-list > li {
+    flex: initial;
+  }
+}
+
+/* ───────── Capa da matéria ───────── */
+.caderno-subj {
+  container-type: inline-size;
+}
+
+.caderno-subj-grid {
+  display: grid;
+  gap: 2rem;
+}
+
+@container (min-width: 44rem) {
+  .caderno-subj-grid {
+    grid-template-columns: minmax(0, 1fr) 17rem;
+  }
+}
+
+.caderno-subj-sticker {
+  display: grid;
+  width: 3.6rem;
+  height: 3.6rem;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: #11151e;
+  background: var(--subj);
+  box-shadow: 0 0 0 4px rgb(var(--sheet)), 0 0 0 5px rgb(var(--line)), 0 10px 16px -10px rgb(0 0 0 / 0.5);
+  rotate: -8deg;
+  animation: caderno-subj-stick 600ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes caderno-subj-stick {
+  from {
+    opacity: 0;
+    transform: scale(1.6) rotate(20deg);
+  }
+}
+
+.caderno-subj-title {
+  margin-top: 1.1rem;
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 112;
+  font-size: clamp(1.5rem, 4.2cqi, 2.3rem);
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.caderno-subj-label {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-subj-percent {
+  font-family: "Kalam", cursive;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.caderno-subj-bar {
+  position: relative;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: repeating-linear-gradient(-45deg, rgb(var(--rule) / 0.6) 0 2px, transparent 2px 7px), rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+}
+
+.caderno-subj-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: max(var(--p), 0.9rem);
+  border-radius: 999px 0.5rem 0.4rem 999px;
+  background: color-mix(in srgb, var(--subj) 75%, rgb(var(--hl-yellow)));
+  transform-origin: left center;
+  animation: caderno-subj-fill 1100ms 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes caderno-subj-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.caderno-subj-pencil {
+  position: absolute;
+  right: -0.6rem;
+  top: -0.95rem;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: rgb(var(--pen));
+  rotate: 8deg;
+}
+
+.caderno-subj-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1.6rem;
+}
+
+.caderno-subj-stat {
+  display: grid;
+  padding: 0.7rem 0.8rem 0.8rem;
+  border-radius: 0.2rem 0.2rem 0.8rem 0.2rem;
+  box-shadow: 0 10px 14px -12px rgb(0 0 0 / 0.55);
+  rotate: calc((var(--i) - 1) * 1.6deg);
+  transition: rotate 260ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: caderno-pop-in 420ms calc(var(--i) * 90ms + 150ms) cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.caderno-subj-stat:hover {
+  rotate: 0deg;
+  transform: translateY(-3px);
+}
+
+.caderno-subj-stat.is-mint {
+  background: #c8f7dc;
+}
+
+.caderno-subj-stat.is-pink {
+  background: #ffd3e0;
+}
+
+.caderno-subj-stat.is-lilac {
+  background: #e2d9ff;
+}
+
+.caderno-subj-stat strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #1d2bb8;
+}
+
+.caderno-subj-stat span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: #3a3f55;
+}
+
+.caderno-subj-mine {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.95rem 1rem;
+  border-radius: 999px;
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--pen));
+  font-weight: 900;
+  text-align: left;
+  box-shadow: 0 4px 0 rgb(var(--pen) / 0.45);
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-subj-mine:hover {
+  transform: translateY(-2px) rotate(-0.8deg);
+}
+
+.caderno-subj-mine:active {
+  transform: translateY(2px);
+}
+
+.caderno-subj-tool {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem 0.85rem 1.2rem;
+  border-radius: 0.3rem 0.9rem 0.9rem 0.3rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+  font-family: "Kalam", cursive;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: left;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease;
+}
+
+.caderno-subj-tool::before {
+  /* a aba colorida do fichário */
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.45rem;
+  border-radius: 0.3rem 0 0 0.3rem;
+  background: var(--tab);
+  transition: width 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-subj-tool:hover {
+  transform: translateX(-6px);
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 12px 18px -14px rgb(0 0 0 / 0.5);
+}
+
+.caderno-subj-tool:hover::before {
+  width: 0.8rem;
+}
+
+.caderno-subj-tool.is-yellow {
+  --tab: rgb(var(--hl-yellow));
+}
+
+.caderno-subj-tool.is-pink {
+  --tab: rgb(var(--hl-pink));
+}
+
+.caderno-subj-tool.is-lilac {
+  --tab: rgb(var(--hl-lilac));
+}
+
+.caderno-subj-badge {
+  display: grid;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  place-items: center;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  color: white;
+  background: rgb(var(--margin-line));
+  font-family: "DM Mono", monospace;
+  font-size: 0.75rem;
+  animation: caderno-pop-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caderno-subj-sticker,
+  .caderno-subj-bar-fill,
+  .caderno-subj-stat,
+  .caderno-subj-badge {
+    animation: none;
+  }
+}
+
+/* ───────── Indicadores (Metric) e botão a lápis ───────── */
+.caderno-metric {
+  position: relative;
+  padding: 1.1rem 1.1rem 1rem;
+  border-radius: 0.3rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+  transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease;
+}
+
+.caderno-metric:hover {
+  transform: translateY(-3px) rotate(-0.8deg);
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 14px 20px -16px rgb(0 0 0 / 0.5);
+}
+
+.caderno-metric-icon {
+  color: var(--accent);
+}
+
+.caderno-metric-value {
+  display: inline-block;
+  margin-top: 0.7rem;
+  padding: 0 0.15em;
+  font-family: "Kalam", cursive;
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: rgb(var(--pen));
+  background: linear-gradient(transparent 58%, color-mix(in srgb, var(--accent) 38%, transparent) 58% 92%, transparent 92%);
+}
+
+.caderno-metric-label {
+  margin-top: 0.2rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-btn-pencil {
+  border-radius: 999px;
+  border: 1.6px solid rgb(var(--theme-text) / 0.35);
+  color: rgb(var(--theme-text));
+  background: rgb(var(--sheet));
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 160ms ease, border-color 160ms ease;
+}
+
+.caderno-btn-pencil:hover {
+  border-color: rgb(var(--pen) / 0.7);
+  background: rgb(var(--hl-yellow) / 0.4);
+  transform: translateY(-2px) rotate(-1deg);
+}

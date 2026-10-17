@@ -1,81 +1,30 @@
-import { EMERGENCY_MODEL, MINE_FALLBACKS, MINE_MODELS, RESILIENCE_MODELS, VISION_AUX_ALIAS, resolveMineModel } from "./models.mjs";
-import { buildMessages, imageAttachments, imagePartsFromAttachments } from "./messages.mjs";
-import { buildInstructionForTask, buildVisionDescriptionInstruction } from "./prompts.mjs";
+import { MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
+import { buildMessages } from "./messages.mjs";
+import { buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
+import { asksForImage, continuesGallery, extractSuggestions, imageStyleFrom, previousGalleryStyle, withImageStyle } from "../shared/chat-media.mjs";
 import { replyQualityIssue } from "./quality.mjs";
-import { webSearchEnabled, webSearchInstruction, webSearchPlugin } from "./web.mjs";
+import { buildSearchQuery, cleanQueries, freshenQueries, matchesSearchTopic, matchesSourceScope, planSearchQueries, resultLimit, searchMany, searchSourcePolicy, searchWeb, WEB_SEARCH_TOOL, webSearchFailedInstruction, webSearchInstruction, webSearchMode } from "./web.mjs";
+import { readTopPages } from "./page-reader.mjs";
 import { callProvider, callProviderStream, MineError, providerAvailable, providerConfigured } from "./providers.mjs";
 import { redactSecrets } from "./env.mjs";
 
-// Camada de roteamento da Mine: recebe um alias de nivel, decide como atender e
-// devolve texto limpo. Quem chama nunca precisa saber qual modelo real rodou.
-
-function extractFirstJsonObject(text) {
-  const source = String(text || "");
-  let start = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index];
-
-    if (start < 0) {
-      if (char === "{") {
-        start = index;
-        depth = 1;
-      }
-      continue;
-    }
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-
-    if (char === "{") depth += 1;
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) return source.slice(start, index + 1);
-    }
-  }
-
-  return "";
-}
-
-function coerceJson(text) {
-  const clean = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
-  try {
-    return JSON.parse(clean);
-  } catch {
-    const objectText = extractFirstJsonObject(clean);
-    if (objectText) {
-      try {
-        return JSON.parse(objectText);
-      } catch {
-        // A interface nunca deve receber detalhe de parser.
-      }
-    }
-    return null;
-  }
-}
+// Camada de roteamento da Mine: decide qual modelo atende (principal ou reserva
+// interna), pesquisa na web quando faz sentido e devolve texto limpo. Quem
+// chama nunca precisa saber qual modelo real rodou.
 
 // Defensivo: se o modelo insistir em embrulhar a resposta em JSON, desembrulha.
-export function cleanReply(text) {
-  let out = String(text || "").trim().replace(/^```(?:json|text)?\s*/i, "").replace(/```$/i, "").trim();
-  if (out.startsWith("{") && /"reply"\s*:/.test(out)) {
-    const parsed = coerceJson(out);
-    if (parsed && typeof parsed.reply === "string" && parsed.reply.trim()) {
-      out = parsed.reply.trim();
-    }
+export function cleanReply(text, { prompt = "" } = {}) {
+  const out = String(text || "").trim();
+  if (/\b(json|c[oó]digo|programa[cç][aã]o)\b/i.test(prompt)) return out;
+  // Codigo e JSON didatico sao conteudo: so desembrulhe um envelope de reply.
+  const envelope = out.match(/^```(?:json|text)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i)?.[1] || out;
+  if (envelope.startsWith("{") && /"reply"\s*:/.test(envelope)) {
+    try {
+      const parsed = JSON.parse(envelope);
+      if (parsed && typeof parsed.reply === "string" && parsed.reply.trim() && Object.keys(parsed).every((key) => ["reply", "actions", "suggestions"].includes(key))) {
+        return parsed.reply.trim();
+      }
+    } catch { /* Preserve conteudo que nao e um envelope JSON valido. */ }
   }
   return out;
 }
@@ -86,15 +35,36 @@ function clampNumber(value, min, max, fallback) {
   return Math.max(min, Math.min(max, Math.round(number)));
 }
 
+// Out/2026: respostas longas (ate ~6 mil tokens, com raciocinio) levam mais
+// de um minuto inteiro em streaming. O teto por tentativa subiu junto com o
+// maxDuration da funcao no vercel.json (300 s).
 export function resolveTimeoutMs() {
-  return clampNumber(process.env.AI_TIMEOUT_MS, 8_000, 120_000, 45_000);
+  return clampNumber(process.env.AI_TIMEOUT_MS, 8_000, 240_000, 150_000);
 }
 
 // Orcamento total do pedido, somando todas as tentativas. Precisa caber no
-// limite da plataforma: na Vercel o vercel.json corta a funcao em 60s, entao o
-// padrao deixa uma folga para o handler responder antes do corte.
+// limite da plataforma: na Vercel o vercel.json corta a funcao em 300 s, entao
+// o padrao deixa uma folga para o handler responder antes do corte.
 function resolveBudgetMs() {
-  return clampNumber(process.env.MINE_TOTAL_BUDGET_MS, 10_000, 300_000, 55_000);
+  return clampNumber(process.env.MINE_TOTAL_BUDGET_MS, 10_000, 290_000, 270_000);
+}
+
+// Leitura das paginas encontradas (mine/page-reader.mjs). MINE_WEB_READ_PAGES=off desliga.
+function pageReadingEnabled() {
+  return String(process.env.MINE_WEB_READ_PAGES || "").trim().toLowerCase() !== "off";
+}
+
+// Ferramenta de pesquisa no modo "auto". Se o provedor recusar ferramentas, o
+// servidor deixa de oferecer por uma hora em vez de pagar um 400 por pergunta.
+// MINE_WEB_TOOL=off desliga de vez (o modo "auto" vira so a regra de palavras).
+let toolsBlockedUntil = 0;
+function toolsSupported() {
+  if (String(process.env.MINE_WEB_TOOL || "").trim().toLowerCase() === "off") return false;
+  return Date.now() >= toolsBlockedUntil;
+}
+function markToolsUnsupported() {
+  toolsBlockedUntil = Date.now() + 60 * 60_000;
+  console.log("[mine] ferramenta=recusada pelo provedor; pausada por 1h");
 }
 
 // Abaixo disso nao vale comecar outra tentativa: so gastaria o resto do tempo
@@ -104,7 +74,6 @@ const MIN_ATTEMPT_MS = 6_000;
 // Log de uma linha, sem segredo e sem conteudo do usuario (documento, secao 25).
 export function logMineCall(entry) {
   const parts = [
-    `mine=${entry.alias}`,
     `provider=${entry.provider}`,
     `model=${entry.providerModel}`,
     `status=${entry.status}`,
@@ -118,107 +87,41 @@ export function logMineCall(entry) {
 }
 
 /**
- * Le as imagens com um modelo de visao e devolve uma descricao textual.
+ * Tarefas que alimentam os jogos.
  *
- * Serve para os niveis que nao aceitam imagem (SuperNova e Verso): o usuario
- * escolheu aquele nivel e continua vendo o nome dele, mas por baixo a imagem
- * passa por um modelo auxiliar antes (documento, secoes 8 e 10).
- */
-async function describeImages({ attachments, prompt, timeoutMs, signal, requestedAlias }) {
-  const aux = MINE_MODELS[VISION_AUX_ALIAS];
-  const startedAt = Date.now();
-
-  const messages = [
-    { role: "system", content: buildVisionDescriptionInstruction() },
-    {
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: `Descreva e transcreva as imagens abaixo. O usuario perguntou: "${String(prompt || "").slice(0, 500)}"`,
-        },
-        ...imagePartsFromAttachments(attachments),
-      ],
-    },
-  ];
-
-  try {
-    const result = await callProvider({
-      provider: aux.provider,
-      providerModel: aux.providerModel,
-      messages,
-      maxTokens: 1200,
-      timeoutMs,
-      signal,
-      providerParams: aux.providerParams,
-    });
-    logMineCall({
-      alias: `${aux.alias}(visao)`,
-      provider: aux.provider,
-      providerModel: aux.providerModel,
-      status: "ok",
-      durationMs: result.durationMs,
-      task: "visao",
-      fallbackFrom: requestedAlias,
-      tokens: result.usage.totalTokens,
-    });
-    return result.content;
-  } catch (error) {
-    logMineCall({
-      alias: `${aux.alias}(visao)`,
-      provider: aux.provider,
-      providerModel: aux.providerModel,
-      status: "erro",
-      durationMs: Date.now() - startedAt,
-      task: "visao",
-      fallbackFrom: requestedAlias,
-      errorCode: error?.code || "error",
-    });
-    throw error;
-  }
-}
-
-/**
- * Tarefas que alimentam os jogos. Elas rodam quentes de proposito: com a
- * temperatura padrao (0.3) o modelo devolvia praticamente a mesma lista de
- * conceitos a cada partida, e a segunda partida virava copia da primeira.
- * O resto do app continua frio, porque ali repetir e o comportamento certo.
+ * Identificam as tarefas de jogo no roteamento (reserva rapida primeiro) e no
+ * orcamento de tempo, que e mais curto que o do chat.
  */
 const GAME_TASKS = new Set(["vf", "pares", "forca", "caca", "sequencia"]);
+// O titulo da conversa tambem vai pela reserva rapida: e uma linha so.
+const FAST_TASKS = new Set([...GAME_TASKS, "title"]);
 
+// Medido em producao em 2026-09-04, `caca` com 6 perguntas no gpt-5-mini:
+// 14,4 s para o pedido antigo e 17,0 s com a folga de ineditismo. O padrao de
+// 18 s de orcamento com 12 s por tentativa vinha dos modelos gratuitos do
+// OpenRouter e nao cabia mais nem antes desta mudanca — o pedido completo
+// (com angulo e lista de bloqueio) devolvia 504 em 18,4 s. Os numeros abaixo
+// deixam uma tentativa inteira caber com folga e ainda sobra para o fallback,
+// bem dentro dos 55 s de orcamento total e dos 60 s da funcao na Vercel.
 function gameBudgetMs() {
-  return clampNumber(process.env.MINE_GAME_BUDGET_MS, 8_000, 30_000, 18_000);
+  return clampNumber(process.env.MINE_GAME_BUDGET_MS, 8_000, 30_000, 28_000);
 }
 
 function gameAttemptMs() {
-  // O navegador libera a partida assim que o lote mínimo chega pelo stream.
-  // Alguns modelos gratuitos começam em ~2 s, mas precisam de 10–12 s para
-  // fechar cinco itens válidos; cortar em 9 s descartava um lote quase pronto.
-  return clampNumber(process.env.MINE_GAME_TIMEOUT_MS, 5_000, 18_000, 12_000);
+  return clampNumber(process.env.MINE_GAME_TIMEOUT_MS, 5_000, 18_000, 17_000);
 }
 
-function temperatureForTask(task) {
-  return GAME_TASKS.has(String(task || "").trim()) ? 0.95 : 0.3;
-}
+// Nao existe temperatura por tarefa: os modelos de raciocinio da OpenAI
+// recusam o parametro. A variacao das partidas vem do prompt e do filtro de
+// ineditismo no cliente.
 
 /**
  * Uma tentativa contra um modelo ja resolvido.
  * Com `onDelta` a resposta vem em streaming; sem ele, de uma vez so.
  */
-async function attemptModel({ model, task, prompt, context, history, attachments, maxTokens, timeoutMs, signal, fallbackFrom, extraSystem = [], onDelta, plugins }) {
-  if (!providerConfigured(model.provider)) {
-    throw new MineError(`Provedor ${model.provider} sem credencial no servidor.`, { code: "config" });
-  }
-
+async function attemptModel({ model, task, prompt, context, history, attachments, maxTokens, timeoutMs, signal, fallback, extraSystem = [], onDelta, onReasoning, tools, toolChoice }) {
   const systemContent = buildInstructionForTask(task, context);
-  const messages = buildMessages({
-    systemContent,
-    history,
-    prompt,
-    attachments,
-    allowImages: model.capabilities.image,
-    extraSystem,
-  });
+  const messages = buildMessages({ systemContent, history, prompt, attachments, allowImages: model.capabilities.image, extraSystem });
 
   const startedAt = Date.now();
   try {
@@ -228,51 +131,47 @@ async function attemptModel({ model, task, prompt, context, history, attachments
       providerModel: model.providerModel,
       messages,
       maxTokens,
-      temperature: temperatureForTask(task),
       timeoutMs,
       signal,
       onDelta,
-      plugins,
+      onReasoning,
       providerParams: model.providerParams,
+      tools,
+      toolChoice,
     });
 
     logMineCall({
-      alias: model.alias,
       provider: model.provider,
       providerModel: model.providerModel,
       status: "ok",
       durationMs: result.durationMs,
       task,
-      fallbackFrom,
+      fallbackFrom: fallback ? "principal" : undefined,
       tokens: result.usage.totalTokens,
     });
 
-    const reply = cleanReply(result.content);
-    const qualityIssue = replyQualityIssue({ task, reply, prompt });
-    if (qualityIssue) {
-      throw new MineError(`Resposta rejeitada pelo controle de qualidade: ${qualityIssue}.`, {
-        code: "empty",
-        retryable: true,
-      });
+    // Pediu uma pesquisa e ainda nao escreveu nada: quem chama pesquisa e
+    // pergunta de novo, entao nao ha resposta para avaliar.
+    const search = (result.toolCalls || []).find((call) => call.name === WEB_SEARCH_TOOL.function.name);
+    if (search && !String(result.content || "").trim()) {
+      return { toolQueries: cleanQueries(search.arguments?.consultas ?? search.arguments?.consulta), reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs };
     }
 
-    return {
-      reply,
-      alias: model.alias,
-      displayName: model.displayName,
-      sources: result.sources || [],
-      usage: result.usage,
-      durationMs: result.durationMs,
-    };
+    const reply = cleanReply(result.content, { prompt });
+    const qualityIssue = replyQualityIssue({ task, reply, prompt, finishReason: result.finishReason });
+    if (qualityIssue) {
+      throw new MineError(`Resposta rejeitada pelo controle de qualidade: ${qualityIssue}.`, { code: "empty", retryable: true });
+    }
+
+    return { reply, reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs };
   } catch (error) {
     logMineCall({
-      alias: model.alias,
       provider: model.provider,
       providerModel: model.providerModel,
       status: "erro",
       durationMs: Date.now() - startedAt,
       task,
-      fallbackFrom,
+      fallbackFrom: fallback ? "principal" : undefined,
       errorCode: error?.code || "error",
     });
     throw error;
@@ -280,15 +179,92 @@ async function attemptModel({ model, task, prompt, context, history, attachments
 }
 
 /**
- * Executa um pedido da Mine com fallback.
+ * Pesquisa na web antes de responder. Devolve a instrucao extra para o modelo,
+ * as fontes para o navegador e um aviso quando a busca falhou.
+ */
+async function prepareWebContext({ prompt, history, signal, deadline, queries: givenQueries = [], onStatus }) {
+  const policy = searchSourcePolicy(prompt, history);
+  const originalQuery = buildSearchQuery(prompt, history);
+  const startedAt = Date.now();
+  try {
+    // A busca nao pode comer o tempo da resposta: fica com no maximo 14 s
+    // (plano, consultas e leitura das paginas) e sempre deixa uns 30 s de
+    // orcamento para o modelo.
+    const searchDeadline = Math.min(deadline - 30_000, Date.now() + 14_000);
+    // As consultas sao do modelo — as que ele pediu pela ferramenta ou as que
+    // o modelo rapido escreveu. Com orgao oficial no assunto (Inep, IBGE...),
+    // a primeira vira consulta dirigida (site:); se a fonte oficial foi
+    // exigida, so ela roda, para nao entregar terceiros como oficiais.
+    const planned = freshenQueries(
+      givenQueries.length
+        ? givenQueries
+        : await planSearchQueries(prompt, history, { signal, timeoutMs: Math.min(6_000, Math.max(1, searchDeadline - Date.now() - 6_000)) }),
+      prompt,
+    );
+    const first = planned[0] || originalQuery;
+    const queries = policy.scopes.length
+      ? [`site:${policy.scopes[0]} ${first}`, ...(policy.required ? [] : planned.slice(1))]
+      : planned.length ? planned : [originalQuery];
+    const query = queries[0];
+    onStatus?.({ stage: "searching", queries });
+    let { results } = await searchMany(queries, { signal, timeoutMs: Math.max(1, searchDeadline - Date.now()) });
+    const official = (items) => items.filter((item) => matchesSourceScope(item.url, policy.scopes) && matchesSearchTopic(item, policy));
+    // Um refinamento no mesmo orcamento: nunca entregue terceiros como fonte oficial.
+    if (policy.scopes.length && !official(results).length && searchDeadline - Date.now() >= 2_000) {
+      const scope = policy.scopes[1] || policy.scopes[0];
+      const terms = policy.topic ? `${policy.topic} ${originalQuery.match(/\b20\d{2}\b/)?.[0] || ""} datas provas inscrições edital` : originalQuery.replace(/(?:por favor|pesquise|na internet|use o inep como fonte|e forneça o link)/gi, " ");
+      const refined = `site:${scope} ${terms.replace(/\s+/g, " ").trim()}`;
+      try {
+        const second = await searchWeb(refined, { signal, timeoutMs: searchDeadline - Date.now() });
+        results = [...results, ...second.results].filter((item, index, all) => all.findIndex((other) => other.url === item.url) === index);
+      } catch (error) {
+        if (error?.code === "aborted") throw error;
+        // Preserve o que a primeira consulta encontrou se o refinamento falhar.
+        console.log(`[mine] web=refinamento_falhou codigo=${error?.code || "erro"}`);
+      }
+    }
+    if (policy.scopes.length) {
+      results = policy.required ? official(results) : [...official(results), ...results.filter((item) => !matchesSourceScope(item.url, policy.scopes))];
+    }
+    results = results.filter((item) => matchesSearchTopic(item, policy));
+    results = results.slice(0, resultLimit());
+    if (!results.length) {
+      console.log(`[mine] web=vazio consultas=${queries.length} ms=${Date.now() - startedAt}`);
+      return { extraSystem: [webSearchFailedInstruction(policy)], sources: [], queries, notice: policy.required ? "Não encontrei uma fonte oficial que confirme esta informação." : "A busca na web não encontrou resultados para esta pergunta." };
+    }
+    const sources = results.map(({ url, title, domain, snippet }) => ({ url, title, domain, snippet: String(snippet || "").slice(0, 240) }));
+    onStatus?.({ stage: "reading", queries, sources });
+    // As melhores paginas sao abertas: o trecho da busca raramente traz o
+    // detalhe (a data no meio do edital, o numero da tabela).
+    const readMs = searchDeadline - Date.now();
+    if (pageReadingEnabled() && readMs >= 1_500) {
+      results = await readTopPages(results, queries.join(" "), { count: 3, signal, timeoutMs: Math.min(4_500, readMs) });
+    }
+    if (signal?.aborted) throw new MineError("Geração cancelada.", { code: "aborted" });
+    const read = results.filter((item) => item.content).length;
+    console.log(`[mine] web=ok consultas=${queries.length} resultados=${results.length} lidas=${read} ms=${Date.now() - startedAt}`);
+    return {
+      extraSystem: [webSearchInstruction(results, query, policy)],
+      sources,
+      queries,
+      notice: "",
+    };
+  } catch (error) {
+    if (error?.code === "aborted" || signal?.aborted) throw new MineError("Geração cancelada.", { code: "aborted" });
+    console.log(`[mine] ${redactSecrets(`web=erro codigo=${error?.code || "erro"} ms=${Date.now() - startedAt} ${error?.message || ""}`)}`);
+    return { extraSystem: [webSearchFailedInstruction(policy)], sources: [], queries: [], notice: "Não foi possível consultar a web neste momento." };
+  }
+}
+
+/**
+ * Executa um pedido da Mine.
  *
- * Tenta o nivel escolhido; se ele falhar de um jeito que vale retentar, desce
- * pela cadeia de niveis parecidos e, no fim, cai no provedor de emergencia.
- * Tudo dentro de um orcamento de tempo unico, para nunca estourar o limite da
- * plataforma no meio da terceira tentativa.
+ * Chat: modelo principal, com a reserva interna se ele falhar. Tarefas
+ * estruturadas: o principal com raciocinio curto. Jogos: a reserva rapida
+ * primeiro, porque a rodada precisa sair em segundos. Tudo dentro de um
+ * orcamento de tempo unico, para nunca estourar o limite da plataforma.
  */
 export async function runMineRequest({
-  alias,
   task = "",
   prompt = "",
   context = "",
@@ -297,182 +273,147 @@ export async function runMineRequest({
   maxTokens = 1024,
   signal,
   onDelta,
+  onReasoning,
+  onStatus,
   webSearch = false,
+  photos = false,
+  tutor = false,
 }) {
-  const requested = resolveMineModel(alias);
-  const gameTask = GAME_TASKS.has(String(task || "").trim());
-  // Busca so acontece com as duas coisas juntas: o usuario pedindo e a flag do
-  // servidor ligada. O servidor sempre tem a ultima palavra — a busca e paga.
-  const useWeb = Boolean(webSearch) && webSearchEnabled();
-  // Jogos precisam liberar a primeira rodada depressa. Um modelo gratuito que
-  // trava nao pode segurar a tela por quase um minuto antes do fallback.
+  const cleanTask = String(task || "").trim();
+  const gameTask = FAST_TASKS.has(cleanTask);
   const deadline = Date.now() + (gameTask ? gameBudgetMs() : resolveBudgetMs());
-  const perAttemptMs = gameTask ? gameAttemptMs() : resolveTimeoutMs();
+  // Tarefas estruturadas sao curtas e sem streaming: 60 s por tentativa basta
+  // e deixa a reserva entrar a tempo se o principal travar.
+  const perAttemptMs = gameTask ? gameAttemptMs() : cleanTask ? Math.min(60_000, resolveTimeoutMs()) : resolveTimeoutMs();
+  const minAttemptMs = gameTask ? 3_500 : MIN_ATTEMPT_MS;
 
-  // Medição real com os formatos dos jogos: o endpoint direto da NVIDIA entrega
-  // o primeiro token em ~1 s e um lote curto em ~3,5 s. Nos jogos ele vem
-  // primeiro; os níveis da família Mine continuam intactos no chat normal.
-  const candidates = gameTask ? [EMERGENCY_MODEL, requested] : [requested];
-  // Lua e Sol sao bons no chat, mas lentos para listas curtas. Se o provedor
-  // rapido falhar, ainda tentamos o nivel pedido e a SuperNova.
-  const fallbackAliases = gameTask ? ["supernova"] : MINE_FALLBACKS[requested.alias] || [];
-  for (const nextAlias of fallbackAliases) {
-    const model = MINE_MODELS[nextAlias];
-    if (model && model !== requested) candidates.push(model);
-  }
-  // Gemini e Groq possuem cotas e infraestrutura independentes. Entram depois
-  // dos niveis equivalentes, antes da rede de emergencia final.
-  candidates.push(...RESILIENCE_MODELS);
-  // Ultimo recurso, outro provedor: cobre o caso de o OpenRouter inteiro estar
-  // fora do ar ou sem cota diaria.
-  if (!gameTask) candidates.push(EMERGENCY_MODEL);
-
-  // Modelo de provedor sem credencial sai da cadeia AQUI, e nao no meio da
-  // tentativa: falta de credencial nao e erro retentavel, entao se ela fosse
-  // descoberta durante o laco o pedido inteiro morreria em vez de descer para o
-  // proximo. E exatamente o que aconteceria num ambiente que tem a chave de um
-  // provedor e nao a do outro.
-  const seenCandidates = new Set();
+  const principal = cleanTask ? MINE_TASK_MODEL : MINE_MODEL;
+  const candidates = gameTask ? [MINE_FAST_MODEL, MINE_TASK_MODEL] : [principal, MINE_FAST_MODEL];
+  const seen = new Set();
   const chain = candidates.filter((model) => {
-    const key = `${model.provider}:${model.providerModel}`;
-    if (seenCandidates.has(key) || !providerConfigured(model.provider)) return false;
-    seenCandidates.add(key);
+    const key = `${model.provider}:${model.providerModel}:${model.providerParams?.reasoning_effort || ""}`;
+    if (seen.has(key) || !providerConfigured(model.provider)) return false;
+    seen.add(key);
     return true;
   });
-
   if (!chain.length) {
     throw new MineError("Nenhum provedor de IA tem credencial configurada no servidor.", { code: "config" });
   }
 
+  // Web em tres jeitos (ver webSearchMode). No "force" a busca acontece uma
+  // vez, antes da primeira tentativa: a reserva, se entrar, recebe os mesmos
+  // resultados e as fontes nao mudam. No "auto" a Mine recebe a ferramenta
+  // `pesquisar_web` e decide sozinha; se pedir, a busca roda e a mesma
+  // tentativa recomeca ja com os resultados.
+  const mode = webSearchMode({ requested: webSearch, prompt, task: cleanTask, history });
+  const empty = { extraSystem: [], sources: [], queries: [], notice: "" };
+  let web = mode === "force" ? await prepareWebContext({ prompt, history, signal, deadline, onStatus }) : empty;
+  let offerTool = mode === "auto" && toolsSupported();
+
+  const previousGallery = cleanTask ? "" : continuesGallery(prompt, history);
+  // "Icons da Ellie": o estilo pedido vai para o marcador. Vale tambem para
+  // "manda mais" depois de uma galeria de icones.
+  const wantsImage = !cleanTask && (photos || asksForImage(prompt) || Boolean(previousGallery));
+  const imageStyle = wantsImage ? imageStyleFrom(prompt) || (previousGallery ? previousGalleryStyle(history) : "") : "";
+  const baseSystem = [
+    // Modo fotos e do chat livre: uma task (simulado, mapa, jogo) tem formato
+    // proprio, e um marcador de imagem no meio dela quebraria o parser.
+    ...(cleanTask ? [] : photos ? [buildPhotoModeInstruction()] : asksForImage(prompt) || previousGallery ? [buildImageRequestInstruction()] : []),
+    // "Manda mais" depois de uma galeria: o mesmo termo devolveria as mesmas
+    // fotos (a galeria fica em cache por termo), então a Mine varia o termo.
+    ...(cleanTask || !previousGallery ? [] : [buildMorePhotosInstruction(previousGallery)]),
+    ...(imageStyle ? [buildImageStyleInstruction(imageStyle)] : []),
+    // Tutor e sugestoes sao do chat livre: tarefas tem formato proprio.
+    ...(cleanTask ? [] : tutor ? [buildTutorInstruction()] : []),
+    ...(cleanTask ? [] : [buildSuggestionsInstruction({ tutor: Boolean(tutor) })]),
+  ];
+
   let lastError = null;
   let committed = false;
-
-  // Descricao das imagens: calculada no maximo uma vez por pedido, e so se
-  // algum modelo da cadeia precisar dela.
-  const hasImages = imageAttachments(attachments).length > 0;
-  let visionNote = null;
-
-  async function visionContext(remaining) {
-    if (!hasImages) return [];
-    if (visionNote !== null) return visionNote ? [visionNote] : [];
-    try {
-      const description = await describeImages({
-        attachments,
-        prompt,
-        timeoutMs: Math.min(perAttemptMs, remaining),
-        signal,
-        requestedAlias: requested.alias,
-      });
-      visionNote = `Descricao das imagens enviadas pelo usuario (leitura automatica; trate como o conteudo real das imagens):\n${description}`;
-    } catch (error) {
-      if (error?.code === "aborted") throw error;
-      // Ler a imagem falhou: melhor a Mine assumir isso do que inventar o que
-      // estava nela.
-      visionNote =
-        "O usuario enviou imagens, mas nao foi possivel ler o conteudo delas. Diga isso com clareza e peca para reenviar ou descrever o que aparece. Nunca invente o que estava na imagem.";
-    }
-    return [visionNote];
-  }
-
-  // A busca pode ser desligada no meio do pedido: se ela falhar, o mesmo modelo
-  // e tentado de novo sem web, para a pergunta ser respondida assim mesmo
-  // (documento, secao 13 — falha da ferramenta nao derruba o chat).
-  let webActive = useWeb;
-  let webNotice = "";
+  let reasoning = "";
 
   for (let index = 0; index < chain.length; index += 1) {
     const model = chain[index];
-    // Uma chave que recebeu 429/402/401 entra em cooldown. Os outros modelos do
-    // mesmo provedor sao pulados sem desperdicarem o orcamento do pedido.
+    // Chave que recebeu 429/402/401 esta em cooldown: nao repete em vao.
     if (!providerAvailable(model.provider)) continue;
     const remaining = deadline - Date.now();
-    if (remaining < (gameTask ? 3_500 : MIN_ATTEMPT_MS)) break;
+    if (remaining < minAttemptMs) break;
 
+    const tools = offerTool ? [WEB_SEARCH_TOOL] : undefined;
     try {
-      const modelUsesWeb = webActive && model.provider === "openrouter";
-      // Modelo que enxerga recebe a imagem direto; os outros recebem a
-      // descricao textual gerada pelo auxiliar.
-      const extraSystem = [
-        ...(model.capabilities.image ? [] : await visionContext(remaining)),
-        ...(modelUsesWeb ? [webSearchInstruction()] : []),
-      ];
-      const afterVision = deadline - Date.now();
-      if (afterVision < (gameTask ? 3_500 : MIN_ATTEMPT_MS)) break;
-
-      // Assim que o primeiro pedaco sai para o navegador, este modelo esta
-      // escolhido: trocar por outro agora emendaria duas respostas diferentes.
       committed = false;
       const result = await attemptModel({
         model,
-        task,
+        task: cleanTask,
         prompt,
         context,
         history,
         attachments,
         maxTokens,
-        timeoutMs: Math.min(perAttemptMs, afterVision),
+        timeoutMs: Math.min(perAttemptMs, remaining),
         signal,
-        fallbackFrom: model === requested ? undefined : requested.alias,
-        extraSystem,
-        plugins: modelUsesWeb ? webSearchPlugin() : undefined,
+        fallback: index > 0 && !gameTask,
+        extraSystem: [...web.extraSystem, ...baseSystem],
+        tools,
         onDelta: onDelta
           ? (text) => {
               committed = true;
               onDelta(text);
             }
           : undefined,
+        onReasoning: onReasoning
+          ? (text) => {
+              reasoning += text;
+              onReasoning(text);
+            }
+          : undefined,
       });
-
-      // O usuario escolheu um nivel: se outro respondeu, ele fica sabendo, sem
-      // ver nome tecnico de modelo (documento, secao 20).
-      const usedFallback = model !== requested;
-      const hiddenReserve = model === EMERGENCY_MODEL || RESILIENCE_MODELS.includes(model);
-      const fallbackWebNotice = useWeb && !modelUsesWeb ? "Não foi possível consultar a web nesta resposta." : "";
+      if (result.toolQueries) {
+        // A Mine pediu para pesquisar: busca com as consultas dela e a mesma
+        // tentativa recomeca, agora sem a ferramenta (uma rodada so).
+        offerTool = false;
+        web = await prepareWebContext({ prompt, history, signal, deadline, queries: result.toolQueries, onStatus });
+        index -= 1;
+        continue;
+      }
+      // O marcador de sugestoes sai do texto e vira lista a parte; nas tarefas
+      // ele nunca foi pedido, entao a resposta passa intacta.
+      const { text: extracted, suggestions } = cleanTask ? { text: result.reply, suggestions: [] } : extractSuggestions(result.reply);
+      // O modelo as vezes esquece o terceiro campo; a versao final (que vale
+      // mais que o streaming) sai com o estilo que o estudante pediu.
+      const reply = imageStyle ? withImageStyle(extracted, imageStyle) : extracted;
       return {
         ...result,
-        // O nivel mostrado continua sendo o que o usuario escolheu quando a
-        // reserva responde, porque ela nao e um nivel escolhivel.
-        alias: hiddenReserve ? requested.alias : result.alias,
-        notice:
-          [
-            usedFallback
-              ? `${requested.displayName} está temporariamente indisponível. A resposta foi gerada por um modelo alternativo.`
-              : "",
-            webNotice || fallbackWebNotice,
-          ]
-            .filter(Boolean)
-            .join(" ") || "",
+        reply: reply || result.reply,
+        reasoning: (reasoning || result.reasoning || "").trim(),
+        suggestions,
+        alias: MINE_MODEL.alias,
+        displayName: MINE_MODEL.displayName,
+        sources: web.sources,
+        queries: web.queries || [],
+        notice: web.notice,
       };
     } catch (error) {
       lastError = error;
       // Texto ja entregue ao navegador: nao da para recomecar com outro modelo.
       if (committed) throw error;
-
-      // A chamada marcou a chave limitada/invalida em cooldown. Se existe outra
-      // chave pronta no mesmo pool, repete o mesmo modelo antes de trocar a
-      // qualidade ou o provedor da resposta.
+      // Provedor que nao aceita ferramentas responde 400: a mesma tentativa
+      // repete sem ela, e o servidor para de oferecer por um tempo.
+      if (tools && !error?.retryable && (error?.status === 400 || error?.status === 422)) {
+        markToolsUnsupported();
+        offerTool = false;
+        index -= 1;
+        continue;
+      }
+      // A chave limitada entrou em cooldown; se ha outra pronta no pool, repete
+      // o mesmo modelo antes de cair para a reserva.
       if (["rate_limit", "quota", "auth"].includes(error?.code) && providerAvailable(model.provider)) {
         index -= 1;
         continue;
       }
-
-      // Primeira suspeita quando a busca esta ligada: a propria busca. Ela e
-      // paga e recusa o pedido inteiro se a conta nao tiver credito. Desliga e
-      // repete o MESMO modelo antes de culpar o modelo.
-      if (webActive && error?.code !== "aborted") {
-        webActive = false;
-        webNotice = "Não foi possível consultar a web neste momento.";
-        index -= 1;
-        continue;
-      }
-
-      // Erro definitivo (credencial errada, pedido invalido, cancelamento):
-      // insistir em outro modelo nao resolve.
       if (!error?.retryable) throw error;
     }
   }
 
   throw lastError || new MineError("Nenhum modelo conseguiu responder.", { code: "unavailable" });
 }
-
-export { MINE_MODELS };

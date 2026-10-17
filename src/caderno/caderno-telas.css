@@ -1,0 +1,948 @@
+/* Peças de assinatura de cada tela do caderno vivo. */
+
+.caderno-inkcheck-sm {
+  width: 1.2rem !important;
+  height: 1.2rem !important;
+}
+
+/* ───────────────────────── Agenda: quadro de bilhetes ───────────────────────── */
+.caderno-board {
+  /* width 0 + min-width 100%: o quadro rola por dentro em vez de alargar o cartão */
+  width: 0;
+  min-width: 100%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(8.4rem, 1fr);
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.1rem 0.75rem;
+}
+
+.caderno-board-col {
+  position: relative;
+  min-height: 15rem;
+  padding: 0.5rem;
+  border-radius: 0.9rem;
+  background: rgb(var(--pen) / 0.035);
+  box-shadow: inset 0 0 0 1px rgb(var(--line));
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-board-col.is-over {
+  background: rgb(var(--mint) / 0.22);
+  box-shadow: inset 0 0 0 2px rgb(var(--pen) / 0.5);
+  transform: scale(1.02);
+}
+
+.caderno-board-col.is-active {
+  box-shadow: inset 0 0 0 2px rgb(var(--pen));
+}
+
+.caderno-board-col.is-late {
+  background: rgb(var(--hl-pink) / 0.16);
+  box-shadow: inset 0 0 0 1px rgb(var(--margin-line) / 0.35);
+}
+
+.caderno-board-head {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+  padding: 0.2rem 0.35rem 0.45rem;
+  border-bottom: 1.5px dashed rgb(var(--line));
+  color: rgb(var(--theme-text));
+  text-align: left;
+}
+
+.caderno-board-head:disabled {
+  cursor: default;
+}
+
+.caderno-board-empty {
+  display: block;
+  padding: 1.2rem 0;
+  text-align: center;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  color: rgb(var(--theme-muted) / 0.55);
+}
+
+.caderno-sticky {
+  --sticky: #f4f05a;
+  position: relative;
+  padding: 0.6rem 0.55rem 0.35rem 0.65rem;
+  border-radius: 0.2rem 0.2rem 0.8rem 0.2rem;
+  background: color-mix(in srgb, var(--sticky) 80%, white);
+  color: #16181d;
+  box-shadow: 0 5px 10px -6px rgb(0 0 0 / 0.4);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+
+html:not(.theme-light) .caderno-sticky {
+  background: color-mix(in srgb, var(--sticky) 72%, #1a2030);
+}
+
+.caderno-sticky::after {
+  /* a dobrinha no canto do post-it */
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 0 0 0.8rem 0;
+  background: linear-gradient(135deg, transparent 50%, rgb(0 0 0 / 0.14) 50%);
+}
+
+.caderno-sticky:active {
+  cursor: grabbing;
+}
+
+.caderno-sticky.is-picked {
+  outline: 2px dashed rgb(var(--pen));
+  outline-offset: 3px;
+}
+
+.caderno-sticky .caderno-inkcheck path {
+  stroke: #16181d;
+}
+
+/* ───────────────────────── Foco: o lápis ───────────────────────── */
+.caderno-pencil-wrap {
+  position: relative;
+  padding: 1.2rem 0 0.4rem;
+}
+
+.caderno-pencil {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.caderno-pencil-eraser {
+  fill: rgb(var(--hl-pink));
+}
+
+.caderno-pencil-ferrule {
+  fill: #b8c1ce;
+}
+
+.caderno-pencil-body,
+.caderno-pencil-tip {
+  transform-box: view-box;
+  transform-origin: 84px 0;
+  transition: transform 1s linear;
+}
+
+.caderno-pencil-body .body {
+  fill: rgb(var(--hl-yellow));
+}
+
+.caderno-pencil-body .shine {
+  fill: rgb(255 255 255 / 0.4);
+}
+
+.caderno-pencil-body .shade {
+  fill: rgb(0 0 0 / 0.1);
+}
+
+.caderno-pencil-tip .wood {
+  fill: #e9c58d;
+}
+
+.caderno-pencil-tip .lead {
+  fill: #2b2d33;
+}
+
+.caderno-pencil-line {
+  fill: none;
+  stroke: rgb(var(--theme-text) / 0.55);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.caderno-pencil-wrap.is-running .caderno-pencil {
+  animation: caderno-pencil-scribble 0.9s ease-in-out infinite alternate;
+  transform-origin: 90% 50%;
+}
+
+@keyframes caderno-pencil-scribble {
+  from {
+    transform: rotate(-0.6deg) translateY(0);
+  }
+  to {
+    transform: rotate(0.6deg) translateY(1.5px);
+  }
+}
+
+.caderno-shaving {
+  position: absolute;
+  width: 10px;
+  height: 7px;
+  border-radius: 60% 10% 60% 40%;
+  background: #e2b474;
+  pointer-events: none;
+}
+
+.caderno-timer-digits {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-weight: 500;
+  font-size: clamp(3.6rem, 9vw, 5.6rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.caderno-colon.is-ticking {
+  animation: caderno-colon 1s steps(1) infinite;
+}
+
+@keyframes caderno-colon {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.caderno-mug {
+  display: block;
+  width: min(15rem, 60%);
+  margin: 0 auto;
+  overflow: visible;
+}
+
+.caderno-mug .cup,
+.caderno-mug .handle,
+.caderno-mug .coffee,
+.caderno-mug .steam {
+  fill: none;
+  stroke: rgb(var(--pen));
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.caderno-mug .cup {
+  fill: rgb(var(--hl-pink) / 0.45);
+}
+
+.caderno-mug .steam {
+  stroke-width: 4;
+  opacity: 0;
+  animation: caderno-steam 2.6s ease-in-out infinite;
+}
+
+.caderno-mug .s2 {
+  animation-delay: 0.8s;
+}
+
+.caderno-mug .s3 {
+  animation-delay: 1.6s;
+}
+
+@keyframes caderno-steam {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  40% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+/* ───────────────────────── Progresso: carimbo, gráfico, figurinhas ───────────────────────── */
+.caderno-stamp {
+  width: 11rem;
+  height: 11rem;
+  color: rgb(var(--margin-line));
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.08));
+}
+
+.caderno-stamp svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.caderno-stamp .ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 6;
+}
+
+.caderno-stamp .ring.thin {
+  stroke-width: 2;
+  stroke-dasharray: 3 5;
+}
+
+.caderno-stamp text {
+  fill: currentColor;
+  text-anchor: middle;
+  font-family: "DM Mono", monospace;
+}
+
+.caderno-stamp .arc {
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-anchor: start;
+}
+
+.caderno-stamp .lbl {
+  font-size: 15px;
+  letter-spacing: 4px;
+}
+
+.caderno-stamp .num {
+  font-family: "Anybody Variable", sans-serif;
+  font-weight: 900;
+  font-size: 62px;
+  font-variation-settings: "wdth" 130;
+}
+
+/* gráfico da semana */
+.caderno-inkchart {
+  margin-top: 1.5rem;
+}
+
+.caderno-inkchart-plot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.8rem;
+  height: 14rem;
+  padding: 1.6rem 0.4rem 0;
+  border-bottom: 2px solid rgb(var(--theme-text) / 0.7);
+  background: repeating-linear-gradient(to top, rgb(var(--rule) / 0.6) 0 1px, transparent 1px 2.8rem);
+}
+
+.caderno-inkchart-col {
+  position: relative;
+  display: flex;
+  flex: 1;
+  height: 100%;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.caderno-inkchart-bar {
+  width: min(2.6rem, 70%);
+  border-radius: 0.35rem 0.6rem 0.2rem 0.2rem;
+  background: rgb(var(--mint) / 0.85);
+  transform-origin: bottom;
+  transform: scaleY(0);
+  transition: transform 700ms cubic-bezier(0.3, 1.4, 0.5, 1);
+  mix-blend-mode: var(--hl-blend);
+}
+
+.caderno-inkchart-val {
+  position: absolute;
+  left: 50%;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+  color: rgb(var(--pen));
+  transform: translate(-50%, 6px);
+  opacity: 0;
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+.caderno-inkchart.is-visible .caderno-inkchart-bar {
+  transform: scaleY(1);
+}
+
+.caderno-inkchart.is-visible .caderno-inkchart-val {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.caderno-inkchart-line {
+  position: absolute;
+  inset: 1.6rem 0.4rem 0;
+  width: calc(100% - 0.8rem);
+  height: calc(100% - 1.6rem);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.caderno-inkchart-line path {
+  fill: none;
+  stroke: rgb(var(--pen));
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.caderno-inkchart.is-visible .caderno-inkchart-line path {
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.45, 0, 0.2, 1) 0.7s;
+  stroke-dashoffset: 0;
+}
+
+.caderno-inkchart-labels {
+  display: flex;
+  gap: 0.8rem;
+  padding: 0.45rem 0.4rem 0;
+}
+
+.caderno-inkchart-labels span {
+  flex: 1;
+  text-align: center;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  color: rgb(var(--theme-muted));
+}
+
+/* álbum de figurinhas */
+.caderno-stickers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 1.1rem;
+  margin-top: 1.4rem;
+}
+
+.caderno-sticker {
+  --tone: var(--hl-mint);
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 0.6rem 0.4rem 0.8rem;
+  border-radius: 1rem;
+  text-align: center;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-sticker-disc {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 4.8rem;
+  height: 4.8rem;
+  border-radius: 50%;
+  color: #16181d;
+  background: rgb(var(--tone));
+  box-shadow: 0 0 0 4px rgb(var(--sheet)), 0 6px 14px -6px rgb(0 0 0 / 0.45);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* o cantinho descolando */
+.caderno-sticker.is-done .caderno-sticker-disc::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  bottom: 6px;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 0 0 50% 0;
+  background: linear-gradient(135deg, transparent 48%, rgb(255 255 255 / 0.85) 50%, rgb(0 0 0 / 0.12));
+  transform: scale(0);
+  transform-origin: bottom right;
+  transition: transform 220ms ease;
+}
+
+.caderno-sticker.is-done:hover .caderno-sticker-disc {
+  transform: rotate(-8deg) scale(1.08) translateY(-3px);
+}
+
+.caderno-sticker.is-done:hover .caderno-sticker-disc::after {
+  transform: scale(1);
+}
+
+.caderno-sticker.is-locked .caderno-sticker-disc {
+  background: transparent;
+  color: rgb(var(--theme-muted));
+  box-shadow: none;
+  border: 2.5px dashed rgb(var(--line));
+}
+
+.caderno-sticker-title {
+  font-weight: 800;
+  font-size: 0.82rem;
+  line-height: 1.15;
+}
+
+.caderno-sticker-meta {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--pen));
+}
+
+.caderno-sticker.is-locked .caderno-sticker-title {
+  color: rgb(var(--theme-muted));
+}
+
+/* ───────────────────────── Ranking: a estante ───────────────────────── */
+html:not(.theme-light) .ranking-arena {
+  --ranking-surface: rgb(var(--panel));
+  --ranking-surface-strong: rgb(var(--panel-2));
+}
+
+.ranking-atmosphere,
+.ranking-hologram {
+  display: none !important;
+}
+
+.ranking-intro h1 {
+  font-family: "Anybody Variable", sans-serif !important;
+  font-variation-settings: "wdth" 118;
+  letter-spacing: -0.01em !important;
+}
+
+.ranking-intro h1 .caderno-hl {
+  color: inherit;
+  text-shadow: none;
+}
+
+.caderno-shelf {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: clamp(0.6rem, 3vw, 2.5rem);
+  padding: 1.5rem clamp(0.4rem, 3vw, 2.5rem) 0;
+  border-bottom: 10px solid rgb(var(--theme-text) / 0.85);
+  box-shadow: 0 10px 0 -4px rgb(0 0 0 / 0.12);
+}
+
+.caderno-shelf-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  text-align: center;
+}
+
+.caderno-shelf-who {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  margin-bottom: 0.6rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.caderno-shelf-avatar {
+  position: relative;
+  display: block;
+}
+
+.caderno-shelf-crown {
+  position: absolute;
+  top: -1.35rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-8deg);
+  font-size: 1.5rem;
+  line-height: 1;
+  color: rgb(var(--hl-yellow));
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.35);
+}
+
+.caderno-shelf-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.caderno-shelf-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-shelf-books {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  width: min(9rem, 100%);
+}
+
+.caderno-shelf-books i {
+  display: block;
+  width: var(--w);
+  height: 0.95rem;
+  margin-left: var(--shift);
+  border-radius: 0.2rem;
+  background:
+    linear-gradient(90deg, transparent 12%, rgb(0 0 0 / 0.14) 12% 14%, transparent 14% 86%, rgb(0 0 0 / 0.14) 86% 88%, transparent 88%),
+    var(--spine);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.16);
+  transform: rotate(var(--tilt));
+}
+
+.caderno-shelf-place {
+  margin-top: 0.5rem;
+  font-family: "Anybody Variable", sans-serif;
+  font-weight: 900;
+  font-size: 1.9rem;
+  font-variation-settings: "wdth" 130;
+  line-height: 1;
+}
+
+.caderno-shelf-stack.is-place-1 .caderno-shelf-place {
+  background: linear-gradient(rgb(var(--mint)), rgb(var(--mint))) no-repeat 0 85% / 100% 45%;
+  padding: 0 0.15em;
+}
+
+.caderno-shelf-score {
+  margin: 0.2rem 0 0.8rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+  color: rgb(var(--pen));
+}
+
+.caderno-shelf-score small {
+  font-size: 0.8em;
+}
+
+/* ───────────────────────── Mine: o rosto desenhado ───────────────────────── */
+/* :where() zera a especificidade: h-12/w-12 do Tailwind definem o tamanho
+   quando a tela pede; sem classe, a carinha ocupa a caixa do pai. */
+:where(.caderno-mineface) {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.caderno-mineface .f-stroke {
+  fill: none;
+  stroke: rgb(var(--theme-text));
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.caderno-mineface .f-thin {
+  stroke-width: 4;
+}
+
+.caderno-mineface .f-head {
+  fill: rgb(var(--panel));
+}
+
+.caderno-mineface .f-visor {
+  fill: rgb(var(--paper));
+}
+
+.caderno-mineface .f-ear,
+.caderno-mineface .f-bulb {
+  fill: rgb(var(--mint));
+}
+
+.caderno-mineface .f-eye {
+  fill: rgb(var(--theme-text));
+}
+
+.caderno-mineface .f-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: caderno-blink 5s var(--blink-delay, 0s) infinite;
+}
+
+@keyframes caderno-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+.caderno-mineface.is-thinking .f-bulb {
+  animation: caderno-bulb 700ms ease-in-out infinite alternate;
+}
+
+/* O avatar deixa de ser um orbe neon e vira o robozinho num cartão de papel. */
+.mine-avatar-face {
+  border: 1px solid rgb(var(--line)) !important;
+  background: rgb(var(--sheet)) !important;
+  box-shadow: var(--card-shadow) !important;
+  border-radius: 32% !important;
+}
+
+.mine-avatar-face svg,
+.mine-avatar-face .caderno-mineface {
+  width: 86% !important;
+  height: 86% !important;
+  filter: none !important;
+}
+
+.mine-avatar-halo {
+  display: none;
+}
+
+.mine-avatar-lg {
+  --mine-avatar-size: 6.5rem !important;
+  animation: caderno-hop 700ms cubic-bezier(0.3, 1.6, 0.5, 1) 0.4s 2 both;
+}
+
+.no-motion .mine-avatar-lg {
+  animation: none;
+}
+
+/* ───────────────────────── Games: a mão de cartas ───────────────────────── */
+.caderno-games-hand {
+  overflow: hidden;
+  padding-bottom: 0.5rem;
+}
+
+.caderno-hand-of-cards {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 25rem;
+  margin-top: 0.5rem;
+  perspective: 1400px;
+}
+
+.caderno-game-card {
+  position: absolute;
+  bottom: 1.2rem;
+  width: 12rem;
+  height: 17rem;
+  transform-origin: 50% 115%;
+}
+
+@media (max-width: 759px) {
+  .caderno-hand-of-cards {
+    height: 21rem;
+  }
+
+  .caderno-game-card {
+    width: 9.6rem;
+    height: 14rem;
+  }
+}
+
+.caderno-game-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.caderno-game-face,
+.caderno-game-back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 1.1rem;
+  padding: 1rem;
+  backface-visibility: hidden;
+  text-align: left;
+  box-shadow: 0 16px 30px -18px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+
+.caderno-game-face {
+  background:
+    radial-gradient(circle at 85% 12%, rgb(255 255 255 / 0.35), transparent 40%),
+    var(--card);
+  color: #14161b;
+}
+
+.caderno-game-face::after {
+  /* pauta miúda na carta, como ficha de estudo */
+  content: "";
+  position: absolute;
+  inset: 45% 1rem 1rem;
+  background: repeating-linear-gradient(to bottom, transparent 0 17px, rgb(0 0 0 / 0.1) 17px 18px);
+  pointer-events: none;
+}
+
+.caderno-game-icon {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 0.7);
+}
+
+.caderno-game-name {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  font-family: "Anybody Variable", sans-serif;
+  font-weight: 900;
+  font-size: 1.25rem;
+  line-height: 1.02;
+  font-variation-settings: "wdth" 112;
+}
+
+.caderno-game-tag {
+  position: relative;
+  z-index: 1;
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  opacity: 0.8;
+}
+
+.caderno-game-back {
+  transform: rotateY(180deg);
+  background: rgb(var(--sheet));
+  color: rgb(var(--theme-text));
+  border: 1px solid rgb(var(--line));
+}
+
+.caderno-game-steps {
+  margin: 0.5rem 0 0.4rem;
+  padding-left: 1.05rem;
+  list-style: decimal;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.caderno-game-goal {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+  line-height: 1.1;
+  color: rgb(var(--pen));
+}
+
+/* ───────────────────────── Comentários: mural de bilhetes ───────────────────────── */
+.caderno-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1.6rem 1.2rem;
+}
+
+.caderno-note-card {
+  --note: var(--hl-yellow);
+  position: relative;
+  height: 100%;
+  padding: 1.2rem 1rem 1rem;
+  border-radius: 0.25rem 0.25rem 1.2rem 0.25rem;
+  background: color-mix(in srgb, rgb(var(--note)) 78%, white);
+  color: #16181d;
+  box-shadow: 0 10px 18px -12px rgb(0 0 0 / 0.5);
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease;
+}
+
+html:not(.theme-light) .caderno-note-card {
+  background: color-mix(in srgb, rgb(var(--note)) 70%, #1a2030);
+}
+
+.caderno-note-card::before {
+  content: "";
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  width: 4.4rem;
+  height: 1.25rem;
+  transform: translateX(-50%) rotate(-3deg);
+  background: rgb(255 255 255 / 0.55);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.caderno-note-card:hover {
+  transform: rotate(0deg) translateY(-4px) scale(1.02);
+  box-shadow: 0 20px 28px -16px rgb(0 0 0 / 0.55);
+}
+
+.caderno-note-card :is([class~="text-white"], [class*="text-white/"], .font-black) {
+  color: #16181d !important;
+}
+
+.caderno-note-card [class*="text-white/"] {
+  opacity: 0.7;
+}
+
+.caderno-note-text {
+  font-family: "Patrick Hand", "Kalam", cursive;
+  font-size: 1.18rem;
+  line-height: 1.45;
+  color: #1f2330;
+}
+
+/* ───────────────────────── Sugestões: carimbos ───────────────────────── */
+.caderno-idea-card {
+  position: relative;
+  padding: 1rem 1rem 1rem 1.2rem;
+  border-radius: 0.9rem;
+  background: rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 4px 0 0 rgb(var(--mint));
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-idea-card:hover {
+  transform: translateY(-2px) rotate(-0.3deg);
+}
+
+.caderno-stamp-chip {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border: 2px solid currentColor;
+  border-radius: 0.3rem;
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(-5deg);
+  color: rgb(var(--pen));
+  animation: caderno-stamp-in 420ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.caderno-stamp-chip.is-concluida { color: #1f9a57; }
+.caderno-stamp-chip.is-nova { color: rgb(var(--margin-line)); }
+.caderno-stamp-chip.is-recusada { color: rgb(var(--theme-muted)); }
+.caderno-stamp-chip.is-planejada { color: #b7791f; }
+
+@keyframes caderno-stamp-in {
+  from {
+    transform: rotate(-5deg) scale(1.9);
+    opacity: 0;
+  }
+  60% {
+    transform: rotate(-5deg) scale(0.92);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(-5deg) scale(1);
+  }
+}
+
+/* ───────────────────────── Perfil: carteirinha ───────────────────────── */
+.caderno-idcard::after {
+  /* furo do cordão da carteirinha */
+  content: "";
+  position: absolute;
+  top: 0.9rem;
+  left: 50%;
+  width: 3.2rem;
+  height: 0.6rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgb(var(--paper));
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.25);
+}
+
+/* ───────────────────────── Sobre ───────────────────────── */
+.caderno-about-mine {
+  background: rgb(var(--sheet));
+  box-shadow: var(--card-shadow), 0 0 0 1px rgb(var(--line));
+}
+
+.games-library-heading p.caderno-note {
+  font-size: 1.3rem !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: rgb(var(--pen)) !important;
+}

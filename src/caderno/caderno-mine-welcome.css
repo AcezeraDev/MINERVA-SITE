@@ -1,0 +1,431 @@
+/*
+  Entrada da Mine (MineWelcome.tsx).
+
+  Linha do tempo, em segundos:
+  0.05–1.2  rabiscos de estudo se desenham em volta (um a cada 90 ms)
+  0.10–1.00 a Mine é contornada à caneta; 0.85 a cor entra; 1.05 os olhos
+            abrem e a antena solta faíscas; 0.7 a mão é desenhada e acena
+  1.00–1.80 "Oi! Eu sou a Mine" se escreve no balão
+  1.05–1.50 o título cai palavra por palavra; o fim ganha o grifo
+  1.60–2.00 as fichas de sugestão são distribuídas a partir da Mine
+  Depois disso só fica o que é contínuo e barato: rabiscos flutuando,
+  parallax pelo mouse, olhos seguindo o cursor e piscando.
+*/
+
+.mine-welcome-scene {
+  --px: 0;
+  --py: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 64vh;
+  padding: 2.5rem 0.5rem 2rem;
+}
+
+/* ───────── constelação de estudo ───────── */
+.mine-welcome-scribbles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.mine-scribble {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  display: grid;
+  place-items: center;
+  opacity: 0.6;
+  transform: translate(-50%, -50%) translate(calc(var(--px) * var(--depth) * 2px), calc(var(--py) * var(--depth) * 2px)) rotate(var(--tilt));
+  transition: transform 500ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.mine-scribble__float {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  animation: mine-scribble-float var(--float, 5s) ease-in-out calc(var(--delay) + 1.2s) infinite alternate;
+}
+
+@keyframes mine-scribble-float {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    transform: translateY(-9px) rotate(4deg);
+  }
+}
+
+.mine-scribble .caderno-doodle {
+  width: 100%;
+  height: 100%;
+}
+
+.mine-scribble.tone-pen { color: rgb(var(--pen)); }
+.mine-scribble.tone-yellow { color: rgb(var(--hl-yellow)); }
+.mine-scribble.tone-mint { color: rgb(var(--mint)); }
+.mine-scribble.tone-pink { color: rgb(var(--hl-pink)); }
+.mine-scribble.tone-lilac { color: rgb(var(--hl-lilac)); }
+
+.theme-light .mine-scribble.tone-yellow { color: #c9a800; }
+.theme-light .mine-scribble.tone-pink { color: rgb(var(--margin-line)); }
+.theme-light .mine-scribble.tone-lilac { color: #7b61e0; }
+.theme-light .mine-scribble.tone-mint { color: #1f9a57; }
+
+.mine-scribble__text {
+  font-family: "Kalam", "Gochi Hand", cursive;
+  font-weight: 700;
+  font-size: calc(var(--size) * 0.72);
+  line-height: 1;
+  white-space: nowrap;
+  animation: mine-write 800ms linear var(--delay) both;
+}
+
+@keyframes mine-write {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (max-width: 639px) {
+  .mine-scribble {
+    opacity: 0.35;
+  }
+}
+
+/* ───────── palco ───────── */
+.mine-welcome-stage {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 44rem;
+  text-align: center;
+}
+
+.mine-welcome-hero {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mine-welcome-face {
+  position: relative;
+  width: 7.5rem;
+  height: 7.5rem;
+  padding: 0.6rem;
+  border-radius: 2.2rem;
+  background: rgb(var(--sheet));
+  box-shadow: var(--card-shadow), 0 0 0 1px rgb(var(--line));
+}
+
+/* A Mine sendo desenhada (MineFace draw). */
+.caderno-mineface.is-drawing .f-stroke {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: caderno-draw 900ms cubic-bezier(0.45, 0, 0.2, 1) 150ms forwards;
+}
+
+.caderno-mineface.is-drawing :is(.f-head, .f-visor, .f-ear, .f-bulb) {
+  fill-opacity: 0;
+  animation: caderno-draw 900ms cubic-bezier(0.45, 0, 0.2, 1) 150ms forwards, mine-fill 450ms ease 850ms forwards;
+}
+
+.caderno-mineface.is-drawing .f-eyes {
+  animation: mine-eyes-open 380ms cubic-bezier(0.3, 1.6, 0.5, 1) 1050ms both, caderno-blink 5s 2.4s infinite;
+}
+
+@keyframes mine-fill {
+  to {
+    fill-opacity: 1;
+  }
+}
+
+@keyframes mine-eyes-open {
+  from {
+    transform: scaleY(0.08);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* faíscas da antena acendendo */
+.mine-welcome-sparks {
+  position: absolute;
+  top: 1.25rem;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.mine-welcome-sparks i {
+  position: absolute;
+  left: -1px;
+  bottom: 0;
+  width: 2.5px;
+  height: 0.75rem;
+  border-radius: 2px;
+  background: rgb(var(--hl-yellow));
+  transform-origin: 50% 100%;
+  transform: rotate(var(--a)) translateY(-0.9rem) scaleY(0);
+  animation: mine-spark 620ms cubic-bezier(0.2, 0.8, 0.2, 1) 1050ms both;
+}
+
+.theme-light .mine-welcome-sparks i {
+  background: rgb(var(--pen));
+}
+
+@keyframes mine-spark {
+  0% {
+    transform: rotate(var(--a)) translateY(-0.7rem) scaleY(0);
+    opacity: 1;
+  }
+  55% {
+    transform: rotate(var(--a)) translateY(-1.3rem) scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--a)) translateY(-1.9rem) scaleY(0.2);
+    opacity: 0;
+  }
+}
+
+/* a mão que acena */
+.mine-welcome-hand {
+  position: absolute;
+  right: -1.7rem;
+  bottom: 0.2rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  overflow: visible;
+  transform-origin: 20% 90%;
+  animation: mine-wave 1.2s ease-in-out 1.25s 2 both;
+}
+
+.mine-welcome-hand path {
+  fill: rgb(var(--sheet));
+  stroke: rgb(var(--theme-text));
+  stroke-width: 2.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: caderno-draw 600ms ease 700ms forwards;
+}
+
+@keyframes mine-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-18deg);
+  }
+  45% {
+    transform: rotate(16deg);
+  }
+  70% {
+    transform: rotate(-12deg);
+  }
+}
+
+/* balão "Oi! Eu sou a Mine" escrito à mão */
+.mine-welcome-hello {
+  position: absolute;
+  top: 0.1rem;
+  left: calc(100% + 2.3rem);
+  padding: 0.45rem 0.9rem;
+  border-radius: 1rem 1rem 1rem 0.2rem;
+  background: rgb(var(--sheet));
+  box-shadow: var(--card-shadow), 0 0 0 1px rgb(var(--line));
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  color: rgb(var(--pen));
+  white-space: nowrap;
+  transform: rotate(-4deg);
+  animation: mine-write 850ms linear 1s both;
+}
+
+@media (max-width: 639px) {
+  .mine-welcome-hello {
+    position: static;
+    margin-top: 0.9rem;
+    transform: rotate(-2deg);
+  }
+
+  .mine-welcome-hand {
+    right: -1.4rem;
+  }
+}
+
+/* ───────── título e texto ───────── */
+.mine-welcome-title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 0.28em;
+  margin: 1.5rem auto 0;
+  max-width: 34rem;
+  font-family: "Anybody Variable", sans-serif;
+  font-weight: 900;
+  font-size: clamp(1.8rem, 4.6vw, 2.7rem);
+  font-variation-settings: "wdth" 116;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  color: rgb(var(--theme-text));
+}
+
+.mine-welcome-word {
+  display: inline-block;
+}
+
+.mine-welcome-hl {
+  padding: 0 0.12em;
+  margin: 0 -0.05em;
+  border-radius: 0.18em 0.5em 0.22em 0.6em;
+  background-image: linear-gradient(rgb(var(--mint) / 0.75), rgb(var(--mint) / 0.75));
+  background-repeat: no-repeat;
+  background-position: 0 88%;
+  background-size: 0% 46%;
+  animation: mine-swipe 620ms cubic-bezier(0.2, 0, 0, 1) var(--hl-delay, 1.3s) forwards;
+}
+
+@keyframes mine-swipe {
+  to {
+    background-size: 100% 46%;
+  }
+}
+
+.mine-welcome-sub {
+  margin: 0.7rem auto 0;
+  max-width: 28rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: rgb(var(--theme-muted));
+}
+
+/* ───────── fichas de sugestão ───────── */
+.mine-welcome-cards {
+  display: grid;
+  gap: 1.1rem 1rem;
+  margin-top: 2.2rem;
+  text-align: left;
+}
+
+@media (min-width: 640px) {
+  .mine-welcome-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.mine-welcome-card-item {
+  --tape: var(--hl-yellow);
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  min-height: 5.4rem;
+  padding: 1.15rem 1rem 1rem;
+  border-radius: 0.35rem 0.35rem 1.1rem 0.35rem;
+  border: 1px solid rgb(var(--line));
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 1.45rem, rgb(var(--rule) / 0.45) 1.45rem calc(1.45rem + 1px)) 0 0.6rem / 100% auto no-repeat,
+    rgb(var(--panel));
+  box-shadow: var(--card-shadow);
+  color: rgb(var(--theme-text));
+  text-align: left;
+}
+
+.mine-welcome-card-item::before {
+  content: "";
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  width: 3.8rem;
+  height: 1.15rem;
+  transform: translateX(-50%) rotate(-3deg);
+  background: rgb(var(--tape) / 0.65);
+  pointer-events: none;
+}
+
+.mine-welcome-card-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, rgb(var(--tape)) 60%, white);
+  color: #16181d;
+  transform: rotate(-6deg);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mine-welcome-card-item:hover .mine-welcome-card-icon {
+  transform: rotate(8deg) scale(1.1);
+}
+
+.mine-welcome-card-title {
+  display: block;
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  font-size: 1.12rem;
+  line-height: 1.25;
+  color: rgb(var(--pen));
+}
+
+.mine-welcome-card-detail {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: rgb(var(--theme-muted));
+}
+
+.mine-welcome-card-arrow {
+  align-self: center;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.4rem;
+  color: rgb(var(--pen));
+  opacity: 0.45;
+  transition: transform 200ms ease, opacity 200ms ease;
+}
+
+.mine-welcome-card-item:hover .mine-welcome-card-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+.mine-welcome-card-item:focus-visible {
+  outline: 2px dashed rgb(var(--pen));
+  outline-offset: 4px;
+}
+
+/* ───────── movimento reduzido: tudo pronto, nada anima ───────── */
+.mine-welcome-scene.is-static *,
+.no-motion .mine-welcome-scene * {
+  animation: none !important;
+}
+
+.mine-welcome-scene.is-static .mine-welcome-hl,
+.no-motion .mine-welcome-scene .mine-welcome-hl {
+  background-size: 100% 46%;
+}
+
+.mine-welcome-scene.is-static .mine-welcome-hand path,
+.no-motion .mine-welcome-scene .mine-welcome-hand path {
+  stroke-dashoffset: 0;
+}
+
+.mine-welcome-scene.is-static .mine-welcome-sparks,
+.no-motion .mine-welcome-scene .mine-welcome-sparks {
+  display: none;
+}

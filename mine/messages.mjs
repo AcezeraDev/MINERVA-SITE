@@ -3,11 +3,20 @@
 // crescer (chunking, selecao de trechos) sem mexer no resto.
 
 import { buildAttachmentContext } from "./documents.mjs";
+import { MAX_CHAT_PROMPT_CHARS } from "../shared/chat-limits.mjs";
 
-export const MAX_HISTORY_MESSAGES = 10;
-export const MAX_HISTORY_CHARS = 2_400;
-export const MAX_HISTORY_TOTAL_CHARS = 12_000;
-export const MAX_PROMPT_CHARS = 6_000;
+// Memoria da conversa (set/2026). Antes eram 10 mensagens de ate 2.400
+// caracteres: uma explicacao longa chegava cortada ao meio na pergunta
+// seguinte e a Mine "esquecia" o comeco da conversa. O modelo atual aceita
+// muito mais contexto; os tetos abaixo continuam existindo porque cada token
+// de entrada e cobrado.
+export const MAX_HISTORY_MESSAGES = 16;
+export const MAX_HISTORY_CHARS = MAX_CHAT_PROMPT_CHARS;
+export const MAX_HISTORY_TOTAL_CHARS = 48_000;
+// Mensagens mais antigas que a janela viram uma lista de assuntos ja tratados.
+export const MAX_EARLIER_TOPICS = 20;
+const EARLIER_TOPIC_CHARS = 160;
+export const MAX_PROMPT_CHARS = MAX_CHAT_PROMPT_CHARS;
 export const MAX_IMAGE_PARTS = 4;
 
 export function attachmentSummary(attachments, prompt = "") {
@@ -34,6 +43,10 @@ export function imagePartsFromAttachments(attachments) {
  * imagem — nesse caso o roteador ja terá injetado a descricao textual.
  */
 export function buildMessages({ systemContent, history, prompt, attachments = [], allowImages = true, extraSystem = [] }) {
+  const fullPrompt = String(prompt || "");
+  if (fullPrompt.length > MAX_PROMPT_CHARS) {
+    throw new RangeError("Sua mensagem é longa demais. Tente dividir em partes menores.");
+  }
   const messages = [{ role: "system", content: systemContent }];
 
   for (const extra of extraSystem) {
@@ -41,7 +54,26 @@ export function buildMessages({ systemContent, history, prompt, attachments = []
     if (text) messages.push({ role: "system", content: text });
   }
 
-  const lastMessages = Array.isArray(history) ? history.slice(-MAX_HISTORY_MESSAGES) : [];
+  const allHistory = Array.isArray(history) ? history : [];
+  const lastMessages = allHistory.slice(-MAX_HISTORY_MESSAGES);
+
+  // O que ficou fora da janela nao some: as perguntas antigas entram como um
+  // resumo curto, para a Mine saber do que ja se falou ("como no exemplo do
+  // comeco") sem pagar pelo texto inteiro de cada resposta.
+  const earlier = allHistory
+    .slice(0, -MAX_HISTORY_MESSAGES)
+    .filter((message) => message?.role === "user")
+    .map((message) => String(message.text || message.content || "").replace(/\s+/g, " ").trim().slice(0, EARLIER_TOPIC_CHARS))
+    .filter(Boolean)
+    .slice(-MAX_EARLIER_TOPICS);
+  if (earlier.length) {
+    messages.push({
+      role: "system",
+      content: `Resumo automatico do inicio desta conversa (mensagens antigas que nao cabem mais inteiras). O estudante ja perguntou, nesta ordem:
+${earlier.map((topic) => `- ${topic}`).join("\n")}
+Use isso para manter a continuidade; se ele se referir a algo daqui, retome sem pedir para repetir.`,
+    });
+  }
   const selectedHistory = [];
   let historyBudget = MAX_HISTORY_TOTAL_CHARS;
   for (const message of [...lastMessages].reverse()) {
@@ -58,7 +90,7 @@ export function buildMessages({ systemContent, history, prompt, attachments = []
   // A pergunta entra na selecao de trechos: o recorte do arquivo e feito em
   // funcao do que o usuario pediu.
   const summary = attachmentSummary(attachments, prompt);
-  const text = [String(prompt || "").slice(0, MAX_PROMPT_CHARS), summary].filter(Boolean).join("\n\n");
+  const text = [fullPrompt, summary].filter(Boolean).join("\n\n");
   const images = allowImages ? imagePartsFromAttachments(attachments) : [];
 
   messages.push({

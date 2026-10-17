@@ -1,8 +1,7 @@
 import { redactSecrets } from "./env.mjs";
-import { extractSources } from "./web.mjs";
 
-// Adapter unico de provedor. Nenhuma outra parte do projeto fala HTTP com
-// OpenRouter, Gemini, Groq ou NVIDIA (documento, secao 14).
+// Adapter unico de provedor. Nenhuma outra parte do projeto fala HTTP de chat
+// com a NanoGPT (documento, secao 14). A busca na web usa `nanogptApiUrl`.
 
 export class MineError extends Error {
   constructor(message, { code = "error", status = 0, retryable = false, cooldownMs = 0 } = {}) {
@@ -24,63 +23,82 @@ export function parseProviderKeys(...values) {
   return [...new Set(keys)];
 }
 
-function googleGeminiKeys() {
-  const legacy = String(process.env.GEMINI_API_KEY || "").trim();
-  return parseProviderKeys(
-    process.env.GOOGLE_GEMINI_API_KEYS,
-    process.env.GOOGLE_GEMINI_API_KEY,
-    process.env.GEMINI_API_KEYS,
-    legacy && !legacy.startsWith("nvapi-") ? legacy : "",
-  );
+export function nanogptKeys() {
+  return parseProviderKeys(process.env.NANOGPT_API_KEYS, process.env.NANOGPT_API_KEY);
 }
 
-function nvidiaKeys() {
-  const legacy = String(process.env.GEMINI_API_KEY || "").trim();
-  return parseProviderKeys(
-    process.env.NVIDIA_API_KEYS,
-    process.env.NVIDIA_API_KEY,
-    legacy.startsWith("nvapi-") ? legacy : "",
-  );
+/** Base OpenAI-compatible da NanoGPT (`.../api/v1`). */
+export function nanogptBaseUrl() {
+  return String(process.env.NANOGPT_BASE_URL || "https://nano-gpt.com/api/v1").trim().replace(/\/$/, "");
+}
+
+/**
+ * Endpoints fora do formato OpenAI (busca na web) moram em `/api/...` na mesma
+ * origem: `https://nano-gpt.com/api/v1` -> `https://nano-gpt.com/api/web`.
+ */
+export function nanogptApiUrl(path) {
+  const root = nanogptBaseUrl().replace(/\/v1$/i, "");
+  return `${root}/${String(path).replace(/^\//, "")}`;
 }
 
 const PROVIDERS = {
-  openrouter: {
-    label: "openrouter",
-    baseUrl: () => String(process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").trim(),
-    apiKeys: () => parseProviderKeys(process.env.OPENROUTER_API_KEYS, process.env.OPENROUTER_API_KEY),
-    apiKey: () => selectProviderKey("openrouter"),
-    // O OpenRouter usa esses dois cabecalhos para atribuir o trafego ao app.
-    extraHeaders: () => ({
-      "HTTP-Referer": String(process.env.PUBLIC_APP_ORIGIN || "https://minerva-web.vercel.app"),
-      "X-Title": "Minerva",
+  nanogpt: {
+    label: "nanogpt",
+    baseUrl: nanogptBaseUrl,
+    apiKeys: nanogptKeys,
+    apiKey: () => selectProviderKey("nanogpt"),
+    extraHeaders: () => ({}),
+    // Os modelos de raciocinio da OpenAI recusam `temperature`/`top_p`, entao
+    // eles nao vao. `max_tokens` inclui o raciocinio oculto e serve tambem de
+    // trava de custo por pedido.
+    requestBody: ({ model, messages, maxTokens, stream, providerParams, tools, toolChoice }) => ({
+      model,
+      messages,
+      max_tokens: maxTokens,
+      stream,
+      ...(stream ? { stream_options: { include_usage: true } } : {}),
+      ...(tools?.length ? { tools, tool_choice: toolChoice || "auto" } : {}),
+      ...(providerParams || {}),
     }),
-  },
-  nvidia: {
-    label: "nvidia",
-    baseUrl: () => String(process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1").trim(),
-    apiKeys: nvidiaKeys,
-    apiKey: () => selectProviderKey("nvidia"),
-    extraHeaders: () => ({}),
-  },
-  gemini: {
-    label: "gemini",
-    baseUrl: () => String(process.env.GOOGLE_GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai").trim(),
-    apiKeys: googleGeminiKeys,
-    apiKey: () => selectProviderKey("gemini"),
-    extraHeaders: () => ({}),
-  },
-  groq: {
-    label: "groq",
-    baseUrl: () => String(process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1").trim(),
-    apiKeys: () => parseProviderKeys(process.env.GROQ_API_KEYS, process.env.GROQ_API_KEY),
-    apiKey: () => selectProviderKey("groq"),
-    extraHeaders: () => ({}),
   },
 };
 
+function providerHeaders(entry, apiKey) {
+  return entry.authHeaders?.(apiKey) || { authorization: `Bearer ${apiKey}` };
+}
+
+function providerRequestBody(entry, { providerModel, messages, maxTokens, stream, providerParams, tools, toolChoice }) {
+  return entry.requestBody({ model: providerModel, messages, maxTokens, stream, providerParams, tools, toolChoice });
+}
+
+/**
+ * Pedidos de ferramenta ja montados: `{ name, arguments }` com os argumentos
+ * em JSON lido. Argumento ilegivel vira objeto vazio — quem chama decide o
+ * que fazer sem consulta.
+ */
+function finishToolCalls(raw) {
+  return raw
+    .filter((call) => call?.name)
+    .map((call) => {
+      let args = {};
+      try {
+        args = JSON.parse(call.arguments || "{}") || {};
+      } catch {
+        args = {};
+      }
+      return { name: call.name, arguments: args };
+    });
+}
+
+// O texto do raciocinio muda de nome conforme o modelo por tras da NanoGPT.
+function reasoningDelta(delta) {
+  const value = delta?.reasoning ?? delta?.reasoning_content ?? delta?.thinking;
+  return typeof value === "string" ? value : "";
+}
+
 export function providerConfigured(provider) {
   const entry = PROVIDERS[provider];
-  return Boolean(entry && entry.apiKeys().length);
+  return Boolean(entry && (entry.isConfigured ? entry.isConfigured() : entry.apiKeys().length));
 }
 
 const keyHealth = new Map();
@@ -137,10 +155,9 @@ function markKeyFailure(provider, apiKey, error) {
   state.cooldownUntil = Date.now() + Math.max(fallback, Number(error.cooldownMs) || 0);
 }
 
-// Um modelo aposentado e o modo de falha mais provavel aqui: o catalogo de
-// modelos gratuitos muda sozinho. O OpenRouter responde 400 "is not a valid
-// model ID" nesse caso, e nao 404 — sem tratar isso como retentavel, a cadeia
-// de fallback inteira seria pulada justo quando ela mais serve.
+// Um modelo aposentado ou renomeado no catalogo da NanoGPT volta como 400
+// "model ... not found", e nao 404 — sem tratar isso como retentavel, a
+// reserva seria pulada justo quando ela mais serve.
 function looksLikeModelProblem(detail) {
   return /\bmodel\b/i.test(String(detail || ""));
 }
@@ -231,12 +248,13 @@ export async function callProviderStream({
   providerModel,
   messages,
   maxTokens = 1024,
-  temperature = 0.3,
   timeoutMs = 45_000,
   signal,
   onDelta,
-  plugins,
+  onReasoning,
   providerParams,
+  tools,
+  toolChoice,
 }) {
   const { entry, apiKey, controller, abortError, cleanup } = requestSetup({ provider, timeoutMs, signal });
   const startedAt = Date.now();
@@ -248,19 +266,20 @@ export async function callProviderStream({
       headers: {
         "content-type": "application/json",
         accept: "text/event-stream",
-        authorization: `Bearer ${apiKey}`,
+        ...providerHeaders(entry, apiKey),
         ...entry.extraHeaders(),
       },
-      body: JSON.stringify({
-        model: providerModel,
-        messages,
-        temperature,
-        top_p: 0.9,
-        max_tokens: maxTokens,
-        stream: true,
-        ...(plugins ? { plugins } : {}),
-        ...(providerParams || {}),
-      }),
+      body: JSON.stringify(
+        providerRequestBody(entry, {
+          providerModel,
+          messages,
+          maxTokens,
+          stream: true,
+          providerParams,
+          tools,
+          toolChoice,
+        }),
+      ),
     });
 
     if (!response.ok) {
@@ -283,10 +302,13 @@ export async function callProviderStream({
     const decoder = new TextDecoder();
     let buffer = "";
     let content = "";
+    let reasoning = "";
     let usage = {};
     let finishReason = "";
     let resolvedModel = providerModel;
-    let sources = [];
+    // Pedidos de ferramenta chegam em pedacos, por indice: o nome no primeiro
+    // e os argumentos (JSON) espalhados pelos seguintes.
+    const rawToolCalls = [];
 
     for await (const piece of response.body) {
       buffer += decoder.decode(piece, { stream: true });
@@ -317,29 +339,38 @@ export async function callProviderStream({
         }
 
         const choice = event?.choices?.[0];
+        const thought = reasoningDelta(choice?.delta);
+        if (thought) {
+          reasoning += thought;
+          onReasoning?.(thought);
+        }
         const delta = choice?.delta?.content;
         if (typeof delta === "string" && delta) {
           content += delta;
           onDelta?.(delta);
         }
+        for (const part of Array.isArray(choice?.delta?.tool_calls) ? choice.delta.tool_calls : []) {
+          const index = Number.isInteger(part?.index) ? part.index : rawToolCalls.length;
+          const slot = (rawToolCalls[index] ||= { name: "", arguments: "" });
+          if (part?.function?.name) slot.name += part.function.name;
+          if (typeof part?.function?.arguments === "string") slot.arguments += part.function.arguments;
+        }
         if (choice?.finish_reason) finishReason = choice.finish_reason;
         if (event?.usage) usage = event.usage;
         if (event?.model) resolvedModel = event.model;
-        // As citacoes podem vir no delta ou na mensagem consolidada.
-        const found = extractSources(choice?.delta || choice?.message);
-        if (found.length) sources = found;
       }
     }
 
-    if (!content.trim()) {
+    const toolCalls = finishToolCalls(rawToolCalls);
+    if (!content.trim() && !toolCalls.length) {
       throw new MineError("O modelo respondeu vazio.", { code: "empty", retryable: true });
     }
 
     markKeySuccess(provider, apiKey);
     return {
       content: content.trim(),
-      reasoning: "",
-      sources,
+      toolCalls,
+      reasoning: reasoning.trim(),
       provider,
       providerModel,
       resolvedModel,
@@ -374,11 +405,11 @@ export async function callProvider({
   providerModel,
   messages,
   maxTokens = 1024,
-  temperature = 0.3,
   timeoutMs = 45_000,
   signal,
-  plugins,
   providerParams,
+  tools,
+  toolChoice,
 }) {
   const entry = PROVIDERS[provider];
   if (!entry) throw new MineError(`Provedor desconhecido: ${provider}`, { code: "config" });
@@ -417,19 +448,20 @@ export async function callProvider({
       headers: {
         "content-type": "application/json",
         accept: "application/json",
-        authorization: `Bearer ${apiKey}`,
+        ...providerHeaders(entry, apiKey),
         ...entry.extraHeaders(),
       },
-      body: JSON.stringify({
-        model: providerModel,
-        messages,
-        temperature,
-        top_p: 0.9,
-        max_tokens: maxTokens,
-        stream: false,
-        ...(plugins ? { plugins } : {}),
-        ...(providerParams || {}),
-      }),
+      body: JSON.stringify(
+        providerRequestBody(entry, {
+          providerModel,
+          messages,
+          maxTokens,
+          stream: false,
+          providerParams,
+          tools,
+          toolChoice,
+        }),
+      ),
     });
 
     let data = {};
@@ -453,7 +485,7 @@ export async function callProvider({
       });
     }
 
-    // O OpenRouter pode responder 200 com erro no corpo.
+    // Provedores agregadores podem responder 200 com erro no corpo.
     if (data?.error) {
       const status = Number(data.error.code) || 0;
       const { code, retryable, cooldownMs } = classifyStatus(status, data.error.message);
@@ -462,19 +494,25 @@ export async function callProvider({
 
     const message = data?.choices?.[0]?.message || {};
     const content = pickMessageText(message).trim();
+    const toolCalls = finishToolCalls(
+      (Array.isArray(message.tool_calls) ? message.tool_calls : []).map((call) => ({
+        name: call?.function?.name || "",
+        arguments: call?.function?.arguments || "",
+      })),
+    );
 
     // Modelos de raciocinio as vezes gastam todo o orcamento pensando e voltam
     // com content vazio. Isso e falha aproveitavel: deixa o fallback tentar
     // outro nivel em vez de mostrar uma bolha em branco.
-    if (!content) {
+    if (!content && !toolCalls.length) {
       throw new MineError("O modelo respondeu vazio.", { code: "empty", retryable: true });
     }
 
     markKeySuccess(provider, apiKey);
     return {
       content,
+      toolCalls,
       reasoning: String(message.reasoning || "").trim(),
-      sources: extractSources(message),
       provider,
       providerModel,
       resolvedModel: data?.model || providerModel,

@@ -6,6 +6,7 @@ import pg from "pg";
 import { loadLocalEnv } from "./gemini-server.mjs";
 import { gamificationStats, levelFromXp, rankingWindows, totalXp, unlockedAchievements, xpSince } from "./shared/xp.mjs";
 import { dailyChallengeKey, leagueFromPoints, seasonPoints } from "./shared/game-meta.mjs";
+import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
 
 const { Pool } = pg;
 const scrypt = promisify(scryptCallback);
@@ -41,10 +42,16 @@ const pool =
   usePostgres
     ? new Pool({
         connectionString: databaseUrl,
+        // O certificado do servidor e validado de verdade. Antes ficava em
+        // `rejectUnauthorized: false`, o que anulava o `sslmode=verify-full`
+        // que `normalizeDatabaseUrl` acabou de forcar na URL: a conexao ia
+        // cifrada, mas sem conferir quem estava do outro lado. Banco que nao
+        // apresenta cadeia confiavel deve usar `DATABASE_SSL=false` de forma
+        // explicita, nunca uma validacao desligada em silencio.
         ssl:
           process.env.DATABASE_SSL === "false" || databaseUrl.includes("localhost") || databaseUrl.includes("127.0.0.1")
             ? false
-            : { rejectUnauthorized: false },
+            : { rejectUnauthorized: true },
       })
     : null;
 
@@ -74,7 +81,7 @@ function defaultSettings(name) {
     focusMinutes: 25,
     mineStyle: "equilibrada",
     reminders: true,
-    themeMode: "dark",
+    themeMode: "light",
     accentColor: "#39F59A",
   };
 }
@@ -150,6 +157,15 @@ async function ensurePostgres() {
       user_id text not null,
       is_admin boolean not null default false,
       expires_at timestamptz not null
+    )
+  `);
+  await pool.query(`
+    create table if not exists minerva_quota (
+      user_id text not null,
+      kind text not null,
+      day date not null,
+      used integer not null default 0,
+      primary key (user_id, kind, day)
     )
   `);
   await pool.query(
@@ -402,6 +418,77 @@ async function requireSession(req, res) {
   return session;
 }
 
+/**
+ * Cota diária por conta para o que custa dinheiro a cada uso (a IA de
+ * imagens do Ateliê). Fica no banco porque a memória da função na Vercel não
+ * sobrevive entre instâncias. Devolve o total usado contando este uso, ou
+ * `null` quando o teto já foi atingido.
+ */
+const localQuota = new Map();
+function quotaDay() {
+  return new Date().toISOString().slice(0, 10);
+}
+async function takeQuota(userId, kind, limit) {
+  const day = quotaDay();
+  if (pool) {
+    await ensurePostgres();
+    const result = await pool.query(
+      `insert into minerva_quota (user_id, kind, day, used) values ($1, $2, $3, 1)
+       on conflict (user_id, kind, day) do update set used = minerva_quota.used + 1
+       where minerva_quota.used < $4
+       returning used`,
+      [userId, kind, day, limit],
+    );
+    return result.rows[0] ? Number(result.rows[0].used) : null;
+  }
+  const key = `${userId}:${kind}:${day}`;
+  const used = localQuota.get(key) || 0;
+  if (used >= limit) return null;
+  localQuota.set(key, used + 1);
+  return used + 1;
+}
+async function giveBackQuota(userId, kind) {
+  const day = quotaDay();
+  if (pool) {
+    await pool.query(`update minerva_quota set used = greatest(0, used - 1) where user_id = $1 and kind = $2 and day = $3`, [userId, kind, day]);
+    return;
+  }
+  const key = `${userId}:${kind}:${day}`;
+  localQuota.set(key, Math.max(0, (localQuota.get(key) || 0) - 1));
+}
+async function quotaUsed(userId, kind) {
+  if (pool) {
+    await ensurePostgres();
+    const result = await pool.query(`select used from minerva_quota where user_id = $1 and kind = $2 and day = $3`, [userId, kind, quotaDay()]);
+    return Number(result.rows[0]?.used || 0);
+  }
+  return localQuota.get(`${userId}:${kind}:${quotaDay()}`) || 0;
+}
+
+async function handleAtelieIa(req, res) {
+  const session = await requireSession(req, res);
+  if (!session) return;
+  if (req.method === "GET") {
+    sendJson(req, res, 200, { used: await quotaUsed(session.userId, "atelie-ia"), limit: ATELIE_DAILY_LIMIT });
+    return;
+  }
+  const body = await readJson(req);
+  const used = await takeQuota(session.userId, "atelie-ia", ATELIE_DAILY_LIMIT);
+  if (used === null) {
+    sendJson(req, res, 429, { error: `Hoje você já usou as ${ATELIE_DAILY_LIMIT} conversões com IA. Amanhã tem mais!`, used: ATELIE_DAILY_LIMIT, limit: ATELIE_DAILY_LIMIT });
+    return;
+  }
+  try {
+    const result = await coloringPageFromPhoto({ image: body.image });
+    sendJson(req, res, 200, { image: result.image, ms: result.ms, used, limit: ATELIE_DAILY_LIMIT });
+  } catch (error) {
+    // Falhou: o uso não conta.
+    await giveBackQuota(session.userId, "atelie-ia").catch(() => undefined);
+    const status = error instanceof AtelieError ? error.status : 502;
+    sendJson(req, res, status, { error: error instanceof AtelieError ? error.message : "A IA não conseguiu desenhar essa foto agora.", used: used - 1, limit: ATELIE_DAILY_LIMIT });
+  }
+}
+
 async function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
   const hash = await scrypt(password, salt, 64);
@@ -432,9 +519,24 @@ async function readJson(req) {
   return body ? JSON.parse(body) : {};
 }
 
+/**
+ * Sem `ADMIN_ACCESS_PASSWORD` configurada nao existe senha administrativa
+ * nenhuma: o acesso admin simplesmente fecha.
+ *
+ * Aqui havia uma senha fixa no codigo como ultimo recurso. Ela transformava
+ * "esqueci de configurar a variavel" em "quem le o repositorio vira admin do
+ * site em producao" — e admin enxerga a conta e as conversas de todo mundo.
+ * Falhar fechado e barulhento e melhor que continuar aberto em silencio.
+ *
+ * A comparacao e de tempo constante para nao vazar o tamanho da senha nem o
+ * prefixo correto atraves do tempo de resposta.
+ */
 function adminPasswordMatches(value) {
-  const expected = process.env.ADMIN_ACCESS_PASSWORD || "45472452";
-  return value === expected;
+  const expected = String(process.env.ADMIN_ACCESS_PASSWORD || "");
+  if (!expected) return false;
+  const provided = Buffer.from(String(value || ""), "utf8");
+  const target = Buffer.from(expected, "utf8");
+  return provided.length === target.length && timingSafeEqual(provided, target);
 }
 
 function sendJson(req, res, status, payload) {
@@ -804,6 +906,11 @@ export async function handleDataRequest(req, res) {
       const body = await readJson(req);
       const nextData = await mutateData((currentData) => mergeUserData(currentData, body.data || body, session));
       sendJson(req, res, 200, { data: dataForSession(nextData, session), database: pool ? "postgres" : "local-file" });
+      return true;
+    }
+
+    if (url.pathname === "/api/atelie-ia" && (req.method === "POST" || req.method === "GET")) {
+      await handleAtelieIa(req, res);
       return true;
     }
 

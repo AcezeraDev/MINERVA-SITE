@@ -1,0 +1,493 @@
+/*
+  CADERNO VIVO — identidade do Minerva.
+
+  O site é o caderno do aluno: folha pautada com margem vermelha, texto em
+  caneta azul, destaques em marca-texto e a navegação como divisórias de
+  fichário. De dia é papel; de noite é o mesmo caderno com a luz apagada.
+
+  Como esta camada funciona: o app inteiro foi escrito com `text-white/…`,
+  `bg-white/…` e poucos tons fixos. Em vez de reescrever milhares de classes,
+  os tokens (--ink, --panel, --theme-text…) mudam de valor aqui e as regras de
+  tema claro que já existiam no index.css fazem a tradução. O que o caderno
+  acrescenta de novo tem prefixo `caderno-`.
+
+  A cor escolhida pela pessoa (--mint) é o marca-texto: fundo de destaque,
+  grifo, preenchimento de progresso. Texto em destaque é caneta (--pen),
+  porque marca-texto não se lê sobre papel.
+*/
+
+/* ───────────────────────── tokens: caderno à noite ───────────────────────── */
+:root {
+  --ink: 17 21 30;
+  --graphite: 21 26 37;
+  --panel: 26 32 48;
+  --panel-2: 33 41 60;
+  --line: 44 56 82;
+  --theme-text: 232 236 244;
+  --theme-muted: 154 163 182;
+
+  --paper: 17 21 30;
+  --sheet: 21 26 38;
+  --rule: 34 44 66;
+  --margin-line: 255 107 111;
+  --pen: 147 163 255;
+  --pen-ink: 17 21 30; /* cor do texto sobre um botão de caneta */
+  --hl-yellow: 214 207 42;
+  --hl-pink: 232 118 146;
+  --hl-lilac: 150 130 240;
+  --hl-mint: 47 212 131;
+
+  --tab-estudo: var(--hl-mint);
+  --tab-ia: var(--hl-lilac);
+  --tab-com: var(--hl-yellow);
+  --tab-conta: var(--hl-pink);
+
+  --card-shadow: 0 1px 0 rgba(0, 0, 0, 0.35), 0 18px 34px -22px rgba(0, 0, 0, 0.75);
+  --hl-blend: normal;
+  --line-step: 32px;
+}
+
+/* ───────────────────────── tokens: caderno de dia ───────────────────────── */
+html.theme-light {
+  --ink: 237 241 245;
+  --graphite: 229 234 240;
+  --panel: 255 255 255;
+  --panel-2: 247 249 251;
+  --line: 203 215 230;
+  --theme-text: 22 24 29;
+  --theme-muted: 90 98 114;
+
+  --paper: 237 241 245;
+  --sheet: 247 249 251;
+  --rule: 203 215 230;
+  --margin-line: 229 72 77;
+  --pen: 29 43 184;
+  --pen-ink: 255 255 255;
+  --hl-yellow: 244 240 90;
+  --hl-pink: 255 179 193;
+  --hl-lilac: 201 188 255;
+  --hl-mint: 141 247 180;
+
+  --card-shadow: 0 1px 0 rgba(22, 24, 29, 0.05), 0 12px 28px -18px rgba(29, 43, 184, 0.3);
+  --hl-blend: multiply;
+}
+
+/* ───────────────────────── espiral do caderno ─────────────────────────
+   Cada volta do arame passa por cima da borda da folha e entra no furo. */
+html.theme-light {
+  --spiral: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='36'%3E%3Ccircle cx='27' cy='19' r='5' fill='%23C9D2DE'/%3E%3Cpath d='M1 25 C 1 9 27 7 27 19' fill='none' stroke='%237C8595' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M3 22 C 5 12 22 10 25 17' fill='none' stroke='%23FFFFFF' stroke-opacity='.55' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+/* Espiral no caderno à noite: arame cinza, furo da cor da mesa. */
+html:not(.theme-light) {
+  --spiral: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='36'%3E%3Ccircle cx='27' cy='19' r='5' fill='%230B0E14'/%3E%3Cpath d='M1 25 C 1 9 27 7 27 19' fill='none' stroke='%238A93A6' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M3 22 C 5 12 22 10 25 17' fill='none' stroke='%23FFFFFF' stroke-opacity='.3' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+/* Tons fixos do tema antigo (verde-grafite) viram o painel do caderno à noite. */
+html:not(.theme-light) .workspace-shell :is(
+  [class*="bg-[#171c1a]"],
+  [class*="bg-[#151a18]"],
+  [class*="bg-[#141a17]"],
+  [class*="bg-[#1b211e]"],
+  [class*="bg-[#121815]"],
+  [class*="bg-[#111310]"],
+  [class*="bg-[#161f1b]"],
+  [class*="bg-[#101714]"],
+  [class*="bg-[#0d1511]"]
+),
+html:not(.theme-light) .workspace-shell :is(.glass, .glass-deep) {
+  background-color: rgb(var(--panel)) !important;
+}
+
+html:not(.theme-light) .workspace-shell :is([class*="bg-[#202723]"], [class*="bg-[#26332d]"], [class*="bg-[#1d2822]"], [class*="bg-[#19241e]"]) {
+  background-color: rgb(var(--panel-2)) !important;
+}
+
+html:not(.theme-light) .caderno-hl {
+  --hl-c: rgb(var(--mint) / 0.55);
+}
+
+html:not(.theme-light) mark.caderno-mark {
+  background-image: linear-gradient(rgb(var(--hl-yellow) / 0.55), rgb(var(--hl-yellow) / 0.55));
+}
+
+html:not(.theme-light) .caderno-tab {
+  background: rgb(var(--tab) / 0.72);
+}
+
+html:not(.theme-light) .caderno-tab[aria-current="page"] {
+  background: rgb(var(--tab));
+}
+
+html,
+body {
+  background: rgb(var(--paper));
+}
+
+body {
+  color: rgb(var(--theme-text));
+  font-family: "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible", system-ui, sans-serif;
+}
+
+::selection {
+  background: rgb(var(--mint) / 0.55);
+  color: rgb(var(--theme-text));
+}
+
+:focus-visible {
+  outline: 2px dashed rgb(var(--pen));
+  outline-offset: 3px;
+}
+
+::-webkit-scrollbar-thumb,
+.minerva-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--pen) / 0.35);
+}
+
+.minerva-scroll {
+  scrollbar-color: rgb(var(--pen) / 0.3) transparent;
+}
+
+/* Títulos largos: Anybody é variável em largura, e o caderno escreve de
+   letra aberta. O tracking negativo que o app pedia para Space Grotesk faria
+   as letras colarem nesta família. */
+.font-display {
+  font-variation-settings: "wdth" 112;
+}
+
+.font-display[class*="tracking-[-"] {
+  letter-spacing: -0.015em;
+}
+
+.font-mono {
+  font-variation-settings: normal;
+}
+
+/* ───────────────────────── a folha ───────────────────────── */
+.study-studio,
+.theme-light .study-studio {
+  background: rgb(var(--paper));
+}
+
+.study-studio::before,
+.theme-light .study-studio::before {
+  background: none;
+}
+
+/*
+  A folha é o próprio <main>. Três camadas de fundo, de cima para baixo:
+  furos do fichário, linha de margem e pauta. Tudo em gradiente: nada de
+  imagem, nada de canvas, e o papel rola junto com o conteúdo de graça.
+*/
+.workspace-canvas.shell-shift {
+  --margin-x: 0.85rem;
+  padding-left: 1.75rem;
+  background-color: rgb(var(--sheet));
+  background-image:
+    linear-gradient(
+      to right,
+      transparent calc(var(--margin-x) - 1px),
+      rgb(var(--margin-line) / 0.5) calc(var(--margin-x) - 1px),
+      rgb(var(--margin-line) / 0.5) calc(var(--margin-x) + 1px),
+      transparent calc(var(--margin-x) + 1px)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(var(--line-step) - 1px),
+      rgb(var(--rule) / 0.75) calc(var(--line-step) - 1px),
+      rgb(var(--rule) / 0.75) var(--line-step)
+    );
+  background-position: 0 0, 0 5.4rem;
+  border-left: 0;
+}
+
+@media (min-width: 768px) {
+  .workspace-canvas.shell-shift {
+    --margin-x: 2.6rem;
+    padding-left: 3.75rem;
+    background-image:
+      var(--spiral),
+      linear-gradient(
+        to right,
+        transparent calc(var(--margin-x) - 1px),
+        rgb(var(--margin-line) / 0.5) calc(var(--margin-x) - 1px),
+        rgb(var(--margin-line) / 0.5) calc(var(--margin-x) + 1px),
+        transparent calc(var(--margin-x) + 1px)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent calc(var(--line-step) - 1px),
+        rgb(var(--rule) / 0.75) calc(var(--line-step) - 1px),
+        rgb(var(--rule) / 0.75) var(--line-step)
+      );
+    background-size: 2.5rem 2.25rem, auto, auto;
+    background-repeat: repeat-y, no-repeat, repeat;
+    background-position: 0 2.5rem, 0 0, 0 5.4rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .workspace-canvas.shell-shift {
+    --margin-x: 3.4rem;
+    padding-left: 4.75rem;
+    box-shadow: inset 10px 0 18px -16px rgb(0 0 0 / 0.35);
+  }
+}
+
+/* Na Mine a tela é um chat em altura cheia: folha lisa, sem pauta. */
+.workspace-canvas:not(.shell-shift) {
+  background: rgb(var(--sheet));
+}
+
+/* ───────────────────────── superfícies ───────────────────────── */
+
+/* Tons fixos do tema antigo (verde-grafite) viram o painel do caderno. */
+
+
+/* Cartões: folha solta branca sobre o caderno, com sombra azulada de papel. */
+.workspace-shell :is(.studio-card, .studio-hero-card, .studio-library, .glass, .glass-deep) {
+  border-color: rgb(var(--line) / 0.9);
+  box-shadow: var(--card-shadow);
+}
+
+.theme-light .workspace-shell :is(.glass, .glass-deep),
+.theme-light :is(.workspace-shell, .auth-stage, .minerva-splash) :is(.glass, .glass-deep) {
+  background: rgb(var(--panel));
+  border-color: rgb(var(--line));
+  box-shadow: var(--card-shadow);
+}
+
+.theme-light :is(.workspace-shell, .auth-stage, .minerva-splash) :is(
+  [class*="bg-[#090e0c]"],
+  [class*="bg-[#080d0b]"],
+  [class*="bg-[#0b0b0f]"],
+  [class*="bg-[#0d0d11]"],
+  [class*="bg-[#0d1511]"],
+  [class*="bg-[#0d1512]"],
+  [class*="bg-[#101714]"],
+  [class*="bg-[#101917]"],
+  [class*="bg-[#12141b]"],
+  [class*="bg-[#141a17]"],
+  [class*="bg-[#151a18]"],
+  [class*="bg-[#161f1b]"],
+  [class*="bg-[#171c1a]"],
+  [class*="bg-[#1a231f]"],
+  [class*="bg-[#1b211e]"],
+  [class*="bg-[#1d2822]"],
+  [class*="bg-[#19241e]"],
+  [class*="bg-[#202723]"],
+  [class*="bg-[#26332d]"]
+) {
+  background-color: rgb(var(--panel)) !important;
+}
+
+.theme-light :is(.workspace-shell, .auth-stage, .minerva-splash) [class*="border-white"] {
+  border-color: rgb(var(--line)) !important;
+}
+
+.theme-light :is(.workspace-shell, .auth-stage, .minerva-splash) [class*="bg-white/"] {
+  background-color: rgb(var(--pen) / 0.045) !important;
+}
+
+.theme-light :is(.workspace-shell, .auth-stage, .minerva-splash) [class*="text-white/"] {
+  color: rgb(var(--theme-muted)) !important;
+}
+
+/* Texto em destaque é caneta. Só os tokens inteiros: `hover:text-mint`
+   continua sendo hover. */
+.theme-light :is(.workspace-shell, .auth-stage, .minerva-splash, .modal-surface) :is(
+  [class~="text-mint"],
+  [class*=" text-mint/"],
+  [class^="text-mint/"],
+  [class~="text-mintDeep"]
+),
+.theme-light :is(.workspace-shell, .auth-stage) [class~="hover:text-mint"]:hover,
+.theme-light :is(.workspace-shell, .auth-stage) .group:hover [class~="group-hover:text-mint"] {
+  color: rgb(var(--pen)) !important;
+}
+
+.theme-light :is(.workspace-shell, .auth-stage) :is([class~="border-mint"], [class*=" border-mint/"]) {
+  border-color: rgb(var(--pen) / 0.55) !important;
+}
+
+/* Sobre marca-texto a letra é sempre escura, nos dois modos. */
+.workspace-shell [class~="bg-mint"] {
+  color: #14161b;
+}
+
+/* Botão principal: tinta de caneta. */
+.caderno-btn-pen {
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+  box-shadow: 0 8px 18px -12px rgb(var(--pen) / 0.9);
+}
+
+.caderno-btn-pen:hover {
+  filter: brightness(1.12);
+}
+
+/* ───────────────────────── capa e divisórias ───────────────────────── */
+.caderno-cover.studio-sidebar {
+  background: rgb(var(--paper)) !important;
+  border-right: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.caderno-cover > div:first-child {
+  border-bottom: 0 !important;
+}
+
+.caderno-tab-group {
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-tab {
+  --tab: var(--tab-estudo);
+  margin-right: 0.9rem;
+  width: calc(100% - 0.9rem);
+  padding: 0.45rem 0.8rem 0.45rem 0.9rem;
+  border-radius: 0.2rem 0.75rem 0.75rem 0.2rem;
+  background: rgb(var(--tab) / 0.9);
+  color: #14161b;
+  box-shadow: inset -6px 0 8px -7px rgb(0 0 0 / 0.35);
+  transform: translateX(0);
+  transition: transform 240ms cubic-bezier(0.2, 0, 0, 1), background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.caderno-tab[data-tone="ia"] { --tab: var(--tab-ia); }
+.caderno-tab[data-tone="com"] { --tab: var(--tab-com); }
+.caderno-tab[data-tone="conta"] { --tab: var(--tab-conta); }
+
+.caderno-tab:hover {
+  transform: translateX(0.35rem);
+}
+
+/* A aba aberta avança até a folha e perde a sombra da dobra. */
+.caderno-tab[aria-current="page"] {
+  transform: translateX(0.9rem);
+  background: rgb(var(--tab));
+  box-shadow: none;
+  font-weight: 800;
+  padding-left: 1.15rem;
+}
+
+.caderno-tab svg {
+  opacity: 0.7;
+}
+
+.caderno-tab[aria-current="page"] svg {
+  opacity: 1;
+}
+
+
+
+/* Rodapé da capa (nível) e topo. */
+.caderno-cover > button:last-child {
+  border-top-color: rgb(var(--line)) !important;
+}
+
+.studio-utility,
+.theme-light .studio-utility {
+  background: rgb(var(--sheet) / 0.94);
+  border-bottom: 1px solid rgb(var(--rule)) !important;
+}
+
+/* ───────────────────────── escrita ───────────────────────── */
+.caderno-hand,
+.caderno-note {
+  font-family: "Gochi Hand", "Comic Sans MS", cursive;
+  color: rgb(var(--pen));
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.caderno-note {
+  display: inline-block;
+  font-size: 1.4rem;
+  line-height: 1;
+  transform: rotate(-1.5deg);
+  transform-origin: left center;
+}
+
+.caderno-page-header {
+  border-bottom: 0 !important;
+}
+
+.caderno-title {
+  font-variation-settings: "wdth" 118;
+  letter-spacing: -0.01em;
+  max-width: 22ch;
+}
+
+/*
+  O grifo. Fundo em gradiente com `box-decoration-break: clone`: quando o
+  título quebra de linha, cada linha ganha o próprio traço, como na vida real.
+  A animação cresce o traço da esquerda para a direita depois que o título
+  aparece.
+*/
+.caderno-hl {
+  --hl-c: rgb(var(--mint));
+  background-image: linear-gradient(var(--hl-c), var(--hl-c));
+  background-repeat: no-repeat;
+  background-position: 0 88%;
+  background-size: 100% 48%;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  border-radius: 0.18em 0.5em 0.22em 0.6em;
+  padding: 0 0.1em;
+  margin: 0 -0.1em;
+  animation: caderno-swipe 620ms cubic-bezier(0.2, 0, 0, 1) 360ms both;
+}
+
+
+@keyframes caderno-swipe {
+  from { background-size: 0% 48%; }
+  to { background-size: 100% 48%; }
+}
+
+/* Grifo de busca: amarelo, mais curto. */
+mark.caderno-mark {
+  color: inherit;
+  background-image: linear-gradient(rgb(var(--hl-yellow)), rgb(var(--hl-yellow)));
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: 0 90%;
+  background-size: 100% 70%;
+  border-radius: 0.15em 0.35em;
+  padding: 0 0.06em;
+  animation: caderno-mark 380ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+
+@keyframes caderno-mark {
+  from { background-size: 0% 70%; }
+  to { background-size: 100% 70%; }
+}
+
+/* XP que sai voando até o contador. */
+.caderno-float-xp {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: rgb(var(--pen));
+  white-space: nowrap;
+}
+
+/* Barra inferior do celular: a aba ativa é uma divisória de marca-texto. */
+.workspace-shell nav.safe-bottom {
+  background: rgb(var(--sheet) / 0.97) !important;
+  border-top: 1px solid rgb(var(--rule)) !important;
+}
+
+/* Aba escondida (ver main.tsx): nenhuma animação CSS roda em segundo plano. */
+html.is-tab-hidden *,
+html.is-tab-hidden *::before,
+html.is-tab-hidden *::after {
+  animation-play-state: paused !important;
+}

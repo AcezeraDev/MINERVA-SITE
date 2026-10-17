@@ -10,10 +10,12 @@ function matches(text, pattern) {
 
 function expectedCount(task, prompt) {
   const source = String(prompt || "");
-  if (task === "caca") {
-    const minimum = source.match(/pelo\s+menos\s+(\d+)/i);
-    if (minimum) return Number(minimum[1]);
-  }
+  // "pelo menos N" vence "crie N" em qualquer task: os jogos pedem itens a mais
+  // do que a partida usa, porque o cliente descarta o que ja saiu em rodadas
+  // anteriores. Sem esta regra o controle de qualidade cobraria a folga e
+  // rejeitaria um lote que era perfeitamente jogavel.
+  const minimum = source.match(/pelo\s+menos\s+(\d+)/i);
+  if (minimum) return Number(minimum[1]);
   const requested = source.match(/(?:gere|crie|escolha)\s+(\d+)/i);
   if (requested) return Number(requested[1]);
   return { vf: 3, pares: 3, forca: 1, caca: 4, quiz: 3, flashcards: 3, sequencia: 3 }[task] || 1;
@@ -111,12 +113,14 @@ function validateFlashcards(reply, minimum) {
   return valid.length >= minimum ? "" : `flashcards incompletos (${valid.length}/${minimum})`;
 }
 
-export function replyQualityIssue({ task = "", reply = "", prompt = "" } = {}) {
+export function replyQualityIssue({ task = "", reply = "", prompt = "", finishReason = "" } = {}) {
   const cleanTask = String(task || "").trim();
   const text = String(reply || "").trim();
   if (!text) return "resposta vazia";
+  if (finishReason === "length") return "resposta interrompida pelo limite de saida";
 
   if (!cleanTask) {
+    if ((text.match(/^\s*```/gm) || []).length % 2) return "bloco de codigo incompleto";
     if (/^(okay|we need answer|the user|assistant analysis)\b/i.test(text)) return "raciocinio interno exposto";
     if (String(prompt || "").trim().length > 30 && text.length < 8) return "resposta curta demais";
     return "";

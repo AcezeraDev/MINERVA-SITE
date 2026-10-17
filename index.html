@@ -3,21 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#070D0A" />
+    <meta name="theme-color" content="#EDF1F5" />
     <script>
       (() => {
         try {
-          const saved = JSON.parse(localStorage.getItem("minerva-appearance-v1") || "{}");
-          const light = saved.themeMode === "light";
+          // v2: o site abre branco; da v1 só a cor de destaque é aproveitada.
+          const current = localStorage.getItem("minerva-appearance-v2");
+          const legacy = JSON.parse(localStorage.getItem("minerva-appearance-v1") || "{}");
+          const saved = current ? JSON.parse(current) : { accentColor: legacy.accentColor };
+          const light = saved.themeMode !== "dark";
           const color = /^#[0-9a-f]{6}$/i.test(saved.accentColor || "") ? saved.accentColor : "#39F59A";
           const raw = color.slice(1);
           const rgb = [0, 2, 4].map((start) => parseInt(raw.slice(start, start + 2), 16));
-          const ui = light ? rgb.map((channel) => Math.round(channel * 0.78)) : rgb;
+          const ui = rgb;
           document.documentElement.classList.toggle("theme-light", light);
           document.documentElement.style.colorScheme = light ? "light" : "dark";
           document.documentElement.style.setProperty("--mint", ui.join(" "));
           document.documentElement.style.setProperty("--mint-deep", ui.map((channel) => Math.round(channel * 0.8)).join(" "));
-          document.querySelector('meta[name="theme-color"]').setAttribute("content", light ? "#F1F6F2" : "#070D0A");
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", light ? "#EDF1F5" : "#11151E");
         } catch {}
       })();
     </script>

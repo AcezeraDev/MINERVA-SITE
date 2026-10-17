@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { handleGeminiRequest, loadLocalEnv } from "./gemini-server.mjs";
 import { handleDataRequest } from "./data-server.mjs";
+import { handleEducationRequest } from "./education-server.mjs";
 
 const appRoot = resolve(process.cwd());
 const root = resolve(process.env.STATIC_DIR || (existsSync(join(appRoot, "dist")) ? join(appRoot, "dist") : appRoot));
@@ -32,6 +33,7 @@ createServer(async (req, res) => {
     return;
   }
   if (url.pathname.startsWith("/api/")) {
+    if (await handleEducationRequest(req, res)) return;
     await handleDataRequest(req, res);
     return;
   }

@@ -1,0 +1,53 @@
+/* Virada de página (PageCurl.tsx). Fica abaixo do cabeçalho fixo (z-40). */
+.caderno-pagecurl {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+  display: none;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* o verso da folha: papel pautado, um tom mais fundo que a frente */
+.caderno-pagecurl-back {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform-origin: 0 0;
+  background:
+    linear-gradient(to right, transparent 0 calc(100% - 4.5rem), rgb(var(--margin-line) / 0.35) calc(100% - 4.5rem) calc(100% - 4.5rem + 2px), transparent 0),
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--line-step) - 1px), rgb(var(--rule) / 0.55) calc(var(--line-step) - 1px) var(--line-step)),
+    linear-gradient(rgb(0 0 0 / 0.035), rgb(0 0 0 / 0.035)),
+    rgb(var(--sheet));
+  will-change: transform, clip-path;
+}
+
+.caderno-pagecurl-shade,
+.caderno-pagecurl-fold {
+  position: absolute;
+  top: -150vh;
+  left: 0;
+  height: 300vh;
+  transform-origin: 0 50%;
+}
+
+/* sombra da folha virando, projetada na página de baixo */
+.caderno-pagecurl-shade {
+  width: 90px;
+  background: linear-gradient(to right, rgb(0 0 0 / 0.26), rgb(0 0 0 / 0.08) 40%, transparent);
+}
+
+/* brilho e curvatura do verso perto da dobra */
+.caderno-pagecurl-fold {
+  width: 140px;
+  background: linear-gradient(to right, rgb(0 0 0 / 0.16), rgb(255 255 255 / 0.35) 18%, rgb(0 0 0 / 0.05) 55%, transparent);
+}
+
+html:not(.theme-light) .caderno-pagecurl-shade {
+  background: linear-gradient(to right, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.18) 40%, transparent);
+}
+
+html:not(.theme-light) .caderno-pagecurl-fold {
+  background: linear-gradient(to right, rgb(0 0 0 / 0.4), rgb(255 255 255 / 0.08) 18%, transparent 60%);
+}

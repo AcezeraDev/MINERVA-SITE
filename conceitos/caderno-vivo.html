@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Minerva · Caderno vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@50..150,300..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@400;500&family=Gochi+Hand&display=swap" rel="stylesheet">
+<style>
+/* ───────── Tokens ─────────
+   papel azulado, caneta esferográfica, marca-texto.
+   As cores das divisórias codificam os quatro grupos da navegação. */
+:root{
+  --paper:#EDF1F5; --paper-2:#F7F9FB; --rule:#CBD7E6; --margin:#E5484D;
+  --ink:#1D2BB8; --ink-soft:#4B57C9; --graphite:#16181D; --muted:#5A6272;
+  --hl:#8DF7B4; --hl-yellow:#F4F05A; --hl-pink:#FFB3C1; --hl-lilac:#C9BCFF;
+  --tab-estudo:var(--hl); --tab-ia:var(--hl-lilac); --tab-com:var(--hl-yellow); --tab-conta:var(--hl-pink);
+  --card:#FFFFFF; --shadow:0 1px 0 rgba(22,24,29,.06),0 10px 24px -14px rgba(29,43,184,.28);
+  --blend:multiply;
+  --f-display:"Anybody",system-ui,sans-serif; --f-body:"Atkinson Hyperlegible",system-ui,sans-serif;
+  --f-hand:"Gochi Hand","Comic Sans MS",cursive; --f-mono:"DM Mono",ui-monospace,monospace;
+  --e-out:cubic-bezier(.2,0,0,1); --e-spring:cubic-bezier(.34,1.56,.64,1); --e-in:cubic-bezier(.4,0,1,1);
+  --t-micro:130ms; --t-ui:260ms; --t-page:420ms;
+  --line:32px;
+}
+:root[data-theme="dark"]{
+  --paper:#11151E; --paper-2:#171C27; --rule:#222B3D; --margin:#FF6B6F;
+  --ink:#93A3FF; --ink-soft:#7B8BF0; --graphite:#E8ECF4; --muted:#9AA3B6;
+  --hl:#2FD483; --hl-yellow:#D6CF2A; --hl-pink:#E0708A; --hl-lilac:#8E7BEA;
+  --card:#1A2030; --shadow:0 1px 0 rgba(0,0,0,.4),0 14px 30px -16px rgba(0,0,0,.7);
+  --blend:screen;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#11151E; --paper-2:#171C27; --rule:#222B3D; --margin:#FF6B6F;
+    --ink:#93A3FF; --ink-soft:#7B8BF0; --graphite:#E8ECF4; --muted:#9AA3B6;
+    --hl:#2FD483; --hl-yellow:#D6CF2A; --hl-pink:#E0708A; --hl-lilac:#8E7BEA;
+    --card:#1A2030; --shadow:0 1px 0 rgba(0,0,0,.4),0 14px 30px -16px rgba(0,0,0,.7);
+    --blend:screen;
+  }
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--graphite);font:16px/1.55 var(--f-body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2px dashed var(--ink);outline-offset:4px;border-radius:4px}
+h1,h2,h3{font-family:var(--f-display);margin:0;line-height:1.02;letter-spacing:-.01em}
+p{margin:0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ───────── Barra do laboratório ───────── */
+.lab{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;background:var(--graphite);color:var(--paper);font:12px/1.2 var(--f-mono)}
+.lab b{font-weight:500;color:var(--hl)}
+.lab .ctrls{display:flex;gap:8px}
+.lab button{border:1px solid color-mix(in srgb,var(--paper) 30%,transparent);border-radius:999px;padding:6px 12px;transition:background var(--t-micro) var(--e-out)}
+.lab button:hover{background:color-mix(in srgb,var(--paper) 14%,transparent)}
+.lab button[aria-pressed="true"]{background:var(--hl);color:#0b1a12;border-color:transparent}
+
+/* ───────── Caderno: folha + divisórias ───────── */
+.book{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 190px;max-width:1360px;margin:0 auto;padding:28px 0 0 20px}
+.sheet{position:relative;min-height:calc(100dvh - 70px);background:
+    repeating-linear-gradient(to bottom,transparent 0 calc(var(--line) - 1px),var(--rule) calc(var(--line) - 1px) var(--line)) 0 96px/100% auto no-repeat,
+    var(--paper-2);
+  border-radius:6px 0 0 0;box-shadow:var(--shadow);padding:40px 48px 96px 108px;overflow:hidden}
+.sheet::before{content:"";position:absolute;left:78px;top:0;bottom:0;width:2px;background:var(--margin);opacity:.55}
+.holes{position:absolute;left:22px;top:60px;bottom:0;display:flex;flex-direction:column;gap:88px}
+.holes i{width:18px;height:18px;border-radius:50%;background:var(--paper);box-shadow:inset 0 2px 3px rgba(0,0,0,.18)}
+
+.tabs{position:sticky;top:64px;align-self:start;display:flex;flex-direction:column;gap:3px;padding-top:34px;max-height:calc(100dvh - 70px);overflow-y:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.group-label{font:11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 0 4px 26px}
+.tab{--c:var(--tab-estudo);position:relative;display:flex;align-items:center;gap:8px;text-align:left;min-height:38px;padding:7px 12px 7px 20px;margin-left:-8px;width:calc(100% + 8px);background:var(--c);color:#14161b;border-radius:0 10px 10px 0;font:600 14px/1.1 var(--f-body);transform:translateX(-4px);transition:transform var(--t-ui) var(--e-out),filter var(--t-micro);box-shadow:inset 6px 0 8px -6px rgba(0,0,0,.25)}
+.tab[data-g="ia"]{--c:var(--tab-ia)}.tab[data-g="com"]{--c:var(--tab-com)}.tab[data-g="conta"]{--c:var(--tab-conta)}
+.tab:hover{transform:translateX(4px)}
+.tab[aria-current="page"]{transform:translateX(-14px);padding-left:34px;box-shadow:none;font-weight:700}
+.tab.sub[aria-current="page"]{padding-left:48px}
+.tab[aria-current="page"]::after{content:"";position:absolute;left:-2px;top:0;bottom:0;width:10px;background:var(--c)}
+.tab.sub{font-weight:400;padding-left:34px;font-size:13px;min-height:32px}
+.tab .k{margin-left:auto;font:11px var(--f-mono);opacity:.55}
+:root[data-theme="dark"] .tab{color:#0c0e12}
+
+/* ───────── Tipografia de página ───────── */
+.page{display:none}
+.page.on{display:block}
+.note{font:22px/1 var(--f-hand);color:var(--ink);transform:rotate(-1.5deg);display:inline-block;margin-bottom:10px}
+.page h1{font-size:clamp(40px,6vw,84px);font-weight:800;font-variation-settings:"wdth" 118;max-width:15ch;margin-bottom:16px}
+.page h1 .w{display:inline-block}
+.lede{max-width:56ch;color:var(--muted);font-size:18px;margin-bottom:36px}
+h2{font-size:26px;font-weight:750;font-variation-settings:"wdth" 108}
+h3{font-size:19px;font-weight:700;font-variation-settings:"wdth" 104}
+.eyebrow{font:12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+.hand{font-family:var(--f-hand);color:var(--ink)}
+
+/* Assinatura: o traço de marca-texto */
+.hl{background:linear-gradient(var(--hlc,var(--hl)),var(--hlc,var(--hl))) no-repeat 0 88%/0% 52%;-webkit-box-decoration-break:clone;box-decoration-break:clone;border-radius:.18em .5em .22em .6em;padding:0 .1em;margin:0 -.1em;transition:background-size 560ms var(--e-out) 180ms}
+.page.on .hl,.hl.lit{background-size:100% 52%}
+mark.hlm{background:none;color:inherit;position:relative;z-index:0}
+mark.hlm::before{content:"";position:absolute;z-index:-1;inset:.1em -.08em -.02em;background:var(--hl-yellow);border-radius:.2em .4em;transform:scaleX(0);transform-origin:left;animation:swipe 380ms var(--e-out) forwards;mix-blend-mode:var(--blend)}
+@keyframes swipe{to{transform:scaleX(1)}}
+
+/* entrada da página */
+.page.on .rise{animation:rise var(--t-page) var(--e-out) both;animation-delay:calc(var(--i,0) * 60ms)}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* peças comuns */
+.card{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:22px}
+.grid{display:grid;gap:20px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g-7-5{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 18px;border-radius:10px;background:var(--ink);color:var(--paper-2);font-weight:700;transition:transform var(--t-micro) var(--e-out),filter var(--t-micro)}
+.btn:hover{filter:brightness(1.12)}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:6px 14px;border-radius:999px;box-shadow:inset 0 0 0 1.5px var(--rule);font-size:14px;transition:background var(--t-micro),box-shadow var(--t-micro)}
+.chip:hover{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.chip[aria-pressed="true"]{background:var(--hl);box-shadow:none;color:#0e1a13}
+.seg{display:inline-flex;padding:4px;border-radius:12px;background:var(--paper);gap:2px}
+.seg button{min-height:36px;padding:6px 14px;border-radius:9px;font-weight:700;font-size:14px;color:var(--muted);transition:background var(--t-ui) var(--e-out),color var(--t-micro)}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--graphite);box-shadow:var(--shadow)}
+.xp-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:var(--graphite);color:var(--paper);font:500 14px var(--f-mono)}
+.float-xp{position:fixed;z-index:60;pointer-events:none;font:26px var(--f-hand);color:var(--ink)}
+.stamp{display:inline-block;padding:4px 10px;border:2.5px solid currentColor;border-radius:6px;font:700 12px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;transform:rotate(-6deg)}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.spread{justify-content:space-between}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+input[type=text],input[type=search],textarea,select{background:var(--card);border:1.5px solid var(--rule);border-radius:10px;padding:10px 12px;min-height:44px;width:100%;transition:border-color var(--t-micro)}
+input:focus,textarea:focus,select:focus{border-color:var(--ink);outline:none}
+input[type=range]{accent-color:var(--ink);width:100%}
+
+/* ───────── Início ───────── */
+.todo{list-style:none;margin:0;padding:0}
+.todo li{display:flex;align-items:center;gap:14px;min-height:var(--line);padding:8px 0}
+.todo label{position:relative;display:flex;align-items:center;gap:14px;cursor:pointer;flex:1}
+.todo input{position:absolute;opacity:0}
+.box{flex:none;width:24px;height:24px}
+.box path{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.box .tick{stroke-dasharray:24;stroke-dashoffset:24;transition:stroke-dashoffset 260ms var(--e-out)}
+.todo input:checked + .box .tick{stroke-dashoffset:0}
+.todo input:focus-visible + .box{outline:2px dashed var(--ink);outline-offset:3px;border-radius:4px}
+.todo .txt{position:relative;font-size:17px}
+.todo .txt::after{content:"";position:absolute;left:-4px;right:-4px;top:55%;height:2px;background:var(--ink);transform:scaleX(0);transform-origin:left;transition:transform 300ms var(--e-out) 80ms;border-radius:2px}
+.todo input:checked ~ .txt::after{transform:scaleX(1)}
+.todo input:checked ~ .txt{color:var(--muted)}
+.todo .tag{font:12px var(--f-mono);color:var(--muted)}
+.bar{height:14px;border-radius:7px;background:var(--paper);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--hl);border-radius:7px;transform-origin:left;transform:scaleX(var(--v,0));transition:transform 700ms var(--e-out)}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:14px}
+.week div{aspect-ratio:1;border-radius:10px;background:var(--paper);display:grid;place-items:center;font:12px var(--f-mono);color:var(--muted);position:relative}
+.week div.done{background:var(--hl);color:#0e1a13}
+.week div.today{box-shadow:inset 0 0 0 2px var(--ink)}
+
+/* ───────── Agenda ───────── */
+.planner{display:grid;grid-template-columns:repeat(7,minmax(128px,1fr));gap:10px;overflow-x:auto;padding-bottom:10px}
+.day{min-height:320px;border-radius:12px;background:var(--card);box-shadow:var(--shadow);padding:10px;display:flex;flex-direction:column;gap:8px;transition:background var(--t-micro)}
+.day header{display:flex;justify-content:space-between;align-items:baseline;padding:2px 4px 8px;border-bottom:1.5px dashed var(--rule)}
+.day header b{font:800 20px var(--f-display)}
+.day.today header b{--hlc:var(--hl-yellow);background-size:100% 52%}
+.day.over{background:color-mix(in srgb,var(--hl) 22%,var(--card))}
+.sticky{--c:var(--hl-yellow);position:relative;background:var(--c);color:#16181D;border-radius:4px 4px 10px 4px;padding:10px 10px 12px;font-size:14px;line-height:1.3;box-shadow:0 4px 10px -6px rgba(0,0,0,.35);cursor:grab;touch-action:none;user-select:none;transition:transform var(--t-ui) var(--e-out),box-shadow var(--t-ui)}
+.sticky:nth-child(odd){transform:rotate(-1.2deg)}.sticky:nth-child(even){transform:rotate(1deg)}
+.sticky:hover{transform:rotate(0) translateY(-2px)}
+.sticky small{display:block;font:11px var(--f-mono);opacity:.7;margin-top:4px}
+.sticky[data-t="prova"]{--c:var(--hl-pink)}.sticky[data-t="revisao"]{--c:var(--hl)}.sticky[data-t="trabalho"]{--c:var(--hl-yellow)}
+.sticky.picked{outline:2px dashed var(--ink);outline-offset:3px}
+.sticky.ghost{position:fixed;z-index:70;pointer-events:none;cursor:grabbing;box-shadow:0 22px 30px -12px rgba(0,0,0,.45);width:var(--w)}
+.sticky.placeholder{opacity:.25}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:14px}
+.legend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+
+/* ───────── Foco ───────── */
+.focus-stage{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:28px;align-items:center}
+.pencil-wrap{position:relative;padding:40px 0 20px}
+.pencil{width:100%;height:auto;overflow:visible}
+.time{font:500 clamp(64px,10vw,128px)/1 var(--f-mono);letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.shaving{position:absolute;width:10px;height:10px;border-radius:50% 0 50% 50%;background:#E9B872;pointer-events:none}
+.sessions{display:flex;gap:8px;margin-top:10px}
+.sessions i{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--ink)}
+.sessions i.on{background:var(--ink)}
+
+/* ───────── Progresso ───────── */
+.chart{width:100%;height:auto;overflow:visible}
+.chart .grid-l{stroke:var(--rule);stroke-width:1}
+.chart .ink{fill:none;stroke:var(--ink);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.chart .area{fill:var(--hl);opacity:.35;mix-blend-mode:var(--blend)}
+.chart .pt{fill:var(--paper-2);stroke:var(--ink);stroke-width:2.5;cursor:pointer;transition:r var(--t-micro)}
+.chart .pt:hover,.chart .pt:focus{r:8}
+.chart text{font:12px var(--f-mono);fill:var(--muted)}
+.tip{position:absolute;pointer-events:none;background:var(--graphite);color:var(--paper);padding:6px 10px;border-radius:8px;font:13px var(--f-mono);transform:translate(-50%,-130%);opacity:0;transition:opacity var(--t-micro)}
+.src-row{display:grid;grid-template-columns:120px 1fr 64px;align-items:center;gap:12px;padding:6px 0}
+.src-row .bar{height:18px}
+.stickers{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:14px}
+.sticker{aspect-ratio:1;border-radius:50%;display:grid;place-items:center;text-align:center;padding:10px;font:700 12px/1.15 var(--f-body);background:var(--c,var(--hl));color:#14161b;box-shadow:0 3px 0 rgba(0,0,0,.12);transition:transform var(--t-ui) var(--e-spring)}
+.sticker:hover{transform:rotate(-8deg) scale(1.06)}
+.sticker.locked{background:var(--paper);color:var(--muted);box-shadow:inset 0 0 0 2px dashed var(--rule);border:2px dashed var(--rule)}
+.sticker .ic{display:block;font-size:26px;margin-bottom:2px}
+
+/* ───────── Ranking (estilos) ───────── */
+.shelf{display:flex;align-items:flex-end;justify-content:center;gap:28px;padding:0 10px;border-bottom:8px solid var(--graphite);min-height:300px}
+.stack{display:flex;flex-direction:column-reverse;align-items:center;width:130px}
+.stack .who{order:-1;margin-top:10px;text-align:center}
+.book-spine{display:block;width:var(--bw,110px);height:18px;border-radius:3px;background:var(--c);margin-left:var(--off,0);box-shadow:inset 0 -3px 0 rgba(0,0,0,.14)}
+.place{font:800 36px var(--f-display);font-variation-settings:"wdth" 130;margin-bottom:6px}
+.rank-list{list-style:none;margin:24px 0 0;padding:0}
+.rank-list li{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:12px;min-height:52px;padding:6px 12px;border-bottom:1px solid var(--rule)}
+.rank-list li.me{background:color-mix(in srgb,var(--hl) 45%,transparent);border-radius:10px;border-color:transparent}
+.rank-list .row{flex-wrap:nowrap;min-width:0}
+.av{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--f-mono);background:var(--c,var(--hl-lilac));color:#14161b}
+
+/* ───────── Mine (estilos) ───────── */
+.mine-stage{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:28px;align-items:start}
+.mine-face{width:100%;max-width:320px;height:auto;display:block;margin:0 auto}
+.mine-face .stroke{fill:none;stroke:var(--graphite);stroke-width:6;stroke-linejoin:round;stroke-linecap:round}
+.mine-face .fillg{fill:var(--hl)}
+.mine-face.thinking .bulb{animation:pulse 800ms ease-in-out infinite alternate}
+@keyframes pulse{from{fill:var(--hl)}to{fill:var(--hl-yellow)}}
+.chat{display:flex;flex-direction:column;gap:12px;min-height:420px}
+.msgs{display:flex;flex-direction:column;gap:10px;flex:1;max-height:420px;overflow-y:auto;padding:4px}
+.msg{max-width:88%;padding:12px 14px;border-radius:14px;line-height:1.45}
+.msg.u{align-self:flex-end;background:var(--ink);color:var(--paper-2);border-bottom-right-radius:4px}
+.msg.m{align-self:flex-start;background:var(--paper);border-bottom-left-radius:4px}
+.msg.enter{animation:rise 280ms var(--e-out) both}
+.dots i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px;animation:bob 900ms ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes bob{50%{transform:translateY(-5px)}}
+.artifact{margin-top:10px;border-radius:12px;background:var(--card);padding:12px}
+.mm{width:100%;height:auto}
+.mm line{stroke:var(--ink);stroke-width:2}
+.mm rect{fill:var(--card);stroke:var(--ink);stroke-width:1.5}
+.mm rect.root{fill:var(--hl)}
+.mm text{font:12px var(--f-body);fill:var(--graphite);text-anchor:middle;dominant-baseline:middle}
+.composer{display:flex;gap:8px}
+
+/* ───────── Games (estilos) ───────── */
+.hand-of-cards{position:relative;height:360px;display:flex;justify-content:center;align-items:flex-end;perspective:1200px}
+.gcard{position:absolute;bottom:0;width:190px;height:270px;transform-origin:50% 120%;transition:transform 420ms var(--e-out),opacity var(--t-ui);transform-style:preserve-3d}
+.gcard .inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform 520ms var(--e-out)}
+.gcard.flipped .inner{transform:rotateY(180deg)}
+.gcard .face{position:absolute;inset:0;border-radius:16px;padding:18px;backface-visibility:hidden;display:flex;flex-direction:column;box-shadow:0 10px 26px -12px rgba(0,0,0,.5);background:var(--c);color:#14161b;text-align:left}
+.gcard .back{transform:rotateY(180deg);background:var(--card);color:var(--graphite)}
+.gcard .face h3{font-size:22px;margin-top:auto}
+.gcard .face .glyph{font:800 60px/1 var(--f-display);font-variation-settings:"wdth" 150;opacity:.85}
+.gcard ol{margin:8px 0;padding-left:18px;font-size:14px}
+
+/* ───────── Busca (estilos) ───────── */
+.search-line input{font:700 clamp(26px,4vw,40px) var(--f-display);font-variation-settings:"wdth" 110;border:0;border-bottom:3px solid var(--ink);border-radius:0;background:transparent;padding:6px 0;min-height:64px}
+.results{list-style:none;margin:18px 0 0;padding:0}
+.results li{display:grid;grid-template-columns:110px 1fr auto;gap:14px;align-items:center;padding:14px 12px;border-radius:10px;border-bottom:1px solid var(--rule);cursor:pointer;transition:background var(--t-micro)}
+.results li[aria-selected="true"],.results li[role=option]:hover{background:var(--card)}
+.results .t{font:12px var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+/* ───────── Plano (estilos) ───────── */
+.plan-grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:28px;align-items:start}
+.plan-row{display:grid;grid-template-columns:78px 1fr;gap:12px;align-items:center;min-height:var(--line)}
+.plan-row .d{font:12px var(--f-mono);color:var(--muted)}
+.blocks{display:flex;gap:4px}
+.blk{height:24px;border-radius:5px;background:var(--c);transform-origin:left;display:flex;align-items:center;padding:0 8px;font:600 12px var(--f-body);color:#14161b;white-space:nowrap;overflow:hidden}
+.blk[data-k="estudo"]{--c:var(--hl)}.blk[data-k="revisao"]{--c:var(--hl-lilac)}.blk[data-k="simulado"]{--c:var(--hl-pink)}.blk[data-k="descanso"]{--c:var(--paper);color:var(--muted)}
+.field{display:grid;gap:6px;margin-bottom:18px}
+.field > label{font-weight:700;font-size:14px}
+.field output{font:14px var(--f-mono);color:var(--ink);margin-left:6px}
+
+/* ───────── Comentários (estilos) ───────── */
+.wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:22px;margin-top:30px}
+.pnote{--c:var(--hl-yellow);position:relative;background:var(--c);color:#16181D;padding:22px 16px 14px;border-radius:3px 3px 14px 3px;box-shadow:0 8px 16px -10px rgba(0,0,0,.45);transform:rotate(var(--r,0deg))}
+.pnote::before{content:"";position:absolute;top:-10px;left:50%;width:70px;height:20px;transform:translateX(-50%) rotate(-3deg);background:rgba(255,255,255,.55);border:1px solid rgba(0,0,0,.06)}
+.pnote p{font-size:15px;line-height:1.4}
+.pnote footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font:12px var(--f-mono)}
+.like{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:4px 8px;border-radius:8px;position:relative;color:#16181D}
+.like:hover{background:rgba(0,0,0,.07)}
+.like svg{width:18px;height:18px;fill:none;stroke:#16181D;stroke-width:2;transition:transform var(--t-ui) var(--e-spring)}
+.like[aria-pressed="true"] svg{fill:#E5484D;stroke:#E5484D;transform:scale(1.15)}
+.ink-dot{position:absolute;width:6px;height:6px;border-radius:50%;background:#E5484D;pointer-events:none;left:14px;top:14px}
+.swatches{display:flex;gap:8px}
+.swatch{width:32px;height:32px;border-radius:8px;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.1)}
+.swatch[aria-pressed="true"]{outline:2.5px solid var(--ink);outline-offset:2px}
+
+/* ───────── Sugestões (estilos) ───────── */
+.sugs{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:12px}
+.sug{display:grid;grid-template-columns:64px 1fr auto;gap:16px;align-items:center;background:var(--card);box-shadow:var(--shadow);border-radius:14px;padding:14px 18px}
+.vote{display:grid;justify-items:center;gap:2px;min-height:56px;padding:6px;border-radius:10px;font:500 18px var(--f-mono);transition:background var(--t-micro)}
+.vote:hover{background:var(--paper)}
+.vote[aria-pressed="true"]{background:var(--hl);color:#0e1a13}
+.vote svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2.4}
+.sug .stamp[data-s="feita"]{color:#1f9a57}.sug .stamp[data-s="analise"]{color:var(--ink)}.sug .stamp[data-s="recebida"]{color:var(--margin)}
+.stamp.hit{animation:stamp 380ms var(--e-out) both}
+@keyframes stamp{from{transform:rotate(-6deg) scale(1.8);opacity:0}60%{transform:rotate(-6deg) scale(.94);opacity:1}to{transform:rotate(-6deg) scale(1)}}
+
+/* ───────── Sobre (estilos) ───────── */
+.about-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:36px;align-items:center}
+.draw{width:100%;max-width:380px;height:auto;margin:0 auto;display:block}
+.draw .part{fill:none;stroke:var(--graphite);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;transition:stroke var(--t-ui)}
+.draw .part.lit{stroke:var(--ink)}
+.draw .accent{fill:var(--hl);opacity:0;transition:opacity 400ms;mix-blend-mode:var(--blend)}
+.principles{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.principles button{display:block;width:100%;text-align:left;padding:14px 16px;border-radius:12px;transition:background var(--t-micro)}
+.principles button:hover,.principles button[aria-pressed="true"]{background:var(--card);box-shadow:var(--shadow)}
+.principles b{font:700 19px var(--f-display);font-variation-settings:"wdth" 106;display:block;margin-bottom:4px}
+.principles span{color:var(--muted);font-size:15px}
+
+/* ───────── Perfil (estilos) ───────── */
+.id-scene{perspective:900px;display:grid;place-items:center;padding:20px 0}
+.idcard{--c:var(--hl);position:relative;width:min(100%,380px);aspect-ratio:1.586;border-radius:18px;background:var(--card);box-shadow:0 30px 50px -28px rgba(0,0,0,.55);padding:20px;display:grid;grid-template-columns:96px 1fr;gap:16px;align-content:start;transform-style:preserve-3d;transition:transform 120ms linear;overflow:hidden}
+.idcard::before{content:"";position:absolute;inset:0 0 auto;height:44%;background:var(--c);transition:background var(--t-ui)}
+.idcard > *{position:relative}
+.idcard .photo{width:96px;height:112px;border-radius:10px;background:var(--paper);display:grid;place-items:center;font:800 40px var(--f-display);box-shadow:0 0 0 4px var(--card)}
+.idcard .glare{position:absolute;inset:0;background:radial-gradient(circle at var(--gx,50%) var(--gy,50%),rgba(255,255,255,.45),transparent 50%);mix-blend-mode:overlay;pointer-events:none}
+.idcard .nm{font:800 22px/1.05 var(--f-display);font-variation-settings:"wdth" 112;margin-top:6px;color:#14161b}
+.idcard .meta{grid-column:1/-1;display:flex;justify-content:space-between;font:12px var(--f-mono);color:var(--muted)}
+.switch{position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:52px;border-bottom:1px solid var(--rule);cursor:pointer}
+.switch input{position:absolute;opacity:0}
+.track{position:relative;width:52px;height:30px;border-radius:15px;background:var(--paper);box-shadow:inset 0 0 0 1.5px var(--rule);flex:none;transition:background var(--t-ui)}
+.track::after{content:"";position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:transform var(--t-ui) var(--e-spring),background var(--t-ui)}
+.switch input:checked + .track{background:var(--hl);box-shadow:none}
+.switch input:checked + .track::after{transform:translateX(22px);background:#14161b}
+.switch input:focus-visible + .track{outline:2px dashed var(--ink);outline-offset:3px}
+
+/* ───────── Admin (estilos) ───────── */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.kpi b{display:block;font:800 40px/1 var(--f-display);font-variation-settings:"wdth" 120;margin:6px 0}
+.spark{width:100%;height:36px}
+.spark path{fill:none;stroke:var(--ink);stroke-width:2}
+.live{display:inline-block;width:10px;height:10px;border-radius:50%;background:#1f9a57;box-shadow:0 0 0 0 rgba(31,154,87,.5);animation:ping 1.8s var(--e-out) infinite}
+@keyframes ping{to{box-shadow:0 0 0 12px rgba(31,154,87,0)}}
+.feed{list-style:none;margin:0;padding:0;max-height:330px;overflow:hidden}
+.feed li{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:10px 0;border-bottom:1px dashed var(--rule);font-size:14px}
+.feed time{font:12px var(--f-mono);color:var(--muted)}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font:12px var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:0}
+.tbl th button{padding:10px 8px;min-height:40px;display:inline-flex;gap:4px;align-items:center}
+.tbl th i{font-style:normal;color:var(--ink)}
+.tbl td{padding:10px 8px;border-top:1px solid var(--rule)}
+
+/* ───────── Matéria (estilos) ───────── */
+.mat{list-style:none;margin:0;padding:0}
+.mat li{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--rule);cursor:pointer}
+.mat .kind{font:11px var(--f-mono);padding:3px 8px;border-radius:6px;background:var(--paper)}
+.mat .box path{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mat .box .tick{stroke-dasharray:24;transition:stroke-dashoffset 260ms var(--e-out)}
+.mat input:focus-visible ~ .box{outline:2px dashed var(--ink);outline-offset:3px;border-radius:4px}
+.deck{position:relative;height:250px;perspective:1000px;margin:6px 0 14px}
+.fcard{position:absolute;inset:0;cursor:pointer;transform-style:preserve-3d;transition:transform 480ms var(--e-out)}
+.fcard .side{position:absolute;inset:0;border-radius:16px;backface-visibility:hidden;display:grid;place-items:center;text-align:center;padding:24px;background:var(--paper-2);box-shadow:var(--shadow);font:700 22px/1.25 var(--f-display);font-variation-settings:"wdth" 104}
+.fcard .side.b{transform:rotateY(180deg);background:var(--hl);color:#14161b;font:18px/1.45 var(--f-body)}
+.fcard.flip{transform:rotateY(180deg)}
+.deck .under{position:absolute;inset:8px -6px -8px 6px;border-radius:16px;background:var(--paper);box-shadow:var(--shadow)}
+
+/* ───────── Responsivo ───────── */
+@media (max-width:1060px){
+  .g3,.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .focus-stage,.mine-stage,.about-grid,.plan-grid,.g-7-5{grid-template-columns:1fr}
+}
+@media (max-width:860px){
+  .book{grid-template-columns:1fr;padding:0}
+  .tabs{position:sticky;top:38px;z-index:30;flex-direction:row;overflow-x:auto;padding:10px 16px 0;gap:4px;background:var(--paper);order:-1;max-height:none}
+  .group-label{display:none}
+  .tab,.tab.sub{margin:0;width:auto;flex:none;border-radius:10px 10px 0 0;padding:8px 14px;transform:translateY(4px);white-space:nowrap;box-shadow:none}
+  .tab:hover{transform:translateY(1px)}
+  .tab[aria-current="page"],.tab.sub[aria-current="page"]{transform:translateY(0);padding:8px 14px}
+  .tab[aria-current="page"]::after{display:none}
+  .sheet{padding:28px 16px 72px 40px;border-radius:0}
+  .sheet::before{left:24px}
+  .holes{display:none}
+  .g2,.g3,.kpis{grid-template-columns:1fr}
+  .results li{grid-template-columns:1fr auto}
+  .results .t{grid-column:1/-1}
+  .hand-of-cards{height:340px}
+  .gcard{width:150px;height:230px}
+  .gcard .face{padding:14px}
+  .gcard .face h3{font-size:18px}
+  .src-row{grid-template-columns:84px 1fr 48px}
+  .shelf{gap:10px}
+  .stack{width:96px}
+  .book-spine{width:calc(var(--bw) * .75)}
+  .sug{grid-template-columns:56px 1fr;padding:12px}
+  .sug .stamp{grid-column:2;justify-self:start}
+  .lab .what{display:none}
+  .page h1{font-variation-settings:"wdth" 100}
+}
+
+/* movimento reduzido: pelo sistema ou pelo botão */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+:root.rm *,:root.rm *::before,:root.rm *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+</style>
+</head>
+<body>
+
+<div class="lab">
+  <span><b>Minerva · Caderno vivo</b> <span class="what">— 15 conceitos de tela · dados fictícios · 29 set 2026</span></span>
+  <span class="ctrls">
+    <button id="themeBtn" aria-pressed="false">Noite</button>
+    <button id="motionBtn" aria-pressed="false">Menos movimento</button>
+  </span>
+</div>
+
+<div class="book">
+<main class="sheet" id="sheet">
+  <div class="holes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+  <!-- ═════════ INÍCIO ═════════ -->
+  <section class="page" data-view="home" aria-labelledby="h-home">
+    <p class="note rise">terça, 29 de setembro</p>
+    <h1 id="h-home" class="rise" style="--i:1">Seu dia <span class="hl">numa página</span> só.</h1>
+    <p class="lede rise" style="--i:2">Risque o que terminou. Cada item concluído vira XP na hora, e a Mine guarda o resto para amanhã.</p>
+    <div class="grid g-7-5">
+      <div class="card rise" style="--i:3">
+        <div class="row spread"><h2>Para hoje</h2><span class="xp-pill" aria-live="polite"><span id="homeXp">1.240</span> XP</span></div>
+        <ul class="todo" id="todo" style="margin-top:12px"></ul>
+      </div>
+      <div class="grid" style="align-content:start">
+        <div class="card rise" style="--i:4">
+          <p class="eyebrow">Continue de onde parou</p>
+          <h3 style="margin:8px 0 4px">Biologia · Divisão celular</h3>
+          <p class="muted small">4 de 6 materiais estudados</p>
+          <div class="bar" style="margin:14px 0 18px"><i style="--v:.66"></i></div>
+          <button class="btn" data-go="subject">Abrir caderno de Biologia →</button>
+        </div>
+        <div class="card rise" style="--i:5">
+          <div class="row spread"><h3>Sequência</h3><span class="hand" style="font-size:20px">5 dias seguidos!</span></div>
+          <div class="week" id="week"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ MATÉRIA ═════════ -->
+  <section class="page" data-view="subject" aria-labelledby="h-subject">
+    <p class="note rise">caderno de</p>
+    <h1 id="h-subject" class="rise" style="--i:1"><span class="hl">Biologia</span></h1>
+    <p class="lede rise" style="--i:2">Materiais à esquerda, revisão à direita. Marque o que já estudou e treine com os cartões da Mine.</p>
+    <div class="grid g-7-5">
+      <div class="card rise" style="--i:3">
+        <div class="row spread"><h2>Materiais</h2><span class="mono small" id="matCount"></span></div>
+        <div class="bar" style="margin:12px 0 6px"><i id="matBar"></i></div>
+        <ul class="mat" id="mat"></ul>
+      </div>
+      <div class="card rise" style="--i:4">
+        <div class="row spread"><h2>Flashcards</h2><span class="mono small" id="fcCount"></span></div>
+        <p class="muted small" style="margin:6px 0 12px">Clique no cartão ou aperte espaço para virar.</p>
+        <div class="deck" id="deck"></div>
+        <div class="row">
+          <button class="btn ghost" id="fcAgain">↺ Revisar de novo</button>
+          <button class="btn" id="fcKnow">Eu sabia ✓</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ AGENDA ═════════ -->
+  <section class="page" data-view="agenda" aria-labelledby="h-agenda">
+    <p class="note rise">semana 40</p>
+    <h1 id="h-agenda" class="rise" style="--i:1">Arraste a semana <span class="hl" style="--hlc:var(--hl-yellow)">até caber</span>.</h1>
+    <p class="lede rise" style="--i:2">Cada bilhete é uma tarefa. Arraste para outro dia, ou selecione com Enter e mova com as setas.</p>
+    <div class="row spread rise" style="--i:3;margin-bottom:14px">
+      <div class="legend"><span style="--c:var(--hl-pink)">Prova</span><span style="--c:var(--hl-yellow)">Trabalho</span><span style="--c:var(--hl)">Revisão</span></div>
+      <span class="mono small" id="agendaInfo" aria-live="polite"></span>
+    </div>
+    <div class="planner rise" style="--i:4" id="planner"></div>
+  </section>
+
+  <!-- ═════════ FOCO ═════════ -->
+  <section class="page" data-view="foco" aria-labelledby="h-foco">
+    <p class="note rise">sessão 3 de 4</p>
+    <h1 id="h-foco" class="rise" style="--i:1">Um lápis <span class="hl">por sessão</span>.</h1>
+    <p class="lede rise" style="--i:2">O lápis gasta enquanto o tempo passa. Quando ele acaba, a sessão vale 25 XP.</p>
+    <div class="focus-stage">
+      <div class="pencil-wrap rise" style="--i:3" id="pencilWrap">
+        <svg class="pencil" viewBox="0 0 620 90" aria-hidden="true">
+          <rect x="0" y="18" width="60" height="54" rx="10" fill="var(--hl-pink)"/>
+          <rect x="54" y="14" width="30" height="62" fill="#B8C1CE"/>
+          <g id="pBody"><rect x="84" y="14" width="420" height="62" fill="var(--hl-yellow)"/><rect x="84" y="14" width="420" height="20" fill="#fff" opacity=".35"/><rect x="84" y="56" width="420" height="20" fill="#000" opacity=".08"/></g>
+          <g id="pTip"><path d="M504 14 L600 45 L504 76 Z" fill="#E9C58D"/><path d="M572 36 L600 45 L572 54 Z" fill="var(--graphite)"/></g>
+        </svg>
+      </div>
+      <div class="rise" style="--i:4">
+        <div class="time" id="time" role="timer" aria-label="Tempo restante">25:00</div>
+        <div class="seg" role="group" aria-label="Duração" id="durSeg" style="margin:16px 0">
+          <button aria-pressed="false" data-m="15">15 min</button><button aria-pressed="true" data-m="25">25 min</button><button aria-pressed="false" data-m="50">50 min</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="focusGo">Começar</button>
+          <button class="btn ghost" id="focusReset">Recomeçar</button>
+        </div>
+        <label class="row small muted" style="margin-top:16px;gap:8px"><input type="checkbox" id="fast"> Acelerar ×60 para ver a demonstração</label>
+        <p class="eyebrow" style="margin-top:22px">Sessões de hoje</p>
+        <div class="sessions" id="sessions"><i class="on"></i><i class="on"></i><i></i><i></i></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ PROGRESSO ═════════ -->
+  <section class="page" data-view="progress" aria-labelledby="h-progress">
+    <p class="note rise">boletim da Mine</p>
+    <h1 id="h-progress" class="rise" style="--i:1">Nível 9, <span class="hl" style="--hlc:var(--hl-lilac)">explorador do saber</span>.</h1>
+    <p class="lede rise" style="--i:2">Faltam 160 XP para o nível 10. Veja de onde vem cada ponto.</p>
+    <div class="card rise" style="--i:3;margin-bottom:20px">
+      <div class="row spread"><span class="mono small">340 / 500 XP neste nível</span><span class="mono small muted">nível 12: Veterano de provas</span></div>
+      <div class="bar" style="height:22px;margin-top:10px"><i style="--v:.68"></i></div>
+    </div>
+    <div class="grid g-7-5">
+      <div class="card rise" style="--i:4;position:relative" id="chartCard">
+        <div class="row spread"><h2>XP por dia</h2>
+          <div class="seg" role="group" aria-label="Período" id="rangeSeg"><button aria-pressed="true" data-r="7">7 dias</button><button aria-pressed="false" data-r="30">30 dias</button></div>
+        </div>
+        <svg class="chart" id="chart" viewBox="0 0 560 240" role="img" aria-label="Gráfico de XP por dia"></svg>
+        <div class="tip" id="tip"></div>
+      </div>
+      <div class="card rise" style="--i:5">
+        <h2>De onde vem</h2>
+        <div id="sources" style="margin-top:12px"></div>
+      </div>
+    </div>
+    <div class="card rise" style="--i:6;margin-top:20px">
+      <div class="row spread"><h2>Figurinhas</h2><span class="mono small">6 de 10</span></div>
+      <div class="stickers" id="stickers" style="margin-top:16px"></div>
+    </div>
+  </section>
+
+  <!-- ═════════ RANKING ═════════ -->
+  <section class="page" data-view="ranking" aria-labelledby="h-ranking">
+    <p class="note rise">quem estudou mais?</p>
+    <h1 id="h-ranking" class="rise" style="--i:1">A estante <span class="hl" style="--hlc:var(--hl-yellow)">da turma</span>.</h1>
+    <p class="lede rise" style="--i:2">Quanto mais alta a pilha, mais XP no período. Só conta o que foi feito dentro dele.</p>
+    <div class="seg rise" style="--i:3;margin-bottom:26px" role="group" aria-label="Período do ranking" id="rankSeg">
+      <button aria-pressed="true" data-w="dia">Hoje</button><button aria-pressed="false" data-w="semana">Semana</button><button aria-pressed="false" data-w="geral">Geral</button>
+    </div>
+    <div class="card rise" style="--i:4">
+      <div class="shelf" id="shelf"></div>
+      <ol class="rank-list" id="rankList"></ol>
+    </div>
+  </section>
+
+  <!-- ═════════ MINE ═════════ -->
+  <section class="page" data-view="mine" aria-labelledby="h-mine">
+    <p class="note rise">ela está de olho em você</p>
+    <h1 id="h-mine" class="rise" style="--i:1">Peça. A Mine <span class="hl" style="--hlc:var(--hl-lilac)">monta na hora</span>.</h1>
+    <p class="lede rise" style="--i:2">Mapa mental, prova ou flashcards: escreva do seu jeito, e o material aparece dentro da conversa.</p>
+    <div class="mine-stage">
+      <div class="rise" style="--i:3">
+        <svg class="mine-face" id="mineFace" viewBox="0 0 300 300" aria-hidden="true">
+          <line class="stroke" x1="150" y1="30" x2="150" y2="62"/>
+          <circle class="bulb stroke" cx="150" cy="24" r="14" style="fill:var(--hl)"/>
+          <rect class="fillg stroke" x="30" y="120" width="30" height="64" rx="12"/>
+          <rect class="fillg stroke" x="240" y="120" width="30" height="64" rx="12"/>
+          <rect class="stroke" x="52" y="62" width="196" height="186" rx="56" style="fill:var(--card)"/>
+          <rect class="stroke" x="78" y="104" width="144" height="96" rx="34" style="fill:var(--paper)"/>
+          <g id="eyes">
+            <g id="eyeL"><ellipse cx="120" cy="142" rx="11" ry="14" fill="var(--graphite)"/></g>
+            <g id="eyeR"><ellipse cx="180" cy="142" rx="11" ry="14" fill="var(--graphite)"/></g>
+          </g>
+          <path class="stroke" d="M130 174 Q150 190 170 174"/>
+        </svg>
+        <p class="hand" style="text-align:center;font-size:22px;margin-top:6px" id="mineStatus">pode perguntar!</p>
+      </div>
+      <div class="card chat rise" style="--i:4">
+        <div class="msgs" id="msgs" aria-live="polite">
+          <div class="msg m">Oi! Sou a Mine. Quer revisar alguma coisa hoje? Posso montar um mapa mental, uma prova rápida ou flashcards.</div>
+        </div>
+        <div class="row" id="suggest" style="gap:8px"></div>
+        <form class="composer" id="composer">
+          <label class="sr" for="mineIn">Mensagem para a Mine</label>
+          <input type="text" id="mineIn" placeholder="Ex.: faz um mapa mental de fotossíntese" autocomplete="off">
+          <button class="btn" type="submit">Enviar</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ GAMES ═════════ -->
+  <section class="page" data-view="games" aria-labelledby="h-games">
+    <p class="note rise">escolha uma carta</p>
+    <h1 id="h-games" class="rise" style="--i:1">Cinco jogos, <span class="hl" style="--hlc:var(--hl-pink)">uma mão</span>.</h1>
+    <p class="lede rise" style="--i:2">A Mine gera perguntas novas a cada rodada. Vire a carta para ler as regras antes de jogar.</p>
+    <div class="hand-of-cards rise" style="--i:3" id="hand"></div>
+    <p class="muted small" style="text-align:center;margin-top:18px">Passe o mouse para abrir o leque. Clique numa carta para virar; Esc volta.</p>
+  </section>
+
+  <!-- ═════════ BUSCA ═════════ -->
+  <section class="page" data-view="search" aria-labelledby="h-search">
+    <p class="note rise">procure em tudo</p>
+    <h1 id="h-search" class="rise" style="--i:1">Achou? <span class="hl" style="--hlc:var(--hl-yellow)">Está grifado</span>.</h1>
+    <p class="lede rise" style="--i:2">Materiais, tarefas, cartões e comentários numa busca só. Use ↑ ↓ e Enter.</p>
+    <div class="search-line rise" style="--i:3">
+      <label class="sr" for="q">Buscar</label>
+      <input type="search" id="q" placeholder="mitose, função, Dom Casmurro…" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="results">
+    </div>
+    <div class="row rise" style="--i:4;margin-top:16px;gap:8px" id="qFilters"></div>
+    <ul class="results" id="results" role="listbox" aria-label="Resultados"></ul>
+  </section>
+
+  <!-- ═════════ PLANO ═════════ -->
+  <section class="page" data-view="plan" aria-labelledby="h-plan">
+    <p class="note rise">até a prova</p>
+    <h1 id="h-plan" class="rise" style="--i:1">Um plano que <span class="hl">se redesenha</span>.</h1>
+    <p class="lede rise" style="--i:2">Diga quanto tempo você tem. A Mine espalha estudo e revisão pelos dias, com simulado antes da véspera.</p>
+    <div class="plan-grid">
+      <div class="card rise" style="--i:3">
+        <div class="field"><label for="pSub">Matéria</label><select id="pSub"><option>Biologia</option><option>Matemática</option><option>História</option><option>Química</option></select></div>
+        <div class="field"><label for="pDays">Dias até a prova <output id="oDays">10</output></label><input type="range" id="pDays" min="4" max="21" value="10"></div>
+        <div class="field"><label for="pMin">Minutos por dia <output id="oMin">60</output></label><input type="range" id="pMin" min="20" max="120" step="10" value="60"></div>
+        <label class="row small" style="gap:8px"><input type="checkbox" id="pRest" checked> Folga no domingo</label>
+        <p class="hand" style="font-size:22px;margin-top:20px" id="pSum" aria-live="polite"></p>
+      </div>
+      <div class="card rise" style="--i:4">
+        <div class="row spread" style="margin-bottom:10px"><h2 id="pTitle">Biologia</h2>
+          <div class="legend small"><span style="--c:var(--hl)">Estudo</span><span style="--c:var(--hl-lilac)">Revisão</span><span style="--c:var(--hl-pink)">Simulado</span></div></div>
+        <div id="planRows"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ COMENTÁRIOS ═════════ -->
+  <section class="page" data-view="comments" aria-labelledby="h-comments">
+    <p class="note rise">mural da turma</p>
+    <h1 id="h-comments" class="rise" style="--i:1">Cole um bilhete <span class="hl" style="--hlc:var(--hl-yellow)">no mural</span>.</h1>
+    <p class="lede rise" style="--i:2">Conte o que funcionou nos seus estudos. Todo mundo da Minerva lê.</p>
+    <form class="card rise" style="--i:3;max-width:640px" id="noteForm">
+      <label class="sr" for="noteTxt">Seu comentário</label>
+      <textarea id="noteTxt" rows="3" maxlength="180" placeholder="Escreva seu bilhete…"></textarea>
+      <div class="row spread" style="margin-top:12px">
+        <div class="swatches" role="group" aria-label="Cor do bilhete" id="noteColors"></div>
+        <button class="btn" type="submit">Colar no mural</button>
+      </div>
+      <p class="small" id="noteErr" style="color:var(--margin);margin-top:8px" aria-live="polite"></p>
+    </form>
+    <div class="wall" id="wall"></div>
+  </section>
+
+  <!-- ═════════ SUGESTÕES ═════════ -->
+  <section class="page" data-view="suggestions" aria-labelledby="h-sug">
+    <p class="note rise">caixinha de ideias</p>
+    <h1 id="h-sug" class="rise" style="--i:1">Vote no que a Minerva <span class="hl" style="--hlc:var(--hl-yellow)">faz primeiro</span>.</h1>
+    <p class="lede rise" style="--i:2">As ideias mais votadas sobem. Quando uma sai do papel, ela ganha o carimbo de feita.</p>
+    <div class="seg rise" style="--i:3" role="group" aria-label="Filtrar por situação" id="sugSeg">
+      <button aria-pressed="true" data-s="todas">Todas</button><button aria-pressed="false" data-s="recebida">Recebidas</button><button aria-pressed="false" data-s="analise">Em análise</button><button aria-pressed="false" data-s="feita">Feitas</button>
+    </div>
+    <form class="row rise" style="--i:4;margin-top:16px;flex-wrap:nowrap" id="sugForm">
+      <label class="sr" for="sugIn">Sua sugestão</label>
+      <input type="text" id="sugIn" placeholder="Sua ideia em uma frase" maxlength="90">
+      <button class="btn" type="submit" style="flex:none">Enviar ideia</button>
+    </form>
+    <ul class="sugs" id="sugs"></ul>
+  </section>
+
+  <!-- ═════════ SOBRE ═════════ -->
+  <section class="page" data-view="about" aria-labelledby="h-about">
+    <p class="note rise">por que existe</p>
+    <h1 id="h-about" class="rise" style="--i:1">Estudar sozinho, <span class="hl">sem estar sozinho</span>.</h1>
+    <p class="lede rise" style="--i:2">A Minerva junta seu caderno, sua agenda e uma tutora que explica. Toque num princípio para ver onde ele mora.</p>
+    <div class="about-grid">
+      <svg class="draw rise" style="--i:3" id="drawing" viewBox="0 0 320 320" aria-hidden="true">
+        <circle class="accent" id="acc-cap" cx="160" cy="66" r="50"/>
+        <circle class="accent" id="acc-face" cx="160" cy="162" r="62"/>
+        <circle class="accent" id="acc-book" cx="160" cy="266" r="58"/>
+        <path class="part" data-p="cap" d="M70 78 L160 44 L250 78 L160 108 Z"/>
+        <path class="part" data-p="cap" d="M236 84 L236 118"/>
+        <path class="part" data-p="cap" d="M160 44 L160 24"/><circle class="part" data-p="cap" cx="160" cy="16" r="8"/>
+        <rect class="part" data-p="face" x="94" y="112" width="132" height="104" rx="40"/>
+        <path class="part" data-p="face" d="M128 156 q8 -10 16 0 M176 156 q8 -10 16 0 M144 180 q16 14 32 0"/>
+        <path class="part" data-p="book" d="M60 236 L160 256 L260 236 L260 296 L160 312 L60 296 Z M160 256 L160 312"/>
+        <path class="part" data-p="book" d="M152 232 L160 216 L168 232 L165 290 L155 290 Z"/>
+      </svg>
+      <ul class="principles rise" style="--i:4" id="principles">
+        <li><button data-p="face" aria-pressed="false"><b>A Mine explica, não entrega pronto.</b><span>Ela devolve perguntas, dá dicas e mostra o caminho da resposta.</span></button></li>
+        <li><button data-p="book" aria-pressed="false"><b>Seu caderno fica num lugar só.</b><span>Materiais, anotações e flashcards organizados por matéria.</span></button></li>
+        <li><button data-p="cap" aria-pressed="false"><b>Todo esforço conta ponto.</b><span>Foco, tarefas, provas e jogos viram XP, nível e figurinhas.</span></button></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ═════════ PERFIL ═════════ -->
+  <section class="page" data-view="perfil" aria-labelledby="h-perfil">
+    <p class="note rise">sua carteirinha</p>
+    <h1 id="h-perfil" class="rise" style="--i:1">Do seu jeito, <span class="hl" style="--hlc:var(--hl-pink)">na carteirinha</span>.</h1>
+    <p class="lede rise" style="--i:2">O que você muda aqui aparece no seu perfil público e no ranking.</p>
+    <div class="grid g2">
+      <div class="id-scene rise" style="--i:3" id="idScene">
+        <div class="idcard" id="idcard">
+          <div class="photo" id="idPhoto">AL</div>
+          <div><p class="eyebrow" style="color:#14161b;opacity:.7">Estudante Minerva</p><p class="nm" id="idName">Ana Luísa</p><p class="mono small" style="margin-top:22px">Nível 9 · Explorador do saber</p></div>
+          <div class="meta"><span>1.240 XP</span><span>2º ano B</span><span>desde mar/2026</span></div>
+          <div class="glare"></div>
+        </div>
+      </div>
+      <div class="card rise" style="--i:4">
+        <div class="field"><label for="pfName">Nome de exibição</label><input type="text" id="pfName" value="Ana Luísa" maxlength="22"></div>
+        <div class="field"><span style="font-weight:700;font-size:14px">Cor da carteirinha</span><div class="swatches" id="idColors" role="group" aria-label="Cor da carteirinha"></div></div>
+        <label class="switch"><span>Aparecer no ranking</span><input type="checkbox" checked><span class="track"></span></label>
+        <label class="switch"><span>Lembrete para voltar ao foco</span><input type="checkbox"><span class="track"></span></label>
+        <label class="switch"><span>Movimento reduzido</span><input type="checkbox" id="pfMotion"><span class="track"></span></label>
+        <button class="btn ghost" style="margin-top:20px">Sair da conta</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════ ADMIN ═════════ -->
+  <section class="page" data-view="admin" aria-labelledby="h-admin">
+    <p class="note rise">caderno de chamada</p>
+    <h1 id="h-admin" class="rise" style="--i:1">A Minerva <span class="hl">agora</span>.</h1>
+    <p class="lede rise" style="--i:2">Quem está estudando, o que está acontecendo e se tudo foi salvo.</p>
+    <div class="kpis rise" style="--i:3" id="kpis"></div>
+    <div class="grid g2" style="margin-top:20px">
+      <div class="card rise" style="--i:4">
+        <div class="row spread"><h2>Acontecendo</h2><button class="chip" id="feedPause" aria-pressed="false">Pausar</button></div>
+        <ul class="feed" id="feed" style="margin-top:10px"></ul>
+      </div>
+      <div class="card rise" style="--i:5;overflow-x:auto">
+        <h2 style="margin-bottom:10px">Contas</h2>
+        <table class="tbl" id="users"><thead><tr>
+          <th><button data-k="nome">Nome <i></i></button></th><th><button data-k="xp">XP <i></i></button></th><th><button data-k="ult">Último acesso <i></i></button></th>
+        </tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs" id="tabs" aria-label="Abas da Minerva"></nav>
+</div>
+
+<script>
+(() => {
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const root = document.documentElement;
+const mq = matchMedia('(prefers-reduced-motion: reduce)');
+const reduced = () => mq.matches || root.classList.contains('rm');
+const anim = (el, kf, o) => el.animate(kf, reduced() ? { ...o, duration: 1, delay: 0 } : o);
+const E_OUT = 'cubic-bezier(.2,0,0,1)', E_SPRING = 'cubic-bezier(.34,1.56,.64,1)';
+const fmt = n => n.toLocaleString('pt-BR');
+
+/* FLIP: guarda posições, deixa o DOM mudar, anima a diferença */
+function flip(els, mutate) {
+  const first = new Map(els().map(el => [el, el.getBoundingClientRect()]));
+  mutate();
+  els().forEach(el => {
+    const a = first.get(el), b = el.getBoundingClientRect();
+    if (!a) { anim(el, [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: E_OUT }); return; }
+    const dx = a.left - b.left, dy = a.top - b.top;
+    if (dx || dy) anim(el, [{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: 380, easing: E_OUT });
+  });
+}
+function floatXp(text, fromEl, toEl) {
+  const a = fromEl.getBoundingClientRect();
+  const s = document.createElement('div');
+  s.className = 'float-xp'; s.textContent = text; s.setAttribute('aria-hidden', 'true');
+  s.style.left = a.left + 'px'; s.style.top = a.top + 'px';
+  document.body.appendChild(s);
+  let dx = 0, dy = -60;
+  if (toEl) { const b = toEl.getBoundingClientRect(); dx = b.left - a.left; dy = b.top - a.top; }
+  anim(s, [
+    { transform: 'translate(0,0) rotate(-6deg) scale(.8)', opacity: 0 },
+    { transform: 'translate(0,-24px) rotate(-6deg) scale(1.1)', opacity: 1, offset: .3 },
+    { transform: `translate(${dx}px,${dy}px) rotate(0) scale(.6)`, opacity: 0 }
+  ], { duration: 900, easing: E_OUT }).onfinish = () => s.remove();
+}
+function countTo(el, from, to, ms = 600) {
+  if (reduced()) { el.textContent = fmt(to); return; }
+  const t0 = performance.now();
+  const step = t => { const p = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(Math.round(from + (to - from) * e)); if (p < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+/* ───────── Navegação: divisórias ───────── */
+const NAV = [
+  { g: 'estudo', label: 'Estudo', items: [['home', 'Início'], ['subject', 'Biologia', 'sub'], ['agenda', 'Agenda'], ['foco', 'Foco'], ['progress', 'Progresso'], ['ranking', 'Ranking']] },
+  { g: 'ia', label: 'Inteligência', items: [['mine', 'Mine'], ['games', 'Games com a Mine'], ['search', 'Busca'], ['plan', 'Plano de estudos']] },
+  { g: 'com', label: 'Comunidade', items: [['comments', 'Comentários'], ['suggestions', 'Sugestões']] },
+  { g: 'conta', label: 'Conta', items: [['about', 'Sobre'], ['perfil', 'Perfil e ajustes'], ['admin', 'Admin']] },
+];
+const tabs = $('#tabs');
+NAV.forEach(grp => {
+  tabs.insertAdjacentHTML('beforeend', `<div class="group-label">${grp.label}</div>`);
+  grp.items.forEach(([v, l, sub]) => tabs.insertAdjacentHTML('beforeend', `<button class="tab ${sub || ''}" data-g="${grp.g}" data-view="${v}">${sub ? '↳ ' : ''}${l}</button>`));
+});
+const inits = {}, started = new Set();
+function go(view, push = true) {
+  const page = $(`.page[data-view="${view}"]`) || $('.page[data-view="home"]');
+  view = page.dataset.view;
+  $$('.page').forEach(p => p.classList.toggle('on', p === page));
+  $$('.tab').forEach(t => t.dataset.view === view ? t.setAttribute('aria-current', 'page') : t.removeAttribute('aria-current'));
+  const active = $(`.tab[data-view="${view}"]`); active && active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  if (!started.has(view) && inits[view]) { started.add(view); inits[view](); }
+  inits[view + ':enter'] && inits[view + ':enter']();
+  if (push) history.replaceState(null, '', '#' + view);
+}
+tabs.addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) go(b.dataset.view); });
+document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
+
+const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+$('#themeBtn').onclick = e => { const dark = !isDark(); root.dataset.theme = dark ? 'dark' : 'light'; e.currentTarget.setAttribute('aria-pressed', dark); };
+$('#themeBtn').setAttribute('aria-pressed', isDark());
+function setRM(on) { root.classList.toggle('rm', on); $('#motionBtn').setAttribute('aria-pressed', on); $('#pfMotion').checked = on; }
+$('#motionBtn').onclick = () => setRM(!root.classList.contains('rm'));
+$('#pfMotion').onchange = e => setRM(e.target.checked);
+if (mq.matches) setRM(true);
+
+/* ───────── Início ───────── */
+const BOX = '<path d="M3 4.5 Q3 3 4.6 3 L19.5 3.2 Q21 3.3 20.9 4.8 L20.6 19.6 Q20.5 21 19 21 L4.4 20.8 Q3 20.7 3.1 19.2 Z"/>';
+inits.home = () => {
+  const items = [['Revisar mitose e meiose', 'Biologia', 20], ['5 exercícios de função afim', 'Matemática', 20], ['Ler o capítulo 3 de Dom Casmurro', 'Português', 20], ['12 flashcards de verbos irregulares', 'Inglês', 60]];
+  const ul = $('#todo'), xpEl = $('#homeXp'); let xp = 1240;
+  ul.innerHTML = items.map(([t, s, x]) => `<li><label><input type="checkbox" data-xp="${x}"><svg class="box" viewBox="0 0 24 24" aria-hidden="true">${BOX}<path class="tick" d="M6.5 12.5 L10.5 16.5 L18 7"/></svg><span class="txt">${t}</span></label><span class="tag">${s} · +${x}</span></li>`).join('');
+  ul.addEventListener('change', e => {
+    const x = +e.target.dataset.xp, on = e.target.checked, prev = xp;
+    xp += on ? x : -x; countTo(xpEl, prev, xp);
+    if (on) floatXp(`+${x} XP`, e.target.closest('li').querySelector('.txt'), xpEl);
+  });
+  const days = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'], names = ['quarta', 'quinta', 'sexta', 'sábado', 'domingo', 'segunda', 'terça'];
+  // a sequência termina hoje (terça), então os 5 últimos dias estão feitos
+  const order = ['Q', 'Q', 'S', 'S', 'D', 'S', 'T'];
+  $('#week').innerHTML = order.map((d, i) => `<div class="${i >= 2 ? 'done' : ''} ${i === 6 ? 'today' : ''}" aria-label="${names[i]}${i >= 2 ? ': estudou' : ''}">${d}</div>`).join('');
+  $$('#week .done').forEach((d, i) => anim(d, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 360, delay: 300 + i * 70, easing: E_SPRING, fill: 'backwards' }));
+};
+
+/* ───────── Matéria ───────── */
+inits.subject = () => {
+  const mats = [['PDF', 'Ciclo celular — resumo da aula', 1], ['Nota', 'Diferenças entre mitose e meiose', 1], ['Vídeo', 'Animação da prófase à telófase', 1], ['PDF', 'Lista de exercícios 4', 0], ['Nota', 'Dúvidas para levar à professora', 0], ['Mapa', 'Mapa mental: fases da mitose', 1]];
+  const ul = $('#mat');
+  const render = () => {
+    const n = mats.filter(m => m[2]).length;
+    $('#matCount').textContent = `${n} de ${mats.length} estudados`;
+    $('#matBar').style.setProperty('--v', n / mats.length);
+  };
+  ul.innerHTML = mats.map(([k, t, d], i) => `<li><input type="checkbox" class="sr" id="m${i}" data-i="${i}" ${d ? 'checked' : ''}><svg class="box" viewBox="0 0 24 24" aria-hidden="true">${BOX}<path class="tick" d="M6.5 12.5 L10.5 16.5 L18 7" style="stroke-dashoffset:${d ? 0 : 24}"/></svg><label for="m${i}" style="cursor:pointer">${t}</label><span class="kind">${k}</span></li>`).join('');
+  ul.addEventListener('click', e => { const li = e.target.closest('li'); if (!li || e.target.matches('input,label')) return; const c = $('input', li); c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); });
+  ul.addEventListener('change', e => {
+    const i = +e.target.dataset.i; mats[i][2] = e.target.checked ? 1 : 0;
+    $('.tick', e.target.closest('li')).style.strokeDashoffset = mats[i][2] ? 0 : 24;
+    if (mats[i][2]) floatXp('+15 XP', e.target.closest('li'));
+    render();
+  });
+  requestAnimationFrame(render);
+
+  const cards = [['O que acontece na anáfase?', 'As cromátides-irmãs se separam e migram para polos opostos da célula.'], ['Mitose gera quantas células?', 'Duas células-filhas geneticamente iguais à célula-mãe.'], ['Para que serve a meiose?', 'Formar gametas com metade dos cromossomos, e ainda misturar genes no crossing-over.'], ['Onde ficam os centríolos?', 'No centrossomo, perto do núcleo. Eles organizam as fibras do fuso.']];
+  let idx = 0, known = 0, total = cards.length;
+  const deck = $('#deck');
+  const draw = () => {
+    if (idx >= cards.length) { deck.innerHTML = `<div class="fcard"><div class="side">Revisão feita!<br><span class="hand" style="font-size:24px">${known} de ${total} de primeira</span></div></div>`; $('#fcCount').textContent = 'fim'; $('#fcKnow').textContent = 'Recomeçar'; idx = -1; return; }
+    const [f, b] = cards[idx];
+    deck.innerHTML = `<div class="under"></div><div class="fcard" tabindex="0" role="button" aria-label="Virar cartão: ${f}"><div class="side">${f}</div><div class="side b">${b}</div></div>`;
+    $('#fcCount').textContent = `${idx + 1} / ${cards.length}`; $('#fcKnow').textContent = 'Eu sabia ✓';
+    const c = $('.fcard', deck);
+    c.onclick = () => c.classList.toggle('flip');
+    c.onkeydown = e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); c.classList.toggle('flip'); } };
+    anim(c, [{ opacity: 0, translate: '0 20px' }, { opacity: 1, translate: '0 0' }], { duration: 300, easing: E_OUT });
+  };
+  const next = dir => {
+    if (idx < 0) { cards.length = total; idx = 0; known = 0; draw(); return; }
+    const c = $('.fcard', deck);
+    anim(c, [{ opacity: 1, translate: '0 0', rotate: '0deg' }, { opacity: 0, translate: `${dir * 140}% 0`, rotate: `${dir * 14}deg` }], { duration: 320, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' })
+      .onfinish = () => { if (dir > 0) known++; else cards.push(cards[idx]); idx++; draw(); };
+    if (dir > 0) floatXp('+5 XP', $('#fcKnow'));
+  };
+  $('#fcKnow').onclick = () => next(1);
+  $('#fcAgain').onclick = () => { if (idx >= 0) next(-1); };
+  draw();
+};
+
+/* ───────── Agenda ───────── */
+inits.agenda = () => {
+  const days = [['seg', 28], ['ter', 29], ['qua', 30], ['qui', 1], ['sex', 2], ['sáb', 3], ['dom', 4]];
+  const tasks = { 0: [['revisao', 'Revisar logaritmos', 'Matemática']], 1: [['prova', 'Prova de Biologia', '8h · sala 12'], ['revisao', 'Flashcards de inglês', '15 min']], 2: [['trabalho', 'Seminário: Era Vargas', 'História · em grupo']], 3: [['prova', 'Simulado ENEM', 'manhã inteira']], 4: [['trabalho', 'Relatório de química', 'entregar no Classroom'], ['revisao', 'Revisar mitose', 'Biologia']], 5: [], 6: [] };
+  const el = $('#planner');
+  el.innerHTML = days.map(([d, n], i) => `<div class="day ${i === 1 ? 'today' : ''}" data-d="${i}" role="group" aria-label="${d} ${n}${i === 1 ? ', hoje' : ''}"><header><span class="mono small">${d}${i === 1 ? ' · hoje' : ''}</span><b class="${i === 1 ? 'hl lit' : ''}">${n}</b></header></div>`).join('');
+  Object.entries(tasks).forEach(([d, list]) => list.forEach(([t, title, sub]) => $(`.day[data-d="${d}"]`, el).insertAdjacentHTML('beforeend', `<div class="sticky" tabindex="0" role="button" aria-roledescription="tarefa arrastável" data-t="${t}">${title}<small>${sub}</small></div>`)));
+  const info = () => { const n = $$('.sticky[data-t="prova"]', el).length; $('#agendaInfo').textContent = `${$$('.sticky', el).length} tarefas · ${n} provas`; };
+  info();
+  const stickies = () => $$('.sticky', el);
+  const moveTo = (s, day) => flip(stickies, () => day.appendChild(s));
+
+  let drag = null;
+  el.addEventListener('pointerdown', e => {
+    const s = e.target.closest('.sticky'); if (!s || e.button) return;
+    const r = s.getBoundingClientRect();
+    drag = { s, ox: e.clientX - r.left, oy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, r, g: null };
+    s.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', e => {
+    if (!drag) return;
+    if (!drag.g) {
+      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 5) return;
+      const g = drag.s.cloneNode(true); g.classList.add('ghost'); g.style.setProperty('--w', drag.r.width + 'px'); g.style.transform = 'rotate(-3deg) scale(1.04)';
+      document.body.appendChild(g); drag.s.classList.add('placeholder'); drag.g = g;
+    }
+    drag.g.style.left = e.clientX - drag.ox + 'px'; drag.g.style.top = e.clientY - drag.oy + 'px';
+    const over = document.elementsFromPoint(e.clientX, e.clientY).find(n => n.classList && n.classList.contains('day'));
+    $$('.day', el).forEach(d => d.classList.toggle('over', d === over));
+    drag.over = over;
+  });
+  const end = () => {
+    if (!drag) return;
+    const { s, g, over } = drag; drag = null;
+    $$('.day', el).forEach(d => d.classList.remove('over'));
+    if (!g) return;
+    if (over && over !== s.parentElement) { s.classList.remove('placeholder'); g.remove(); moveTo(s, over); $('#agendaInfo').textContent = `Movida para ${days[over.dataset.d].join(' ')}`; }
+    else { const r = s.getBoundingClientRect(); anim(g, [{ left: g.style.left, top: g.style.top }, { left: r.left + 'px', top: r.top + 'px' }], { duration: 220, easing: E_OUT }).onfinish = () => { g.remove(); s.classList.remove('placeholder'); }; }
+  };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+
+  el.addEventListener('keydown', e => {
+    const s = e.target.closest('.sticky'); if (!s) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const on = s.classList.toggle('picked'); $('#agendaInfo').textContent = on ? 'Use ← → para mudar o dia; Enter solta' : 'Tarefa solta'; }
+    else if (s.classList.contains('picked') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      e.preventDefault();
+      const d = +s.parentElement.dataset.d + (e.key === 'ArrowRight' ? 1 : -1);
+      const day = $(`.day[data-d="${d}"]`, el); if (day) { moveTo(s, day); s.focus(); $('#agendaInfo').textContent = `Movida para ${days[d].join(' ')}`; }
+    } else if (e.key === 'Escape') { s.classList.remove('picked'); info(); }
+  });
+};
+
+/* ───────── Foco ───────── */
+inits.foco = () => {
+  const body = $('#pBody'), tip = $('#pTip'), time = $('#time'), wrap = $('#pencilWrap');
+  const LEN = 420;
+  let total = 25 * 60, left = total, running = false, last = 0, shaveT = 0;
+  const paint = () => {
+    const f = left / total;
+    body.setAttribute('transform', `translate(84 0) scale(${Math.max(f, .001)} 1) translate(-84 0)`);
+    tip.setAttribute('transform', `translate(${-(1 - f) * LEN} 0)`);
+    const m = Math.floor(left / 60), s = Math.floor(left % 60);
+    time.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+  const shave = () => {
+    if (reduced()) return;
+    const svg = $('.pencil', wrap).getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    const k = svg.width / 620, x = (560 - (1 - left / total) * LEN) * k + (svg.left - wr.left), y = 45 * k + (svg.top - wr.top);
+    const p = document.createElement('i'); p.className = 'shaving';
+    p.style.left = x + 'px'; p.style.top = y + 'px'; wrap.appendChild(p);
+    p.animate([{ transform: 'translate(0,0) rotate(0)', opacity: 1 }, { transform: `translate(${20 + Math.random() * 40}px,${50 + Math.random() * 30}px) rotate(${200 + Math.random() * 200}deg)`, opacity: 0 }], { duration: 1100, easing: 'cubic-bezier(.3,.2,.6,1)' }).onfinish = () => p.remove();
+  };
+  const tick = t => {
+    if (!running) return;
+    const fast = $('#fast').checked, dt = (t - last) / 1000 * (fast ? 60 : 1); last = t;
+    left = Math.max(0, left - dt); shaveT += dt;
+    if (shaveT > (fast ? 25 : 4)) { shaveT = 0; shave(); }
+    paint();
+    if (left <= 0) { running = false; $('#focusGo').textContent = 'Começar'; floatXp('+25 XP · sessão concluída', time); const nx = $('#sessions i:not(.on)'); nx && nx.classList.add('on'); return; }
+    requestAnimationFrame(tick);
+  };
+  $('#focusGo').onclick = () => {
+    if (left <= 0) left = total;
+    running = !running; $('#focusGo').textContent = running ? 'Pausar' : 'Continuar';
+    if (running) { last = performance.now(); requestAnimationFrame(tick); }
+  };
+  $('#focusReset').onclick = () => { running = false; left = total; $('#focusGo').textContent = 'Começar'; paint(); };
+  $('#durSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; $$('#durSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); total = left = +b.dataset.m * 60; running = false; $('#focusGo').textContent = 'Começar'; paint(); };
+  paint();
+};
+
+/* ───────── Progresso ───────── */
+inits.progress = () => {
+  const svg = $('#chart'), tip = $('#tip'), card = $('#chartCard');
+  const seed = n => Array.from({ length: n }, (_, i) => Math.round(40 + 60 * Math.abs(Math.sin(i * 1.7 + 2)) + (i % 5 === 0 ? 50 : 0) + i * 1.4));
+  const data = { 7: [55, 90, 40, 120, 85, 150, 110], 30: seed(30) };
+  const draw = n => {
+    const d = data[n], W = 560, H = 240, P = 30, top = Math.ceil(Math.max(...d) * 1.15 / 50) * 50;
+    const x = i => P + 10 + (W - P * 2 - 10) * (i / (d.length - 1)), y = v => H - P - (H - P * 2) * (v / top);
+    const pts = d.map((v, i) => [x(i), y(v)]);
+    let path = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 0; i < pts.length - 1; i++) { const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2; path += ` C${p1[0] + (p2[0] - p0[0]) / 6},${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6},${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]},${p2[1]}`; }
+    const grid = [0, .5, 1].map(f => `<line class="grid-l" x1="${P + 10}" x2="${W - P}" y1="${y(top * f)}" y2="${y(top * f)}"/><text x="0" y="${y(top * f) + 4}">${top * f}</text>`).join('');
+    const labels = n == 7 ? ['qua', 'qui', 'sex', 'sáb', 'dom', 'seg', 'ter'].map((l, i) => `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${l}</text>`).join('') : `<text x="${x(0)}" y="${H - 6}">31/ago</text><text x="${x(29)}" y="${H - 6}" text-anchor="end">hoje</text>`;
+    svg.innerHTML = `${grid}<path class="area" d="${path} L${x(d.length - 1)},${H - P} L${x(0)},${H - P} Z"/><path class="ink" d="${path}"/>${labels}` +
+      pts.map((p, i) => `<circle class="pt" r="${n == 7 ? 5.5 : 3.5}" cx="${p[0]}" cy="${p[1]}" tabindex="0" data-v="${d[i]}" aria-label="${d[i]} XP"/>`).join('');
+    svg.setAttribute('aria-label', `XP por dia nos últimos ${n} dias; média de ${Math.round(d.reduce((a, b) => a + b) / d.length)} XP`);
+    const ink = $('.ink', svg), L = ink.getTotalLength();
+    ink.style.strokeDasharray = L;
+    anim(ink, [{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: 1100, easing: E_OUT });
+    anim($('.area', svg), [{ opacity: 0 }, { opacity: .35 }], { duration: 600, delay: 600, easing: E_OUT, fill: 'backwards' });
+    $$('.pt', svg).forEach((c, i) => anim(c, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 200 + i * (900 / d.length), fill: 'backwards' }));
+  };
+  const show = e => {
+    const c = e.target.closest('.pt'); if (!c) { tip.style.opacity = 0; return; }
+    const r = c.getBoundingClientRect(), cr = card.getBoundingClientRect();
+    tip.textContent = `+${c.dataset.v} XP`; tip.style.left = r.left - cr.left + r.width / 2 + 'px'; tip.style.top = r.top - cr.top + 'px'; tip.style.opacity = 1;
+  };
+  svg.addEventListener('pointerover', show); svg.addEventListener('focusin', show);
+  svg.addEventListener('pointerleave', () => tip.style.opacity = 0); svg.addEventListener('focusout', () => tip.style.opacity = 0);
+  $('#rangeSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; $$('#rangeSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); draw(b.dataset.r); };
+  draw(7);
+
+  const src = [['Foco', 425, 'var(--hl)'], ['Tarefas', 300, 'var(--hl-yellow)'], ['Provas', 210, 'var(--hl-pink)'], ['Games', 165, 'var(--hl-lilac)'], ['Flashcards', 95, 'var(--hl)'], ['Mine', 45, 'var(--hl-lilac)']];
+  const mx = src[0][1];
+  $('#sources').innerHTML = src.map(([l, v, c]) => `<div class="src-row"><span class="small">${l}</span><div class="bar"><i style="background:${c}"></i></div><span class="mono small" style="text-align:right">${v}</span></div>`).join('');
+  requestAnimationFrame(() => requestAnimationFrame(() => $$('#sources .bar i').forEach((b, i) => { b.style.transitionDelay = 200 + i * 80 + 'ms'; b.style.setProperty('--v', src[i][1] / mx); })));
+
+  const st = [['🔥', 'Sequência de 5 dias', 1, 'var(--hl-yellow)'], ['⏱', '10 sessões de foco', 1, 'var(--hl)'], ['📚', '5 matérias', 1, 'var(--hl-lilac)'], ['🧠', '100 flashcards', 1, 'var(--hl-pink)'], ['🎮', 'Primeiro jogo', 1, 'var(--hl)'], ['✍️', 'Primeira prova', 1, 'var(--hl-yellow)'], ['🌙', '30 dias seguidos', 0], ['🏆', 'Top 3 da semana', 0], ['💬', '50 conversas com a Mine', 0], ['🗺', '10 mapas mentais', 0]];
+  $('#stickers').innerHTML = st.map(([ic, t, on, c]) => `<button class="sticker ${on ? '' : 'locked'}" style="--c:${c || ''}" aria-label="${t}${on ? '' : ' (ainda bloqueada)'}"><span><span class="ic" aria-hidden="true">${on ? ic : '?'}</span>${t}</span></button>`).join('');
+  $$('#stickers .sticker').forEach((s, i) => {
+    anim(s, [{ scale: '.7', rotate: '-20deg', opacity: 0 }, { scale: '1', rotate: '0deg', opacity: 1 }], { duration: 420, delay: 400 + i * 50, easing: E_SPRING, fill: 'backwards' });
+    s.onclick = () => anim(s, s.classList.contains('locked') ? [{ translate: '0' }, { translate: '-6px' }, { translate: '6px' }, { translate: '0' }] : [{ rotate: '0deg', scale: '1' }, { rotate: '12deg', scale: '1.12' }, { rotate: '0deg', scale: '1' }], { duration: 360, easing: E_OUT });
+  });
+};
+
+/* ───────── Ranking ───────── */
+inits.ranking = () => {
+  const color = { 'Ana Luísa': 'var(--hl)', 'Bruno': 'var(--hl-lilac)', 'Carol': 'var(--hl-pink)', 'Davi': 'var(--hl-yellow)', 'Érica': 'var(--hl)', 'Felipe': 'var(--hl-lilac)', 'Gabi': 'var(--hl-pink)', 'Heitor': 'var(--hl-yellow)' };
+  const W = {
+    dia: { unit: 25, xp: { 'Ana Luísa': 180, 'Bruno': 240, 'Carol': 95, 'Davi': 310, 'Érica': 60, 'Felipe': 150, 'Gabi': 205, 'Heitor': 40 } },
+    semana: { unit: 100, xp: { 'Ana Luísa': 940, 'Bruno': 1120, 'Carol': 610, 'Davi': 870, 'Érica': 450, 'Felipe': 1300, 'Gabi': 720, 'Heitor': 380 } },
+    geral: { unit: 320, xp: { 'Ana Luísa': 1240, 'Bruno': 3900, 'Carol': 2810, 'Davi': 2200, 'Érica': 1480, 'Felipe': 4400, 'Gabi': 1990, 'Heitor': 1100 } },
+  };
+  const list = $('#rankList'), shelf = $('#shelf');
+  Object.keys(color).forEach(n => list.insertAdjacentHTML('beforeend', `<li data-n="${n}" class="${n === 'Ana Luísa' ? 'me' : ''}"><span class="mono pos"></span><span class="row" style="gap:10px"><span class="av" style="--c:${color[n]}">${n.slice(0, 2).toUpperCase()}</span><span>${n}${n === 'Ana Luísa' ? ' <span class="hand">(você)</span>' : ''}</span></span><span class="mono xp"></span></li>`));
+  const render = w => {
+    const { unit, xp } = W[w];
+    const order = Object.keys(xp).sort((a, b) => xp[b] - xp[a]);
+    flip(() => $$('li', list), () => order.forEach((n, i) => {
+      const li = $(`li[data-n="${n}"]`, list);
+      $('.pos', li).textContent = i + 1 + 'º'; $('.xp', li).textContent = fmt(xp[n]) + ' XP';
+      list.appendChild(li);
+    }));
+    const podium = [order[1], order[0], order[2]];
+    shelf.innerHTML = podium.map((n, k) => {
+      const books = Math.max(1, Math.round(xp[n] / unit)), place = [2, 1, 3][k];
+      const spines = Array.from({ length: Math.min(books, 16) }, (_, i) => `<i class="book-spine" style="--c:${['var(--hl)', 'var(--hl-lilac)', 'var(--hl-pink)', 'var(--hl-yellow)', 'var(--ink-soft)'][(i * 7 + place) % 5]};--bw:${96 + ((i * 13) % 26)}px;--off:${((i * 17) % 13) - 6}px"></i>`).join('');
+      return `<div class="stack">${spines}<div class="who"><div class="place">${place}º</div><b>${n}</b><div class="mono small muted">${fmt(xp[n])} XP</div></div></div>`;
+    }).join('');
+    $$('.stack', shelf).forEach((st, k) => $$('.book-spine', st).forEach((b, i) => anim(b, [{ transform: 'translateY(-60px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 340, delay: k * 90 + i * 35, easing: E_SPRING, fill: 'backwards' })));
+    shelf.setAttribute('role', 'img');
+    shelf.setAttribute('aria-label', `Pódio: 1º ${order[0]}, 2º ${order[1]}, 3º ${order[2]}. Cada livro vale ${unit} XP.`);
+  };
+  $('#rankSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; $$('#rankSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); render(b.dataset.w); };
+  render('dia');
+};
+
+/* ───────── Mine ───────── */
+inits.mine = () => {
+  const face = $('#mineFace'), eyes = [$('#eyeL'), $('#eyeR')], status = $('#mineStatus'), msgs = $('#msgs');
+  eyes.forEach(e => { e.style.transformBox = 'fill-box'; e.style.transformOrigin = 'center'; });
+  document.addEventListener('pointermove', e => {
+    if (!$('.page[data-view="mine"]').classList.contains('on') || reduced()) return;
+    const r = face.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height * .47;
+    const a = Math.atan2(e.clientY - cy, e.clientX - cx), d = Math.min(1, Math.hypot(e.clientX - cx, e.clientY - cy) / 400);
+    $('#eyes').setAttribute('transform', `translate(${Math.cos(a) * 9 * d} ${Math.sin(a) * 7 * d})`);
+  });
+  const blink = () => { if (!reduced()) eyes.forEach(e => e.animate([{ transform: 'scaleY(1)' }, { transform: 'scaleY(.1)' }, { transform: 'scaleY(1)' }], { duration: 180 })); setTimeout(blink, 2600 + Math.random() * 3000); };
+  setTimeout(blink, 1500);
+
+  const sugg = ['Faz um mapa mental de fotossíntese', 'Me testa em função afim', 'Cria flashcards de verbos irregulares'];
+  $('#suggest').innerHTML = sugg.map(s => `<button class="chip" type="button">${s}</button>`).join('');
+  $('#suggest').onclick = e => { const b = e.target.closest('.chip'); if (b) send(b.textContent); };
+  $('#composer').onsubmit = e => { e.preventDefault(); const v = $('#mineIn').value.trim(); if (v) { send(v); $('#mineIn').value = ''; } };
+
+  const topicOf = t => { const m = t.match(/\b(?:de|sobre|em)\s+(.+)$/i); return (m ? m[1] : t).replace(/[?.!]+$/, '').trim(); };
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let busy = false;
+  function add(cls, html) { const d = document.createElement('div'); d.className = `msg ${cls} enter`; d.innerHTML = html; msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight; return d; }
+  async function type(el, text) {
+    if (reduced()) { el.textContent = text; return; }
+    const words = text.split(' ');
+    for (let i = 0; i < words.length; i++) { el.textContent = words.slice(0, i + 1).join(' '); msgs.scrollTop = msgs.scrollHeight; await new Promise(r => setTimeout(r, 38)); }
+  }
+  async function send(text) {
+    if (busy) return; busy = true;
+    add('u', esc(text));
+    const topic = topicOf(text), low = text.toLowerCase();
+    const kind = /mapa/.test(low) ? 'mapa' : /(prova|testa|quest|quiz)/.test(low) ? 'prova' : /(flash|cart)/.test(low) ? 'cards' : 'fala';
+    face.classList.add('thinking'); status.textContent = 'pensando…';
+    const wait = add('m', '<span class="dots" aria-label="A Mine está escrevendo"><i></i><i></i><i></i></span>');
+    await new Promise(r => setTimeout(r, reduced() ? 50 : 900));
+    wait.innerHTML = '<span class="t"></span>';
+    const say = { mapa: `Montei um mapa mental de ${topic}. Os ramos são os pontos que mais caem.`, prova: `Uma questão rápida de ${topic} para aquecer. Escolha uma alternativa:`, cards: `Separei três flashcards de ${topic}. Clique para virar.`, fala: `Boa pergunta! Antes de eu explicar ${topic}: o que você já sabe sobre isso? Assim eu começo do ponto certo.` }[kind];
+    await type($('.t', wait), say);
+    if (kind !== 'fala') { const art = document.createElement('div'); art.className = 'artifact'; wait.appendChild(art); build(kind, topic, art); }
+    face.classList.remove('thinking'); status.textContent = 'pode perguntar!'; busy = false;
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+  function build(kind, topic, el) {
+    if (kind === 'mapa') {
+      const br = /fotoss/i.test(topic) ? ['Luz do sol', 'Clorofila', 'Água + CO₂', 'Glicose', 'Oxigênio'] : ['Definição', 'Exemplos', 'Causas', 'Efeitos', 'Dúvidas'];
+      const cx = 200, cy = 110, pos = br.map((_, i) => { const a = -Math.PI / 2 + i * (2 * Math.PI / br.length); return [cx + Math.cos(a) * 150, cy + Math.sin(a) * 80]; });
+      el.innerHTML = `<svg class="mm" viewBox="0 0 400 220" role="img" aria-label="Mapa mental de ${esc(topic)}: ${br.join(', ')}">${pos.map(([x, y]) => `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}"/>`).join('')}${pos.map(([x, y], i) => `<g class="n"><rect x="${x - 48}" y="${y - 14}" width="96" height="28" rx="14"/><text x="${x}" y="${y}">${br[i]}</text></g>`).join('')}<rect class="root" x="${cx - 62}" y="${cy - 18}" width="124" height="36" rx="18"/><text x="${cx}" y="${cy}" style="font-weight:700">${esc(topic.slice(0, 18))}</text></svg>`;
+      $$('line', el).forEach((l, i) => { const L = Math.hypot(l.x2.baseVal.value - cx, l.y2.baseVal.value - cy); l.style.strokeDasharray = L; anim(l, [{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: 400, delay: i * 90, easing: E_OUT, fill: 'backwards' }); });
+      $$('.n', el).forEach((n, i) => { n.style.transformBox = 'fill-box'; n.style.transformOrigin = 'center'; anim(n, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 360, delay: 250 + i * 90, easing: E_SPRING, fill: 'backwards' }); });
+    } else if (kind === 'prova') {
+      const q = /fun[çc][ãa]o/i.test(topic) ? ['Se f(x) = 2x + 3, quanto vale f(4)?', ['8', '11', '10', '14'], 1] : [`Qual destas frases resume melhor ${topic}?`, ['Uma definição decorada', 'Uma ideia explicada com exemplo', 'Uma data solta', 'Um nome sem contexto'], 1];
+      el.innerHTML = `<p style="font-weight:700;margin-bottom:8px">${esc(q[0])}</p><div class="row" style="gap:8px">${q[1].map((o, i) => `<button class="chip" data-i="${i}">${String.fromCharCode(65 + i)}) ${esc(o)}</button>`).join('')}</div><p class="hand" style="font-size:20px;margin-top:8px" aria-live="polite"></p>`;
+      el.onclick = e => { const b = e.target.closest('.chip'); if (!b || el.dataset.done) return; el.dataset.done = 1; const ok = +b.dataset.i === q[2]; b.style.background = ok ? 'var(--hl)' : 'var(--hl-pink)'; b.style.color = '#14161b'; $('.hand', el).textContent = ok ? 'Isso! +5 XP' : `Quase. A certa é a ${String.fromCharCode(65 + q[2])}. Quer que eu explique?`; if (ok) floatXp('+5 XP', b); else anim(b, [{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 240 }); };
+    } else {
+      const cs = /verbo/i.test(topic) ? [['go', 'went · gone'], ['take', 'took · taken'], ['write', 'wrote · written']] : [['Conceito 1', 'Resumo curto'], ['Conceito 2', 'Resumo curto'], ['Conceito 3', 'Resumo curto']];
+      el.innerHTML = `<div class="row" style="gap:10px">${cs.map(([f, b]) => `<button class="fcard-mini" aria-label="Flashcard ${f}: virar" style="position:relative;width:110px;height:76px;perspective:600px"><span class="inner" style="position:absolute;inset:0;transform-style:preserve-3d;transition:transform 420ms var(--e-out)"><span style="position:absolute;inset:0;display:grid;place-items:center;border-radius:10px;background:var(--card);box-shadow:var(--shadow);backface-visibility:hidden;font-weight:700">${f}</span><span style="position:absolute;inset:0;display:grid;place-items:center;border-radius:10px;background:var(--hl);color:#14161b;backface-visibility:hidden;transform:rotateY(180deg);font-size:14px">${b}</span></span></button>`).join('')}</div>`;
+      $$('.fcard-mini', el).forEach((c, i) => { anim(c, [{ transform: 'translateY(16px) rotate(-6deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 360, delay: i * 100, easing: E_SPRING, fill: 'backwards' }); c.onclick = () => { const s = $('.inner', c); s.style.transform = s.style.transform ? '' : 'rotateY(180deg)'; }; });
+    }
+  }
+};
+
+/* ───────── Games ───────── */
+inits.games = () => {
+  const games = [
+    ['Forja de Sequências', '1→2', 'var(--hl-yellow)', 'Coloque etapas na ordem certa.', ['A Mine mostra etapas embaralhadas.', 'Arraste até a ordem fazer sentido.', 'Leia por que aquela ordem funciona.']],
+    ['A Jornada da Mine', '✦', 'var(--hl)', 'Quatro capítulos até o farol antigo.', ['Cada porta abre com uma resposta certa.', 'Errou? A Mine explica e você tenta de novo.', 'Chegue ao farol para fechar o capítulo.']],
+    ['Arquivo Perdido', '¶', 'var(--hl-lilac)', 'Reconstrua uma biblioteca antiga.', ['Fragmentos de texto aparecem soltos.', 'Encaixe cada um no tema certo.', 'Complete as estantes para vencer.']],
+    ['Torre dos Códigos', 'A_', 'var(--hl-pink)', 'Decifre palavras para subir a torre.', ['Cada andar esconde uma palavra.', 'Chute letras usando a dica da Mine.', 'Acertou, sobe. Seis erros, a torre trava.']],
+    ['Caça-Palavras da Mine', '#?', 'var(--hl)', 'Ache os termos escondidos na grade.', ['Arraste sobre as letras para marcar.', 'Cada termo achado mostra o significado.', 'Ache todos antes do tempo acabar.']],
+  ];
+  const hand = $('#hand');
+  hand.innerHTML = games.map(([n, g, c, t, steps], i) => `<div class="gcard" data-i="${i}" style="--c:${c}"><div class="inner"><button class="face" aria-label="${n}: ver regras"><span class="glyph" aria-hidden="true">${g}</span><h3>${n}</h3><p class="small" style="margin-top:6px">${t}</p></button><div class="face back"><p class="eyebrow">Como jogar</p><h3 style="margin:6px 0 0;font-size:18px">${n}</h3><ol>${steps.map(s => `<li>${s}</li>`).join('')}</ol><p class="mono small" style="margin-top:auto">5 XP por acerto</p><div class="row" style="margin-top:8px;gap:6px"><button class="btn play" style="min-height:38px;padding:6px 12px">Jogar</button><button class="btn ghost close" style="min-height:38px;padding:6px 12px">Voltar</button></div></div></div></div>`).join('');
+  const cards = $$('.gcard', hand);
+  let open = -1, spread = false, hover = -1;
+  const layout = () => cards.forEach((c, i) => {
+    const k = i - 2, isOpen = open === i;
+    const w = matchMedia('(max-width:860px)').matches ? .45 : 1;
+    let t = spread || open >= 0 ? `translateX(${k * 150 * w}px) rotate(${k * 6}deg)` : `translateX(${k * 46 * w}px) rotate(${k * 9}deg)`;
+    if (open < 0 && hover === i) t += ' translateY(-26px)';
+    if (open >= 0 && !isOpen) t += ' translateY(40px) scale(.9)';
+    if (isOpen) t = 'translateY(-20px) scale(1.12)';
+    c.style.transform = t; c.style.zIndex = isOpen ? 10 : i; c.style.opacity = open >= 0 && !isOpen ? .55 : 1;
+    c.classList.toggle('flipped', isOpen);
+    $('.face', c).tabIndex = isOpen ? -1 : 0;
+    $$('.back button', c).forEach(b => b.tabIndex = isOpen ? 0 : -1);
+  });
+  hand.addEventListener('pointerenter', () => { spread = true; layout(); });
+  hand.addEventListener('pointerleave', () => { spread = false; hover = -1; layout(); });
+  hand.addEventListener('focusin', e => { spread = true; const c = e.target.closest('.gcard'); hover = c ? +c.dataset.i : -1; layout(); });
+  cards.forEach((c, i) => { c.addEventListener('pointerenter', () => { hover = i; layout(); }); });
+  hand.addEventListener('click', e => {
+    const c = e.target.closest('.gcard'); if (!c) return;
+    if (e.target.closest('.close')) { open = -1; layout(); $('.face', c).focus(); return; }
+    if (e.target.closest('.play')) { floatXp('abrindo o jogo…', e.target); return; }
+    if (e.target.closest('.face:not(.back)')) { open = +c.dataset.i; layout(); setTimeout(() => $('.back .play', c).focus(), 300); }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && open >= 0) { const c = cards[open]; open = -1; layout(); $('.face', c).focus(); } });
+  layout();
+  cards.forEach((c, i) => anim(c, [{ opacity: 0, translate: '0 180px' }, { opacity: 1, translate: '0 0' }], { duration: 520, delay: i * 70, easing: E_OUT, fill: 'backwards' }));
+};
+
+/* ───────── Busca ───────── */
+inits.search = () => {
+  const data = [
+    ['material', 'Ciclo celular — resumo da aula', 'Biologia', 'subject'], ['material', 'Diferenças entre mitose e meiose', 'Biologia', 'subject'], ['material', 'Lista de exercícios de função afim', 'Matemática', 'subject'],
+    ['material', 'Dom Casmurro — capítulos 1 a 5', 'Português', 'subject'], ['tarefa', 'Prova de Biologia', 'terça, 8h', 'agenda'], ['tarefa', 'Seminário: Era Vargas', 'quarta', 'agenda'],
+    ['tarefa', 'Relatório de química: titulação', 'sexta', 'agenda'], ['cartão', 'O que acontece na anáfase?', 'Biologia', 'subject'], ['cartão', 'go → went → gone', 'Inglês', 'subject'],
+    ['cartão', 'Coeficiente angular de uma função afim', 'Matemática', 'subject'], ['comentário', 'Fazer o mapa mental da mitose antes de ler salvou minha prova', 'Carol', 'comments'],
+    ['comentário', 'Foco de 50 minutos é demais pra mim, 25 funciona melhor', 'Davi', 'comments'], ['material', 'Revolução Industrial: linha do tempo', 'História', 'subject'], ['cartão', 'Fórmula da densidade', 'Química', 'subject'],
+  ];
+  const types = [['tudo', 'Tudo'], ['material', 'Materiais'], ['tarefa', 'Tarefas'], ['cartão', 'Cartões'], ['comentário', 'Comentários']];
+  let filter = 'tudo', sel = 0;
+  $('#qFilters').innerHTML = types.map(([k, l]) => `<button class="chip" data-k="${k}" aria-pressed="${k === 'tudo'}">${l}</button>`).join('');
+  $('#qFilters').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; filter = b.dataset.k; $$('#qFilters .chip').forEach(x => x.setAttribute('aria-pressed', x === b)); run(); };
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const mark = (s, q) => { if (!q) return esc(s); const i = norm(s).indexOf(norm(q)); return i < 0 ? esc(s) : esc(s.slice(0, i)) + `<mark class="hlm">${esc(s.slice(i, i + q.length))}</mark>` + esc(s.slice(i + q.length)); };
+  const out = $('#results'), inp = $('#q');
+  function run() {
+    const q = inp.value.trim();
+    let shown = data.filter(d => (filter === 'tudo' || d[0] === filter) && (!q || norm(d[1] + ' ' + d[2]).includes(norm(q))));
+    const recent = !q && filter === 'tudo';
+    if (recent) shown = shown.slice(0, 5);
+    sel = 0;
+    out.innerHTML = shown.length ? shown.map((d, i) => `<li role="option" id="r${i}" aria-selected="${i === 0}" data-go="${d[3]}"><span class="t">${d[0]}</span><span>${mark(d[1], q)}</span><span class="muted small">${mark(d[2], q)}</span></li>`).join('')
+      : `<li role="presentation" style="display:block;cursor:default"><p class="hand" style="font-size:24px">Nada com “${esc(q)}”.</p><p class="muted">Tente o nome da matéria, ou <button class="btn ghost" data-go="mine" style="min-height:36px;padding:4px 12px">peça para a Mine buscar na web</button></p></li>`;
+    if (recent && shown.length) out.insertAdjacentHTML('afterbegin', '<li role="presentation" style="display:block;cursor:default;border:0;padding:6px 12px;background:none" class="eyebrow">Vistos recentemente</li>');
+    $$('li[role=option]', out).forEach((li, i) => anim(li, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 220, delay: i * 30, easing: E_OUT, fill: 'backwards' }));
+    shown.length ? inp.setAttribute('aria-activedescendant', 'r0') : inp.removeAttribute('aria-activedescendant');
+  }
+  inp.addEventListener('input', run);
+  inp.addEventListener('keydown', e => {
+    const opts = $$('li[role=option]', out); if (!opts.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length; opts.forEach((o, i) => o.setAttribute('aria-selected', i === sel)); inp.setAttribute('aria-activedescendant', 'r' + sel); opts[sel].scrollIntoView({ block: 'nearest' }); }
+    if (e.key === 'Enter') { e.preventDefault(); go(opts[sel].dataset.go); }
+  });
+  run();
+};
+inits['search:enter'] = () => setTimeout(() => $('#q').focus({ preventScroll: true }), 50);
+
+/* ───────── Plano ───────── */
+inits.plan = () => {
+  const topics = { Biologia: ['Citologia', 'Mitose', 'Meiose', 'Genética', 'Ecologia', 'Evolução'], Matemática: ['Funções', 'Função afim', 'Quadrática', 'Logaritmos', 'Progressões'], História: ['Era Vargas', 'Ditadura', 'Redemocratização', 'Guerra Fria'], Química: ['Estequiometria', 'Soluções', 'Titulação', 'Termoquímica'] };
+  const wd = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const start = new Date(2026, 8, 29);
+  const rowsEl = $('#planRows');
+  function build() {
+    const sub = $('#pSub').value, n = +$('#pDays').value, m = +$('#pMin').value, rest = $('#pRest').checked;
+    $('#oDays').textContent = n; $('#oMin').textContent = m; $('#pTitle').textContent = sub;
+    const tp = topics[sub], studied = []; let sessions = 0, minutes = 0, t = 0;
+    const rows = [];
+    for (let i = 0; i < n; i++) {
+      const d = new Date(start); d.setDate(d.getDate() + i);
+      const lab = `${wd[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+      let blocks;
+      if (i === n - 1) blocks = [['revisao', m, 'Revisão geral']];
+      else if (i === n - 2) blocks = [['simulado', m, 'Simulado']];
+      else if (rest && d.getDay() === 0) blocks = [['descanso', 30, 'folga']];
+      else {
+        const due = studied.filter(s => [1, 3, 7].includes(i - s.day)).slice(0, 2);
+        const rv = Math.min(due.length * 15, Math.floor(m / 2));
+        const topic = tp[t++ % tp.length]; studied.push({ day: i, topic });
+        blocks = [['estudo', m - rv, topic], ...due.map(s => ['revisao', rv / due.length, 'Rev. ' + s.topic])];
+      }
+      blocks.forEach(b => { if (b[0] !== 'descanso') { sessions++; minutes += b[1]; } });
+      rows.push(`<div class="plan-row"><span class="d">${lab}</span><div class="blocks">${blocks.map(([k, mm, l]) => `<span class="blk" data-k="${k}" style="width:${mm / 120 * 100}%" title="${l} · ${Math.round(mm)} min">${l}</span>`).join('')}</div></div>`);
+    }
+    const end = new Date(start); end.setDate(end.getDate() + n);
+    rowsEl.innerHTML = rows.join('');
+    const h = Math.floor(minutes / 60), mm = Math.round(minutes % 60);
+    $('#pSum').textContent = `${sessions} sessões · ${h}h${mm ? String(mm).padStart(2, '0') : ''} no total · prova em ${end.getDate()}/${end.getMonth() + 1}`;
+    $$('.blk', rowsEl).forEach((b, i) => anim(b, [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: 360, delay: i * 18, easing: E_OUT, fill: 'backwards' }));
+  }
+  ['pSub', 'pDays', 'pMin', 'pRest'].forEach(id => $('#' + id).addEventListener('input', build));
+  build();
+};
+
+/* ───────── Comentários ───────── */
+inits.comments = () => {
+  const colors = ['var(--hl-yellow)', 'var(--hl)', 'var(--hl-pink)', 'var(--hl-lilac)'];
+  const names = ['amarelo', 'verde', 'rosa', 'lilás'];
+  let color = colors[0];
+  $('#noteColors').innerHTML = colors.map((c, i) => `<button type="button" class="swatch" style="--c:${c}" aria-label="Bilhete ${names[i]}" aria-pressed="${i === 0}"></button>`).join('');
+  $('#noteColors').onclick = e => { const b = e.target.closest('.swatch'); if (!b) return; color = b.style.getPropertyValue('--c'); $$('#noteColors .swatch').forEach(x => x.setAttribute('aria-pressed', x === b)); };
+  const seed = [['Carol', 'Fazer o mapa mental da mitose antes de ler o resumo salvou minha prova.', 14, 1], ['Davi', 'Foco de 50 minutos é demais pra mim. Com 25 eu rendo muito mais.', 9, 0], ['Gabi', 'A Torre dos Códigos com palavras de química é viciante 😅', 21, 2], ['Bruno', 'Dica: peça pra Mine te testar em vez de pedir resumo.', 17, 3], ['Érica', 'Alguém quer montar um grupo de revisão pro simulado de quinta?', 6, 1]];
+  const wall = $('#wall');
+  const noteHtml = (who, txt, likes, c, when = 'ontem') => `<article class="pnote" style="--c:${typeof c === 'number' ? colors[c] : c};--r:${(Math.random() * 5 - 2.5).toFixed(1)}deg"><p>${txt}</p><footer><span>${who} · ${when}</span><button class="like" aria-pressed="false" aria-label="Curtir bilhete de ${who}"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg><span>${likes}</span></button></footer></article>`;
+  wall.innerHTML = seed.map(s => noteHtml(...s)).join('');
+  $$('.pnote', wall).forEach((n, i) => anim(n, [{ opacity: 0, translate: '0 -20px' }, { opacity: 1, translate: '0 0' }], { duration: 380, delay: 200 + i * 70, easing: E_OUT, fill: 'backwards' }));
+  wall.addEventListener('click', e => {
+    const b = e.target.closest('.like'); if (!b) return;
+    const on = b.getAttribute('aria-pressed') !== 'true', n = $('span', b);
+    b.setAttribute('aria-pressed', on); n.textContent = +n.textContent + (on ? 1 : -1);
+    if (on && !reduced()) for (let i = 0; i < 7; i++) { const d = document.createElement('i'); d.className = 'ink-dot'; b.appendChild(d); const a = i / 7 * Math.PI * 2; d.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${Math.cos(a) * 22}px,${Math.sin(a) * 22}px) scale(.3)`, opacity: 0 }], { duration: 480, easing: E_OUT }).onfinish = () => d.remove(); }
+  });
+  $('#noteForm').onsubmit = e => {
+    e.preventDefault();
+    const v = $('#noteTxt').value.trim();
+    if (!v) { $('#noteErr').textContent = 'Escreva algo antes de colar o bilhete.'; $('#noteTxt').focus(); return; }
+    $('#noteErr').textContent = '';
+    const safe = v.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    flip(() => $$('.pnote', wall).slice(0, 12), () => wall.insertAdjacentHTML('afterbegin', noteHtml('Você', safe, 0, color, 'agora')));
+    const n = wall.firstElementChild; n.getAnimations().forEach(a => a.cancel());
+    anim(n, [{ translate: '0 -90px', rotate: '-14deg', scale: '1.08', opacity: 0 }, { translate: '0 0', rotate: '0deg', scale: '1', opacity: 1 }], { duration: 560, easing: E_SPRING });
+    $('#noteTxt').value = '';
+  };
+};
+
+/* ───────── Sugestões ───────── */
+inits.suggestions = () => {
+  const S = { recebida: 'Recebida', analise: 'Em análise', feita: 'Feita' };
+  const items = [['Modo escuro que acompanha o horário', 42, 'feita'], ['Ranking só entre amigos da turma', 37, 'analise'], ['Importar horário do Classroom', 29, 'analise'], ['Jogo de química com tabela periódica', 24, 'recebida'], ['Lembrete de revisão pelo WhatsApp', 18, 'recebida'], ['Exportar mapa mental em PDF', 12, 'feita']].map(([t, v, s], id) => ({ id, t, v, s, me: false }));
+  let filter = 'todas';
+  const ul = $('#sugs');
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const li = it => `<li class="sug" data-id="${it.id}"><button class="vote" aria-pressed="${it.me}" aria-label="Votar em: ${esc(it.t)}"><svg viewBox="0 0 24 24"><path d="M6 14l6-6 6 6"/></svg><span>${it.v}</span></button><div><b>${esc(it.t)}</b></div><span class="stamp" data-s="${it.s}">${S[it.s]}</span></li>`;
+  const render = fresh => {
+    const list = items.filter(i => filter === 'todas' || i.s === filter).sort((a, b) => b.v - a.v);
+    flip(() => $$('.sug', ul), () => {
+      const keep = new Map($$('.sug', ul).map(n => [n.dataset.id, n]));
+      ul.innerHTML = '';
+      list.forEach(it => { let n = keep.get(String(it.id)); if (!n) { const t = document.createElement('template'); t.innerHTML = li(it); n = t.content.firstElementChild; } $('.vote span', n).textContent = it.v; $('.vote', n).setAttribute('aria-pressed', it.me); ul.appendChild(n); });
+    });
+    if (fresh != null) { const st = $(`.sug[data-id="${fresh}"] .stamp`, ul); st && st.classList.add('hit'); }
+  };
+  ul.addEventListener('click', e => {
+    const b = e.target.closest('.vote'); if (!b) return;
+    const it = items.find(i => i.id == b.closest('.sug').dataset.id);
+    it.me = !it.me; it.v += it.me ? 1 : -1;
+    render();
+    anim($('span', b), [{ transform: 'translateY(-8px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 220, easing: E_OUT });
+  });
+  $('#sugSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; filter = b.dataset.s; $$('#sugSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); render(); };
+  $('#sugForm').onsubmit = e => {
+    e.preventDefault(); const v = $('#sugIn').value.trim(); if (!v) { $('#sugIn').focus(); return; }
+    const it = { id: items.length, t: v, v: 1, s: 'recebida', me: true };
+    items.push(it); $('#sugIn').value = '';
+    if (filter !== 'todas' && filter !== 'recebida') { filter = 'todas'; $$('#sugSeg button').forEach(x => x.setAttribute('aria-pressed', x.dataset.s === 'todas')); }
+    render(it.id);
+  };
+  render();
+  $$('.sug .stamp', ul).forEach((s, i) => { s.style.animationDelay = 300 + i * 90 + 'ms'; s.classList.add('hit'); });
+};
+
+/* ───────── Sobre ───────── */
+inits.about = () => {
+  const parts = $$('#drawing .part');
+  parts.forEach((p, i) => { const L = p.getTotalLength(); p.style.strokeDasharray = L; anim(p, [{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: 700, delay: 200 + i * 160, easing: 'cubic-bezier(.45,0,.2,1)', fill: 'backwards' }); });
+  $('#principles').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    $$('#principles button').forEach(x => x.setAttribute('aria-pressed', on && x === b));
+    parts.forEach(p => p.classList.toggle('lit', on && p.dataset.p === b.dataset.p));
+    $$('#drawing .accent').forEach(a => a.style.opacity = on && a.id === 'acc-' + b.dataset.p ? .55 : 0);
+  };
+};
+
+/* ───────── Perfil ───────── */
+inits.perfil = () => {
+  const card = $('#idcard'), scene = $('#idScene');
+  scene.addEventListener('pointermove', e => {
+    if (reduced()) return;
+    const r = card.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    card.style.transform = `rotateX(${(.5 - y) * 16}deg) rotateY(${(x - .5) * 22}deg)`;
+    card.style.setProperty('--gx', x * 100 + '%'); card.style.setProperty('--gy', y * 100 + '%');
+  });
+  scene.addEventListener('pointerleave', () => { card.style.transition = 'transform 500ms var(--e-spring)'; card.style.transform = ''; setTimeout(() => card.style.transition = '', 500); });
+  $('#pfName').addEventListener('input', e => {
+    const v = e.target.value.trim() || 'Sem nome';
+    $('#idName').textContent = v;
+    $('#idPhoto').textContent = v.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  });
+  const cs = ['var(--hl)', 'var(--hl-lilac)', 'var(--hl-pink)', 'var(--hl-yellow)'], names = ['verde', 'lilás', 'rosa', 'amarelo'];
+  $('#idColors').innerHTML = cs.map((c, i) => `<button type="button" class="swatch" style="--c:${c}" aria-label="Carteirinha ${names[i]}" aria-pressed="${i === 0}"></button>`).join('');
+  $('#idColors').onclick = e => { const b = e.target.closest('.swatch'); if (!b) return; card.style.setProperty('--c', b.style.getPropertyValue('--c')); $$('#idColors .swatch').forEach(x => x.setAttribute('aria-pressed', x === b)); anim(card, [{ rotate: 'y 0deg' }, { rotate: 'y 360deg' }], { duration: 640, easing: E_OUT }); };
+};
+
+/* ───────── Admin ───────── */
+inits.admin = () => {
+  const spark = arr => { const mx = Math.max(...arr); return `<svg class="spark" viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden="true"><path vector-effect="non-scaling-stroke" d="${arr.map((v, i) => `${i ? 'L' : 'M'}${i / (arr.length - 1) * 100},${34 - v / mx * 30}`).join(' ')}"/></svg>`; };
+  $('#kpis').innerHTML = [
+    ['Estudando agora', 38, [12, 18, 15, 22, 30, 26, 38]], ['Mensagens para a Mine hoje', 1204, [300, 420, 380, 610, 820, 990, 1204]], ['Sessões de foco hoje', 212, [40, 60, 90, 110, 150, 180, 212]],
+  ].map(([l, v, s]) => `<div class="card kpi"><p class="eyebrow">${l}</p><b data-v="${v}">0</b>${spark(s)}</div>`).join('') + `<div class="card kpi"><p class="eyebrow">Banco de dados</p><b style="font-size:26px;margin:14px 0"><span class="live"></span> Salvo</b><p class="mono small muted" id="saved">há 2 s</p></div>`;
+  $$('#kpis b[data-v]').forEach(b => countTo(b, 0, +b.dataset.v, 900));
+  $$('#kpis .spark path').forEach(p => { const L = p.getTotalLength(); p.style.strokeDasharray = L; anim(p, [{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: 900, easing: E_OUT }); });
+  let sec = 2; setInterval(() => { sec = Math.random() < .2 ? 0 : sec + 1; $('#saved').textContent = `há ${sec} s`; }, 1000);
+
+  const ev = [['Bruno', 'concluiu uma sessão de foco (+25 XP)'], ['Carol', 'pediu um mapa mental de genética'], ['Felipe', 'subiu para o nível 14'], ['Gabi', 'colou um bilhete no mural'], ['Davi', 'jogou Torre dos Códigos: 8 acertos'], ['Érica', 'criou um plano de estudos de Química'], ['Heitor', 'marcou “Lista 4” como estudada'], ['Ana Luísa', 'votou numa sugestão']];
+  const feed = $('#feed'); let paused = false, k = 0, clock = 14 * 60 + 2;
+  const push = () => {
+    const [w, t] = ev[k++ % ev.length]; clock++;
+    const li = document.createElement('li');
+    li.innerHTML = `<time>${Math.floor(clock / 60)}:${String(clock % 60).padStart(2, '0')}</time><span><b>${w}</b> ${t}</span>`;
+    flip(() => $$('li', feed), () => feed.prepend(li));
+    while (feed.children.length > 7) feed.lastElementChild.remove();
+  };
+  for (let i = 0; i < 5; i++) push();
+  setInterval(() => { if (!paused && !reduced() && $('.page[data-view="admin"]').classList.contains('on')) push(); }, 2600);
+  $('#feedPause').onclick = e => { paused = !paused; e.currentTarget.setAttribute('aria-pressed', paused); e.currentTarget.textContent = paused ? 'Continuar' : 'Pausar'; };
+
+  const users = [['Ana Luísa', 1240, 2], ['Bruno', 3900, 0], ['Carol', 2810, 45], ['Davi', 2200, 180], ['Érica', 1480, 1440], ['Felipe', 4400, 5], ['Gabi', 1990, 60]];
+  const ago = m => m < 1 ? 'agora' : m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} dia`;
+  const tb = $('#users tbody');
+  tb.innerHTML = users.map(u => `<tr data-n="${u[0]}"><td>${u[0]}</td><td class="mono">${fmt(u[1])}</td><td class="muted">${ago(u[2])}</td></tr>`).join('');
+  let key = 'xp', dir = -1;
+  const sort = () => {
+    const idx = { nome: 0, xp: 1, ult: 2 }[key];
+    const s = [...users].sort((a, b) => (typeof a[idx] === 'string' ? a[idx].localeCompare(b[idx]) : a[idx] - b[idx]) * dir);
+    flip(() => $$('tr', tb), () => s.forEach(u => tb.appendChild($(`tr[data-n="${u[0]}"]`, tb))));
+    $$('#users th').forEach(th => { const b = $('button', th), on = b.dataset.k === key; on ? th.setAttribute('aria-sort', dir > 0 ? 'ascending' : 'descending') : th.removeAttribute('aria-sort'); $('i', b).textContent = on ? (dir > 0 ? '↑' : '↓') : ''; });
+  };
+  $('#users thead').onclick = e => { const b = e.target.closest('button'); if (!b) return; if (key === b.dataset.k) dir *= -1; else { key = b.dataset.k; dir = key === 'xp' ? -1 : 1; } sort(); };
+  sort();
+};
+
+go((location.hash || '#home').slice(1), false);
+
+})();
+</script>
+</body>
+</html>
+

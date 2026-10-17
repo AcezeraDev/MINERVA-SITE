@@ -1,0 +1,2580 @@
+/*
+  Games no caderno. A central vira um fichário com divisórias coloridas; as
+  missões, fichas; as partidas acontecem em cima de papel quadriculado.
+*/
+
+.caderno-gnav {
+  position: relative;
+  margin-bottom: 1.5rem;
+  padding: 1rem 1rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 18px 30px -26px rgb(0 0 0 / 0.5);
+}
+
+.caderno-gnav-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+  padding-inline: 0.25rem;
+}
+
+.caderno-gnav-title {
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 112;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.caderno-gnav-saved {
+  display: none;
+  padding: 0.15rem 0.7rem;
+  border: 2px solid #1f9a57;
+  border-radius: 0.35rem;
+  font-family: "Kalam", cursive;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1f9a57;
+  rotate: -3deg;
+}
+
+html:not(.theme-light) .caderno-gnav-saved {
+  color: #5fe3a1;
+  border-color: #5fe3a1;
+}
+
+@media (min-width: 640px) {
+  .caderno-gnav-saved {
+    display: inline-block;
+  }
+}
+
+.caderno-gnav-scroll {
+  overflow-x: auto;
+  padding: 0.35rem 0.1rem 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--pen) / 0.35) transparent;
+}
+
+.caderno-gnav-grid {
+  display: grid;
+  min-width: 48rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+@media (min-width: 1536px) {
+  .caderno-gnav-grid {
+    min-width: 0;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.caderno-gtab {
+  --tab: rgb(var(--hl-yellow));
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 4.6rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem 0.7rem 1.1rem;
+  border-radius: 0.35rem 0.9rem 0.9rem 0.35rem;
+  text-align: left;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease;
+}
+
+.caderno-gtab[data-tone="pink"] { --tab: rgb(var(--hl-pink)); }
+.caderno-gtab[data-tone="lilac"] { --tab: rgb(var(--hl-lilac)); }
+.caderno-gtab[data-tone="mint"] { --tab: rgb(var(--hl-mint)); }
+.caderno-gtab[data-tone="blue"] { --tab: #9fd0ff; }
+.caderno-gtab[data-tone="orange"] { --tab: #ffc58f; }
+
+.caderno-gtab::before {
+  /* a aba da divisória */
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.5rem;
+  border-radius: 0.35rem 0 0 0.35rem;
+  background: var(--tab);
+  transition: width 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-gtab:hover {
+  transform: translateY(-3px) rotate(-0.6deg);
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 14px 20px -16px rgb(0 0 0 / 0.5);
+}
+
+.caderno-gtab:hover::before {
+  width: 0.8rem;
+}
+
+.caderno-gtab:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 3px;
+}
+
+.caderno-gtab.is-active {
+  box-shadow: 0 0 0 2px rgb(var(--pen)), 0 14px 22px -16px rgb(0 0 0 / 0.5);
+}
+
+.caderno-gtab-mark {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--tab) 45%, transparent);
+}
+
+.caderno-gtab-icon {
+  position: relative;
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: color-mix(in srgb, var(--tab) 70%, transparent);
+  rotate: -6deg;
+  transition: rotate 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-gtab:hover .caderno-gtab-icon,
+.caderno-gtab.is-active .caderno-gtab-icon {
+  rotate: 6deg;
+}
+
+.caderno-gtab.is-active .caderno-gtab-icon {
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--pen));
+}
+
+.caderno-gtab-label {
+  display: block;
+  font-family: "Kalam", cursive;
+  font-size: 1.12rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: rgb(var(--pen));
+}
+
+.caderno-gtab-hint {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gtab-count {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.35rem;
+  display: grid;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  place-items: center;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  color: white;
+  background: rgb(var(--margin-line));
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  animation: caderno-pop-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ───────── Barra de contexto: etiquetas de caderno ───────── */
+html .workspace-shell .games-command-bar {
+  border: 0;
+  border-radius: 0.9rem;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+html .workspace-shell .games-subject-control,
+html .workspace-shell .games-command-stat {
+  border: 0;
+  border-radius: 0.35rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 10px 16px -14px rgb(0 0 0 / 0.5);
+}
+
+html .workspace-shell .games-command-stat:nth-child(2) {
+  background: color-mix(in srgb, rgb(var(--hl-yellow)) 30%, rgb(var(--panel)));
+  rotate: 0.8deg;
+}
+
+html .workspace-shell .games-command-stat:nth-child(3) {
+  background: color-mix(in srgb, rgb(var(--hl-mint)) 30%, rgb(var(--panel)));
+  rotate: -0.8deg;
+}
+
+html .workspace-shell .games-command-icon {
+  border: 0;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-lilac) / 0.6);
+  rotate: -6deg;
+}
+
+html .workspace-shell .games-subject-control label > span,
+html .workspace-shell .games-command-stat small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .games-subject-control select,
+html .workspace-shell .games-command-stat strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+html .workspace-shell .games-subject-control select option {
+  color: rgb(var(--theme-text));
+  background: rgb(var(--panel));
+}
+
+html .workspace-shell .games-command-stat svg {
+  color: rgb(var(--pen));
+}
+
+/* ───────── Mapa de estudos: um mapa do tesouro desenhado à caneta ───────── */
+html .workspace-shell .games-expedition-panel,
+html .workspace-shell .games-daily-card {
+  border: 0;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 22px 36px -30px rgb(0 0 0 / 0.55);
+}
+
+html .workspace-shell .games-expedition-panel {
+  background:
+    repeating-linear-gradient(to right, rgb(var(--rule) / 0.35) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(to bottom, rgb(var(--rule) / 0.35) 0 1px, transparent 1px 26px),
+    rgb(var(--sheet));
+}
+
+html .workspace-shell .games-expedition-copy p,
+html .workspace-shell .games-library-heading p:not(.caderno-note) {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--margin-line));
+}
+
+html .workspace-shell .games-expedition-copy h2 {
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 114;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  color: rgb(var(--theme-text));
+}
+
+html .workspace-shell .games-expedition-copy div > span {
+  font-size: 0.85rem;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .games-expedition-coordinate {
+  border: 2px solid rgb(var(--pen));
+  border-radius: 0.35rem;
+  color: rgb(var(--pen));
+  background: rgb(var(--sheet));
+  font-family: "Kalam", cursive;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  rotate: 4deg;
+}
+
+html .workspace-shell .study-expedition-map__contours path {
+  stroke: rgb(var(--pen) / 0.1);
+}
+
+html .workspace-shell .study-expedition-map__path--base {
+  stroke: rgb(var(--theme-muted) / 0.45);
+  stroke-width: 3;
+  stroke-dasharray: 2 9;
+}
+
+html .workspace-shell .study-expedition-map__path--progress {
+  stroke: rgb(var(--margin-line));
+  stroke-width: 3.5;
+  stroke-dasharray: 10 7;
+  filter: none;
+}
+
+html .workspace-shell .study-expedition-map__stop-disc {
+  fill: rgb(var(--sheet));
+  stroke: rgb(var(--pen) / 0.55);
+  stroke-width: 2.5;
+}
+
+html .workspace-shell .study-expedition-map__stop text:not(.study-expedition-map__stop-label) {
+  fill: rgb(var(--pen));
+  font-family: "Kalam", cursive;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+html .workspace-shell .study-expedition-map__stop-label {
+  fill: rgb(var(--theme-text));
+  font-family: "Gochi Hand", cursive;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+html .workspace-shell .study-expedition-map__stop--complete .study-expedition-map__stop-disc {
+  fill: rgb(var(--hl-mint) / 0.6);
+  stroke: rgb(var(--pen));
+}
+
+html .workspace-shell .study-expedition-map__check {
+  stroke: rgb(var(--pen));
+}
+
+html .workspace-shell .study-expedition-map__current-ring {
+  stroke: rgb(var(--margin-line) / 0.6);
+  stroke-dasharray: 4 5;
+}
+
+html .workspace-shell .study-expedition-map__stop--current .study-expedition-map__stop-disc {
+  fill: rgb(var(--hl-yellow));
+  stroke: rgb(var(--pen));
+  filter: none;
+}
+
+html .workspace-shell .study-expedition-map__stop--current text:not(.study-expedition-map__stop-label) {
+  fill: rgb(var(--pen));
+}
+
+html .workspace-shell .study-expedition-map__compass circle,
+html .workspace-shell .study-expedition-map__compass path {
+  stroke: rgb(var(--pen) / 0.4);
+}
+
+html .workspace-shell .study-expedition-map__compass path {
+  fill: rgb(var(--hl-pink) / 0.5);
+}
+
+html .workspace-shell .study-expedition-map__compass text {
+  fill: rgb(var(--pen));
+  font-family: "Kalam", cursive;
+}
+
+html .workspace-shell .games-current-mission {
+  border-top: 1.5px dashed rgb(var(--line));
+  background: rgb(var(--panel) / 0.94);
+  backdrop-filter: none;
+}
+
+html .workspace-shell .games-current-mission__icon {
+  border-radius: 50%;
+  rotate: -6deg;
+}
+
+html .workspace-shell .games-current-mission small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--margin-line));
+}
+
+html .workspace-shell .games-current-mission strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+html .workspace-shell .games-current-mission em {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .games-current-mission button,
+html .workspace-shell .games-daily-card > button {
+  border-radius: 999px;
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--pen));
+  font-size: 0.85rem;
+  box-shadow: 0 3px 0 rgb(var(--pen) / 0.45);
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html .workspace-shell .games-current-mission button:hover,
+html .workspace-shell .games-daily-card > button:hover {
+  transform: translateY(-2px) rotate(-1deg);
+  box-shadow: 0 5px 0 rgb(var(--pen) / 0.45);
+}
+
+/* ───────── Desafio do dia: um post-it grande ───────── */
+html .workspace-shell .games-daily-card {
+  overflow: visible;
+  color: #2b2410;
+  background: linear-gradient(180deg, #fff3a0, #ffe86b);
+  border-radius: 0.2rem 0.2rem 1.2rem 0.2rem;
+  rotate: 0.8deg;
+}
+
+html .workspace-shell .games-daily-card::before {
+  content: "";
+  position: absolute;
+  top: -0.75rem;
+  left: 50%;
+  width: 5.5rem;
+  height: 1.4rem;
+  translate: -50% 0;
+  rotate: -3deg;
+  background: rgb(255 255 255 / 0.6);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+html .workspace-shell .games-daily-card__topline {
+  font-family: "Kalam", cursive;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #1d2bb8;
+}
+
+html .workspace-shell .games-daily-card__topline small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  color: #6b5a1c;
+}
+
+html .workspace-shell .games-daily-card__emblem {
+  border: 2.5px solid #1d2bb8;
+  border-radius: 50%;
+  color: #1d2bb8;
+  background: rgb(255 255 255 / 0.45);
+  box-shadow: none;
+  animation: caderno-daily-wobble 3.2s ease-in-out infinite;
+}
+
+@keyframes caderno-daily-wobble {
+  0%,
+  100% {
+    transform: rotate(7deg);
+  }
+  50% {
+    transform: rotate(-7deg) scale(1.05);
+  }
+}
+
+html .workspace-shell .games-daily-card > p {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #c2185b;
+}
+
+html .workspace-shell .games-daily-card h3 {
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #1d2bb8;
+}
+
+html .workspace-shell .games-daily-card > span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #4a3f17;
+}
+
+html .workspace-shell .games-daily-progress {
+  border-top: 1.5px dashed rgb(43 36 16 / 0.3);
+}
+
+html .workspace-shell .games-daily-progress > div:first-child,
+html .workspace-shell .games-daily-reward {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #5a4c1a;
+}
+
+html .workspace-shell .games-daily-progress strong,
+html .workspace-shell .games-daily-reward strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.05rem;
+  color: #1d2bb8;
+}
+
+html .workspace-shell .games-daily-progress__track {
+  height: 0.6rem;
+  background: rgb(43 36 16 / 0.12);
+}
+
+html .workspace-shell .games-daily-progress__track span {
+  background: #1d2bb8;
+}
+
+html .workspace-shell .games-daily-card > button {
+  color: white;
+  background: #1d2bb8;
+  box-shadow: 0 3px 0 rgb(29 43 184 / 0.4);
+}
+
+html .workspace-shell .games-context-note {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .games-context-note strong {
+  color: rgb(var(--pen));
+}
+
+/* ───────── Biblioteca de missões: fichas com a foto presa por fita ───────── */
+html .workspace-shell .games-library-heading h2 {
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 112;
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+html .workspace-shell .games-library-heading > span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .games-dossier-scroll {
+  padding: 1rem 0.3rem 0.8rem;
+  scrollbar-color: rgb(var(--pen) / 0.35) transparent;
+}
+
+html .workspace-shell .game-dossier {
+  overflow: visible;
+  border: 0;
+  border-radius: 0.3rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 14px 22px -18px rgb(0 0 0 / 0.5);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease, rotate 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html .workspace-shell .games-dossier-grid > :nth-child(odd) .game-dossier {
+  rotate: -1deg;
+}
+
+html .workspace-shell .games-dossier-grid > :nth-child(even) .game-dossier {
+  rotate: 1deg;
+}
+
+html .workspace-shell .games-dossier-grid > * .game-dossier:hover {
+  rotate: 0deg;
+  transform: translateY(-6px);
+  box-shadow: 0 0 0 2px var(--dossier-accent), 0 22px 30px -18px rgb(0 0 0 / 0.5);
+}
+
+html .workspace-shell .game-dossier__media {
+  overflow: visible;
+  margin: 0.55rem 0.55rem 0;
+  border: 0;
+  border-radius: 0.15rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
+html .workspace-shell .game-dossier__media::before {
+  /* fita segurando a "foto" */
+  content: "";
+  position: absolute;
+  z-index: 3;
+  top: -0.5rem;
+  left: 50%;
+  width: 3.8rem;
+  height: 1.1rem;
+  translate: -50% 0;
+  rotate: -4deg;
+  background: color-mix(in srgb, var(--dossier-accent) 35%, rgb(255 255 255 / 0.6));
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+html .workspace-shell .game-dossier__media .game-artwork {
+  overflow: hidden;
+  border-radius: 0.15rem;
+}
+
+html .workspace-shell .game-dossier__media::after {
+  display: none;
+}
+
+html .workspace-shell .game-dossier__index {
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+}
+
+html .workspace-shell .game-dossier__icon {
+  border: 0;
+  border-radius: 50%;
+  color: #11151e;
+  background: var(--dossier-accent);
+  backdrop-filter: none;
+  rotate: -8deg;
+}
+
+html .workspace-shell .game-dossier__body > strong {
+  font-family: "Kalam", cursive;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0;
+  color: rgb(var(--pen));
+}
+
+html .workspace-shell .game-dossier__meta {
+  border-top: 1.5px dashed rgb(var(--line));
+}
+
+html .workspace-shell .game-dossier__meta em,
+html .workspace-shell .game-dossier__record {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .game-dossier__status {
+  font-family: "Kalam", cursive;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--theme-text));
+  background: linear-gradient(transparent 55%, color-mix(in srgb, var(--dossier-accent) 45%, transparent) 55% 92%, transparent 92%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html .workspace-shell .games-daily-card__emblem {
+    animation: none;
+  }
+}
+
+/* ───────── Ilustrações dos jogos: desenho a caneta em papel ─────────
+   A mesma cena de antes, trocando o neon por tinta: contornos na cor da
+   caneta, preenchimentos de papel e marca-texto na cor de cada jogo. */
+.game-artwork {
+  --ink: rgb(var(--pen));
+  --paper: rgb(var(--sheet));
+}
+
+.game-artwork .game-artwork__paper {
+  fill: var(--paper);
+}
+
+.game-artwork .game-artwork__gridline {
+  stroke: rgb(var(--rule) / 0.55);
+}
+
+.game-artwork .game-artwork__aura {
+  fill: var(--art-accent);
+  opacity: 0.18;
+}
+
+.game-artwork .game-artwork__frame {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  opacity: 0.5;
+}
+
+.game-artwork .game-artwork__route,
+.game-artwork .game-artwork__journey-route,
+.game-artwork .game-artwork__match-line,
+.game-artwork .game-artwork__word-path {
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__contour {
+  stroke: rgb(var(--pen) / 0.14);
+}
+
+.game-artwork .game-artwork__network > path:not(.game-artwork__route) {
+  stroke: rgb(var(--pen) / 0.55);
+}
+
+.game-artwork .game-artwork__node-halo {
+  opacity: 0.35;
+}
+
+.game-artwork .game-artwork__node {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.game-artwork .game-artwork__hero-node .game-artwork__node {
+  fill: var(--art-accent);
+}
+
+.game-artwork .game-artwork__leaf {
+  fill: color-mix(in srgb, var(--art-accent) 45%, var(--paper));
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__bench,
+.game-artwork .game-artwork__sequence-arrow {
+  stroke: rgb(var(--pen) / 0.45);
+}
+
+.game-artwork .game-artwork__module rect {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.game-artwork .game-artwork__module circle:not(.game-artwork__module-core),
+.game-artwork .game-artwork__module path {
+  stroke: rgb(var(--pen) / 0.55);
+}
+
+.game-artwork .game-artwork__module-core {
+  fill: rgb(var(--hl-yellow));
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__module text {
+  fill: var(--ink);
+  font-family: "Kalam", cursive;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.game-artwork .game-artwork__module--active rect {
+  fill: color-mix(in srgb, var(--art-accent) 35%, var(--paper));
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__module--active circle:not(.game-artwork__module-core),
+.game-artwork .game-artwork__module--active path {
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__mountain {
+  fill: color-mix(in srgb, var(--art-accent) 22%, var(--paper));
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.game-artwork .game-artwork__mountain--back {
+  fill: color-mix(in srgb, var(--art-accent) 10%, var(--paper));
+  stroke: rgb(var(--pen) / 0.4);
+  opacity: 1;
+}
+
+.game-artwork .game-artwork__waypoint circle:first-child {
+  fill: var(--paper);
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__waypoint circle:last-child,
+.game-artwork .game-artwork__signal {
+  fill: var(--art-accent);
+}
+
+.game-artwork .game-artwork__lighthouse > path:not(.game-artwork__beam),
+.game-artwork .game-artwork__lighthouse rect {
+  fill: var(--paper);
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__lighthouse rect {
+  fill: var(--art-accent);
+}
+
+.game-artwork .game-artwork__beam {
+  fill: rgb(var(--hl-yellow) / 0.55);
+}
+
+.game-artwork .game-artwork__archive-wall {
+  fill: color-mix(in srgb, var(--art-accent) 10%, var(--paper));
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__drawer rect:first-child {
+  fill: var(--paper);
+  stroke: rgb(var(--pen) / 0.55);
+}
+
+.game-artwork .game-artwork__drawer path {
+  stroke: rgb(var(--pen) / 0.2);
+}
+
+.game-artwork .game-artwork__drawer rect:last-child {
+  fill: rgb(var(--pen) / 0.35);
+}
+
+.game-artwork .game-artwork__drawer--active rect:first-child {
+  fill: color-mix(in srgb, var(--art-accent) 40%, var(--paper));
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__tower-ground {
+  fill: color-mix(in srgb, var(--art-accent) 18%, var(--paper));
+}
+
+.game-artwork .game-artwork__tower-body {
+  fill: var(--paper);
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__tower-spine,
+.game-artwork .game-artwork__tower-floor > path,
+.game-artwork .game-artwork__antenna,
+.game-artwork .game-artwork__signal-wave {
+  stroke: rgb(var(--pen) / 0.5);
+}
+
+.game-artwork .game-artwork__tower-floor rect {
+  fill: rgb(var(--pen) / 0.08);
+  stroke: rgb(var(--pen) / 0.4);
+}
+
+.game-artwork .game-artwork__tower-floor--1 rect,
+.game-artwork .game-artwork__tower-floor--3 rect {
+  fill: var(--art-accent);
+}
+
+.game-artwork .game-artwork__signal-wave,
+.game-artwork .game-artwork__scan {
+  stroke: var(--art-accent);
+}
+
+.game-artwork .game-artwork__letter rect {
+  fill: var(--paper);
+  stroke: rgb(var(--pen) / 0.35);
+}
+
+.game-artwork .game-artwork__letter text {
+  fill: var(--ink);
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+}
+
+.game-artwork .game-artwork__letter--selected rect {
+  fill: color-mix(in srgb, var(--art-accent) 45%, var(--paper));
+  stroke: var(--ink);
+}
+
+.game-artwork .game-artwork__letter--selected text {
+  fill: var(--ink);
+}
+
+.game-artwork .game-artwork__word-path {
+  stroke: var(--art-accent);
+  opacity: 0.85;
+}
+
+.game-artwork .game-artwork__magnifier circle,
+.game-artwork .game-artwork__magnifier path {
+  fill: rgb(var(--sheet) / 0.5);
+  stroke: var(--ink);
+}
+
+.game-art-card-shade {
+  background: none;
+}
+
+/* ───────── Ficha da missão (GameIntro) ───────── */
+.caderno-gi {
+  container-type: inline-size;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 24px 40px -32px rgb(0 0 0 / 0.55);
+}
+
+.caderno-gi-grid {
+  display: grid;
+}
+
+@container (min-width: 52rem) {
+  .caderno-gi-grid {
+    grid-template-columns: minmax(17rem, 0.85fr) minmax(0, 1.15fr);
+  }
+
+  .caderno-gi-left {
+    border-bottom: 0;
+    border-right: 1.5px dashed rgb(var(--line));
+  }
+}
+
+.caderno-gi-left {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 1.5rem;
+  border-bottom: 1.5px dashed rgb(var(--line));
+}
+
+.caderno-gi-emblem {
+  display: grid;
+  width: 4.6rem;
+  height: 4.6rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #11151e;
+  background: var(--game-accent);
+  box-shadow: 0 0 0 4px rgb(var(--sheet)), 0 0 0 5.5px rgb(var(--pen) / 0.7);
+  rotate: -8deg;
+  animation: caderno-subj-stick 600ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.caderno-gi-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.7rem;
+  border: 1.5px dashed rgb(var(--theme-muted) / 0.6);
+  border-radius: 999px;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gi-status.is-ready {
+  border: 2px solid #1f9a57;
+  border-radius: 0.35rem;
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  color: #1f9a57;
+  rotate: -4deg;
+  animation: caderno-sn-stamp 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+html:not(.theme-light) .caderno-gi-status.is-ready {
+  color: #5fe3a1;
+  border-color: #5fe3a1;
+}
+
+.caderno-gi-photo {
+  position: relative;
+  margin-top: 1.6rem;
+  padding: 0.55rem 0.55rem 2rem;
+  background: white;
+  box-shadow: 0 14px 22px -16px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(var(--line));
+  rotate: -1.5deg;
+  transition: rotate 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html:not(.theme-light) .caderno-gi-photo {
+  background: rgb(var(--panel-2));
+}
+
+.caderno-gi-photo:hover {
+  rotate: 0.8deg;
+}
+
+.caderno-gi-photo > svg {
+  display: block;
+  aspect-ratio: 16 / 9;
+}
+
+.caderno-gi-photo figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.35rem;
+  text-align: center;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gi-tape {
+  position: absolute;
+  z-index: 2;
+  top: -0.7rem;
+  left: 50%;
+  width: 5rem;
+  height: 1.35rem;
+  translate: -50% 0;
+  rotate: 3deg;
+  background: color-mix(in srgb, var(--game-accent) 40%, rgb(255 255 255 / 0.6));
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+.caderno-gi-title {
+  margin-top: 0.3rem;
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 114;
+  font-size: clamp(1.9rem, 5cqi, 2.6rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.caderno-gi-tagline {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gi-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-gi-goal {
+  margin-top: 1.4rem;
+}
+
+.caderno-gi-goal p {
+  margin-top: 0.3rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.12rem;
+  font-weight: 700;
+  line-height: 1.55;
+  color: rgb(var(--pen));
+}
+
+.caderno-gi-goal mark {
+  padding: 0 0.15em;
+  color: inherit;
+  background: linear-gradient(transparent 50%, color-mix(in srgb, var(--game-accent) 45%, transparent) 50% 92%, transparent 92%);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.caderno-gi-rule {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1.5px dashed rgb(var(--line));
+}
+
+.caderno-gi-rule p {
+  margin-top: 0.25rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: rgb(var(--theme-text) / 0.8);
+}
+
+.caderno-gi-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: auto;
+  padding-top: 1.6rem;
+}
+
+.caderno-gi-stat {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.7rem 0.65rem;
+  border-radius: 0.2rem 0.2rem 0.7rem 0.2rem;
+  box-shadow: 0 10px 14px -12px rgb(0 0 0 / 0.55);
+}
+
+.caderno-gi-stat.is-a { background: #fff1a6; rotate: -1.5deg; }
+.caderno-gi-stat.is-b { background: #c8f7dc; rotate: 1deg; }
+.caderno-gi-stat.is-c { background: #ffd3e0; rotate: -0.6deg; }
+
+.caderno-gi-stat span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.92rem;
+  color: #4a4a5a;
+}
+
+.caderno-gi-stat strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Kalam", cursive;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1d2bb8;
+}
+
+.caderno-gi-right {
+  min-width: 0;
+  padding: 1.5rem;
+  background:
+    linear-gradient(to right, transparent 2.2rem, rgb(var(--margin-line) / 0.45) 2.2rem calc(2.2rem + 2px), transparent calc(2.2rem + 2px)),
+    rgb(var(--sheet));
+}
+
+.caderno-gi-subtitle {
+  margin-top: 0.2rem;
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 112;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.caderno-gi-steps {
+  margin-top: 1rem;
+}
+
+.caderno-gi-steps > li {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr);
+  gap: 0.8rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid rgb(var(--rule) / 0.8);
+}
+
+.caderno-gi-step-num {
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border: 2px solid rgb(var(--pen));
+  border-radius: 50%;
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+  background: rgb(var(--sheet));
+}
+
+.caderno-gi-steps > li:first-child .caderno-gi-step-num {
+  background: color-mix(in srgb, var(--game-accent) 45%, rgb(var(--sheet)));
+}
+
+.caderno-gi-step-when {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gi-step-text {
+  margin-top: 0.1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.55;
+  color: rgb(var(--theme-text) / 0.88);
+}
+
+.caderno-gi-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0 1.5rem 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.3rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+  color: #4a3f17;
+  background: #fff3a0;
+  rotate: -0.4deg;
+}
+
+.caderno-gi-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1rem 1.5rem;
+  border-top: 1.5px dashed rgb(var(--line));
+  background: rgb(var(--panel-2));
+}
+
+@media (min-width: 640px) {
+  .caderno-gi-foot {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.caderno-gi-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Kalam", cursive;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.caderno-gi-play {
+  display: inline-flex;
+  min-height: 3rem;
+  min-width: 13rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 1.5rem;
+  border-radius: 999px;
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--pen));
+  font-size: 0.9rem;
+  font-weight: 900;
+  box-shadow: 0 4px 0 rgb(var(--pen) / 0.45);
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 160ms ease;
+}
+
+.caderno-gi-play:not(:disabled):hover {
+  transform: translateY(-2px) rotate(-1deg);
+  box-shadow: 0 6px 0 rgb(var(--pen) / 0.45);
+}
+
+.caderno-gi-play:not(:disabled):active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgb(var(--pen) / 0.45);
+}
+
+.caderno-gi-play:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+/* ───────── Configurar partida (GameSetup) ───────── */
+.caderno-gs {
+  padding: 1.5rem;
+  border-radius: 0.6rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(2rem - 1px), rgb(var(--rule) / 0.5) calc(2rem - 1px) 2rem),
+    rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 24px 40px -32px rgb(0 0 0 / 0.55);
+}
+
+@media (min-width: 1024px) {
+  .caderno-gs {
+    padding: 2.2rem;
+  }
+}
+
+.caderno-gs-badge {
+  display: grid;
+  width: 3.6rem;
+  height: 3.6rem;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-lilac) / 0.7);
+  rotate: -8deg;
+}
+
+.caderno-gs-title {
+  margin-top: 0.2rem;
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 112;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.caderno-gs-sub {
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gs-chip {
+  width: fit-content;
+  padding: 0.2rem 0.8rem;
+  border-radius: 999px;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--hl-mint) / 0.6);
+  rotate: 2deg;
+}
+
+.caderno-gs-card {
+  padding: 1.2rem 1.3rem 1.4rem;
+  border-radius: 0.35rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 14px 22px -18px rgb(0 0 0 / 0.5);
+}
+
+.caderno-gs-card-title {
+  font-family: "Kalam", cursive;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.caderno-gs-card-sub {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gs-bubble {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 0.6rem 0.2rem;
+  border-radius: 0.6rem;
+  transition: background-color 160ms ease;
+}
+
+.caderno-gs-bubble:hover {
+  background: rgb(var(--hl-yellow) / 0.3);
+}
+
+.caderno-gs-bubble-dot {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  width: 3.4rem;
+  height: 3.4rem;
+  place-items: center;
+  border: 2.5px solid rgb(var(--theme-muted) / 0.7);
+  border-radius: 50%;
+  font-family: "Kalam", cursive;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: rgb(var(--theme-muted));
+  transition: color 180ms ease, border-color 180ms ease;
+}
+
+.caderno-gs-bubble-dot::before {
+  /* o lápis preenche a bolinha escolhida */
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: -1;
+  border-radius: 50%;
+  background: rgb(var(--pen));
+  transform: scale(0);
+  transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-gs-bubble.is-on .caderno-gs-bubble-dot {
+  border-color: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+}
+
+.caderno-gs-bubble.is-on .caderno-gs-bubble-dot::before {
+  transform: scale(1);
+}
+
+.caderno-gs-bubble-label {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gs-switch {
+  display: flex;
+  width: 100%;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.2rem;
+  padding: 0.6rem 0.9rem;
+  border: 1.5px dashed rgb(var(--line));
+  border-radius: 0.6rem;
+  text-align: left;
+  transition: background-color 160ms ease;
+}
+
+.caderno-gs-switch.is-on {
+  background: rgb(var(--hl-mint) / 0.3);
+}
+
+.caderno-gs-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.caderno-gs-switch-hint {
+  display: block;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-gs-toggle {
+  position: relative;
+  flex: none;
+  width: 3.4rem;
+  height: 2rem;
+  border: 2.5px solid rgb(var(--pen));
+  border-radius: 999px;
+  background: rgb(var(--sheet));
+  transition: background-color 180ms ease;
+}
+
+.caderno-gs-switch.is-on .caderno-gs-toggle {
+  background: rgb(var(--hl-mint));
+}
+
+.caderno-gs-knob {
+  position: absolute;
+  top: 0.18rem;
+  left: 0.2rem;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: rgb(var(--pen));
+  /* meia-lua mostra o giro do botão */
+  box-shadow: inset -0.35rem 0 0 rgb(var(--pen-ink) / 0.35);
+}
+
+.caderno-gs-foot {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.6rem;
+  margin-top: 1.6rem;
+  padding-top: 1.2rem;
+  border-top: 1.5px dashed rgb(var(--line));
+}
+
+@media (min-width: 640px) {
+  .caderno-gs-foot {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caderno-gi-emblem,
+  .caderno-gi-status.is-ready {
+    animation: none;
+  }
+}
+
+/* ───────── Torre dos Códigos (forca) no caderno ───────── */
+html .workspace-shell .code-tower-heading p,
+html .workspace-shell .code-tower-heading > span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--margin-line));
+}
+
+html .workspace-shell .code-tower-heading h2 {
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 114;
+  letter-spacing: -0.03em;
+}
+
+html .workspace-shell .code-tower-heading > span {
+  border: 2px solid rgb(var(--pen));
+  border-radius: 0.35rem;
+  background: rgb(var(--sheet));
+  color: rgb(var(--pen));
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  rotate: 3deg;
+}
+
+html .workspace-shell .code-tower-stage {
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 22px 36px -30px rgb(0 0 0 / 0.55);
+}
+
+html .workspace-shell .code-tower-chamber {
+  border-color: rgb(var(--line));
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(to right, rgb(var(--rule) / 0.4) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(to bottom, rgb(var(--rule) / 0.4) 0 1px, transparent 1px 26px),
+    rgb(var(--sheet));
+}
+
+html .workspace-shell .code-tower-chamber-grid {
+  display: none;
+}
+
+html .workspace-shell .code-tower-visual::after {
+  background: rgb(var(--pen) / 0.12);
+  filter: none;
+  height: 0.5rem;
+}
+
+html .workspace-shell .code-tower-visual.is-critical::after {
+  background: rgb(var(--margin-line) / 0.25);
+}
+
+html .workspace-shell .code-tower-visual svg {
+  filter: none;
+}
+
+html .workspace-shell .code-tower-orbit {
+  border: 2px dashed rgb(var(--pen) / 0.2);
+}
+
+html .workspace-shell .code-tower-orbit::after {
+  background: rgb(var(--hl-pink));
+  box-shadow: 0 0 0 2px rgb(var(--pen));
+}
+
+.code-tower-sketch-body {
+  fill: rgb(var(--panel));
+  stroke: rgb(var(--pen));
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.code-tower-sketch-line {
+  fill: none;
+  stroke: rgb(var(--pen) / 0.45);
+  stroke-width: 2;
+}
+
+.code-tower-sketch-ground {
+  fill: none;
+  stroke: rgb(var(--pen));
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.code-tower-sketch-door {
+  fill: rgb(var(--hl-lilac) / 0.6);
+  stroke: rgb(var(--pen));
+  stroke-width: 2;
+}
+
+.code-tower-sketch-floor {
+  stroke: rgb(var(--pen));
+  stroke-width: 1.8;
+  transition: fill 300ms ease, opacity 300ms ease;
+}
+
+.is-on > .code-tower-sketch-floor {
+  fill: rgb(var(--hl-yellow));
+}
+
+.is-on:nth-child(odd) > .code-tower-sketch-floor {
+  fill: rgb(var(--hl-mint));
+}
+
+.is-off > .code-tower-sketch-floor {
+  fill: rgb(var(--hl-pink) / 0.35);
+  opacity: 0.7;
+}
+
+.code-tower-sketch-cross {
+  fill: none;
+  stroke: rgb(var(--margin-line));
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 80;
+  stroke-dashoffset: 80;
+  animation: tower-cross 380ms ease-out forwards;
+}
+
+@keyframes tower-cross {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.code-tower-sketch-flag {
+  fill: rgb(var(--hl-yellow));
+  stroke: rgb(var(--pen));
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.code-tower-sketch-flag.is-out {
+  fill: rgb(var(--hl-pink));
+}
+
+html .workspace-shell .code-tower-energy-readout {
+  border: 0;
+  border-radius: 0.2rem 0.2rem 0.7rem 0.2rem;
+  background: #fff1a6;
+  box-shadow: 0 8px 12px -10px rgb(0 0 0 / 0.5);
+  rotate: 3deg;
+}
+
+html .workspace-shell .code-tower-energy-readout span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #4a4a5a;
+}
+
+html .workspace-shell .code-tower-energy-readout strong {
+  font-family: "Kalam", cursive;
+  color: #1d2bb8;
+}
+
+html .workspace-shell .code-tower-visual.is-critical .code-tower-energy-readout strong {
+  color: #c2185b;
+}
+
+html .workspace-shell .code-tower-energy-readout small {
+  color: #4a4a5a;
+}
+
+html .workspace-shell .code-tower-floor-status > span,
+html .workspace-shell .code-tower-terminal-bar,
+html .workspace-shell .code-tower-terminal-foot {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.98rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--theme-muted));
+}
+
+html .workspace-shell .code-tower-floor-status i {
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 1.5px solid rgb(var(--pen));
+  background: transparent;
+}
+
+html .workspace-shell .code-tower-floor-status i.is-on {
+  background: rgb(var(--pen));
+  box-shadow: none;
+}
+
+html .workspace-shell .code-tower-terminal {
+  background:
+    linear-gradient(to right, transparent 1.2rem, rgb(var(--margin-line) / 0.45) 1.2rem calc(1.2rem + 2px), transparent calc(1.2rem + 2px)),
+    repeating-linear-gradient(to bottom, transparent 0 calc(2rem - 1px), rgb(var(--rule) / 0.55) calc(2rem - 1px) 2rem),
+    rgb(var(--panel));
+  background-size: auto;
+  padding-left: 2.2rem;
+}
+
+html .workspace-shell .code-tower-terminal-live {
+  color: #1f9a57;
+}
+
+html .workspace-shell .code-tower-terminal-live i {
+  box-shadow: none;
+}
+
+html .workspace-shell .code-tower-hint > span {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(var(--margin-line));
+}
+
+html .workspace-shell .code-tower-hint p {
+  font-family: "Kalam", cursive;
+  font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+  font-weight: 400;
+  line-height: 2rem;
+  color: rgb(var(--pen));
+}
+
+html .workspace-shell .code-tower-letter {
+  border: 0;
+  border-bottom: 3px solid rgb(var(--pen));
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: rgb(var(--pen));
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+}
+
+html .workspace-shell .code-tower-letter::after {
+  display: none;
+}
+
+html .workspace-shell .code-tower-letter.is-revealed {
+  background: linear-gradient(transparent 40%, rgb(var(--hl-mint) / 0.7) 40% 95%, transparent 95%);
+  animation: caderno-pop-in 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html .workspace-shell .code-tower-letter.is-lost {
+  border-bottom-color: rgb(var(--margin-line));
+  background: transparent;
+  color: rgb(var(--margin-line));
+}
+
+html .workspace-shell .code-tower-terminal-foot {
+  border-top: 1.5px dashed rgb(var(--line));
+}
+
+html .workspace-shell .code-tower-keyboard {
+  border: 0;
+  border-radius: 0.5rem;
+  background: rgb(var(--panel-2));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
+html .workspace-shell .code-tower-key {
+  border: 1.5px solid rgb(var(--line));
+  border-bottom-width: 3px;
+  border-radius: 0.5rem;
+  background: rgb(var(--sheet));
+  color: rgb(var(--pen));
+  font-family: "Kalam", cursive;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+html .workspace-shell .code-tower-key.is-correct {
+  border-color: #1f9a57;
+  background: rgb(var(--hl-mint) / 0.7);
+  color: rgb(var(--theme-text));
+}
+
+html .workspace-shell .code-tower-key.is-wrong {
+  border-color: transparent;
+  background: transparent;
+  color: rgb(var(--margin-line) / 0.5);
+  text-decoration: line-through;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html .workspace-shell .code-tower-key:not(:disabled):hover {
+    border-color: rgb(var(--pen));
+    background: rgb(var(--hl-yellow) / 0.6);
+    color: rgb(var(--pen));
+    transform: translateY(-2px) rotate(-3deg);
+  }
+}
+
+html .workspace-shell .code-tower-result {
+  border: 0;
+  border-radius: 0.4rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
+html .workspace-shell .code-tower-result.is-success {
+  background: color-mix(in srgb, rgb(var(--hl-mint)) 35%, rgb(var(--sheet)));
+  box-shadow: 0 0 0 2px #1f9a57;
+}
+
+html .workspace-shell .code-tower-result.is-failure {
+  background: color-mix(in srgb, rgb(var(--hl-pink)) 30%, rgb(var(--sheet)));
+  box-shadow: 0 0 0 2px rgb(var(--margin-line));
+}
+
+html .workspace-shell .code-tower-result > span,
+html .workspace-shell .code-tower-help {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  font-weight: 400;
+  color: rgb(var(--theme-muted));
+}
+
+@media (min-width: 700px) {
+  html .workspace-shell .code-tower-chamber {
+    border-right: 1.5px dashed rgb(var(--line));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .code-tower-sketch-cross {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ───────── Placar dos jogos (GameHud): post-its ───────── */
+.caderno-hud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.caderno-hud-note {
+  min-width: 5.5rem;
+  flex: 1;
+  padding: 0.45rem 0.75rem 0.55rem;
+  border-radius: 0.2rem 0.2rem 0.7rem 0.2rem;
+  background: #fff1a6;
+  box-shadow: 0 8px 12px -10px rgb(0 0 0 / 0.5);
+  rotate: -1deg;
+  transition: rotate 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.caderno-hud-note:nth-child(3n + 2) { background: #c8f7dc; rotate: 1deg; }
+.caderno-hud-note:nth-child(3n + 3) { background: #e2d9ff; rotate: 0.4deg; }
+.caderno-hud-note.is-good { background: #b8f2cf; }
+.caderno-hud-note.is-alert { background: #ffc9d8; animation: caderno-shake 420ms ease; }
+
+.caderno-hud-label {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  color: #4a4a5a;
+}
+
+.caderno-hud-value {
+  font-family: "Kalam", cursive;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #1d2bb8;
+}
+
+.caderno-hud-note.is-alert .caderno-hud-value {
+  color: #c2185b;
+}
+
+/* ───────── Trilha da história dos jogos ───────── */
+.caderno-story {
+  position: relative;
+  padding: 1rem 1.1rem;
+  border-radius: 0.4rem;
+  background:
+    repeating-linear-gradient(to right, rgb(var(--rule) / 0.35) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(to bottom, rgb(var(--rule) / 0.35) 0 1px, transparent 1px 24px),
+    rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
+.caderno-story.is-compact {
+  padding: 0.6rem 1rem;
+}
+
+.caderno-story-kicker {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.98rem;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-story-title {
+  margin-top: 0.15rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.caderno-story-text {
+  margin-top: 0.1rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-story-distance {
+  font-family: "Kalam", cursive;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.caderno-story-track {
+  position: absolute;
+  inset-inline: 0.5rem;
+  top: 1.25rem;
+  height: 0;
+  border-top: 3px dashed rgb(var(--theme-muted) / 0.5);
+}
+
+.caderno-story-fill {
+  position: absolute;
+  left: 0.5rem;
+  top: 1.1rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgb(var(--hl-yellow));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--pen) / 0.35);
+}
+
+.caderno-story-stop {
+  position: absolute;
+  top: 0.85rem;
+  display: grid;
+  width: 1rem;
+  height: 1rem;
+  translate: -50% 0;
+  place-items: center;
+  border: 2px solid rgb(var(--pen) / 0.5);
+  border-radius: 50%;
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--sheet));
+}
+
+.caderno-story-stop.is-reached {
+  border-color: rgb(var(--pen));
+  background: rgb(var(--pen));
+}
+
+.caderno-story-mine {
+  position: absolute;
+  top: -0.35rem;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  translate: -50% 0;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 2px rgb(var(--pen)), 0 6px 10px -6px rgb(0 0 0 / 0.5);
+}
+
+.caderno-game-tip {
+  text-align: center;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.02rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* ───────── Corrida: capítulo, relógio-lápis e cartão V/F ───────── */
+.caderno-chapter {
+  position: relative;
+  min-height: 22rem;
+  padding: 1.6rem;
+  border-radius: 0.5rem;
+  background:
+    repeating-linear-gradient(to right, rgb(var(--rule) / 0.4) 0 1px, transparent 1px 26px),
+    repeating-linear-gradient(to bottom, rgb(var(--rule) / 0.4) 0 1px, transparent 1px 26px),
+    rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
+.caderno-chapter-badge {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-mint) / 0.7);
+  box-shadow: 0 0 0 3px rgb(var(--sheet)), 0 0 0 4.5px rgb(var(--pen) / 0.6);
+}
+
+.caderno-chapter-badge.is-end {
+  background: rgb(var(--hl-yellow));
+}
+
+.caderno-chapter-title {
+  margin-top: 0.3rem;
+  font-family: "Anybody Variable", sans-serif;
+  font-variation-settings: "wdth" 114;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.caderno-chapter-text {
+  max-width: 40rem;
+  margin-top: 0.6rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  line-height: 1.55;
+  color: rgb(var(--theme-text) / 0.8);
+}
+
+.caderno-timer {
+  position: relative;
+  height: 0.9rem;
+  overflow: hidden;
+  border-radius: 0.2rem 999px 999px 0.2rem;
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+}
+
+.caderno-timer-fill {
+  height: 100%;
+  border-radius: inherit;
+  /* corpo do lápis amarelo com a ponta grafite */
+  background:
+    linear-gradient(to left, rgb(var(--pen)) 0 0.35rem, #f6c177 0.35rem 1rem, transparent 1rem),
+    repeating-linear-gradient(to bottom, #ffd84d 0 3px, #f5c518 3px 6px);
+}
+
+.caderno-timer-fill.is-low {
+  background:
+    linear-gradient(to left, rgb(var(--pen)) 0 0.35rem, #f6c177 0.35rem 1rem, transparent 1rem),
+    repeating-linear-gradient(to bottom, #ff8fb1 0 3px, #f06292 3px 6px);
+}
+
+.caderno-tf-card {
+  position: relative;
+  min-height: 9.5rem;
+  padding: 1.4rem 1.6rem 1.4rem 3rem;
+  border-radius: 0.35rem;
+  background:
+    linear-gradient(to right, transparent 2rem, rgb(var(--margin-line) / 0.5) 2rem calc(2rem + 2px), transparent calc(2rem + 2px)),
+    repeating-linear-gradient(to bottom, transparent 0 calc(2rem - 1px), rgb(var(--rule) / 0.6) calc(2rem - 1px) 2rem),
+    rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 16px 26px -20px rgb(0 0 0 / 0.5);
+  transition: box-shadow 200ms ease;
+}
+
+.caderno-tf-card.is-right {
+  box-shadow: 0 0 0 2.5px #1f9a57, 0 16px 26px -20px rgb(0 0 0 / 0.5);
+}
+
+.caderno-tf-card.is-wrong {
+  box-shadow: 0 0 0 2.5px rgb(var(--margin-line)), 0 16px 26px -20px rgb(0 0 0 / 0.5);
+}
+
+.caderno-tf-count {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-tf-statement {
+  margin-top: 0.2rem;
+  font-family: "Kalam", cursive;
+  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  font-weight: 700;
+  line-height: 2rem;
+  color: rgb(var(--pen));
+}
+
+.caderno-tf-feedback {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.6;
+  color: rgb(var(--theme-text) / 0.8);
+}
+
+.caderno-tf-stamp {
+  position: absolute;
+  top: 1rem;
+  right: 1.2rem;
+  padding: 0.1rem 0.6rem;
+  border: 2.5px solid currentColor;
+  border-radius: 0.35rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.4rem;
+  font-weight: 700;
+  rotate: -8deg;
+}
+
+.caderno-tf-stamp.is-right { color: #1f9a57; }
+.caderno-tf-stamp.is-wrong { color: rgb(var(--margin-line)); }
+
+.caderno-tf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.1rem 0.5rem;
+  border-radius: 0.8rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.35rem;
+  font-weight: 700;
+  box-shadow: 0 5px 0 rgb(0 0 0 / 0.18);
+  transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 160ms ease;
+}
+
+.caderno-tf-btn.is-true {
+  color: #0b3d22;
+  background: #b8f2cf;
+  rotate: -1deg;
+}
+
+.caderno-tf-btn.is-false {
+  color: #7a1024;
+  background: #ffc9d8;
+  rotate: 1deg;
+}
+
+.caderno-tf-btn:not(:disabled):hover {
+  transform: translateY(-3px);
+}
+
+.caderno-tf-btn:not(:disabled):active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.18);
+}
+
+.caderno-tf-btn:disabled {
+  opacity: 0.45;
+}
+
+/* ───────── Memória: fichas que viram ───────── */
+.caderno-memo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+@media (min-width: 640px) {
+  .caderno-memo-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.caderno-memo {
+  display: block;
+  min-height: 7.5rem;
+  perspective: 900px;
+  rotate: var(--tilt, 0deg);
+  transition: rotate 240ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 200ms ease;
+}
+
+.caderno-memo:not(:disabled):hover {
+  rotate: 0deg;
+  transform: translateY(-3px);
+}
+
+.caderno-memo-inner {
+  position: relative;
+  display: grid;
+  height: 100%;
+  min-height: 7.5rem;
+  transform-style: preserve-3d;
+  transition: transform 460ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+.caderno-memo.is-open .caderno-memo-inner {
+  transform: rotateY(180deg);
+}
+
+.caderno-memo-face {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.25rem;
+  padding: 0.7rem;
+  border-radius: 0.35rem;
+  backface-visibility: hidden;
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 10px 16px -12px rgb(0 0 0 / 0.5);
+}
+
+.caderno-memo-face.is-back {
+  color: rgb(var(--pen));
+  background:
+    repeating-linear-gradient(45deg, rgb(var(--pen) / 0.07) 0 6px, transparent 6px 12px),
+    rgb(var(--hl-lilac) / 0.55);
+}
+
+.caderno-memo-face.is-front {
+  transform: rotateY(180deg);
+  text-align: center;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(1.5rem - 1px), rgb(var(--rule) / 0.6) calc(1.5rem - 1px) 1.5rem),
+    rgb(var(--panel));
+}
+
+.caderno-memo-face.is-front.is-term {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(1.5rem - 1px), rgb(var(--rule) / 0.6) calc(1.5rem - 1px) 1.5rem),
+    color-mix(in srgb, rgb(var(--hl-yellow)) 30%, rgb(var(--panel)));
+}
+
+.caderno-memo.is-done .caderno-memo-face.is-front {
+  box-shadow: 0 0 0 2.5px #1f9a57, 0 10px 16px -12px rgb(0 0 0 / 0.5);
+}
+
+.caderno-memo.is-wrong .caderno-memo-face.is-front {
+  box-shadow: 0 0 0 2.5px rgb(var(--margin-line)), 0 10px 16px -12px rgb(0 0 0 / 0.5);
+}
+
+.caderno-memo-kind {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.9rem;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-memo-text {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: rgb(var(--theme-text));
+}
+
+.is-term > .caderno-memo-text {
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  color: rgb(var(--pen));
+}
+
+/* ───────── Caça-palavras: grade quadriculada ───────── */
+.caderno-ws-grid {
+  gap: 0;
+  padding: 0.35rem;
+  border-radius: 0.4rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 16px 26px -20px rgb(0 0 0 / 0.5);
+}
+
+.caderno-ws-cell {
+  display: grid;
+  aspect-ratio: 1;
+  min-width: 0;
+  place-items: center;
+  border-right: 1px solid rgb(var(--rule) / 0.7);
+  border-bottom: 1px solid rgb(var(--rule) / 0.7);
+  font-family: "Kalam", cursive;
+  font-size: clamp(0.85rem, 2.8vw, 1.2rem);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  color: rgb(var(--pen));
+  transition: background-color 150ms ease;
+}
+
+.caderno-ws-cell:hover {
+  background: rgb(var(--hl-yellow) / 0.35);
+}
+
+.caderno-ws-cell.is-found {
+  background: rgb(var(--hl-mint) / 0.85);
+  color: rgb(var(--theme-text));
+}
+
+.caderno-ws-cell.is-path {
+  background: rgb(var(--hl-yellow));
+  color: rgb(var(--theme-text));
+}
+
+.caderno-ws-cell.is-anchor {
+  background: rgb(var(--hl-pink) / 0.7);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgb(var(--pen));
+}
+
+.caderno-ws-found {
+  position: relative;
+  padding: 1.2rem 1rem 1rem;
+  border-radius: 0.2rem 0.2rem 0.9rem 0.2rem;
+  background: linear-gradient(180deg, #d9f8e6, #bff0d3);
+  box-shadow: 0 14px 20px -16px rgb(0 0 0 / 0.55);
+  rotate: -1deg;
+}
+
+.caderno-ws-found .caderno-note {
+  color: #1f6b41;
+}
+
+.caderno-ws-tape {
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  width: 4.5rem;
+  height: 1.25rem;
+  translate: -50% 0;
+  rotate: 3deg;
+  background: rgb(255 255 255 / 0.6);
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+.caderno-ws-word {
+  margin-top: 0.1rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #1d2bb8;
+}
+
+.caderno-ws-meaning {
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.55;
+  color: #243044;
+}
+
+.caderno-ws-list {
+  padding: 1rem;
+  border-radius: 0.35rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(2.2rem - 1px), rgb(var(--rule) / 0.55) calc(2.2rem - 1px) 2.2rem) 0 2.6rem / 100% 100% no-repeat,
+    rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
+.caderno-ws-list-title {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-ws-list-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-ws-item {
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  text-align: left;
+  font-family: "Kalam", cursive;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-ws-item.is-found {
+  color: rgb(var(--pen));
+  text-decoration: line-through;
+  text-decoration-color: rgb(var(--margin-line));
+  text-decoration-thickness: 2px;
+}
+
+.caderno-ws-item.is-found:hover {
+  background: rgb(var(--hl-yellow) / 0.4);
+}
+
+.caderno-ws-glossary {
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
+.caderno-ws-glossary-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1.5px dashed rgb(var(--line));
+}
+
+.caderno-ws-glossary-icon {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-mint) / 0.6);
+  rotate: -6deg;
+}
+
+.caderno-ws-glossary-title {
+  font-family: "Kalam", cursive;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+
+.caderno-ws-glossary-sub {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-ws-glossary-count {
+  padding: 0.1rem 0.7rem;
+  border-radius: 999px;
+  font-family: "Kalam", cursive;
+  font-weight: 700;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--hl-yellow) / 0.7);
+}
+
+.caderno-ws-entry {
+  padding: 0.8rem 0.9rem;
+  border-left: 4px solid rgb(var(--hl-mint));
+  border-radius: 0.2rem;
+  background: rgb(var(--sheet));
+}
+
+.caderno-ws-entry-word {
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: rgb(var(--pen));
+}
+
+.caderno-ws-entry-meaning {
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: rgb(var(--theme-text) / 0.78);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caderno-memo-inner {
+    transition: none;
+  }
+}
+
+/* ───────── Boletim da partida ───────── */
+.caderno-result {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  max-width: 34rem;
+  margin: 1rem auto 0;
+  padding: 2.4rem 1.5rem 1.8rem;
+  text-align: center;
+  border-radius: 0.4rem;
+  background:
+    linear-gradient(to right, transparent 2rem, rgb(var(--margin-line) / 0.5) 2rem calc(2rem + 2px), transparent calc(2rem + 2px)),
+    repeating-linear-gradient(to bottom, transparent 0 calc(2rem - 1px), rgb(var(--rule) / 0.55) calc(2rem - 1px) 2rem),
+    rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 26px 40px -30px rgb(0 0 0 / 0.55);
+  rotate: -0.6deg;
+}
+
+.caderno-result-tape {
+  position: absolute;
+  top: -0.75rem;
+  left: 50%;
+  width: 6rem;
+  height: 1.45rem;
+  translate: -50% 0;
+  rotate: 2deg;
+  background: rgb(var(--hl-yellow) / 0.65);
+  clip-path: polygon(3% 0, 97% 5%, 100% 50%, 96% 100%, 4% 95%, 0 50%);
+}
+
+.caderno-result-grade {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  padding: 0.6rem 2rem 0.4rem;
+}
+
+.caderno-result-ring {
+  position: absolute;
+  left: -6%;
+  top: -10%;
+  width: 112%;
+  height: 120%;
+  color: rgb(var(--margin-line));
+}
+
+.caderno-result-ring path {
+  vector-effect: non-scaling-stroke;
+}
+
+.caderno-result-points {
+  font-family: "Kalam", cursive;
+  font-size: clamp(3.2rem, 9vw, 4.6rem);
+  font-weight: 700;
+  line-height: 1;
+  color: rgb(var(--margin-line));
+  animation: caderno-pop-in 520ms 150ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.caderno-result-unit {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.1rem;
+  color: rgb(var(--theme-muted));
+}
+
+.caderno-result-stamp {
+  margin-top: 0.8rem;
+  padding: 0.15rem 0.9rem;
+  border: 3px solid #d97706;
+  border-radius: 0.4rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #d97706;
+  rotate: -7deg;
+  animation: caderno-sn-stamp 460ms 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.caderno-result-meta {
+  margin-top: 0.8rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.05rem;
+  color: rgb(var(--pen));
+}
+
+.caderno-result-xp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.caderno-result-xp mark {
+  padding: 0 0.2em;
+  color: inherit;
+  background: linear-gradient(transparent 45%, rgb(var(--hl-yellow)) 45% 92%, transparent 92%);
+}
+
+.caderno-result-bubbles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.caderno-result-bubbles span {
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 2px solid rgb(var(--pen) / 0.6);
+  border-radius: 50%;
+  animation: caderno-pop-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.caderno-result-bubbles span.is-on {
+  border-color: rgb(var(--pen));
+  background: rgb(var(--pen));
+}
+
+.caderno-result-note {
+  margin-top: 0.9rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.2rem;
+  color: rgb(var(--theme-text));
+}
+
+.caderno-result-record {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.98rem;
+  color: rgb(var(--theme-muted));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caderno-result-points,
+  .caderno-result-stamp,
+  .caderno-result-bubbles span {
+    animation: none;
+  }
+}
