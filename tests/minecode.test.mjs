@@ -284,7 +284,7 @@ test("MineCode no router: palavra solta é tirada na hora, sem chamar outro mode
   assert.equal(calls.length, 1);
 });
 
-test("MineCode no router: erro de sintaxe depois do streaming é refeito pelo gpt-6-luna sem streaming", async () => {
+test("MineCode no router: erro de sintaxe depois do streaming é refeito pelo segundo modelo, sem streaming", async () => {
   const { runMineRequest } = await import("../mine/router.mjs");
   const calls = [];
   const broken = goodSite.replace("scene.add(planeta);", "scene.add(planeta) researcher;");
@@ -298,7 +298,7 @@ test("MineCode no router: erro de sintaxe depois do streaming é refeito pelo gp
     assert.equal(streamed, reply(broken));
     assert.equal(result.reply, reply(goodSite));
   });
-  assert.deepEqual(calls.map((call) => [call.model, Boolean(call.stream)]), [["z-ai/glm-5.3-flash", true], ["openai/gpt-6-luna", false]]);
+  assert.deepEqual(calls.map((call) => [call.model, Boolean(call.stream)]), [["openai/gpt-6-luna", true], ["z-ai/glm-5.3-flash", false]]); // site/3D: luna primeiro, GLM refaz
   assert.match(JSON.stringify(calls[1].messages), /versao anterior deste arquivo saiu com defeito/);
 });
 

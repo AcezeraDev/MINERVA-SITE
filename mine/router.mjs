@@ -121,14 +121,15 @@ function gameAttemptMs() {
 // ineditismo no cliente.
 
 /**
- * Sites (skill de front-end) pedem mais raciocinio: com "low" o GLM entregava
- * paginas genericas. Codigo curto de Python/JS segue com o padrao do modelo.
- * MINE_CODE_SITE_REASONING_EFFORT troca o nivel dos sites.
+ * Cadeia do MineCode. Sites (skill de front-end) vao primeiro para o modelo
+ * principal: medido em 17/out/2026 com o mesmo pedido de hero 3D, o GLM em
+ * "low" entregava pagina generica e em "high" estourou 150 s sem terminar,
+ * enquanto o gpt-6-luna fez um site bonito em 70 s. Python/JS seguem no GLM,
+ * mais barato e rapido para codigo curto.
  */
-function codeModelFor({ prompt, context, history }) {
-  if (!pickCodeSkills({ prompt, context, history }).includes("frontend")) return MINE_CODE_MODEL;
-  const effort = String(process.env.MINE_CODE_SITE_REASONING_EFFORT || "high").trim().toLowerCase();
-  return { ...MINE_CODE_MODEL, providerParams: { reasoning_effort: ["low", "high", "max"].includes(effort) ? effort : "high" } };
+function codeChainFor({ prompt, context, history }) {
+  const site = pickCodeSkills({ prompt, context, history }).includes("frontend");
+  return site ? [MINE_TASK_MODEL, MINE_CODE_MODEL] : [MINE_CODE_MODEL, MINE_TASK_MODEL];
 }
 
 /**
@@ -323,7 +324,7 @@ export async function runMineRequest({
   const candidates = gameTask
     ? [MINE_FAST_MODEL, MINE_TASK_MODEL]
     : cleanTask === "minecode"
-      ? [codeModelFor({ prompt, context, history }), MINE_TASK_MODEL]
+      ? codeChainFor({ prompt, context, history })
       : [principal, MINE_FAST_MODEL];
   const seen = new Set();
   const chain = candidates.filter((model) => {
