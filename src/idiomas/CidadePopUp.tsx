@@ -18,6 +18,7 @@
 */
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { buildLandmark } from "./predios";
 
 export type StopState = "locked" | "open" | "next" | "done";
 export type CityStop = { id: string; emoji: string; label: string; place: string; color: string; state: StopState };
@@ -89,47 +90,6 @@ function pageTexture(dark: boolean) {
     ctx.font = "84px 'Gochi Hand', cursive";
     ctx.textAlign = "left";
     ctx.fillText("London ~ my exchange trip", 220, 1330);
-  });
-}
-
-/** Fachada: cor de marca-texto, janelas e porta à caneta. */
-function facadeTexture(color: string, locked: boolean, dark: boolean, seed: number) {
-  return canvasTexture(256, 320, (ctx) => {
-    ctx.fillStyle = locked ? (dark ? "#2a3247" : "#dfe5ee") : color;
-    ctx.fillRect(0, 0, 256, 320);
-    // hachura de lápis por cima, para parecer pintado à mão
-    ctx.strokeStyle = locked ? "rgba(120,130,150,.35)" : "rgba(255,255,255,.18)";
-    ctx.lineWidth = 2;
-    for (let i = -320; i < 256; i += 14) {
-      ctx.beginPath();
-      ctx.moveTo(i, 320);
-      ctx.lineTo(i + 320, 0);
-      ctx.stroke();
-    }
-    const ink = locked ? "rgba(110,120,140,.8)" : "#161a22";
-    ctx.strokeStyle = ink;
-    ctx.lineWidth = 6;
-    ctx.lineJoin = "round";
-    ctx.strokeRect(6, 6, 244, 308);
-    ctx.lineWidth = 4;
-    const cols = 2 + (seed % 2);
-    const gap = 256 / (cols + 1);
-    for (let row = 0; row < 3; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        const x = gap * (col + 1) - 18;
-        const y = 34 + row * 70;
-        ctx.fillStyle = locked ? "rgba(255,255,255,.25)" : "rgba(255,248,200,.9)";
-        ctx.fillRect(x, y, 36, 42);
-        ctx.strokeRect(x, y, 36, 42);
-        ctx.beginPath();
-        ctx.moveTo(x + 18, y);
-        ctx.lineTo(x + 18, y + 42);
-        ctx.stroke();
-      }
-    }
-    ctx.fillStyle = locked ? "rgba(110,120,140,.4)" : "#3a2a1f";
-    ctx.fillRect(103, 246, 50, 68);
-    ctx.strokeRect(103, 246, 50, 68);
   });
 }
 
@@ -277,7 +237,6 @@ export default function CidadePopUp({
     // ── prédios ──
     const buildings: Building[] = [];
     const hitTargets: THREE.Object3D[] = [];
-    const roofGeometry = track(new THREE.ConeGeometry(0.82, 0.62, 4));
     const signGeometry = track(new THREE.PlaneGeometry(1.5, 0.586));
     const stamp = track(stampTexture());
     let pin: THREE.Group | null = null;
@@ -286,7 +245,6 @@ export default function CidadePopUp({
     stops.forEach((stop, index) => {
       const [x, z] = SPOTS[index % SPOTS.length];
       const locked = stop.state === "locked";
-      const height = 0.95 + ((index * 37) % 5) * 0.14;
       const anchor = new THREE.Group();
       anchor.position.set(x, 0, z);
       world.add(anchor);
@@ -296,21 +254,12 @@ export default function CidadePopUp({
       hinge.position.z = -0.45;
       anchor.add(hinge);
 
-      const facade = track(facadeTexture(stop.color, locked, dark, index));
-      const bodyMaterial = track(new THREE.MeshStandardMaterial({ map: facade, roughness: 0.85 }));
-      const sideMaterial = track(new THREE.MeshStandardMaterial({ color: locked ? (dark ? 0x262d40 : 0xd4dbe6) : new THREE.Color(stop.color).multiplyScalar(0.82), roughness: 0.9 }));
-      // fechada é só a fachada recortada, fina como papel, deitada na folha
-      const depth = locked ? 0.12 : 0.9;
-      const body = new THREE.Mesh(track(new THREE.BoxGeometry(1.1, height, depth)), [sideMaterial, sideMaterial, sideMaterial, sideMaterial, bodyMaterial, sideMaterial]);
-      body.position.set(0, height / 2, depth / 2);
-      body.castShadow = high;
-      hinge.add(body);
-
-      const roof = new THREE.Mesh(roofGeometry, track(new THREE.MeshStandardMaterial({ color: locked ? (dark ? 0x3a4258 : 0xbfc8d6) : dark ? 0xff8c8f : 0xe5484d, roughness: 0.8 })));
-      roof.rotation.y = Math.PI / 4;
-      roof.position.set(0, height + 0.31, 0.45);
-      roof.castShadow = high;
-      if (!locked) hinge.add(roof);
+      // o prédio com a cara do lugar (src/idiomas/predios.ts)
+      const landmark = buildLandmark(stop.id, { color: stop.color, locked, dark, shadows: high, track });
+      const height = landmark.height;
+      hinge.add(landmark.group);
+      // fechada: o recorte fica achatado, deitado na folha como papel dobrado
+      if (locked) hinge.scale.z = 0.14;
 
       const sign = new THREE.Mesh(signGeometry, track(new THREE.MeshStandardMaterial({ map: track(signTexture(stop, dark)), roughness: 0.9, transparent: true })));
       // a placa fica de pé na frente, fora da dobra: é ela que diz o que está fechado
@@ -320,10 +269,10 @@ export default function CidadePopUp({
 
       if (stop.state === "done") {
         const pole = new THREE.Mesh(track(new THREE.CylinderGeometry(0.02, 0.02, 0.7, 6)), track(new THREE.MeshStandardMaterial({ color: 0x16181d })));
-        pole.position.set(0.32, height + 0.55, 0.45);
+        pole.position.set(-0.78, 0.35, 0.12);
         hinge.add(pole);
         const flag = new THREE.Mesh(track(new THREE.PlaneGeometry(0.46, 0.29)), track(new THREE.MeshStandardMaterial({ map: stamp, side: THREE.DoubleSide })));
-        flag.position.set(0.56, height + 0.75, 0.45);
+        flag.position.set(-0.55, 0.55, 0.12);
         hinge.add(flag);
       }
 
@@ -339,10 +288,14 @@ export default function CidadePopUp({
         world.add(pin);
       }
 
-      body.userData.stop = index;
-      roof.userData.stop = index;
+      landmark.group.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          child.userData.stop = index;
+          hitTargets.push(child);
+        }
+      });
       sign.userData.stop = index;
-      hitTargets.push(body, roof, sign);
+      hitTargets.push(sign);
       buildings.push({
         id: stop.id,
         hinge,

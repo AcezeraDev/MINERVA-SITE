@@ -265,6 +265,7 @@ class MesaBoundary extends React.Component<{ onFail: () => void; children: React
 }
 
 const ComoUsarView = React.lazy(() => import("./guia/ComoUsarView").then((m) => ({ default: m.ComoUsarView })));
+const MineCode = React.lazy(() => import("./chat/MineCode").then((m) => ({ default: m.MineCode })));
 const MindmapModal = React.lazy(() => import("./mindmap/MindmapPanel").then((m) => ({ default: m.MindmapModal })));
 
 /** Enquanto um pedaço do caderno carrega: um lápis girando no meio da folha. */
@@ -7552,6 +7553,20 @@ function MineView({
   const contextTriggerRef = useRef<HTMLButtonElement | null>(null);
   const contextDrawerRef = useRef<HTMLElement | null>(null);
   const sendRef = useRef(send);
+  // Aba MineCode: editor de código do chat. Abre pelas abas do cabeçalho ou
+  // pelo botão "MineCode" de um bloco de código de uma resposta.
+  const [codeTab, setCodeTab] = useState(false);
+  const [codeIncoming, setCodeIncoming] = useState<{ code: string; lang: string; at: number } | null>(null);
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const detail = (event as CustomEvent<{ code: string; lang: string }>).detail;
+      if (!detail?.code) return;
+      setCodeIncoming({ code: detail.code, lang: detail.lang, at: Date.now() });
+      setCodeTab(true);
+    };
+    window.addEventListener("minecode:open", onOpen);
+    return () => window.removeEventListener("minecode:open", onOpen);
+  }, []);
   const saveResponseRef = useRef(saveResponse);
   const feedbackRef = useRef(setFeedback);
   const versionRef = useRef(showVersion);
@@ -7915,7 +7930,7 @@ function MineView({
         </div>
       </aside>
 
-      <div className="mine-main flex h-full min-h-0 min-w-0 flex-col bg-[#111310]">
+      <div className="mine-main relative flex h-full min-h-0 min-w-0 flex-col bg-[#111310]">
         <header className="mine-header relative flex min-h-[3.75rem] shrink-0 items-center justify-between gap-2 px-3 py-2 sm:gap-3 md:px-5">
           <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <button
@@ -7936,6 +7951,16 @@ function MineView({
                 {activeThread ? activeThread.title : "Nova conversa"}
               </p>
             </div>
+          </div>
+          <div className="mine-tabs" role="tablist" aria-label="Modo do chat">
+            <button type="button" role="tab" aria-selected={!codeTab} className={!codeTab ? "is-on" : ""} onClick={() => setCodeTab(false)}>
+              <MessageCircle className="h-4 w-4" aria-hidden />
+              <span>Conversa</span>
+            </button>
+            <button type="button" role="tab" aria-selected={codeTab} className={codeTab ? "is-on" : ""} onClick={() => setCodeTab(true)}>
+              <Code2 className="h-4 w-4" aria-hidden />
+              <span>MineCode</span>
+            </button>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <HandwritingToggle />
@@ -7972,6 +7997,21 @@ function MineView({
             </button>
           </div>
         </header>
+
+        {codeTab ? (
+          <div className="mine-minecode-layer">
+            <React.Suspense fallback={<PageLoading />}>
+              <MineCode
+                incoming={codeIncoming}
+                busy={loading}
+                onAsk={(text) => {
+                  setCodeTab(false);
+                  void sendRef.current(text, selectedSubjectId);
+                }}
+              />
+            </React.Suspense>
+          </div>
+        ) : null}
 
         <div className="relative min-h-0 flex-1">
           <div

@@ -1,0 +1,52 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { isSitePage, mineCodeLanguage, runnableLanguage } from "../shared/code-run.mjs";
+import { buildSystemInstruction, buildLanguageChatInstruction } from "../mine/prompts.mjs";
+import { languageCorrectionIssue, replyQualityIssue } from "../mine/quality.mjs";
+
+const page = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Loja</title><style>body{margin:0}</style></head>
+<body><main><h1>Olá, mundo!</h1><p>Minha primeira página.</p></main></body></html>`;
+
+test("página HTML completa vira prévia; trecho solto de tag continua código", () => {
+  assert.equal(isSitePage(page, "html"), true);
+  assert.equal(isSitePage("<p>oi</p>", "html"), false);
+  assert.equal(isSitePage(page, "python"), false);
+  const sem = `<style>.card{padding:20px;border-radius:12px;background:#eee;font-family:system-ui}</style>
+<div class="card"><h2>Cartão</h2><p>Sem doctype, mas com estilo e estrutura de página.</p></div>`;
+  assert.equal(isSitePage(sem, "html"), true);
+});
+
+test("linguagens que rodam e as da aba MineCode", () => {
+  assert.equal(runnableLanguage("Python"), "python");
+  assert.equal(runnableLanguage("js"), "javascript");
+  assert.equal(runnableLanguage("java"), null);
+  assert.equal(mineCodeLanguage("html"), "html");
+  assert.equal(mineCodeLanguage("py"), "python");
+  assert.equal(mineCodeLanguage("css"), null);
+});
+
+test("o chat manda a Mine entregar site em HTML completo e nunca em ASCII", () => {
+  const prompt = buildSystemInstruction("");
+  assert.match(prompt, /UM arquivo HTML completo/);
+  assert.match(prompt, /NUNCA desenhe a pagina em ASCII/);
+  assert.match(prompt, /MineCode/);
+  assert.match(prompt, /botao Executar/);
+});
+
+test("correção do roleplay que troca 'I' por 'you' é recusada", () => {
+  const reply = (correction) => `MINE: Oh, you're from Brazil!\nCORRECAO: ${correction}\nNOTA: 1`;
+  assert.notEqual(languageCorrectionIssue("i from brazil, sao paulo", reply("You are from Brazil, São Paulo.")), "");
+  assert.equal(languageCorrectionIssue("i from brazil, sao paulo", reply("I'm from Sao Paulo, Brazil.")), "");
+  assert.equal(languageCorrectionIssue("[COMECAR]", reply("OK")), "");
+  assert.equal(languageCorrectionIssue("is very expensive", reply("It is very expensive.")), "");
+  assert.notEqual(replyQualityIssue({ task: "idioma-conversa", prompt: "my name is davi", reply: reply("Your name is Davi.") }), "");
+});
+
+test("o roleplay proíbe a Mine de falar as frases do aluno e traz um exemplo completo", () => {
+  const prompt = buildLanguageChatInstruction("ctx");
+  assert.match(prompt, /Nunca fale as frases que sao do estudante/);
+  assert.match(prompt, /nunca vira "You are/);
+  assert.match(prompt, /Exemplo \(parada do aeroporto/);
+});

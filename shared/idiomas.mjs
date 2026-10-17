@@ -66,16 +66,16 @@ export const englishUnits = [
         mine: "Hello! Welcome to London. What is your name?",
         options: [
           { en: "Hello, my name is Ana.", ok: true },
-          { en: "I am a suitcase.", ok: false },
-          { en: "Goodbye, plane.", ok: false },
+          { en: "I am from London.", ok: false },
+          { en: "Goodbye, see you later!", ok: false },
         ],
       },
       {
         mine: "Nice to meet you! Where are you from?",
         options: [
           { en: "I am from Brazil.", ok: true },
-          { en: "My name is Brazil.", ok: false },
-          { en: "Thank you, passport.", ok: false },
+          { en: "My name is Ana.", ok: false },
+          { en: "I am fine, thank you.", ok: false },
         ],
       },
       {
@@ -83,15 +83,15 @@ export const englishUnits = [
         options: [
           { en: "Here is my passport.", ok: true },
           { en: "How are you?", ok: false },
-          { en: "I am a friend.", ok: false },
+          { en: "I am from Brazil.", ok: false },
         ],
       },
       {
-        mine: "Perfect. Enjoy your trip!",
+        mine: "Perfect. Enjoy your stay in London!",
         options: [
           { en: "Thank you! Goodbye.", ok: true },
-          { en: "Hello, my suitcase.", ok: false },
-          { en: "I am from passport.", ok: false },
+          { en: "Here is my passport.", ok: false },
+          { en: "What is your name?", ok: false },
         ],
       },
     ],
@@ -138,7 +138,7 @@ export const englishUnits = [
         mine: "Good morning! What would you like?",
         options: [
           { en: "I would like a coffee, please.", ok: true },
-          { en: "I am a coffee.", ok: false },
+          { en: "I am from Brazil.", ok: false },
           { en: "Where is the airport?", ok: false },
         ],
       },
@@ -146,24 +146,24 @@ export const englishUnits = [
         mine: "Sure! Anything to eat?",
         options: [
           { en: "Yes, a sandwich, please.", ok: true },
-          { en: "Yes, a passport, please.", ok: false },
-          { en: "No, I am water.", ok: false },
+          { en: "Yes, I am fine.", ok: false },
+          { en: "Where is the museum?", ok: false },
         ],
       },
       {
         mine: "That is five pounds. Anything else?",
         options: [
           { en: "No, thank you.", ok: true },
-          { en: "How are you name?", ok: false },
-          { en: "The cake is my friend.", ok: false },
+          { en: "My name is Ana.", ok: false },
+          { en: "Yes, I am hungry.", ok: false },
         ],
       },
       {
         mine: "Here you are. Have a nice day!",
         options: [
           { en: "Thank you very much!", ok: true },
-          { en: "I am hungry juice.", ok: false },
-          { en: "Hello, goodbye milk.", ok: false },
+          { en: "I am from Brazil.", ok: false },
+          { en: "Good morning!", ok: false },
         ],
       },
     ],
@@ -201,7 +201,7 @@ export const englishUnits = [
       { en: "This is my notebook.", pt: "Este é meu caderno." },
       { en: "My pencil is blue.", pt: "Meu lápis é azul." },
       { en: "Can you help me?", pt: "Você pode me ajudar?" },
-      { en: "I do not understand.", pt: "Eu não entendo." },
+      { en: "I don't understand.", pt: "Eu não entendo." },
       { en: "Open your book.", pt: "Abra seu livro." },
       { en: "The teacher is nice.", pt: "A professora é legal." },
     ],
@@ -210,32 +210,32 @@ export const englishUnits = [
         mine: "Welcome to class! Do you have a notebook?",
         options: [
           { en: "Yes, this is my notebook.", ok: true },
-          { en: "Yes, I am a notebook.", ok: false },
-          { en: "No, coffee please.", ok: false },
+          { en: "My pencil is blue.", ok: false },
+          { en: "Open your book.", ok: false },
         ],
       },
       {
         mine: "Good. What color is your pencil?",
         options: [
           { en: "My pencil is blue.", ok: true },
-          { en: "My pencil is hungry.", ok: false },
-          { en: "Blue is my name.", ok: false },
+          { en: "Yes, I have a notebook.", ok: false },
+          { en: "Can you help me?", ok: false },
         ],
       },
       {
-        mine: "Please open your book on page ten.",
+        mine: "Please open your book to page ten.",
         options: [
-          { en: "Sorry, I do not understand.", ok: true },
-          { en: "Ten is my backpack.", ok: false },
-          { en: "Goodbye, book.", ok: false },
+          { en: "Sorry, I don't understand.", ok: true },
+          { en: "My backpack is red.", ok: false },
+          { en: "Nice to meet you.", ok: false },
         ],
       },
       {
         mine: "No problem! Page ten. I can help you.",
         options: [
           { en: "Thank you, teacher!", ok: true },
-          { en: "I am from page ten.", ok: false },
-          { en: "Red green blue.", ok: false },
+          { en: "This is my notebook.", ok: false },
+          { en: "Where is the bus stop?", ok: false },
         ],
       },
     ],
@@ -282,32 +282,32 @@ export const englishUnits = [
         mine: "Hi, dear! Welcome to our house. Do you have brothers or sisters?",
         options: [
           { en: "Yes, I have one brother.", ok: true },
-          { en: "Yes, I have one kitchen.", ok: false },
-          { en: "No, I am a dog.", ok: false },
+          { en: "Yes, I am tired.", ok: false },
+          { en: "The dog is in the kitchen.", ok: false },
         ],
       },
       {
         mine: "How nice! This is our dog, Max.",
         options: [
           { en: "Hello, Max! Your house is beautiful.", ok: true },
-          { en: "Max is my passport.", ok: false },
-          { en: "I would like a bed coffee.", ok: false },
+          { en: "I have one brother.", ok: false },
+          { en: "Where is the bank?", ok: false },
         ],
       },
       {
         mine: "Thank you! Are you tired after the trip?",
         options: [
           { en: "Yes, I am tired.", ok: true },
-          { en: "Yes, I am kitchen.", ok: false },
-          { en: "No, my mother is blue.", ok: false },
+          { en: "Yes, this is my mother.", ok: false },
+          { en: "The dog is in the kitchen.", ok: false },
         ],
       },
       {
-        mine: "Come, I will show you your room.",
+        mine: "Come on, I'll show you your room.",
         options: [
           { en: "Thank you! Where is my room?", ok: true },
-          { en: "The dog is my father.", ok: false },
-          { en: "Goodbye, house.", ok: false },
+          { en: "I have one brother.", ok: false },
+          { en: "Nice to meet you!", ok: false },
         ],
       },
     ],
@@ -354,32 +354,32 @@ export const englishUnits = [
         mine: "Hi! You look lost. Can I help you?",
         options: [
           { en: "Yes, please. Where is the museum?", ok: true },
-          { en: "Yes, I am a museum.", ok: false },
-          { en: "No, I am a bus.", ok: false },
+          { en: "Yes, I am fine, thank you.", ok: false },
+          { en: "I would like a coffee, please.", ok: false },
         ],
       },
       {
         mine: "Go straight ahead and turn left at the bank.",
         options: [
           { en: "Is it far?", ok: true },
-          { en: "The bank is my sister.", ok: false },
-          { en: "I would like a left, please.", ok: false },
+          { en: "I am from Brazil.", ok: false },
+          { en: "My pencil is blue.", ok: false },
         ],
       },
       {
-        mine: "No, it is near. Five minutes walking.",
+        mine: "No, it's near. It's a five-minute walk.",
         options: [
           { en: "Great! Thank you very much.", ok: true },
-          { en: "Five is my street.", ok: false },
-          { en: "Goodbye, hospital map.", ok: false },
+          { en: "Where is my room?", ok: false },
+          { en: "How much is the cake?", ok: false },
         ],
       },
       {
-        mine: "You are welcome. Enjoy the museum!",
+        mine: "You're welcome. Enjoy the museum!",
         options: [
           { en: "Thanks! Have a nice day.", ok: true },
-          { en: "I am lost my bread.", ok: false },
-          { en: "Right left right.", ok: false },
+          { en: "Where is the museum?", ok: false },
+          { en: "I am lost.", ok: false },
         ],
       },
     ],
@@ -423,35 +423,35 @@ export const englishUnits = [
     ],
     script: [
       {
-        mine: "Fresh fruit! Fresh fruit! What do you want today?",
+        mine: "Fresh fruit! Fresh fruit! What would you like today?",
         options: [
           { en: "I want two bananas, please.", ok: true },
-          { en: "I want two hospitals.", ok: false },
-          { en: "My name is banana.", ok: false },
+          { en: "I am from Brazil.", ok: false },
+          { en: "Where is the bus stop?", ok: false },
         ],
       },
       {
         mine: "Here you are. Anything else?",
         options: [
           { en: "How much are the apples?", ok: true },
-          { en: "How old are the apples?", ok: false },
-          { en: "Where is my apple room?", ok: false },
+          { en: "I am tired.", ok: false },
+          { en: "Nice to meet you.", ok: false },
         ],
       },
       {
-        mine: "The apples are ten pounds a bag.",
+        mine: "They're ten pounds a bag.",
         options: [
           { en: "Oh, it is too expensive!", ok: true },
-          { en: "Oh, it is too banana!", ok: false },
-          { en: "Ten is my mother.", ok: false },
+          { en: "Yes, I like apples.", ok: false },
+          { en: "My name is Ana.", ok: false },
         ],
       },
       {
         mine: "Okay, for you, five pounds!",
         options: [
           { en: "Great! Here is the money.", ok: true },
-          { en: "Great! Here is the grapes dog.", ok: false },
-          { en: "Goodbye, five.", ok: false },
+          { en: "How much are the apples?", ok: false },
+          { en: "I want two bananas.", ok: false },
         ],
       },
     ],
@@ -490,7 +490,7 @@ export const englishUnits = [
       { en: "I like birds.", pt: "Eu gosto de pássaros." },
       { en: "It is very cold.", pt: "Está muito frio." },
       { en: "The cat is under the tree.", pt: "O gato está debaixo da árvore." },
-      { en: "We go to the park on Sunday.", pt: "Nós vamos ao parque no domingo." },
+      { en: "We go to the park on Sundays.", pt: "Nós vamos ao parque aos domingos." },
       { en: "Look at the sky!", pt: "Olhe para o céu!" },
     ],
     script: [
@@ -498,32 +498,32 @@ export const englishUnits = [
         mine: "Good afternoon! It is a beautiful day. Do you like animals?",
         options: [
           { en: "Yes, I like birds.", ok: true },
-          { en: "Yes, I like rain coffee.", ok: false },
-          { en: "No, I am a tree.", ok: false },
+          { en: "It is very cold.", ok: false },
+          { en: "Look at the sky!", ok: false },
         ],
       },
       {
         mine: "Look! There is a cat. Where is it?",
         options: [
           { en: "The cat is under the tree.", ok: true },
-          { en: "The cat is my passport.", ok: false },
-          { en: "The cat is Sunday.", ok: false },
+          { en: "Yes, I like cats.", ok: false },
+          { en: "It is sunny today.", ok: false },
         ],
       },
       {
-        mine: "Yes! How is the weather in Brazil now?",
+        mine: "Yes! What's the weather like in Brazil now?",
         options: [
           { en: "It is very hot.", ok: true },
-          { en: "It is very sister.", ok: false },
-          { en: "It is my name.", ok: false },
+          { en: "The cat is under the tree.", ok: false },
+          { en: "I like birds.", ok: false },
         ],
       },
       {
         mine: "Lucky you! Come back on Sunday for the bird show.",
         options: [
           { en: "Great! I will come on Sunday.", ok: true },
-          { en: "Great! I am the bird show.", ok: false },
-          { en: "Sunday is cold juice.", ok: false },
+          { en: "The cat is under the tree.", ok: false },
+          { en: "Yes, I like birds.", ok: false },
         ],
       },
     ],
@@ -570,32 +570,32 @@ export const englishUnits = [
         mine: "Hey! Are you happy with your trip?",
         options: [
           { en: "Yes, I am happy to be here.", ok: true },
-          { en: "Yes, I am a gift.", ok: false },
-          { en: "No, I am soccer.", ok: false },
+          { en: "I like to play soccer.", ok: false },
+          { en: "Let's take a photo!", ok: false },
         ],
       },
       {
         mine: "What do you like to do in your free time?",
         options: [
           { en: "I like to play soccer.", ok: true },
-          { en: "I like to play bank.", ok: false },
-          { en: "My free time is blue.", ok: false },
+          { en: "Yes, I am happy.", ok: false },
+          { en: "This gift is for you.", ok: false },
         ],
       },
       {
         mine: "Cool! This gift is for you. A souvenir from London!",
         options: [
           { en: "Thank you! I will miss you.", ok: true },
-          { en: "Thank you! I am a photo.", ok: false },
-          { en: "Goodbye, gift music.", ok: false },
+          { en: "Do you want to dance?", ok: false },
+          { en: "I like to play soccer.", ok: false },
         ],
       },
       {
         mine: "I will miss you too! Let's take a photo!",
         options: [
           { en: "Yes! Let's take a photo!", ok: true },
-          { en: "Yes! Let's take a bus dance.", ok: false },
-          { en: "I am sad cake.", ok: false },
+          { en: "I like to play soccer.", ok: false },
+          { en: "Where is the bus stop?", ok: false },
         ],
       },
     ],
@@ -752,38 +752,78 @@ function buildTip(unit, phrases) {
   return { kind: "dica", title: unit.tip.title, rule: unit.tip.rule, en: unit.tip.en, pt: unit.tip.pt, phrases: phrases.map((item) => ({ en: item.en, pt: item.pt })), word: "" };
 }
 
-function joinSentence(tiles, original) {
+/** Palavras que continuam com maiúscula no meio da frase. */
+const keepCase = /^(I|I'm|I'll|Brazil|Brazilian|London|Ana|Max|Sunday|Sundays|Davi|Lily|Tom)$/;
+
+function joinSentence(tiles, original, firstWord = "") {
   const end = String(original).trim().match(/[.?!]$/)?.[0] || "";
-  const text = tiles.join(" ");
+  // a primeira palavra da frase certa, se foi parar no meio, perde a maiúscula ("It Is far?" → "It is far?")
+  const fixed = tiles.map((tile, index) => (index > 0 && tile === firstWord && !keepCase.test(tile) ? tile.toLowerCase() : tile));
+  const text = fixed.join(" ");
   return text.charAt(0).toUpperCase() + text.slice(1) + end;
 }
 
+/** Inverter "I am"/"It is" no começo vira uma pergunta válida ("Am I hungry?"): não serve de erro. */
+const auxiliaries = new Set(["am", "is", "are", "do", "does", "don't", "doesn't", "can", "can't", "will", "would"]);
+
 /**
- * Frases erradas que parecem certas, para "Qual frase está certa?": duas
- * palavras trocadas de lugar e uma palavra trocada por outra da parada. São
- * os erros que um brasileiro comete de verdade (ordem e escolha de palavra).
+ * Frases erradas que parecem certas, para "Qual frase está certa?". Só erros
+ * de gramática que um brasileiro comete de verdade: ordem das palavras, verbo
+ * que não concorda, palavrinha esquecida e o "s" no verbo depois de I/you.
+ * Trocar uma palavra por outra (frase certa com outro sentido) é o último
+ * recurso, porque confunde mais do que ensina.
  */
 export function sentenceDistractors(phrase, unit, random) {
   const tiles = sentenceTiles(phrase.en);
   const right = normalizeAnswer(phrase.en);
   const found = [];
+  const join = (list) => joinSentence(list, phrase.en, tiles[0]);
   const add = (candidate) => {
     const key = normalizeAnswer(candidate);
     if (key && key !== right && !found.some((item) => normalizeAnswer(item) === key)) found.push(candidate);
   };
-  if (tiles.length >= 3) {
-    const at = 1 + Math.floor(random() * (tiles.length - 2));
+  const swapAt = (at) => {
     const swapped = [...tiles];
     [swapped[at - 1], swapped[at]] = [swapped[at], swapped[at - 1]];
-    add(joinSentence(swapped, phrase.en));
+    return swapped;
+  };
+  // uma troca de lugar que não forme pergunta por acidente
+  const swapSpots = [];
+  for (let at = 1; at < tiles.length; at += 1) {
+    // trocar as duas primeiras quando uma é auxiliar vira pergunta (ou afirmação) válida
+    if (at === 1 && (auxiliaries.has(String(tiles[1]).toLowerCase()) || auxiliaries.has(String(tiles[0]).toLowerCase()))) continue;
+    // "too" anda na frase sem errar ("It is expensive too" também é inglês certo)
+    if ([tiles[at - 1], tiles[at]].some((tile) => String(tile).toLowerCase() === "too")) continue;
+    swapSpots.push(at);
   }
+  if (tiles.length >= 3 && swapSpots.length) add(join(swapAt(swapSpots[Math.floor(random() * swapSpots.length)])));
   const verbs = { am: "is", is: "are", are: "am", do: "does", have: "has" };
   const verbAt = tiles.findIndex((tile) => verbs[tile.toLowerCase()]);
   if (verbAt >= 0) {
     const changed = [...tiles];
     changed[verbAt] = verbs[tiles[verbAt].toLowerCase()];
-    add(joinSentence(changed, phrase.en));
+    add(join(changed));
   }
+  // "s" no verbo depois de I/you/we: "I likes birds", "Opens your book"
+  const baseVerbs = new Set(["like", "want", "go", "open", "turn", "look", "take", "miss", "help", "understand"]);
+  const subjects = new Set(["i", "you", "we", "they"]);
+  const baseAt = tiles.findIndex((tile, index) => baseVerbs.has(tile.toLowerCase()) && (index === 0 || subjects.has(String(tiles[index - 1]).toLowerCase())));
+  if (found.length < 2 && baseAt >= 0) {
+    const verb = tiles[baseAt];
+    const changed = [...tiles];
+    changed[baseAt] = /(s|sh|ch|x|o)$/i.test(verb) ? `${verb}es` : `${verb}s`;
+    add(join(changed));
+  }
+  // sem a palavrinha (artigo, verbo de ligação, "to"): erro clássico de quem traduz palavra por palavra
+  const small = new Set(["a", "an", "the", "is", "am", "are", "to", "do"]);
+  const smallAt = tiles.findIndex((tile, index) => index > 0 && small.has(tile.toLowerCase()));
+  if (found.length < 2 && smallAt > 0 && tiles.length > 2) add(join(tiles.filter((_, index) => index !== smallAt)));
+  // outra troca de lugar, em outro ponto da frase
+  for (const at of swapSpots) {
+    if (found.length >= 2 || tiles.length < 3) break;
+    add(join(swapAt(at)));
+  }
+  // último recurso: trocar uma palavra da parada (frase certa na gramática, errada no sentido)
   const vocab = unit.words.map((item) => item.en).filter((item) => !item.includes(" "));
   const wordAt = tiles.findIndex((tile) => vocab.some((item) => item.toLowerCase() === tile.toLowerCase()));
   const target = wordAt >= 0 ? wordAt : tiles.length - 1;
@@ -792,7 +832,7 @@ export function sentenceDistractors(phrase, unit, random) {
     if (other.toLowerCase() === String(tiles[target]).toLowerCase()) continue;
     const changed = [...tiles];
     changed[target] = other;
-    add(joinSentence(changed, phrase.en));
+    add(join(changed));
   }
   return found.slice(0, 2);
 }
@@ -1059,7 +1099,7 @@ export function conversationContext(unit, level, studentName = "") {
   return [
     `Cenario: intercambio em Londres, parada "${unit.placeEn}" (${unit.place}).`,
     `Seu personagem: ${unit.character}, ${unit.role}. Apresente-se pelo nome na primeira fala.`,
-    studentName ? `Nome do estudante: ${studentName}. Use o nome dele de vez em quando, com naturalidade.` : "",
+    studentName ? `Nome do estudante: ${studentName}. So use o nome depois que ele mesmo disser como se chama na conversa; depois disso, de vez em quando.` : "",
     `Tema da parada: ${unit.theme}.`,
     `Nivel do estudante: ${level.code} (${level.label}).`,
     `Palavras da parada: ${unit.words.map((item) => item.en).join(", ")}.`,

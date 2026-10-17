@@ -1,0 +1,345 @@
+/*
+  Código que roda no chat da Mine: prévia de site (SitePreview.tsx), saída do
+  programa (CodeRunner.tsx), as abas Conversa | MineCode e a camada da aba.
+  Importado por CodeRunner.tsx, que já vem no pacote do chat.
+*/
+
+/* ───────────── abas do cabeçalho ───────────── */
+.mine-tabs {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.22rem;
+  border-radius: 999px;
+  background: rgb(var(--panel-2, 33 41 60) / 0.7);
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.7);
+}
+.mine-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: rgb(var(--theme-muted));
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.mine-tabs button.is-on {
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+}
+@media (max-width: 520px) {
+  .mine-tabs button span {
+    display: none;
+  }
+  .mine-tabs button {
+    padding: 0.45rem 0.6rem;
+  }
+}
+
+/* a aba MineCode cobre a conversa e a barra de escrever, abaixo do cabeçalho */
+.mine-minecode-layer {
+  position: absolute;
+  inset: 3.75rem 0 0 0;
+  z-index: 30;
+  overflow-y: auto;
+  background: rgb(var(--sheet));
+}
+
+/* ───────────── bloco com Executar ───────────── */
+.mrt-runnable {
+  display: grid;
+  gap: 0;
+}
+.mrt-runnable .mrt-codebox {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mcr-inline {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 0;
+  border-radius: 0 0 1.05em 1.05em;
+  background: #0f1512;
+  overflow: hidden;
+}
+.mcr-inline__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+}
+.mcr-run,
+.minecode-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 0.7rem;
+  background: #2fd483;
+  color: #0b100e;
+  font-weight: 900;
+  font-size: 0.86rem;
+  box-shadow: 0 3px 0 rgba(47, 212, 131, 0.35);
+  transition: transform 120ms ease;
+}
+.mcr-run svg,
+.minecode-run svg {
+  width: 1rem;
+  height: 1rem;
+}
+.mcr-run:hover:not(:disabled),
+.minecode-run:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.mcr-run:disabled,
+.minecode-run:disabled {
+  opacity: 0.6;
+}
+.mcr-stdin {
+  display: grid;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 10rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: rgba(217, 230, 223, 0.6);
+}
+.mcr-stdin textarea {
+  min-height: 2.1rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0b100e;
+  color: #d9e6df;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+/* terminal de saída */
+.mcr-out {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #070a09;
+  color: #d9e6df;
+}
+.mcr-out__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(217, 230, 223, 0.55);
+}
+.mcr-out__bar svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.mcr-out__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 700;
+}
+.mcr-out.has-error .mcr-out__status {
+  color: #ff8a8f;
+}
+.mcr-out__clear {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 0.4rem;
+  color: rgba(217, 230, 223, 0.55);
+}
+.mcr-out__clear:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.mcr-out__pre {
+  max-height: 18rem;
+  margin: 0;
+  padding: 0.2rem 0.85rem 0.8rem;
+  overflow: auto;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mcr-out__pre .is-stderr {
+  color: #ffd27a;
+}
+.mcr-out__pre .is-error {
+  color: #ff8a8f;
+}
+.mcr-out__pre .is-result {
+  color: #7cc8ff;
+}
+.mcr-out__pre .is-info {
+  color: rgba(217, 230, 223, 0.5);
+  font-style: italic;
+}
+
+/* ───────────── prévia de site ───────────── */
+.msp {
+  margin-inline: 0;
+  overflow: hidden;
+  border-radius: 1.05em;
+  border: 1px solid rgb(var(--line) / 0.9);
+  background: rgb(var(--panel));
+  box-shadow: 0 18px 40px -30px rgba(0, 0, 0, 0.7);
+}
+.msp-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.75rem;
+  background: rgb(var(--panel-2, 33 41 60));
+  border-bottom: 1px solid rgb(var(--line) / 0.8);
+}
+.msp-dots {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+.msp-dots i {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+.msp-dots i:nth-child(2) {
+  background: #febc2e;
+}
+.msp-dots i:nth-child(3) {
+  background: #28c840;
+}
+.msp-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: rgb(var(--sheet));
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgb(var(--theme-muted));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msp-tabs {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+.msp-tabs button,
+.msp-tools button,
+.msp-full-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: rgb(var(--theme-muted));
+}
+.msp-tabs svg,
+.msp-tools svg,
+.msp-full-bar svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.msp-tabs button.is-on,
+.msp-tools button[aria-pressed="true"] {
+  background: rgb(var(--pen) / 0.14);
+  color: rgb(var(--pen));
+}
+.msp-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid rgb(var(--line) / 0.6);
+}
+.msp-tools button:hover,
+.msp-tabs button:hover {
+  background: rgb(var(--line) / 0.45);
+}
+.msp-devices,
+.msp-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+.msp-stage {
+  display: grid;
+  justify-items: center;
+  background:
+    linear-gradient(45deg, rgb(var(--line) / 0.25) 25%, transparent 25%, transparent 75%, rgb(var(--line) / 0.25) 75%) 0 0 / 18px 18px,
+    rgb(var(--sheet));
+}
+.msp-frame {
+  display: block;
+  width: 100%;
+  height: 30rem;
+  border: 0;
+  background: #fff;
+}
+.msp-stage.is-mobile {
+  padding: 1rem 0;
+}
+.msp-stage.is-mobile .msp-frame {
+  width: 375px;
+  max-width: 100%;
+  height: 34rem;
+  border-radius: 1.6rem;
+  box-shadow: 0 0 0 8px #16181d, 0 18px 30px -12px rgba(0, 0, 0, 0.5);
+}
+.msp-code .mrt-codebox {
+  border: 0;
+  border-radius: 0;
+}
+.msp-full {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: rgb(var(--ink));
+}
+.msp-full-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: rgb(var(--panel));
+}
+.msp-full .msp-stage,
+.msp-full .msp-frame {
+  height: 100%;
+}
+@media (max-width: 640px) {
+  .msp-tools button span,
+  .msp-tabs button {
+    font-size: 0.74rem;
+  }
+  .msp-actions button span {
+    display: none;
+  }
+  .msp-frame {
+    height: 26rem;
+  }
+}
+
+/* o botão MineCode fica junto do Copiar, no canto da barra */
+.mrt-copy--minecode {
+  margin-left: auto;
+}
+.mrt-copy--minecode + .mrt-copy {
+  margin-left: 0.35rem;
+}

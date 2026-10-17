@@ -17,6 +17,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { MineCitation } from "./MineSources";
+import { SitePreview, isSitePage } from "./SitePreview";
+import { InlineRunner } from "./CodeRunner";
+import { openInMineCode, runnableLanguage } from "./runner";
 import { CALLOUT_TITLES, labelOf, parseBlocks, parseInline, type Block, type CalloutKind, type InlineToken, type ListBlock } from "../../shared/chat-markdown.mjs";
 
 /*
@@ -248,7 +251,23 @@ const LANGUAGE_NAMES: Record<string, string> = {
   kt: "Kotlin",
 };
 
+/**
+ * Bloco de código. Página HTML completa vira prévia do site funcionando;
+ * Python e JavaScript ganham o botão Executar e "Abrir no MineCode".
+ */
 const CodeBlock = memo(function CodeBlock({ code, lang, open }: { code: string; lang: string; open: boolean }) {
+  const runnable = !open ? runnableLanguage(lang) : null;
+  if (!open && isSitePage(code, lang)) return <SitePreview code={code} codeView={<CodeBox code={code} lang={lang} open={false} />} />;
+  if (!runnable) return <CodeBox code={code} lang={lang} open={open} />;
+  return (
+    <div className="mrt-runnable">
+      <CodeBox code={code} lang={lang} open={false} onMineCode={() => openInMineCode(code, lang)} />
+      <InlineRunner language={runnable} code={code} />
+    </div>
+  );
+});
+
+const CodeBox = memo(function CodeBox({ code, lang, open, onMineCode }: { code: string; lang: string; open: boolean; onMineCode?: () => void }) {
   // Enquanto o bloco ainda está chegando, realçar a cada token só gastaria
   // CPU: a cor entra de uma vez quando a cerca fecha.
   const highlight = useHighlighter(Boolean(lang) && !open);
@@ -268,6 +287,12 @@ const CodeBlock = memo(function CodeBlock({ code, lang, open }: { code: string; 
           {name}
         </span>
         <span className="mrt-codebox__meta">{lines} {lines === 1 ? "linha" : "linhas"}</span>
+        {onMineCode ? (
+          <button type="button" className="mrt-copy mrt-copy--minecode" onClick={onMineCode} aria-label={`Abrir este código ${name} no MineCode`}>
+            <Code2 aria-hidden />
+            <span>MineCode</span>
+          </button>
+        ) : null}
         {!open ? <CopyChip text={code} label={`Copiar código ${name}`} /> : null}
       </figcaption>
       <div className="mrt-codebox__scroll">

@@ -98,7 +98,7 @@ export function Conversa({
   useEffect(() => {
     const controller = new AbortController();
     abort.current = controller;
-    askLanguageMine({ task: "idioma-conversa", prompt: "[COMECAR]", context }, { signal: controller.signal, timeoutMs: 25_000 })
+    askLanguageMine({ task: "idioma-conversa", prompt: "[COMECAR]", context }, { signal: controller.signal, timeoutMs: 45_000 })
       .then((reply) => {
         // resposta que chegou depois de a tela fechar (ou do remonte do StrictMode) não entra
         if (controller.signal.aborted) return;
@@ -164,7 +164,7 @@ export function Conversa({
     const previous = [...history.current];
     history.current.push({ role: "user", text: clean });
     try {
-      const reply = await askLanguageMine({ task: "idioma-conversa", prompt, context, history: previous }, { signal: abort.current?.signal, timeoutMs: 25_000 });
+      const reply = await askLanguageMine({ task: "idioma-conversa", prompt, context, history: previous }, { signal: abort.current?.signal, timeoutMs: 45_000 });
       const parsed = parseConversationReply(reply);
       if (!parsed) throw new Error("formato");
       grade(parsed.score, parsed.correction, parsed.tip);

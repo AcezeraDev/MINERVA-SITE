@@ -113,6 +113,20 @@ function validateFlashcards(reply, minimum) {
   return valid.length >= minimum ? "" : `flashcards incompletos (${valid.length}/${minimum})`;
 }
 
+/**
+ * Correcao do roleplay que trocou a pessoa: o aluno falou de si ("i from
+ * brazil") e a correcao voltou "You are from Brazil". Ensina errado, entao a
+ * resposta e recusada e a proxima tentativa entra.
+ */
+export function languageCorrectionIssue(prompt, reply) {
+  const said = String(prompt || "").split("\n")[0].trim().toLowerCase();
+  const correction = (String(reply || "").match(/^\s*\**\s*CORRE[CÇ][AÃ]O\s*\**\s*:\s*(.+)$/im)?.[1] || "").trim().toLowerCase();
+  if (!said || said === "[comecar]" || !correction || /^ok\b/.test(correction)) return "";
+  const aboutSelf = /^(hi|hello|yes|no|ok|okay|oh|well|um)?[\s,!.]*(i\b|i'm\b|im\b|my\b)/.test(said);
+  const nowYou = /^(oh,?\s*)?(you\b|you're\b|your\b)/.test(correction);
+  return aboutSelf && nowYou ? "correcao trocou a pessoa (I virou you)" : "";
+}
+
 export function replyQualityIssue({ task = "", reply = "", prompt = "", finishReason = "" } = {}) {
   const cleanTask = String(task || "").trim();
   const text = String(reply || "").trim();
@@ -138,7 +152,8 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
     return valid >= minimum ? "" : `sequencias incompletas (${valid}/${minimum})`;
   }
   if (cleanTask === "idioma-conversa") {
-    return /^\s*MINE\s*:\s*\S/im.test(text) ? "" : "fala do roleplay sem o rotulo MINE";
+    if (!/^\s*MINE\s*:\s*\S/im.test(text)) return "fala do roleplay sem o rotulo MINE";
+    return languageCorrectionIssue(prompt, text);
   }
   if (cleanTask === "mindmap") {
     const branches = matches(text, /^RAMO:\s*.+$/gim).length;
