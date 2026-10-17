@@ -3,6 +3,7 @@
 // ajustados para portugues do Brasil e para o formato que o frontend renderiza.
 
 import { idiomaPerfectBonus, xpPerAction } from "../shared/xp.mjs";
+import { codeSkillsText, pickCodeSkills } from "./minecode-skills.mjs";
 
 const MINERVA_PRODUCT_GUIDE = `
 GUIA DO PROPRIO MINERVA (fonte de verdade sobre o site)
@@ -530,7 +531,8 @@ ${context || "Conversa livre em ingles basico."}`;
  * direto para o editor. O cliente le o ULTIMO bloco de codigo da resposta
  * (readCodeReply em shared/code-run.mjs) e troca o arquivo inteiro por ele.
  */
-export function buildMineCodeInstruction(context) {
+export function buildMineCodeInstruction(context, { prompt = "", history = [] } = {}) {
+  const skills = codeSkillsText(pickCodeSkills({ prompt, context, history }));
   return `Voce e a Mine no MineCode, o editor de codigo do Minerva, programando junto com um estudante brasileiro de escola (ensino fundamental ou medio). O contexto abaixo traz a linguagem aberta, o arquivo atual do editor e a ultima saida do programa.
 
 O que voce faz:
@@ -547,12 +549,12 @@ Formato da resposta, nesta ordem:
 Regras do codigo:
 - Python roda no navegador (Pyodide): use so a biblioteca padrao (random, math, datetime...) e numpy; nada de tkinter, turtle, pygame, requests ou arquivos. Mostre resultados com print(). input() funciona: as respostas vem do campo "Entradas", uma por linha.
 - JavaScript roda sem pagina (sem DOM, sem document): use console.log para mostrar resultados.
-- HTML: arquivo completo com <!doctype html>, <meta charset>, <meta name="viewport">, <title>, CSS em <style> e JS em <script>, sem arquivos externos, sem frameworks e sem imagens de fora (use gradientes, emojis e SVG inline). Capriche no design: moderno, responsivo, cores harmonicas, botoes com hover, textos de verdade em portugues.
+- HTML: arquivo completo com <!doctype html>, <meta charset>, <meta name="viewport">, <title>, CSS em <style> e JS em <script>, sem imagens de fora (use gradientes, emojis e SVG inline). De fora so entram Google Fonts e as bibliotecas que as skills abaixo liberam (three.js e GSAP, nas versoes indicadas); nada de React, Vue, Tailwind ou jQuery. Capriche no design: moderno, responsivo, cores harmonicas, botoes com hover, textos de verdade em portugues.
 - Nomes de variaveis claros (em portugues tudo bem) e comentarios curtos em portugues nas partes importantes. Codigo no nivel de um estudante: claro antes de esperto.
 - Se a ultima saida mostra um erro, explique a causa em uma frase e corrija.
 
 Sem tabelas e sem titulos com #. Seja animada e direta, como uma colega que manja de programacao.
-
+${skills ? `\n${skills}\n` : ""}
 Contexto:
 ${context || "Editor vazio."}`;
 }
@@ -583,7 +585,7 @@ const TASK_PROMPTS = {
   sequencia: buildSequenceInstruction,
 };
 
-export function buildInstructionForTask(task, context) {
+export function buildInstructionForTask(task, context, request = {}) {
   const build = TASK_PROMPTS[String(task || "").trim()];
-  return build ? build(context) : buildSystemInstruction(context);
+  return build ? build(context, request) : buildSystemInstruction(context);
 }

@@ -80,3 +80,28 @@ test("o prompt do MineCode exige o arquivo completo e respeita o que roda no nav
   assert.match(prompt, /nada de tkinter/);
   assert.match(prompt, /Linguagem aberta no editor: Python/);
 });
+
+test("skills do MineCode: entram só quando o pedido pede site, animação ou 3D", async () => {
+  const { pickCodeSkills } = await import("../mine/minecode-skills.mjs");
+  const { buildInstructionForTask } = await import("../mine/prompts.mjs");
+  const py = "Linguagem aberta no editor: Python (arquivo main.py).";
+  const html = "Linguagem aberta no editor: HTML (arquivo index.html).";
+  assert.deepEqual(pickCodeSkills({ prompt: "faz um jogo da forca com menu", context: py }), []);
+  assert.deepEqual(pickCodeSkills({ prompt: "o que é uma lista?", context: py }), []);
+  assert.deepEqual(pickCodeSkills({ prompt: "faz um site de padaria", context: py }), ["frontend"]);
+  assert.deepEqual(pickCodeSkills({ prompt: "coloca animações bonitas", context: html }), ["frontend", "motion"]);
+  assert.deepEqual(pickCodeSkills({ prompt: "cria um sistema solar em 3D", context: py }), ["frontend", "motion", "three"]);
+  // arquivo que já usa three.js continua 3D no pedido seguinte
+  const threeCode = `${html}\nimport * as THREE from "three";`;
+  assert.deepEqual(pickCodeSkills({ prompt: "deixa mais rápido", context: threeCode }), ["frontend", "motion", "three"]);
+  // a fala anterior do estudante também conta
+  assert.ok(pickCodeSkills({ prompt: "muda a cor", context: py, history: [{ role: "user", text: "faz um cubo girando" }] }).includes("three"));
+
+  const pyPrompt = buildInstructionForTask("minecode", py, { prompt: "soma dois números" });
+  assert.doesNotMatch(pyPrompt, /SKILL/);
+  const threePrompt = buildInstructionForTask("minecode", py, { prompt: "planeta 3d girando" });
+  assert.match(threePrompt, /SKILL 3D/);
+  assert.match(threePrompt, /three@0\.170\.0/);
+  assert.match(threePrompt, /SKILL FRONT-END/);
+  assert.ok(threePrompt.indexOf("SKILL") < threePrompt.indexOf("Contexto:"));
+});

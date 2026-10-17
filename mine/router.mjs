@@ -124,7 +124,7 @@ function gameAttemptMs() {
  * Com `onDelta` a resposta vem em streaming; sem ele, de uma vez so.
  */
 async function attemptModel({ model, task, prompt, context, history, attachments, maxTokens, timeoutMs, signal, fallback, extraSystem = [], onDelta, onReasoning, tools, toolChoice }) {
-  const systemContent = buildInstructionForTask(task, context);
+  const systemContent = buildInstructionForTask(task, context, { prompt, history });
   const messages = buildMessages({ systemContent, history, prompt, attachments, allowImages: model.capabilities.image, extraSystem });
 
   const startedAt = Date.now();
