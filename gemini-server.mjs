@@ -174,7 +174,7 @@ export async function handleGeminiRequest(req, res) {
     // portfolio saia cortado e o controle de qualidade recusava a resposta.
     const serverTokenCap =
       task === "minecode"
-        ? clampNumber(process.env.MINE_CODE_MAX_OUTPUT_TOKENS, 1000, 16000, 8000)
+        ? clampNumber(process.env.MINE_CODE_MAX_OUTPUT_TOKENS, 1000, 16000, 16000)
         : clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
     const requestedTokens = clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
     const maxTokens = Math.min(requestedTokens, serverTokenCap);

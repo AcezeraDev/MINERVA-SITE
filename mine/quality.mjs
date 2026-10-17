@@ -2,6 +2,9 @@
 // trocados com frequencia e podem devolver somente o primeiro caractere de uma
 // dica/definicao; esses lotes nao podem chegar aos jogos ou simulados.
 
+import { Script } from "node:vm";
+
+import { readCodeReply } from "../shared/code-run.mjs";
 import { parseSequencePuzzles } from "../shared/game-core.mjs";
 
 function matches(text, pattern) {
@@ -127,6 +130,165 @@ export function languageCorrectionIssue(prompt, reply) {
   return aboutSelf && nowYou ? "correcao trocou a pessoa (I virou you)" : "";
 }
 
+// ---------------------------------------------------------------------------
+// MineCode (out/2026): o z-ai/glm-5.3-flash as vezes deixa uma palavra perdida
+// no meio do arquivo ("erate" numa linha do CSS, "researcher" no JS). O CSS
+// segue funcionando pela metade e a palavra no JS da ReferenceError so quando
+// roda, entao nada disso aparece no streaming. Aqui o ultimo bloco de codigo da
+// resposta e conferido: sintaxe do JS e palavras sozinhas no CSS e no JS.
+// Python passa direto (nao ha parser dele no servidor).
+
+const JS_SCRIPT_TYPES = new Set(["", "text/javascript", "application/javascript", "text/ecmascript", "application/ecmascript", "module"]);
+
+// Palavras que podem ficar sozinhas numa linha de JS valido.
+const JS_LONE_KEYWORDS = new Set(["break", "continue", "return", "debugger", "else", "try", "finally", "do", "default", "this", "super", "null", "true", "false", "undefined", "async", "await", "yield", "static", "get", "set", "let", "var", "const", "new", "case", "throw", "typeof", "void", "delete", "in", "of", "instanceof", "function", "class", "extends", "import", "export", "from", "as"]);
+
+const LONE_WORD = /^[A-Za-z_$][\w$-]*$/;
+
+function lineAt(text, index) {
+  return text.slice(0, index).split("\n").length;
+}
+
+function blankKeepingLines(text) {
+  return text.replace(/[^\n]/g, " ");
+}
+
+/** Pedacos do arquivo que dao para conferir: o JS inteiro, ou os <script>/<style> do HTML. */
+function checkableParts(code, lang) {
+  if (lang === "javascript") return [{ kind: "js", code, firstLine: 1 }];
+  if (lang !== "html") return [];
+  const parts = [];
+  for (const match of code.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
+    const type = (match[1].match(/\btype\s*=\s*["']?([^"'\s>]*)/i)?.[1] || "").toLowerCase();
+    // importmap, JSON, text/babel e afins nao sao JS puro.
+    if (!JS_SCRIPT_TYPES.has(type) || !match[2].trim()) continue;
+    const start = match.index + match[0].indexOf(">") + 1;
+    parts.push({ kind: "js", code: match[2], firstLine: lineAt(code, start) });
+  }
+  for (const match of code.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+    const start = match.index + match[0].indexOf(">") + 1;
+    parts.push({ kind: "css", code: match[1], firstLine: lineAt(code, start) });
+  }
+  return parts;
+}
+
+/**
+ * Sintaxe do JS sem executar nada: o vm so compila. import/export saem antes
+ * (o Script do vm nao conhece modulo) e o corpo vai dentro de uma funcao
+ * async, que aceita o await de topo dos <script type="module">.
+ */
+function jsSyntaxIssue(source) {
+  const body = source
+    .replace(/^[ \t]*import\b(?![ \t]*[.(])[\s\S]*?["'][^"'\n]*["'][ \t]*;?/gm, blankKeepingLines)
+    .replace(/^[ \t]*export[ \t]*(?:\*[^;\n]*|\{[^}]*\}[^;\n]*);?/gm, blankKeepingLines)
+    .replace(/^([ \t]*)export[ \t]+default\b/gm, "$1void")
+    .replace(/^([ \t]*)export\b/gm, "$1      ")
+    .replace(/\bimport\.meta\b/g, "__meta__");
+  try {
+    new Script(`(async function () {\n${body}\n})`, { filename: "minecode.js" });
+    return null;
+  } catch (error) {
+    const line = Number(String(error?.stack || "").match(/minecode\.js:(\d+)/)?.[1] || 0);
+    return { message: String(error?.message || "erro de sintaxe"), line: line > 1 ? line - 1 : 0 };
+  }
+}
+
+function previousLine(lines, index) {
+  for (let i = index - 1; i >= 0; i -= 1) if (lines[i].trim()) return lines[i].trim();
+  return "";
+}
+
+function nextLine(lines, index) {
+  for (let i = index + 1; i < lines.length; i += 1) if (lines[i].trim()) return lines[i].trim();
+  return "";
+}
+
+/**
+ * Linha com uma palavra so entre duas declaracoes de CSS. Seletor quebrado em
+ * linhas ("h1,\nh2 {") e valor que continua ("font-family:\n  serif;") nao
+ * entram: a linha anterior termina em ; { } (ou e o comeco do <style>) e a
+ * seguinte nao abre regra.
+ */
+function strayCssLines(css) {
+  const lines = css.replace(/\/\*[\s\S]*?\*\//g, blankKeepingLines).split("\n");
+  const stray = [];
+  lines.forEach((raw, index) => {
+    const line = raw.trim();
+    if (!LONE_WORD.test(line)) return;
+    const before = previousLine(lines, index);
+    const after = nextLine(lines, index);
+    if (before && !/[;{}]$/.test(before)) return;
+    if (/^[{,]/.test(after) || /^[^;]*\{/.test(after)) return;
+    stray.push(index);
+  });
+  return stray;
+}
+
+/**
+ * Identificador sozinho numa linha de JS, entre comandos, que nao aparece em
+ * mais nenhum lugar do script: e sintaxe valida ("researcher" vira uma
+ * expressao), mas so serve para dar ReferenceError quando roda.
+ */
+function strayJsLines(js) {
+  const lines = js.split("\n");
+  const stray = [];
+  lines.forEach((raw, index) => {
+    const line = raw.trim();
+    if (!/^[A-Za-z_$][\w$]*$/.test(line) || JS_LONE_KEYWORDS.has(line)) return;
+    const before = previousLine(lines, index).replace(/\s*\/\/.*$/, "");
+    const after = nextLine(lines, index);
+    if (before && !/[;{})]$/.test(before)) return;
+    if (/^[.([`=+\-*/%?:,&|<>]/.test(after) && !/^\/[/*]/.test(after)) return;
+    const uses = js.match(new RegExp(`(?<![\\w$])${line.replace(/\$/g, "\\$")}(?![\\w$])`, "g"))?.length || 0;
+    if (uses > 1) return;
+    stray.push(index);
+  });
+  return stray;
+}
+
+/**
+ * Problemas do codigo final de uma resposta do MineCode.
+ * `strayLines` sao linhas (base 1, no bloco de codigo) que so tem a palavra
+ * perdida; `syntax` e o erro do parser de JS, quando sobra algum.
+ */
+export function mineCodeIssues(reply) {
+  const { code, lang, open } = readCodeReply(reply);
+  if (!lang || !code.trim()) return { issue: "", strayLines: [], syntax: "" };
+  if (open) return { issue: "bloco de codigo incompleto", strayLines: [], syntax: "" };
+  const strayLines = [];
+  let syntax = "";
+  for (const part of checkableParts(code, lang)) {
+    const found = part.kind === "css" ? strayCssLines(part.code) : strayJsLines(part.code);
+    for (const index of found) strayLines.push(part.firstLine + index);
+    if (part.kind === "js" && !syntax) {
+      const error = jsSyntaxIssue(part.code);
+      if (error) syntax = `${error.message}${error.line ? ` (linha ${part.firstLine + error.line - 1})` : ""}`;
+    }
+  }
+  strayLines.sort((a, b) => a - b);
+  const words = strayLines.map((line) => `"${code.split("\n")[line - 1].trim()}" na linha ${line}`);
+  const problems = [...(words.length ? [`palavra solta no codigo: ${words.join(", ")}`] : []), ...(syntax ? [`erro de sintaxe no JavaScript: ${syntax}`] : [])];
+  return { issue: problems.join("; "), strayLines, syntax };
+}
+
+/**
+ * Conserto sem gastar outra chamada: tira as linhas que so tem a palavra
+ * perdida. So vale se o arquivo sai limpo depois; erro de sintaxe que sobra
+ * fica para o proximo modelo. Devolve "" quando nao da para consertar assim.
+ */
+export function repairMineCode(reply) {
+  const text = String(reply || "").replace(/\r/g, "");
+  const { strayLines, syntax } = mineCodeIssues(text);
+  if (!strayLines.length || syntax) return "";
+  const { code } = readCodeReply(text);
+  const at = text.lastIndexOf(code.replace(/\n$/, ""));
+  if (at < 0) return "";
+  const drop = new Set(strayLines.map((line) => line - 1));
+  const fixed = code.split("\n").filter((_line, index) => !drop.has(index)).join("\n");
+  const repaired = text.slice(0, at) + fixed.replace(/\n$/, "") + text.slice(at + code.replace(/\n$/, "").length);
+  return mineCodeIssues(repaired).issue ? "" : repaired;
+}
+
 export function replyQualityIssue({ task = "", reply = "", prompt = "", finishReason = "" } = {}) {
   const cleanTask = String(task || "").trim();
   const text = String(reply || "").trim();
@@ -160,6 +322,7 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
     const items = matches(text, /^-\s+.+:\s+.+$/gim).length;
     return branches === 6 && items === 24 ? "" : `mapa mental incompleto (${branches} ramos, ${items} itens)`;
   }
+  if (cleanTask === "minecode") return mineCodeIssues(text).issue;
   if (cleanTask === "plan") {
     return /^DIA\s+\d+\s*\|\s*.+\|\s*.+\|\s*.+$/im.test(text) ? "" : "plano de estudos fora do formato";
   }

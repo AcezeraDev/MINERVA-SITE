@@ -13,7 +13,7 @@ export async function streamMineCode(
   const response = await fetch("/api/mine/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ task: "minecode", prompt: payload.prompt, context: payload.context, history: payload.history, stream: true, maxOutputTokens: 8000 }),
+    body: JSON.stringify({ task: "minecode", prompt: payload.prompt, context: payload.context, history: payload.history, stream: true, maxOutputTokens: 16000 }),
     signal: options.signal,
   });
   const type = response.headers.get("content-type") || "";

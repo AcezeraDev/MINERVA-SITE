@@ -1,8 +1,9 @@
 import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
+import { pickCodeSkills } from "./minecode-skills.mjs";
 import { buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
 import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, extractSuggestions, imageStyleFrom, previousGalleryStyle, withImageStyle } from "../shared/chat-media.mjs";
-import { replyQualityIssue } from "./quality.mjs";
+import { repairMineCode, replyQualityIssue } from "./quality.mjs";
 import { buildSearchQuery, cleanQueries, freshenQueries, matchesSearchTopic, matchesSourceScope, planSearchQueries, resultLimit, searchMany, searchSourcePolicy, searchWeb, WEB_SEARCH_TOOL, webSearchFailedInstruction, webSearchInstruction, webSearchMode } from "./web.mjs";
 import { readTopPages } from "./page-reader.mjs";
 import { callProvider, callProviderStream, MineError, providerAvailable, providerConfigured } from "./providers.mjs";
@@ -120,6 +121,17 @@ function gameAttemptMs() {
 // ineditismo no cliente.
 
 /**
+ * Sites (skill de front-end) pedem mais raciocinio: com "low" o GLM entregava
+ * paginas genericas. Codigo curto de Python/JS segue com o padrao do modelo.
+ * MINE_CODE_SITE_REASONING_EFFORT troca o nivel dos sites.
+ */
+function codeModelFor({ prompt, context, history }) {
+  if (!pickCodeSkills({ prompt, context, history }).includes("frontend")) return MINE_CODE_MODEL;
+  const effort = String(process.env.MINE_CODE_SITE_REASONING_EFFORT || "high").trim().toLowerCase();
+  return { ...MINE_CODE_MODEL, providerParams: { reasoning_effort: ["low", "high", "max"].includes(effort) ? effort : "high" } };
+}
+
+/**
  * Uma tentativa contra um modelo ja resolvido.
  * Com `onDelta` a resposta vem em streaming; sem ele, de uma vez so.
  */
@@ -161,10 +173,24 @@ async function attemptModel({ model, task, prompt, context, history, attachments
       return { toolQueries: cleanQueries(search.arguments?.consultas ?? search.arguments?.consulta), reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs };
     }
 
-    const reply = cleanReply(result.content, { prompt });
-    const qualityIssue = replyQualityIssue({ task, reply, prompt, finishReason: result.finishReason });
+    let reply = cleanReply(result.content, { prompt });
+    let qualityIssue = replyQualityIssue({ task, reply, prompt, finishReason: result.finishReason });
+    // MineCode com palavra perdida no codigo: se tirar as linhas da palavra
+    // deixa o arquivo limpo, o conserto sai daqui mesmo, sem outra chamada.
+    if (qualityIssue && task === "minecode" && result.finishReason !== "length") {
+      const repaired = repairMineCode(reply);
+      if (repaired) {
+        console.log(`[mine] minecode=consertado model=${model.providerModel} ${qualityIssue.replace(/"[^"]*"/g, "\"…\"")}`);
+        reply = repaired;
+        qualityIssue = "";
+      }
+    }
     if (qualityIssue) {
-      throw new MineError(`Resposta rejeitada pelo controle de qualidade: ${qualityIssue}.`, { code: "empty", retryable: true });
+      const error = new MineError(`Resposta rejeitada pelo controle de qualidade: ${qualityIssue}.`, { code: "empty", retryable: true });
+      // O codigo com defeito ainda serve de ultimo recurso: e melhor que nada
+      // se nenhum outro modelo conseguir refazer a tempo.
+      if (task === "minecode" && result.finishReason !== "length") Object.assign(error, { badCode: { reply, issue: qualityIssue, reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs } });
+      throw error;
     }
 
     return { reply, reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs };
@@ -288,14 +314,16 @@ export async function runMineRequest({
   const deadline = Date.now() + (gameTask ? gameBudgetMs() : resolveBudgetMs());
   // Tarefas estruturadas sao curtas e sem streaming: 60 s por tentativa basta
   // e deixa a reserva entrar a tempo se o principal travar.
-  const perAttemptMs = gameTask ? gameAttemptMs() : cleanTask ? Math.min(60_000, resolveTimeoutMs()) : resolveTimeoutMs();
+  // o MineCode escreve arquivos inteiros em streaming (um site 3D passa de 1
+  // minuto): fica com o teto do chat, nao com os 60 s das tarefas curtas
+  const perAttemptMs = gameTask ? gameAttemptMs() : cleanTask && cleanTask !== "minecode" ? Math.min(60_000, resolveTimeoutMs()) : resolveTimeoutMs();
   const minAttemptMs = gameTask ? 3_500 : MIN_ATTEMPT_MS;
 
   const principal = cleanTask ? MINE_TASK_MODEL : MINE_MODEL;
   const candidates = gameTask
     ? [MINE_FAST_MODEL, MINE_TASK_MODEL]
     : cleanTask === "minecode"
-      ? [MINE_CODE_MODEL, MINE_TASK_MODEL]
+      ? [codeModelFor({ prompt, context, history }), MINE_TASK_MODEL]
       : [principal, MINE_FAST_MODEL];
   const seen = new Set();
   const chain = candidates.filter((model) => {
@@ -345,6 +373,34 @@ export async function runMineRequest({
   let lastError = null;
   let committed = false;
   let reasoning = "";
+  // MineCode com codigo quebrado (palavra perdida, erro de sintaxe) que o
+  // conserto local nao resolveu. O editor ja recebeu o texto ao vivo, mas o
+  // evento final ("done") substitui tudo no cliente: entao o proximo modelo
+  // da cadeia refaz o arquivo SEM streaming, e a versao dele vai no "done".
+  // Se nenhum conseguir, a primeira versao e entregue como antes.
+  let badCode = null;
+  let streamOff = false;
+  let fixNote = [];
+
+  const deliver = (result) => {
+    // O marcador de sugestoes sai do texto e vira lista a parte; nas tarefas
+    // ele nunca foi pedido, entao a resposta passa intacta.
+    const { text: extracted, suggestions } = cleanTask ? { text: result.reply, suggestions: [] } : extractSuggestions(result.reply);
+    // O modelo as vezes esquece o terceiro campo; a versao final (que vale
+    // mais que o streaming) sai com o estilo que o estudante pediu.
+    const reply = imageStyle ? withImageStyle(extracted, imageStyle) : extracted;
+    return {
+      ...result,
+      reply: reply || result.reply,
+      reasoning: (reasoning || result.reasoning || "").trim(),
+      suggestions,
+      alias: MINE_MODEL.alias,
+      displayName: MINE_MODEL.displayName,
+      sources: web.sources,
+      queries: web.queries || [],
+      notice: web.notice,
+    };
+  };
 
   for (let index = 0; index < chain.length; index += 1) {
     const model = chain[index];
@@ -364,18 +420,20 @@ export async function runMineRequest({
         history,
         attachments,
         maxTokens,
-        timeoutMs: Math.min(perAttemptMs, remaining),
+        // Refazer o arquivo inteiro sem streaming demora mais que uma
+        // tentativa comum de tarefa: usa o que sobra do orcamento.
+        timeoutMs: Math.min(badCode ? resolveTimeoutMs() : perAttemptMs, remaining),
         signal,
         fallback: index > 0 && !gameTask,
-        extraSystem: [...web.extraSystem, ...baseSystem],
+        extraSystem: [...web.extraSystem, ...baseSystem, ...fixNote],
         tools,
-        onDelta: onDelta
+        onDelta: onDelta && !streamOff
           ? (text) => {
               committed = true;
               onDelta(text);
             }
           : undefined,
-        onReasoning: onReasoning
+        onReasoning: onReasoning && !streamOff
           ? (text) => {
               reasoning += text;
               onReasoning(text);
@@ -390,27 +448,18 @@ export async function runMineRequest({
         index -= 1;
         continue;
       }
-      // O marcador de sugestoes sai do texto e vira lista a parte; nas tarefas
-      // ele nunca foi pedido, entao a resposta passa intacta.
-      const { text: extracted, suggestions } = cleanTask ? { text: result.reply, suggestions: [] } : extractSuggestions(result.reply);
-      // O modelo as vezes esquece o terceiro campo; a versao final (que vale
-      // mais que o streaming) sai com o estilo que o estudante pediu.
-      const reply = imageStyle ? withImageStyle(extracted, imageStyle) : extracted;
-      return {
-        ...result,
-        reply: reply || result.reply,
-        reasoning: (reasoning || result.reasoning || "").trim(),
-        suggestions,
-        alias: MINE_MODEL.alias,
-        displayName: MINE_MODEL.displayName,
-        sources: web.sources,
-        queries: web.queries || [],
-        notice: web.notice,
-      };
+      return deliver(result);
     } catch (error) {
       lastError = error;
-      // Texto ja entregue ao navegador: nao da para recomecar com outro modelo.
-      if (committed) throw error;
+      if (error?.badCode) {
+        badCode ||= error.badCode;
+        fixNote = [`Atencao: uma versao anterior deste arquivo saiu com defeito (${error.badCode.issue}). Escreva o arquivo inteiro de novo, revisando que nenhuma palavra solta fique no meio do CSS ou do JavaScript e que a sintaxe esteja valida.`];
+        // Ja foi para a tela: as proximas tentativas vem inteiras, sem streaming.
+        if (committed) streamOff = true;
+      } else if (committed) {
+        // Texto ja entregue ao navegador: nao da para recomecar com outro modelo.
+        throw error;
+      }
       // Provedor que nao aceita ferramentas responde 400: a mesma tentativa
       // repete sem ela, e o servidor para de oferecer por um tempo.
       if (tools && !error?.retryable && (error?.status === 400 || error?.status === 422)) {
@@ -425,9 +474,16 @@ export async function runMineRequest({
         index -= 1;
         continue;
       }
-      if (!error?.retryable) throw error;
+      if (!error?.retryable) {
+        if (badCode && error?.code !== "aborted") break;
+        throw error;
+      }
     }
   }
 
+  if (badCode && !signal?.aborted) {
+    console.log("[mine] minecode=entregue_com_defeito nenhum modelo refez o arquivo a tempo");
+    return deliver(badCode);
+  }
   throw lastError || new MineError("Nenhum modelo conseguiu responder.", { code: "unavailable" });
 }

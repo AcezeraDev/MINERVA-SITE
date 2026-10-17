@@ -14,26 +14,38 @@ export const CODE_CDN = {
   scrollTrigger: "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js",
 };
 
-export const FRONTEND_SKILL = `SKILL FRONT-END (sites e paginas):
-Direcao visual
-- Antes de codar, escolha UMA direcao que combine com o assunto (ex.: site de padaria = tons quentes de pao e creme, tipografia serifada amigavel; site de games = escuro com um neon so; site de ciencias = azul profundo e branco limpo). Nada de gradiente roxo-azul generico em tudo.
-- Defina tokens em :root: --bg, --surface, --text, --muted, --accent, --accent-2, --radius, --shadow e uma escala de espaco (4, 8, 12, 16, 24, 32, 48, 64 px). Use as variaveis no resto do CSS.
-- Tipografia: no maximo 2 familias. Pode usar Google Fonts com <link> (ex.: "Inter", "Poppins", "Fraunces", "Space Grotesk"). Titulos com font-size: clamp(2rem, 5vw, 3.5rem), line-height 1.1, letter-spacing levemente negativo; texto 1rem a 1.125rem, line-height 1.6, largura maxima ~65ch.
-- Contraste de texto legivel (texto escuro em fundo claro ou o contrario, nunca cinza claro em branco).
-Layout
-- Mobile-first: comeca numa coluna e abre com @media (min-width: 768px). Use CSS Grid para secoes e cards (grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))) e Flexbox para barras. Container com max-width ~1100px e padding lateral de 16 a 24px. Nunca pode haver rolagem horizontal.
-- Estrutura semantica: <header> com nav, <main> com <section>s, <footer>. Uma pagina boa tem: hero com titulo forte + subtitulo + botao de acao, 2 a 4 secoes de conteudo real, e rodape.
-- Hierarquia clara: um elemento de destaque por secao; respiro generoso entre secoes (64 a 96px no desktop).
-Componentes
-- Botoes e links com estados :hover, :focus-visible (outline visivel) e :active; cursor: pointer; area de toque minima 44px.
-- Cards com borda suave ou sombra leve, raio consistente, e conteudo de verdade.
-- Imagens: nada de arquivo externo; desenhe com SVG inline, gradientes, formas CSS ou emoji grande. Icones em SVG inline simples.
-- Formularios com <label>, validacao em JS e mensagem de sucesso/erro escrita na pagina.
-Conteudo e JS
-- Textos reais em portugues do Brasil sobre o tema pedido; nunca lorem ipsum.
-- JS com addEventListener e funcoes pequenas. Nada de alert(), prompt() ou confirm() (a previa bloqueia): mostre mensagens num elemento da pagina.
-- localStorage so dentro de try/catch (na previa ele lanca erro); a pagina tem que funcionar sem ele.
-- Acessibilidade: lang="pt-BR", alt/aria-label onde precisa, ordem de foco natural.`;
+export const FRONTEND_SKILL = `SKILL FRONT-END (sites e paginas). O padrao e site de estudio de design premiado, nao de template.
+
+1. Escolha UMA direcao de arte abaixo pelo assunto do site (ou a que o estudante pedir) e siga as cores e fontes dela EXATAMENTE. Nao misture direcoes e nao invente paleta. Google Fonts por <link> com display=swap.
+- EDITORIAL (portfolio, escrita, historia, escola, receitas): fundo #f3eee4, texto #1b1a17, apagado #6b665c, destaque #e4572e, linhas #1b1a17 a 12%. Fontes "Fraunces" (titulos, peso 600, itálico em uma palavra-chave) + "Inter". Assinatura: titulos enormes de revista, filetes de 1px, secoes numeradas (01, 02...), uma coluna de texto estreita ao lado de uma grande.
+- ARCADE NEON (games, musica, tecnologia, eventos): fundo #0b0b10, superficie #15151d, texto #f2f2f5, destaques #c6ff3d e #ff3d8b (so esses dois). Fontes "Space Grotesk" + "JetBrains Mono" para rotulos. Assinatura: grade fina de fundo, rotulos em mono MAIUSCULO, bordas 1px brilhando no hover, numeros grandes.
+- NATUREZA (ciencias, biologia, meio ambiente, esportes ao ar livre): fundo #0f2a24, superficie #163a32, texto #eaf4ee, destaque #ffb547, secundaria #7fd1a8. Fontes "Fraunces" + "Manrope". Assinatura: formas organicas em SVG, cantos bem arredondados, ilustracao SVG grande de folha/onda/montanha.
+- POP ESCOLAR (criancas, jogos educativos, feiras, clubes): fundo #fff7e0, texto #1d1d1b, blocos #ff6b6b, #4ecdc4, #ffd93d, #5b8def. Fontes "Baloo 2" + "Nunito". Assinatura: contorno preto de 2-3px e sombra deslocada solida (box-shadow: 6px 6px 0 #1d1d1b), cartoes coloridos inclinados de leve.
+- ESPACO PREMIUM (astronomia, 3D, fisica, startups): fundo #05060a, superficie rgba(255,255,255,.04), texto #e9ecf5, apagado #8a90a6, destaques #5ce1ff e #ffb86b. Fontes "Sora" + "Inter". Assinatura: vidro (superficie + borda 1px rgba(255,255,255,.08)), brilho radial SO atras do elemento principal, numeros em destaque.
+- SUICO MINIMAL (negocios, apresentacao, matematica, dados): fundo #ffffff, texto #111111, apagado #6e6e6e, destaque #0047ff. Fonte "Inter Tight" (pesos 400 e 800). Assinatura: grade rigida de 12 colunas, tipografia gigante, muito branco, um unico bloco de cor forte.
+Proibido como identidade principal: gradiente roxo/violeta para azul, fundo azul-marinho com roxo, "glassmorphism" em tudo, emoji como icone de titulo. Se o arquivo atual for so o exemplo inicial do editor (o cartao "Ola, eu sou a Ana"), NAO herde as cores nem o layout dele: comece do zero numa direcao acima (pode manter o nome da pessoa).
+
+2. Composicao do hero (a primeira tela decide tudo)
+- Ocupa a tela: min-height: 100svh, conteudo centralizado na vertical. Nunca metade da tela vazia: ou divide em 2 colunas (texto 55% + elemento visual 45%) ou centraliza com o visual grande ATRAS do texto.
+- Titulo gigante e curto: font-size: clamp(2.8rem, 7.5vw, 7rem); line-height: .95; letter-spacing: -0.03em; 2 ou 3 linhas no maximo; destaque UMA palavra (cor, italico ou sublinhado desenhado).
+- Acima do titulo um rotulo pequeno (ex.: "PORTFOLIO — 2026"); abaixo um subtitulo de 1-2 frases (max 34ch) e 2 botoes (um cheio, um contornado).
+- Um elemento visual protagonista e GRANDE (40 a 60% da tela): objeto 3D, ilustracao SVG detalhada, pilha de cartoes inclinados, mockup de celular/janela desenhado em CSS. Formas soltas pequenas espalhadas NAO contam como visual.
+- Uma faixa de prova abaixo do hero: 3 numeros grandes com legenda, ou uma fila de selos/tags.
+
+3. Resto da pagina
+- Hero + pelo menos 3 secoes, cada uma com layout DIFERENTE: grade de cartoes (com numero ou icone SVG e titulo forte), bloco dividido texto + visual, linha do tempo ou passos numerados, citacao grande, faixa final de chamada (CTA) com fundo de cor de destaque. Feche com rodape simples.
+- Container max-width 1200px, padding lateral clamp(16px, 4vw, 48px), espaco entre secoes clamp(72px, 10vw, 140px). Mobile-first; nunca rolagem horizontal.
+- Tokens em :root (--bg, --surface, --text, --muted, --accent, --accent-2, --radius, --line) e use so eles.
+- Detalhes que mostram capricho: ::selection com a cor de destaque, rotulos de secao numerados, filetes 1px, um grao sutil (SVG feTurbulence com opacity .05 sobre o fundo) nas direcoes escuras, transicoes de hover em tudo que e clicavel, :focus-visible visivel.
+- Imagens: nada de arquivo externo. Desenhe com SVG inline (ilustracoes com varias formas e cores da paleta), CSS ou canvas. Icones em SVG de traco simples.
+
+4. Conteudo e JS
+- Textos reais, especificos e com personalidade em portugues do Brasil sobre o tema; nunca lorem ipsum nem frases vazias ("bem-vindo ao meu site").
+- JS com addEventListener e funcoes pequenas. Nada de alert(), prompt() ou confirm() (a previa bloqueia): mostre mensagens na pagina. Formularios com <label> e validacao em JS.
+- localStorage so dentro de try/catch (na previa ele lanca erro).
+- Acessibilidade: lang="pt-BR", contraste forte, alt/aria-label onde precisa.
+
+5. Antes de entregar, confira: a direcao esta aplicada com as cores e fontes certas? O hero enche a tela e tem um visual protagonista grande? Ha 3+ secoes com layouts diferentes? Nada de roxo-azul generico? Funciona em 375px de largura? Se algo falhar, corrija antes de responder.`;
 
 export const MOTION_SKILL = `SKILL ANIMACAO:
 - Anime so transform e opacity (e filter leve em poucos elementos). Nunca anime width, height, top, left, margin ou box-shadow em loop: trava no celular.
@@ -61,7 +73,11 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 - Interacao: OrbitControls com enableDamping = true (chame controls.update() no loop); clique em objetos com THREE.Raycaster usando as coordenadas normalizadas do ponteiro.
 - Interface (titulo, botoes, placar, explicacao) em HTML por cima do canvas, com position: fixed e pointer-events so nos botoes.
 - Desempenho: reaproveite geometrias e materiais, ate alguns milhares de objetos com InstancedMesh, geometrias com poucos segmentos (esfera 32x32 basta).
-- Se o WebGL falhar (try/catch ao criar o renderer), mostre uma mensagem na pagina em vez de tela preta.`;
+- Se o WebGL falhar (try/catch ao criar o renderer), mostre uma mensagem na pagina em vez de tela preta.
+- Direcao de cena: o 3D e o protagonista, nao enfeite. Um objeto principal bem modelado (varias pecas agrupadas, ex.: planeta com aneis e luas, cristal facetado com Icosahedron detail 0 + flatShading, escultura de toros entrelacados, terreno de ondas com PlaneGeometry deformada) ocupando 40 a 60% da tela, enquadrado pela camera. Nada de 3 ou 4 formas pequenas soltas.
+- Como fundo de hero: canvas position fixed atras do conteudo; no desktop, desloque o objeto para o lado oposto ao texto (ex.: objeto.position.x = 2.2) e no celular centralize atras com opacidade menor. O texto precisa de contraste: um degradê do --bg para transparente por cima do canvas do lado do texto.
+- Cores e luz vindas da direcao de arte do site (destaques como cor das luzes ou emissive). Iluminacao de estudio: uma luz principal, uma de contorno colorida atras do objeto (rim light) e ambiente fraco.
+- Vida: rotacao lenta, flutuacao com Math.sin(tempo) e paralaxe leve seguindo o ponteiro (lerp da rotacao ate a posicao do mouse). Movimento suave e continuo, nada de giro rapido.`;
 
 // "menu", "tela" e "loja" ficam de fora: em Python sao menu de terminal e
 // sistema de loja, e a skill de site empurraria a Mine para HTML.
