@@ -168,7 +168,14 @@ export async function handleGeminiRequest(req, res) {
     // Out/2026: o teto subiu de 2600 para 8000. Com raciocinio "medium" o
     // modelo gastava boa parte dos 1500 pedidos pelo chat so pensando, e
     // explicacoes longas saiam cortadas ou encurtadas.
-    const serverTokenCap = clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
+    // O MineCode tem teto proprio: ele devolve o ARQUIVO inteiro (um site
+    // completo passa facil de 4 mil tokens, fora o raciocinio). Com o teto
+    // geral de producao (MINE_MAX_OUTPUT_TOKENS, de antes de out/2026) um
+    // portfolio saia cortado e o controle de qualidade recusava a resposta.
+    const serverTokenCap =
+      task === "minecode"
+        ? clampNumber(process.env.MINE_CODE_MAX_OUTPUT_TOKENS, 1000, 16000, 8000)
+        : clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
     const requestedTokens = clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
     const maxTokens = Math.min(requestedTokens, serverTokenCap);
     const wantsStream = payload.stream === true;
