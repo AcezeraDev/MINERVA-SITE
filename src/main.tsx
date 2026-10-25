@@ -102,6 +102,8 @@ import {
   ThumbsDown,
   Mic,
   MicOff,
+  Repeat,
+  Clock,
 } from "lucide-react";
 import "./fonts";
 import "./index.css";
@@ -224,6 +226,7 @@ import {
   unresolvedGameErrors,
   type GameAnswer,
 } from "../shared/game-meta.mjs";
+import { setTaskDone, type TaskKind, type TaskPriority, type TaskRepeat } from "../shared/agenda.mjs";
 
 // Telas pesadas e usadas por poucos (ou só às vezes) chegam sob demanda: o
 // pacote inicial fica com o que todo aluno abre ao entrar.
@@ -232,6 +235,8 @@ const GamesView = React.lazy(() => import("./games/GamesPanel").then((m) => ({ d
 const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({ default: m.AtelieView })));
 const IdiomasView = React.lazy(() => import("./idiomas/IdiomasView").then((m) => ({ default: m.IdiomasView })));
 const MesaDeEstudo = React.lazy(() => import("./caderno/MesaDeEstudo"));
+const AgendaView = React.lazy(() => import("./agenda/AgendaView").then((m) => ({ default: m.AgendaView })));
+const TaskEditor = React.lazy(() => import("./agenda/TaskEditor").then((m) => ({ default: m.TaskEditor })));
 
 /**
  * A mesa 3D só no computador (tela larga e mouse), fora do tier baixo e sem
@@ -271,7 +276,7 @@ const MineCode = React.lazy(() => import("./chat/MineCode").then((m) => ({ defau
 const MindmapModal = React.lazy(() => import("./mindmap/MindmapPanel").then((m) => ({ default: m.MindmapModal })));
 
 /** Enquanto um pedaço do caderno carrega: um lápis girando no meio da folha. */
-function PageLoading() {
+export function PageLoading() {
   return (
     <div className="grid min-h-[50vh] place-items-center" role="status" aria-label="Carregando">
       <Loader2 className="h-8 w-8 animate-spin text-pen" />
@@ -520,7 +525,7 @@ type ResearchResult = {
   source: "Crossref";
 };
 
-type PublicHoliday = {
+export type PublicHoliday = {
   date: string;
   localName: string;
   name: string;
@@ -541,7 +546,18 @@ export type Task = {
   /** Quando foi concluída. Alimenta o XP por dia/semana do ranking. */
   doneAt?: number;
   createdAt: number;
+  /** Campos da agenda nova; todos opcionais porque tarefas antigas não têm. */
+  kind?: TaskKind;
+  priority?: TaskPriority;
+  /** "HH:MM" no fuso de quem criou. */
+  time?: string;
+  steps?: TaskStep[];
+  repeat?: TaskRepeat;
+  /** Id da cópia criada ao concluir uma tarefa que repete (evita duplicar). */
+  spawnedNext?: string;
 };
+
+export type TaskStep = { id: string; text: string; done: boolean };
 
 type ChatAttachment = {
   id: string;
@@ -824,7 +840,7 @@ export type Modal =
   | { type: "subject" }
   | { type: "material"; subjectId: string }
   | { type: "materialView"; materialId: string }
-  | { type: "task"; subjectId?: string }
+  | { type: "task"; subjectId?: string; taskId?: string; dueAt?: number; title?: string }
   | { type: "quiz"; subjectId?: string; topic?: string; initialQuestions?: QuizQuestion[]; initialMode?: QuizMode }
   | { type: "mindmap"; subjectId?: string; topic?: string; initialMap?: Mindmap }
   | { type: "flashcards"; subjectId: string }
@@ -1335,7 +1351,7 @@ export function go(view: View, id?: string) {
   window.location.hash = id ? `#/${view}/${id}` : `#/${view}`;
 }
 
-function dateLabel(timestamp: number) {
+export function dateLabel(timestamp: number) {
   const diff = Math.round((timestamp - today()) / 86400000);
   if (diff < 0) return "Atrasada";
   if (diff === 0) return "Hoje";
@@ -1896,7 +1912,7 @@ function App() {
     if (route.view === "subject" && currentSubject) {
       return <SubjectView subject={currentSubject} data={userData} setModal={setModal} update={update} notify={notify} setSelectedSubjectId={setSelectedSubjectId} />;
     }
-    if (route.view === "agenda") return <AgendaView data={userData} setModal={setModal} update={update} notify={notify} />;
+    if (route.view === "agenda") return <React.Suspense fallback={<PageLoading />}><AgendaView data={userData} user={user} setModal={setModal} update={update} notify={notify} /></React.Suspense>;
     if (route.view === "foco") return <FocusView data={userData} user={user} update={update} notify={notify} />;
     if (route.view === "progress") return <ProgressView data={userData} user={user} />;
     if (route.view === "ranking") return <RankingView user={user} update={update} notify={notify} />;
@@ -2617,7 +2633,7 @@ function App() {
   );
 }
 
-function Input({
+export function Input({
   label,
   value,
   onChange,
@@ -3742,7 +3758,7 @@ function HomeView({
                       toggle={() =>
                         update((draft) => ({
                           ...draft,
-                          tasks: draft.tasks.map((item) => (item.id === task.id ? toggleDone(item, !item.done) : item)),
+                          tasks: setTaskDone(draft.tasks, task.id, undefined),
                         }))
                       }
                     />
@@ -3951,7 +3967,7 @@ function StudyNowPanel({
                       cheer(event.currentTarget, xpPerAction.taskDone);
                       update((draft) => ({
                         ...draft,
-                        tasks: draft.tasks.map((task) => (task.id === nextTask.id ? toggleDone(task, true) : task)),
+                        tasks: setTaskDone(draft.tasks, nextTask.id, true),
                       }));
                     }}
                     className="inline-flex min-h-11 items-center gap-2 rounded-[.8rem] border border-white/10 px-4 text-[12px] font-black text-white/60 transition hover:border-mint/30 hover:text-white"
@@ -4011,7 +4027,7 @@ function TodayChecklist({ tasks, update }: { tasks: Task[]; update: (next: (draf
     cheer(target, xpPerAction.taskDone);
     setStriking((list) => [...list, task.id]);
     window.setTimeout(() => {
-      update((draft) => ({ ...draft, tasks: draft.tasks.map((item) => (item.id === task.id ? toggleDone(item, true) : item)) }));
+      update((draft) => ({ ...draft, tasks: setTaskDone(draft.tasks, task.id, true) }));
       setStriking((list) => list.filter((id) => id !== task.id));
     }, reduced ? 0 : 900);
   };
@@ -4599,7 +4615,7 @@ function SubjectView({
                       toggle={() =>
                         update((draft) => ({
                           ...draft,
-                          tasks: draft.tasks.map((item) => (item.id === task.id ? toggleDone(item, !item.done) : item)),
+                          tasks: setTaskDone(draft.tasks, task.id, undefined),
                         }))
                       }
                       remove={() => {
@@ -4797,501 +4813,30 @@ function MaterialRow({ material, update, open }: { material: Material; update: (
   );
 }
 
-function AgendaView({ data, setModal, update, notify }: { data: ReturnType<typeof useMemoUserData>; setModal: (modal: Modal) => void; update: (next: (draft: AppData) => AppData) => void; notify: (message: string) => void }) {
-  const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
-  const [dayFilter, setDayFilter] = useState<number | null>(null);
-  const [showDone, setShowDone] = useState(false);
-  const [holidays, setHolidays] = useState<PublicHoliday[]>([]);
-  const [holidaysUnavailable, setHolidaysUnavailable] = useState(false);
-  const weekdayLong = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const years = Array.from(new Set([new Date(today()).getFullYear(), new Date(addDays(7)).getFullYear()]));
-    Promise.allSettled(years.map((year) => apiJson<{ results: PublicHoliday[] }>(`/api/holidays?year=${year}`, { signal: controller.signal })))
-      .then((responses) => {
-        if (controller.signal.aborted) return;
-        const available = responses.flatMap((response) => (response.status === "fulfilled" ? response.value.results : []));
-        setHolidays(available);
-        setHolidaysUnavailable(responses.every((response) => response.status === "rejected"));
-      });
-    return () => controller.abort();
-  }, []);
+const taskKindLabel: Record<TaskKind, string> = { prova: "Prova", trabalho: "Trabalho", licao: "Lição", revisao: "Revisão", leitura: "Leitura" };
 
-  const byDue = (a: Task, b: Task) => a.dueAt - b.dueAt || a.createdAt - b.createdAt;
-  const tasks = subjectFilter ? data.tasks.filter((task) => task.subjectId === subjectFilter) : data.tasks;
-  const open = tasks.filter((task) => !task.done);
-  const overdue = open.filter((task) => task.dueAt < today()).sort(byDue);
-  const todayOpen = open.filter((task) => task.dueAt === today()).sort(byDue);
-  const weekOpen = open.filter((task) => task.dueAt > today() && task.dueAt <= addDays(7)).sort(byDue);
-  const laterOpen = open.filter((task) => task.dueAt > addDays(7)).sort(byDue);
-  const doneTasks = tasks.filter((task) => task.done).sort((a, b) => b.dueAt - a.dueAt);
-  const doneTodayCount = tasks.filter((task) => task.done && task.dueAt === today()).length;
-  const todayTotal = todayOpen.length + doneTodayCount;
-
-  const holidayByDate = new Map(holidays.map((holiday) => [holiday.date, holiday]));
-  const week = Array.from({ length: 7 }, (_, index) => {
-    const day = addDays(index);
-    return { day, count: open.filter((task) => task.dueAt === day).length, holiday: holidayByDate.get(localDateKey(day)) };
-  });
-  const selectedHoliday = dayFilter === null ? undefined : holidayByDate.get(localDateKey(dayFilter));
-  const nextHoliday = week.find((item) => item.holiday)?.holiday;
-  const dayTasks = dayFilter !== null ? tasks.filter((task) => task.dueAt === dayFilter).sort((a, b) => Number(a.done) - Number(b.done) || byDue(a, b)) : [];
-
-  const toggleTask = (task: Task) =>
-    update((draft) => ({
-      ...draft,
-      tasks: draft.tasks.map((item) => (item.id === task.id ? toggleDone(item, !item.done) : item)),
-    }));
-  const removeTask = (task: Task) => {
-    update((draft) => ({ ...draft, tasks: draft.tasks.filter((item) => item.id !== task.id) }));
-    notify("Tarefa excluída.");
-  };
-  const postponeTask = (task: Task) => {
-    update((draft) => ({ ...draft, tasks: draft.tasks.map((item) => (item.id === task.id ? { ...item, dueAt: today() } : item)) }));
-    notify("Tarefa reagendada para hoje.");
-  };
-  const renderTask = (task: Task, options?: { postpone?: boolean }) => (
-    <TaskRow
-      key={task.id}
-      task={task}
-      subject={data.subjects.find((subject) => subject.id === task.subjectId)}
-      toggle={() => toggleTask(task)}
-      remove={() => removeTask(task)}
-      postpone={options?.postpone ? () => postponeTask(task) : undefined}
-    />
-  );
-
-  const groups: Array<{ title: string; tasks: Task[]; empty?: string }> = [
-    { title: `Hoje (${todayOpen.length})`, tasks: todayOpen, empty: "Nada para hoje. Aproveite para adiantar a semana ou revisar flashcards." },
-    { title: `Esta semana (${weekOpen.length})`, tasks: weekOpen },
-    { title: `Depois (${laterOpen.length})`, tasks: laterOpen },
-  ];
-
-  return (
-    <>
-      <PageHeader
-        eyebrow="Agenda"
-        title="Sua rotina"
-        subtitle={overdue.length ? `${overdue.length} ${overdue.length === 1 ? "tarefa atrasada" : "tarefas atrasadas"} esperando por você.` : "Semana organizada. Escolha um dia para focar."}
-        action={
-          <PrimaryButton icon={Plus} onClick={() => setModal({ type: "task" })}>
-            Nova tarefa
-          </PrimaryButton>
-        }
-      />
-      <div className="grid gap-5">
-        <Reveal>
-          <GlassCard>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <SectionTitle icon={CalendarDays} title="Sua semana" hint="toque em um dia para filtrar" />
-              <div className="flex flex-wrap gap-2 text-xs font-black">
-                {overdue.length ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amberGlow/25 bg-amberGlow/12 px-3 py-1.5 text-amberGlow">
-                    <Flame className="h-3.5 w-3.5" />
-                    {overdue.length} atrasadas
-                  </span>
-                ) : null}
-                <span className="rounded-full bg-white/[0.07] px-3 py-1.5 text-white/60">{todayOpen.length} hoje</span>
-                <span className="rounded-full bg-white/[0.07] px-3 py-1.5 text-white/60">{weekOpen.length} na semana</span>
-                {nextHoliday ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyanGlow/20 bg-cyanGlow/10 px-3 py-1.5 text-cyanGlow">
-                    <Landmark className="h-3.5 w-3.5" />
-                    {nextHoliday.localName}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            {todayTotal ? (
-              <div className="mt-5">
-                <div className="mb-2 flex items-center justify-between text-[13px] font-bold text-white/52">
-                  <span>Progresso de hoje</span>
-                  <span className="tabular text-mint">
-                    {doneTodayCount} de {todayTotal}
-                  </span>
-                </div>
-                <AnimatedBar value={percent(doneTodayCount, todayTotal)} height={9} />
-              </div>
-            ) : null}
-            <StickyWeekBoard
-              days={week}
-              overdue={overdue}
-              open={open}
-              subjects={data.subjects}
-              dayFilter={dayFilter}
-              setDayFilter={setDayFilter}
-              update={update}
-            />
-            {holidaysUnavailable ? <p className="mt-3 text-xs text-white/35">Os feriados não puderam ser atualizados agora; suas tarefas continuam disponíveis normalmente.</p> : null}
-          </GlassCard>
-        </Reveal>
-
-        {data.subjects.length > 1 ? (
-          <Reveal delay={0.05}>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                aria-pressed={!subjectFilter}
-                onClick={() => setSubjectFilter(null)}
-                className={`relative rounded-full px-4 py-2 text-[13px] font-black transition-colors duration-control ${
-                  !subjectFilter ? "bg-mint text-black shadow-glowSoft" : "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] hover:text-white"
-                }`}
-              >
-                Todas
-              </button>
-              {data.subjects.map((subject) => {
-                const active = subjectFilter === subject.id;
-                return (
-                  <button
-                    key={subject.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setSubjectFilter(active ? null : subject.id)}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-black transition-colors duration-control ${
-                      active ? "text-black shadow-glowSoft" : "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] hover:text-white"
-                    }`}
-                    style={active ? { backgroundColor: subject.color } : undefined}
-                  >
-                    <span className="h-2 w-2 rounded-full" style={{ background: active ? "rgba(0,0,0,.55)" : subject.color }} />
-                    {subject.name}
-                  </button>
-                );
-              })}
-            </div>
-          </Reveal>
-        ) : null}
-
-        <Reveal delay={0.08}>
-          {/* Ficha presa com fita: um mini calendário com o dia da prova
-              circulado à caneta e uma seta rabiscada puxando para o plano. */}
-          <motion.button
-            onClick={() => go("plan")}
-            whileHover={{ y: -4, rotate: -0.4 }}
-            whileTap={{ scale: 0.98 }}
-            transition={spring.soft}
-            className="caderno-plan-cta group"
-          >
-            <span className="caderno-plan-tape" aria-hidden />
-            <span className="caderno-plan-cal" aria-hidden>
-              <span className="caderno-plan-cal-top">prova</span>
-              <span className="caderno-plan-cal-day">{new Date().getDate() + 14 > 28 ? 28 : new Date().getDate() + 14}</span>
-              <Doodle kind="circle" className="caderno-plan-cal-ring" duration={900} delay={250} strokeWidth={2.6} stretch />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="caderno-note block">plano de estudos</span>
-              <span className="caderno-plan-title">Cronograma até a prova</span>
-              <span className="caderno-plan-sub">Monte um plano de revisão e mande tudo pra agenda.</span>
-            </span>
-            <Doodle kind="arrow" className="caderno-plan-arrow hidden sm:block" duration={800} delay={500} strokeWidth={2.6} redraw />
-          </motion.button>
-        </Reveal>
-
-        {!tasks.length ? (
-          <EmptyState
-            icon={CalendarDays}
-            title="Agenda vazia"
-            text="Crie uma tarefa ou gere um plano de estudos para preencher sua rotina."
-            action={
-              <PrimaryButton icon={Plus} onClick={() => setModal({ type: "task" })}>
-                Criar primeira tarefa
-              </PrimaryButton>
-            }
-          />
-        ) : dayFilter !== null ? (
-          <GlassCard>
-            <SectionTitle
-              icon={CalendarDays}
-              title={`${weekdayLong.format(new Date(dayFilter))} · ${shortDate(dayFilter)}${selectedHoliday ? ` · ${selectedHoliday.localName}` : ""}`}
-              action={
-                <button type="button" onClick={() => setDayFilter(null)} className="text-sm font-black text-mint transition hover:text-white">
-                  Ver tudo
-                </button>
-              }
-            />
-            <Stagger className="mt-4 space-y-2.5" gap={0.045}>
-              {dayTasks.map((task) => (
-                <StaggerItem key={task.id}>{renderTask(task)}</StaggerItem>
-              ))}
-            </Stagger>
-            {!dayTasks.length ? <p className="mt-4 text-sm text-white/45">Nenhuma tarefa para este dia.</p> : null}
-          </GlassCard>
-        ) : (
-          <>
-            {overdue.length ? (
-              <Reveal delay={0.1}>
-                <section className="depth-panel relative overflow-hidden rounded-lg border border-amberGlow/25 bg-amberGlow/[0.06] p-5 shadow-panel backdrop-blur-lg md:p-6">
-                  <span aria-hidden className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full bg-amberGlow/15 blur-[70px]" />
-                  <div className="relative flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amberGlow/15 text-amberGlow">
-                        <Flame className="h-5 w-5" />
-                      </span>
-                      <h2 className="font-display text-[1.35rem] font-black md:text-2xl">Atrasadas ({overdue.length})</h2>
-                    </div>
-                    <p className="hidden text-sm font-bold text-amberGlow/70 md:block">Reagende para hoje ou conclua.</p>
-                  </div>
-                  <Stagger className="relative mt-4 space-y-2.5" gap={0.045}>
-                    {overdue.map((task) => (
-                      <StaggerItem key={task.id}>{renderTask(task, { postpone: true })}</StaggerItem>
-                    ))}
-                  </Stagger>
-                </section>
-              </Reveal>
-            ) : null}
-            {groups.map(({ title, tasks: groupTasks, empty }, groupIndex) =>
-              groupTasks.length || empty ? (
-                <Reveal key={title} delay={0.12 + groupIndex * 0.04}>
-                  <GlassCard>
-                    <SectionTitle icon={CalendarDays} title={title} />
-                    <Stagger className="mt-4 space-y-2.5" gap={0.04}>
-                      {groupTasks.map((task) => (
-                        <StaggerItem key={task.id}>{renderTask(task)}</StaggerItem>
-                      ))}
-                    </Stagger>
-                    {!groupTasks.length && empty ? <p className="mt-4 text-sm text-white/45">{empty}</p> : null}
-                  </GlassCard>
-                </Reveal>
-              ) : null,
-            )}
-            {doneTasks.length ? (
-              <GlassCard>
-                <SectionTitle
-                  icon={CheckCircle2}
-                  title={`Concluídas (${doneTasks.length})`}
-                  action={
-                    <div className="flex items-center gap-4">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setModal({
-                            type: "confirm",
-                            title: "Excluir tarefas concluídas?",
-                            body: `${doneTasks.length} ${doneTasks.length === 1 ? "tarefa concluída será removida" : "tarefas concluídas serão removidas"} da agenda. Essa ação não tem volta.`,
-                            onConfirm: () => {
-                              update((draft) => ({
-                                ...draft,
-                                tasks: draft.tasks.filter((item) => !(item.done && (!subjectFilter || item.subjectId === subjectFilter))),
-                              }));
-                              notify("Tarefas concluídas removidas.");
-                            },
-                          })
-                        }
-                        className="text-[13px] font-black text-white/45 transition hover:text-roseGlow"
-                      >
-                        Limpar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowDone((value) => !value)}
-                        aria-expanded={showDone}
-                        className="inline-flex items-center gap-1 text-[13px] font-black text-mint transition hover:text-white"
-                      >
-                        {showDone ? "Ocultar" : "Mostrar"}
-                        <motion.span animate={{ rotate: showDone ? 180 : 0 }} transition={spring.snappy} className="grid place-items-center">
-                          <ChevronDown className="h-4 w-4" />
-                        </motion.span>
-                      </button>
-                    </div>
-                  }
-                />
-                <AnimatePresence initial={false}>
-                  {showDone ? (
-                    <motion.div
-                      key="done-list"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.35, ease: ease.out }}
-                      className="overflow-hidden"
-                    >
-                      <div className="mt-4 space-y-2.5">{doneTasks.map((task) => renderTask(task))}</div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </GlassCard>
-            ) : null}
-          </>
-        )}
-      </div>
-    </>
-  );
-}
-
-/**
- * A semana como um quadro de bilhetes. Cada tarefa aberta é um post-it na cor
- * da matéria; arrastar para outra coluna reagenda de verdade (muda o dueAt).
- * O mesmo gesto existe no teclado: Enter pega o bilhete, ← → trocam o dia,
- * Enter ou Esc soltam. `layoutId` faz o bilhete viajar até a coluna nova.
- */
-function StickyWeekBoard({
-  days,
-  overdue,
+export function TaskRow({
+  task,
+  subject,
+  toggle,
+  remove,
+  postpone,
   open,
-  subjects,
-  dayFilter,
-  setDayFilter,
-  update,
 }: {
-  days: Array<{ day: number; count: number; holiday?: PublicHoliday }>;
-  overdue: Task[];
-  open: Task[];
-  subjects: Subject[];
-  dayFilter: number | null;
-  setDayFilter: (day: number | null) => void;
-  update: (next: (draft: AppData) => AppData) => void;
+  task: Task;
+  subject?: Subject;
+  toggle: () => void;
+  remove?: () => void;
+  postpone?: () => void;
+  /** Abre o editor ao tocar no texto. Sem ele a linha só marca e desmarca. */
+  open?: () => void;
 }) {
-  const reduced = useSoftMotion();
-  const [picked, setPicked] = useState<string | null>(null);
-  const [overDay, setOverDay] = useState<number | null>(null);
-  const [status, setStatus] = useState("");
-  const [crumpling, setCrumpling] = useState<string[]>([]);
-  const weekday = new Intl.DateTimeFormat("pt-BR", { weekday: "short" });
-  const weekdayLong = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
-  const colorOf = (task: Task) => subjects.find((subject) => subject.id === task.subjectId)?.color || "#F4F05A";
-  const nameOf = (task: Task) => subjects.find((subject) => subject.id === task.subjectId)?.name || "Matéria";
-
-  const moveTo = (task: Task, day: number) => {
-    if (task.dueAt === day) return;
-    update((draft) => ({ ...draft, tasks: draft.tasks.map((item) => (item.id === task.id ? { ...item, dueAt: day } : item)) }));
-    const label = weekdayLong.format(new Date(day));
-    setStatus(`${task.title} foi para ${label}.`);
-    mineSays(`Anotado pra ${label}!`, "happy");
-  };
-  const complete = (task: Task, target: HTMLElement) => {
-    cheer(target, xpPerAction.taskDone);
-    setCrumpling((list) => [...list, task.id]);
-    window.setTimeout(() => {
-      update((draft) => ({ ...draft, tasks: draft.tasks.map((item) => (item.id === task.id ? toggleDone(item, true) : item)) }));
-      setCrumpling((list) => list.filter((id) => id !== task.id));
-    }, reduced ? 0 : 420);
-  };
-  const dayUnder = (x: number, y: number) => {
-    const column = document.elementsFromPoint(x, y).find((node) => (node as HTMLElement).dataset?.boardDay) as HTMLElement | undefined;
-    return column ? Number(column.dataset.boardDay) : null;
-  };
-
-  const columns: Array<{ key: string; day: number | null; title: string; sub: string; tasks: Task[]; holiday?: PublicHoliday; late?: boolean }> = [
-    ...(overdue.length ? [{ key: "late", day: null, title: "!", sub: "atrasadas", tasks: overdue, late: true }] : []),
-    ...days.map(({ day, holiday }) => ({
-      key: String(day),
-      day,
-      title: String(new Date(day).getDate()),
-      sub: day === today() ? "hoje" : weekday.format(new Date(day)).replace(".", ""),
-      tasks: open.filter((task) => task.dueAt === day),
-      holiday,
-    })),
-  ];
-
-  const note = (task: Task, index: number) => {
-    const isPicked = picked === task.id;
-    const tilt = ((task.id.charCodeAt(task.id.length - 1) % 5) - 2) * 1.1;
-    const gone = crumpling.includes(task.id);
-    return (
-      <motion.div
-        key={task.id}
-        layoutId={reduced ? undefined : `sticky-${task.id}`}
-        layout={!reduced}
-        drag={!reduced && !gone}
-        dragSnapToOrigin
-        dragElastic={0.6}
-        dragMomentum={false}
-        whileDrag={{ scale: 1.07, rotate: -4, zIndex: 60, boxShadow: "0 24px 30px -14px rgba(0,0,0,.45)" }}
-        onDrag={(event) => {
-          const point = event as PointerEvent;
-          if ("clientX" in point) setOverDay(dayUnder(point.clientX, point.clientY));
-        }}
-        onDragEnd={(event) => {
-          const point = event as PointerEvent;
-          setOverDay(null);
-          if (!("clientX" in point)) return;
-          const day = dayUnder(point.clientX, point.clientY);
-          if (day !== null) moveTo(task, day);
-        }}
-        initial={reduced ? false : { opacity: 0, y: -14, rotate: tilt - 6 }}
-        animate={gone ? { opacity: 0, scale: 0.3, rotate: 40 } : { opacity: 1, y: 0, scale: 1, rotate: tilt }}
-        transition={{ type: "spring", stiffness: 420, damping: 28, delay: reduced || gone ? 0 : index * 0.04 }}
-        tabIndex={0}
-        role="button"
-        aria-roledescription="bilhete arrastável"
-        aria-label={`${task.title}, ${nameOf(task)}. Enter para pegar e setas para mudar o dia.`}
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget) return;
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            setPicked(isPicked ? null : task.id);
-            setStatus(isPicked ? "Bilhete solto." : "Bilhete pego: use as setas para trocar o dia.");
-          } else if (isPicked && (event.key === "ArrowRight" || event.key === "ArrowLeft")) {
-            event.preventDefault();
-            const base = task.dueAt < today() ? today() - 86400000 : task.dueAt;
-            const next = base + (event.key === "ArrowRight" ? 1 : -1) * 86400000;
-            if (next >= today() && next <= addDays(6)) moveTo(task, next);
-          } else if (event.key === "Escape") {
-            setPicked(null);
-          }
-        }}
-        className={`caderno-sticky ${isPicked ? "is-picked" : ""}`}
-        style={{ "--sticky": colorOf(task) } as React.CSSProperties}
-      >
-        <p className="line-clamp-3 text-[13px] font-bold leading-snug">{task.title}</p>
-        <div className="mt-1.5 flex items-center justify-between gap-1">
-          <span className="truncate font-mono text-[10px] opacity-70">{nameOf(task)}</span>
-          <button
-            type="button"
-            onPointerDownCapture={(event) => event.stopPropagation()}
-            onClick={(event) => complete(task, event.currentTarget)}
-            aria-label={`Concluir ${task.title}`}
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-md hover:bg-black/10"
-          >
-            <InkCheck checked={gone} className="caderno-inkcheck-sm" />
-          </button>
-        </div>
-      </motion.div>
-    );
-  };
-
-  return (
-    <div className="mt-5">
-      <p className="sr-only" aria-live="polite">{status}</p>
-      <LayoutGroup>
-        <div className="caderno-board minerva-scroll">
-          {columns.map((column) => {
-            const active = column.day !== null && dayFilter === column.day;
-            const isToday = column.day === today();
-            return (
-              <div
-                key={column.key}
-                data-board-day={column.day ?? undefined}
-                className={`caderno-board-col ${column.late ? "is-late" : ""} ${overDay !== null && overDay === column.day ? "is-over" : ""} ${active ? "is-active" : ""}`}
-              >
-                <button
-                  type="button"
-                  disabled={column.day === null}
-                  onClick={() => column.day !== null && setDayFilter(active ? null : column.day)}
-                  aria-pressed={column.day === null ? undefined : active}
-                  className="caderno-board-head"
-                  title={column.holiday ? `Feriado: ${column.holiday.localName}` : column.day !== null ? "Filtrar a lista por este dia" : undefined}
-                >
-                  <span className="font-mono text-[10px] uppercase tracking-[.1em]">{column.sub}</span>
-                  <span className={`font-display text-xl font-black ${isToday ? "caderno-hl" : ""}`}>{column.title}</span>
-                  {column.holiday ? <Landmark aria-hidden className="absolute right-2 top-2 h-3 w-3 text-pen" /> : null}
-                </button>
-                <div className="grid gap-2">
-                  {column.tasks.slice(0, 5).map((task, index) => note(task, index))}
-                  {column.tasks.length > 5 ? <p className="caderno-hand text-center text-base">+{column.tasks.length - 5} bilhetes</p> : null}
-                  {!column.tasks.length ? <span className="caderno-board-empty" aria-hidden>livre</span> : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </LayoutGroup>
-    </div>
-  );
-}
-
-function TaskRow({ task, subject, toggle, remove, postpone }: { task: Task; subject?: Subject; toggle: () => void; remove?: () => void; postpone?: () => void }) {
   const isOverdue = !task.done && task.dueAt < today();
   const reduced = useSoftMotion();
+  const steps = task.steps || [];
+  const stepsDone = steps.filter((step) => step.done).length;
+  const Body = open ? "button" : "div";
   return (
     <motion.div
       layout={!reduced}
@@ -5320,18 +4865,36 @@ function TaskRow({ task, subject, toggle, remove, postpone }: { task: Task; subj
       >
         <InkCheck checked={task.done} />
       </motion.button>
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-black leading-tight">
-          <span className={`caderno-strike ${task.done ? "is-struck" : ""}`}>{task.title}</span>
+      <Body
+        {...(open ? { type: "button" as const, onClick: open, "aria-label": `Editar ${task.title}` } : {})}
+        className={`min-w-0 flex-1 text-left ${open ? "rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-mint" : ""}`}
+      >
+        <p className="flex min-w-0 items-center gap-2 font-black leading-tight">
+          {task.priority === "alta" && !task.done ? <span className="agenda-urgent" title="Urgente">!</span> : null}
+          <span className={`caderno-strike truncate ${task.done ? "is-struck" : ""}`}>{task.title}</span>
+          {task.kind ? <span className={`agenda-kind is-${task.kind}`}>{taskKindLabel[task.kind]}</span> : null}
         </p>
         <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-white/45">
           <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: subject?.color || "rgba(255,255,255,.3)" }} />
           <span className="truncate">
             {subject?.name || "Matéria"} · <span className={isOverdue ? "font-black text-amberGlow" : ""}>{dateLabel(task.dueAt)}</span>
+            {task.time ? (
+              <>
+                {" · "}
+                <Clock aria-hidden className="mb-0.5 inline h-3 w-3" /> {task.time}
+              </>
+            ) : null}
             {task.note ? ` · ${task.note}` : ""}
           </span>
+          {task.repeat ? <Repeat aria-label={task.repeat === "daily" ? "Repete todo dia" : "Repete toda semana"} className="h-3.5 w-3.5 shrink-0" /> : null}
+          {steps.length ? (
+            <span className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono text-[11px]" title="Passos feitos">
+              <ListChecks aria-hidden className="h-3.5 w-3.5" />
+              {stepsDone}/{steps.length}
+            </span>
+          ) : null}
         </p>
-      </div>
+      </Body>
       {postpone ? (
         <motion.button
           onClick={postpone}
@@ -5728,7 +5291,7 @@ function FocusView({
                       toggle={() =>
                         update((draft) => ({
                           ...draft,
-                          tasks: draft.tasks.map((item) => (item.id === task.id ? toggleDone(item, !item.done) : item)),
+                          tasks: setTaskDone(draft.tasks, task.id, undefined),
                         }))
                       }
                     />
@@ -11218,7 +10781,11 @@ function ModalHost({
               const subject = data.subjects.find((item) => item.id === material.subjectId);
               return <MaterialViewModal material={material} subject={subject} update={update} setModal={setModal} notify={notify} />;
             })()}
-          {modal.type === "task" && <TaskModal user={user} subjects={data.subjects} subjectId={modal.subjectId} update={update} close={() => setModal(null)} notify={notify} />}
+          {modal.type === "task" && (
+            <React.Suspense fallback={<PageLoading />}>
+              <TaskEditor user={user} subjects={data.subjects} tasks={data.tasks} initial={modal} update={update} close={() => setModal(null)} notify={notify} />
+            </React.Suspense>
+          )}
           {modal.type === "quiz" &&
             (() => {
               const subject = data.subjects.find((item) => item.id === modal.subjectId);
@@ -11600,40 +11167,6 @@ function MaterialModal({ user, subjectId, update, close, notify }: { user: User;
   );
 }
 
-function TaskModal({ user, subjects, subjectId, update, close, notify }: { user: User; subjects: Subject[]; subjectId?: string; update: (next: (draft: AppData) => AppData) => void; close: () => void; notify: (message: string) => void }) {
-  const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState(subjectId || subjects[0]?.id || "");
-  const [days, setDays] = useState(1);
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!title.trim() || !subject) return;
-        update((draft) => ({
-          ...draft,
-          tasks: [...draft.tasks, { id: uid("task"), userId: user.id, subjectId: subject, title: title.trim(), note: "", dueAt: addDays(days), done: false, createdAt: Date.now() }],
-        }));
-        notify("Tarefa criada.");
-        close();
-      }}
-      className="space-y-5"
-    >
-      <h2 className="font-display text-3xl font-black">Nova tarefa</h2>
-      <Input label="Título" value={title} onChange={setTitle} placeholder="Ex: Prova de química" />
-      <label className="block">
-        <span className="mb-2 block text-sm font-black text-white/72">Matéria</span>
-        <select value={subject} onChange={(event) => setSubject(event.target.value)} className="h-14 w-full rounded-2xl border border-white/12 bg-panel2 px-4 outline-none focus:border-mint">
-          {subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-      </label>
-      <label className="block">
-        <span className="text-sm font-black text-white/62">Prazo: {days === 0 ? "Hoje" : `${days} dias`}</span>
-        <input value={days} min={0} max={30} type="range" onChange={(event) => setDays(Number(event.target.value))} className="mt-3 w-full accent-mint" />
-      </label>
-      <PrimaryButton icon={Plus}>Criar tarefa</PrimaryButton>
-    </form>
-  );
-}
 
 export function HeroCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -12089,7 +11622,7 @@ const mineEndpoint = "/api/mine/chat";
 
 type MineHistoryItem = { role: ChatMessage["role"]; text: string };
 
-async function requestAssistantResponse(payload: {
+export async function requestAssistantResponse(payload: {
   prompt: string;
   history: MineHistoryItem[];
   context: string;
@@ -13312,17 +12845,13 @@ function applyAssistantActions(data: AppData, userId: string, actions: Assistant
 
     if (action.type === "complete_task") {
       const title = action.title ? normalizeText(action.title) : "";
-      let changed = false;
-      next.tasks = next.tasks.map((task) => {
+      const hits = next.tasks.filter((task) => {
         const matchesId = action.taskId && task.id === action.taskId;
         const matchesTitle = title && normalizeText(task.title).includes(title);
-        if (task.userId === userId && (matchesId || matchesTitle)) {
-          changed = true;
-          return toggleDone(task, true);
-        }
-        return task;
+        return task.userId === userId && !task.done && (matchesId || matchesTitle);
       });
-      if (changed) feedback.push("Tarefa concluída");
+      for (const task of hits) next.tasks = setTaskDone(next.tasks, task.id, true);
+      if (hits.length) feedback.push("Tarefa concluída");
       continue;
     }
 
