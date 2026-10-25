@@ -90,6 +90,8 @@ import {
   Globe,
   HeartPulse,
   Languages,
+  NotebookPen,
+  ClipboardList,
   Landmark,
   Pencil,
   Gamepad2,
@@ -234,6 +236,8 @@ const AdminView = React.lazy(() => import("./admin/AdminPanel").then((m) => ({ d
 const GamesView = React.lazy(() => import("./games/GamesPanel").then((m) => ({ default: m.GamesView })));
 const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({ default: m.AtelieView })));
 const IdiomasView = React.lazy(() => import("./idiomas/IdiomasView").then((m) => ({ default: m.IdiomasView })));
+const RedacaoView = React.lazy(() => import("./redacao/RedacaoView").then((m) => ({ default: m.RedacaoView })));
+const AtividadesView = React.lazy(() => import("./atividades/AtividadesView").then((m) => ({ default: m.AtividadesView })));
 const MesaDeEstudo = React.lazy(() => import("./caderno/MesaDeEstudo"));
 const AgendaView = React.lazy(() => import("./agenda/AgendaView").then((m) => ({ default: m.AgendaView })));
 const TaskEditor = React.lazy(() => import("./agenda/TaskEditor").then((m) => ({ default: m.TaskEditor })));
@@ -421,6 +425,8 @@ type View =
   | "home"
   | "subject"
   | "agenda"
+  | "atividades"
+  | "redacao"
   | "foco"
   | "progress"
   | "ranking"
@@ -739,6 +745,13 @@ export type Session = {
   wordsRight?: string[];
   wordsMissed?: string[];
   spoke?: number;
+  /** Aba Redação: tema e as notas das 5 competências (0 a 200 cada). */
+  tema?: string;
+  notas?: number[];
+  /** Aba Atividades: componente e pontos da tarefa. */
+  materia?: string;
+  pontos?: number;
+  pontosMax?: number;
 };
 
 type Flashcard = {
@@ -904,6 +917,8 @@ const subjectPalette = [
 const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
   { view: "home", label: "Início", icon: Home },
   { view: "agenda", label: "Agenda", icon: CalendarDays },
+  { view: "atividades", label: "Atividades", icon: ClipboardList },
+  { view: "redacao", label: "Redação", icon: NotebookPen },
   { view: "foco", label: "Foco", icon: Timer },
   { view: "progress", label: "Progresso", icon: Activity },
   { view: "ranking", label: "Ranking", icon: Trophy },
@@ -923,7 +938,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
 
 /** A barra lateral agrupa os destinos em quatro blocos para virar uma lista escaneável. */
 const navGroups: Array<{ label: string; views: View[] }> = [
-  { label: "Estudo", views: ["home", "agenda", "foco", "progress", "ranking"] },
+  { label: "Estudo", views: ["home", "agenda", "atividades", "redacao", "foco", "progress", "ranking"] },
   { label: "Inteligência", views: ["mine", "games", "idiomas", "atelie", "search", "plan"] },
   { label: "Comunidade", views: ["comments", "suggestions"] },
   { label: "Conta", views: ["como-usar", "about", "perfil", "admin"] },
@@ -2509,6 +2524,8 @@ function App() {
     }
     if (route.view === "games") return <React.Suspense fallback={<PageLoading />}><GamesView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "atelie") return <React.Suspense fallback={<PageLoading />}><AtelieView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "redacao") return <React.Suspense fallback={<PageLoading />}><RedacaoView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "atividades") return <React.Suspense fallback={<PageLoading />}><AtividadesView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "idiomas") return <React.Suspense fallback={<PageLoading />}><IdiomasView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "search") return <SearchView data={userData} user={user} query={query} setQuery={setQuery} update={update} notify={notify} />;
     if (route.view === "plan") return <PlanView data={userData} update={update} user={user} notify={notify} />;
@@ -11614,7 +11631,7 @@ function buildAssistantContext(data: ReturnType<typeof useMemoUserData>, user: U
     "Quando o usuário pedir para analisar, resumir, explicar ou corrigir 'o conteúdo', 'os anexos' ou 'o que enviei', use o texto dos conteúdos listados acima como fonte principal da resposta.",
     "Tarefas:",
     taskLines.join("\n") || "- nenhuma",
-    "Rotas disponíveis: home, agenda, progress, mine, games, search, plan, comments, suggestions, about e settings.",
+    "Rotas disponíveis: home, agenda, atividades, redacao, progress, mine, games, search, plan, comments, suggestions, about e settings.",
   ].join("\n");
 }
 
@@ -12875,7 +12892,7 @@ function applyAssistantActions(data: AppData, userId: string, actions: Assistant
     }
 
     if (action.type === "navigate") {
-      const allowed: View[] = ["home", "agenda", "progress", "ranking", "mine", "games", "atelie", "idiomas", "search", "plan", "comments", "suggestions", "about", "perfil"];
+      const allowed: View[] = ["home", "agenda", "atividades", "redacao", "progress", "ranking", "mine", "games", "atelie", "idiomas", "search", "plan", "comments", "suggestions", "about", "perfil"];
       if (action.view === "subject") {
         const subject = findSubject(next.subjects.filter((item) => item.userId === userId), action);
         if (subject) route = { view: "subject", id: subject.id };

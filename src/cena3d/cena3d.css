@@ -1,0 +1,80 @@
+/* Cenas 3D das abas Redação e Atividades e a ilustração parada que as substitui. */
+
+.cena3d {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+}
+
+.cena3d-host,
+.cena3d-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cena3d-host {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+/* ── ilustração parada (tier baixo, movimento reduzido ou sem WebGL) ── */
+.cena3d-plana {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  perspective: 900px;
+}
+
+.cena3d-plana-folha {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  width: min(46%, 170px);
+  aspect-ratio: 3.2 / 4.2;
+  padding: 22% 12% 0 22%;
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, transparent 15%, rgb(var(--margin-line) / 0.7) 15%, rgb(var(--margin-line) / 0.7) calc(15% + 2px), transparent calc(15% + 2px)),
+    rgb(var(--sheet));
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+  transform: rotateX(18deg) rotateY(-18deg) rotateZ(4deg);
+}
+
+.cena3d-plana-folha i {
+  height: 3px;
+  border-radius: 3px;
+  background: rgb(var(--pen) / 0.55);
+}
+
+.cena3d-plana-folha i:nth-child(2n) {
+  width: 80%;
+}
+
+.is-prancheta .cena3d-plana-folha {
+  background: rgb(var(--sheet));
+  outline: 10px solid #a8774d;
+}
+
+.cena3d-plana-caneta {
+  position: absolute;
+  width: 10px;
+  height: 34%;
+  border-radius: 6px;
+  background: linear-gradient(#1d2bb8 0 82%, #d9b45a 82%);
+  transform: translate(60px, 10px) rotate(32deg);
+}
+
+.cena3d-plana-clipe {
+  position: absolute;
+  width: 18%;
+  height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(#e6e9ef, #9aa1ad);
+  transform: translateY(-115px);
+}

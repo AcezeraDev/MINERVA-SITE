@@ -9,6 +9,10 @@ export type XpStatKey =
   | "gameXp"
   | "idiomas"
   | "idiomaXp"
+  | "redacoes"
+  | "redacaoXp"
+  | "atividades"
+  | "atividadeXp"
   | "mineMessages"
   | "cardReviews"
   | "mastered"
@@ -43,6 +47,12 @@ export const xpPerAction: Record<
 >;
 export const drawingsPerDay: number;
 export const idiomaPerfectBonus: number;
+export const redacaoXpMax: number;
+export const redacoesPorDia: number;
+export const atividadeXpMax: number;
+export const atividadesPorDia: number;
+export function redacaoXp(total: number): number;
+export function atividadeXp(acertos: number): number;
 export const xpActions: Array<[string, number]>;
 export const levelTitles: ReadonlyArray<{ level: number; title: string }>;
 export const achievementList: ReadonlyArray<AchievementRule>;

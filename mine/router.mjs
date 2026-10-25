@@ -100,6 +100,7 @@ const GAME_TASKS = new Set(["vf", "pares", "forca", "caca", "sequencia"]);
 // ingles ("I check your passport now") e trocava a pessoa na correcao; o
 // ingles da Mine e o modelo que o aluno copia, entao vai no modelo principal.
 const FAST_TASKS = new Set([...GAME_TASKS, "title", "idioma-dica"]);
+const LONG_TASKS = new Set(["atividade", "redacao"]);
 
 // Medido em producao em 2026-09-04, `caca` com 6 perguntas no gpt-5-mini:
 // 14,4 s para o pedido antigo e 17,0 s com a folga de ineditismo. O padrao de
@@ -317,7 +318,15 @@ export async function runMineRequest({
   // e deixa a reserva entrar a tempo se o principal travar.
   // o MineCode escreve arquivos inteiros em streaming (um site 3D passa de 1
   // minuto): fica com o teto do chat, nao com os 60 s das tarefas curtas
-  const perAttemptMs = gameTask ? gameAttemptMs() : cleanTask && cleanTask !== "minecode" ? Math.min(60_000, resolveTimeoutMs()) : resolveTimeoutMs();
+  // A atividade (7 questoes em JSON) e a correcao da redacao (5 competencias
+  // e os grifos) passam de 60 s com raciocinio: ficam com 120 s.
+  const perAttemptMs = gameTask
+    ? gameAttemptMs()
+    : LONG_TASKS.has(cleanTask)
+      ? Math.min(120_000, resolveTimeoutMs())
+      : cleanTask && cleanTask !== "minecode"
+        ? Math.min(60_000, resolveTimeoutMs())
+        : resolveTimeoutMs();
   const minAttemptMs = gameTask ? 3_500 : MIN_ATTEMPT_MS;
 
   const principal = cleanTask ? MINE_TASK_MODEL : MINE_MODEL;

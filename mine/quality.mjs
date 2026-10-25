@@ -6,6 +6,8 @@ import { Script } from "node:vm";
 
 import { readCodeReply } from "../shared/code-run.mjs";
 import { parseSequencePuzzles } from "../shared/game-core.mjs";
+import { lerAtividade, lerCorrecaoDissertativa } from "../shared/atividades.mjs";
+import { lerCorrecao } from "../shared/redacao.mjs";
 
 function matches(text, pattern) {
   return [...String(text || "").matchAll(pattern)];
@@ -323,6 +325,10 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
     return branches === 6 && items === 24 ? "" : `mapa mental incompleto (${branches} ramos, ${items} itens)`;
   }
   if (cleanTask === "minecode") return mineCodeIssues(text).issue;
+  // A redacao vem no prompt: os trechos grifados precisam existir nela.
+  if (cleanTask === "redacao") return lerCorrecao(text, prompt) ? "" : "correcao de redacao fora do formato";
+  if (cleanTask === "atividade") return lerAtividade(text) ? "" : "atividade incompleta ou fora do formato";
+  if (cleanTask === "atividade-correcao") return lerCorrecaoDissertativa(text) ? "" : "correcao da dissertativa fora do formato";
   if (cleanTask === "plan") {
     return /^DIA\s+\d+\s*\|\s*.+\|\s*.+\|\s*.+$/im.test(text) ? "" : "plano de estudos fora do formato";
   }

@@ -28,6 +28,27 @@ export const xpPerAction = {
   idioma: 4,
 };
 
+/**
+ * Redação e atividade: o XP vem da nota, com teto por envio e por dia. O
+ * servidor recalcula com estes tetos em vez de confiar no `xpEarned` cru,
+ * para uma sessão adulterada não disparar no ranking.
+ */
+export const redacaoXpMax = 40;
+export const redacoesPorDia = 3;
+export const atividadeXpMax = 40;
+export const atividadesPorDia = 5;
+
+/** 10 XP por entregar a redação e até 30 pela nota (0 a 1000). */
+export function redacaoXp(total) {
+  const nota = Math.max(0, Math.min(1000, Number(total) || 0));
+  return Math.min(redacaoXpMax, 10 + Math.round((nota / 1000) * 30));
+}
+
+/** 10 XP por finalizar a atividade e 5 por questão certa, até o teto. */
+export function atividadeXp(acertos) {
+  return Math.min(atividadeXpMax, 10 + Math.max(0, Math.floor(Number(acertos) || 0)) * 5);
+}
+
 /** Bônus de quem fecha uma lição de idioma sem errar nada. */
 export const idiomaPerfectBonus = 10;
 
@@ -52,6 +73,8 @@ export const xpActions = [
   ["Acertar um exercício na aba Idiomas", xpPerAction.idioma],
   ["Fechar uma lição de idioma sem errar (bônus)", idiomaPerfectBonus],
   [`Guardar um desenho pintado no Ateliê (até ${drawingsPerDay} por dia)`, xpPerAction.drawing],
+  [`Entregar uma redação corrigida (pela nota, até ${redacoesPorDia} por dia)`, redacaoXpMax],
+  [`Finalizar uma atividade (pelos acertos, até ${atividadesPorDia} por dia)`, atividadeXpMax],
 ];
 
 export const levelTitles = [
@@ -96,6 +119,10 @@ export const achievementList = [
   { id: "idioma-1", title: "Hello, world!", text: "Termine sua primeira lição na aba Idiomas.", xp: 20, target: 1, stat: "idiomas" },
   { id: "idioma-12", title: "Passaporte carimbado", text: "Termine 12 lições de idioma.", xp: 80, target: 12, stat: "idiomas" },
   { id: "arte-1", title: "Primeira obra", text: "Guarde seu primeiro desenho pintado no Ateliê.", xp: 20, target: 1, stat: "drawings" },
+  { id: "redacao-1", title: "Primeira redação", text: "Entregue sua primeira redação para a Mine corrigir.", xp: 20, target: 1, stat: "redacoes" },
+  { id: "redacao-10", title: "Caneta afiada", text: "Entregue 10 redações.", xp: 80, target: 10, stat: "redacoes" },
+  { id: "atividade-1", title: "Tarefa entregue", text: "Finalize sua primeira atividade.", xp: 20, target: 1, stat: "atividades" },
+  { id: "atividade-15", title: "Aluno exemplar", text: "Finalize 15 atividades.", xp: 80, target: 15, stat: "atividades" },
   { id: "arte-10", title: "Artista da Minerva", text: "Guarde 10 desenhos pintados no Ateliê.", xp: 60, target: 10, stat: "drawings" },
 ];
 
@@ -134,6 +161,23 @@ function countedDrawings(sessions, since = 0) {
   return total;
 }
 
+/** Soma o XP de um tipo de sessão respeitando o teto por envio e por dia. */
+function cappedKindXp(sessions, kind, maxEach, perDay, since = 0) {
+  const byDay = new Map();
+  for (const item of sessions) {
+    if (item?.kind !== kind || !(Number(item.createdAt) >= since)) continue;
+    const day = startOfDay(item.createdAt);
+    const list = byDay.get(day) || [];
+    list.push(Math.max(0, Math.min(maxEach, Math.floor(Number(item.xpEarned) || 0))));
+    byDay.set(day, list);
+  }
+  let total = 0;
+  for (const values of byDay.values()) {
+    total += values.sort((a, b) => b - a).slice(0, perDay).reduce((sum, value) => sum + value, 0);
+  }
+  return total;
+}
+
 /**
  * `scope` são as coleções já filtradas para uma única conta.
  * O servidor filtra por userId antes de chamar; o frontend já recebe assim.
@@ -156,6 +200,10 @@ export function gamificationStats(scope, now = Date.now()) {
     idiomaXp: sessions
       .filter((item) => item.kind === "Idiomas")
       .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0),
+    redacoes: sessions.filter((item) => item.kind === "Redação").length,
+    redacaoXp: cappedKindXp(sessions, "Redação", redacaoXpMax, redacoesPorDia),
+    atividades: sessions.filter((item) => item.kind === "Atividade").length,
+    atividadeXp: cappedKindXp(sessions, "Atividade", atividadeXpMax, atividadesPorDia),
     mineMessages: list(scope?.chats).filter((item) => item.role === "user").length,
     cardReviews: flashcards.reduce((sum, card) => sum + (Number(card.reps) || 0), 0),
     mastered: flashcards.filter((card) => (Number(card.level) || 0) >= 4).length,
@@ -178,6 +226,8 @@ export function totalXp(stats) {
     stats.provas * xpPerAction.prova +
     (Number(stats.gameXp) || 0) +
     (Number(stats.idiomaXp) || 0) +
+    (Number(stats.redacaoXp) || 0) +
+    (Number(stats.atividadeXp) || 0) +
     stats.mineMessages * xpPerAction.mineMessage +
     stats.cardReviews * xpPerAction.cardReview +
     (Number(stats.drawings) || 0) * xpPerAction.drawing;
@@ -224,6 +274,8 @@ export function xpSince(scope, since) {
     sessions
       .filter((item) => item.kind === "Idiomas" && after(item.createdAt))
       .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0) +
+    cappedKindXp(sessions, "Redação", redacaoXpMax, redacoesPorDia, from) +
+    cappedKindXp(sessions, "Atividade", atividadeXpMax, atividadesPorDia, from) +
     list(scope?.chats).filter((item) => item.role === "user" && after(item.createdAt)).length * xpPerAction.mineMessage +
     list(scope?.flashcards).filter((item) => after(item.lastReviewedAt)).length * xpPerAction.cardReview +
     countedDrawings(sessions, from) * xpPerAction.drawing
