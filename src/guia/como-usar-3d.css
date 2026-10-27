@@ -1,0 +1,815 @@
+/*
+  COMO USAR — camada 3D e interativa.
+
+  Direção de movimento (tokens da skill de motion, os mesmos do resto da aba):
+  - tese: "papel com peso" — a folha responde rápido ao ponteiro e assenta
+    devagar, sem quique; quique (--cu-pop) só no que a pessoa toca;
+  - --cu-expo (expoOut) para o que segue o ponteiro, --cu-pop (backOut)
+    para o retorno do toque, --cu-ease para o resto;
+  - 140 ms para controle, 240 ms para superfície, 420 ms para assentar.
+  Tudo em transform/translate/opacity; --tx/--ty vêm do ponteiro (useTilt).
+*/
+
+.cu-root {
+  --cu-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ═══════════════════ abertura: mesa em profundidade ═══════════════════ */
+
+.cu-abertura .cu-livro3d {
+  transform:
+    translateX(calc(var(--open) * min(190px, 35vw)))
+    translateY(calc(var(--p, 0) * -4vh))
+    rotate(calc((1 - var(--open)) * -4deg))
+    rotateY(calc(var(--tx, 0) * 12deg))
+    rotateX(calc(var(--ty, 0) * -9deg));
+  transition: transform 0.42s var(--cu-expo);
+}
+
+/* cada objeto da mesa numa camada: os de perto andam mais com o ponteiro */
+.cu-abertura .cu-mesa {
+  translate: calc(var(--tx, 0) * var(--d, 18px)) calc(var(--ty, 0) * var(--d, 18px));
+  transition: translate 0.6s var(--cu-expo);
+}
+
+.cu-abertura .cu-mesa-lapis { --d: -34px; }
+.cu-abertura .cu-mesa-borracha { --d: 26px; }
+.cu-abertura .cu-mesa-regua { --d: -22px; }
+.cu-abertura .cu-mesa-clipe { --d: 40px; }
+.cu-abertura .cu-mesa-aviao { --d: 52px; }
+.cu-abertura .cu-mesa-estrela { --d: -46px; }
+
+/* ═══════════════════ capítulos: a folha inclina ═══════════════════ */
+
+.cu-tilt {
+  transform-style: preserve-3d;
+  transform: rotateX(calc(var(--ty, 0) * -5deg)) rotateY(calc(var(--tx, 0) * 7deg));
+  transition: transform 0.42s var(--cu-expo);
+}
+
+.cu-palco.is-tilt .cu-tilt {
+  transition-duration: 0.14s;
+}
+
+/* as zonas da cena flutuam acima do papel, como um livro pop-up */
+.cu-pagina .cu-z.is-now {
+  translate: calc(var(--tx, 0) * 9px) calc(var(--ty, 0) * 7px);
+  transition: opacity 0.5s var(--cu-ease), transform 0.6s var(--cu-ease), translate 0.42s var(--cu-expo);
+}
+
+/* luz da janela batendo no papel, segue o ponteiro */
+.cu-brilho {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgb(255 255 255 / 0.32), transparent 55%);
+  mix-blend-mode: soft-light;
+  opacity: 0;
+  transition: opacity 0.24s;
+}
+
+.cu-palco.is-tilt .cu-brilho {
+  opacity: 1;
+}
+
+/* ═══════════════════ o que dá para mexer ═══════════════════ */
+
+.cu-z.is-pre {
+  pointer-events: none;
+}
+
+.cu-mexe {
+  position: relative;
+}
+
+.cu-mexe button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cu-mexe button:focus-visible,
+.cu-pilha.is-voce:focus-visible {
+  outline: 2px solid var(--cu-pen);
+  outline-offset: 3px;
+}
+
+/* dica a lápis: aparece na zona em foco, balança de leve */
+.cu-toque {
+  position: absolute;
+  right: -0.4rem;
+  top: -1.4rem;
+  z-index: 3;
+  font-family: var(--cu-gochi);
+  font-size: 0.95rem;
+  color: var(--cu-red);
+  rotate: 6deg;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s 0.9s;
+}
+
+.cu-z.is-now .cu-toque {
+  opacity: 1;
+  animation: cu-toque 1.6s ease-in-out 1.2s infinite;
+}
+
+@keyframes cu-toque {
+  50% {
+    translate: 0 -4px;
+  }
+}
+
+/* — agenda: post-it de verdade — */
+.cu-quadro .cu-p {
+  display: grid;
+  place-items: center;
+  border: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.cu-quadro .cu-p.is-arrastando {
+  z-index: 4;
+  cursor: grabbing;
+  scale: 1.08;
+  box-shadow: 0 18px 22px -12px rgb(0 0 0 / 0.45);
+  transition: scale 0.14s var(--cu-expo), box-shadow 0.14s;
+}
+
+.cu-quadro .cu-p.is-solto {
+  transition: translate 0.45s var(--cu-pop), scale 0.24s var(--cu-ease), left 0s, rotate 0.24s;
+}
+
+/* — foco: teste de 10 segundos — */
+.cu-timer-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.cu-testar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  border: 1.5px dashed var(--cu-pen);
+  border-radius: 999px;
+  font-family: var(--cu-gochi);
+  font-size: 1rem;
+  color: var(--cu-pen);
+  transition: background-color 0.14s, transform 0.14s var(--cu-ease);
+}
+
+.cu-testar:hover:not(:disabled) {
+  background: rgb(var(--pen) / 0.08);
+  transform: translateY(-1px);
+}
+
+.cu-testar:disabled {
+  cursor: default;
+  border-style: solid;
+}
+
+@property --gasto {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.cu-traco.is-rodando {
+  animation: cu-gasta 10s linear forwards;
+}
+
+@keyframes cu-gasta {
+  from {
+    --gasto: 0;
+  }
+  to {
+    --gasto: 1;
+  }
+}
+
+/* — progresso: colar figurinha — */
+button.cu-figurinha {
+  font: inherit;
+  font-size: 1.6rem;
+  color: rgb(var(--theme-muted));
+}
+
+button.cu-figurinha.is-vazia:hover {
+  scale: 1.06;
+  rotate: 3deg;
+}
+
+.cu-figurinha.is-colada {
+  animation: cu-cola 0.5s var(--cu-pop) both;
+}
+
+@keyframes cu-cola {
+  from {
+    scale: 1.6;
+    rotate: -18deg;
+    opacity: 0;
+  }
+}
+
+/* — ranking: livro novo cai na pilha — */
+.cu-pilha.is-voce {
+  cursor: pointer;
+}
+
+.cu-estante:not(.is-pre) .cu-livro.is-novo {
+  animation: cu-livro-novo 0.5s var(--cu-pop) both;
+  transition: none;
+}
+
+@keyframes cu-livro-novo {
+  from {
+    transform: translateY(-140px) rotate(-12deg);
+    opacity: 0;
+  }
+}
+
+/* — mine: prova e ficha — */
+button.cu-bolinha {
+  color: inherit;
+  background: transparent;
+  transition: background-color 0.14s, color 0.14s, scale 0.14s var(--cu-pop);
+}
+
+button.cu-bolinha:hover {
+  scale: 1.12;
+}
+
+.cu-artefatos.is-mexido .cu-bolinha {
+  transition-delay: 0s;
+}
+
+.cu-artefatos:not(.is-pre) .cu-bolinha.is-errada {
+  background: var(--cu-red);
+  border-color: var(--cu-red);
+  color: #fff;
+}
+
+.cu-correcao {
+  margin-left: 0.3rem;
+  font-family: var(--cu-gochi);
+  font-size: 0.95rem;
+  white-space: nowrap;
+  opacity: 0;
+  animation: cu-correcao 0.4s var(--cu-pop) both;
+}
+
+.cu-artefatos:not(.is-pre) .cu-correcao {
+  animation-delay: 1s;
+}
+
+.cu-artefatos.is-mexido .cu-correcao {
+  animation-delay: 0s;
+}
+
+.cu-correcao.is-certa {
+  color: #15803d;
+}
+
+.cu-correcao.is-errada {
+  color: var(--cu-red);
+}
+
+@keyframes cu-correcao {
+  from {
+    opacity: 0;
+    scale: 1.6;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+button.cu-ficha {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+}
+
+.cu-ficha .cu-ficha-in {
+  display: block;
+}
+
+.cu-ficha.is-tocada .cu-ficha-in {
+  transition-delay: 0s;
+}
+
+.cu-artefatos:not(.is-pre) .cu-ficha.is-desvirada .cu-ficha-in {
+  transform: none;
+}
+
+.cu-ficha:hover .cu-ficha-in {
+  scale: 1.04;
+}
+
+/* — ateliê: pintar e escolher a canetinha — */
+.cu-colorir .cu-tinta {
+  cursor: pointer;
+}
+
+.cu-colorir.is-mexido .cu-tinta {
+  transition-delay: 0s;
+  transition-duration: 0.24s;
+}
+
+.cu-colorir .cu-tinta:hover {
+  opacity: 0.82;
+}
+
+button.cu-canetinha {
+  padding: 0;
+  border: 0;
+}
+
+.cu-estojo:not(.is-pre) button.cu-canetinha:hover:not(.is-aberta) {
+  transform: translateY(-6px);
+  transition-delay: 0s;
+}
+
+.cu-estojo:not(.is-pre) .cu-canetinha.is-aberta {
+  transition-delay: 0s;
+}
+
+/* — comunidade: dar estrelas — */
+.cu-estrela-btn {
+  display: inline-grid;
+  padding: 0;
+  border: 0;
+  background: none;
+  transition: opacity 0.24s, scale 0.14s var(--cu-pop);
+}
+
+.cu-estrela-btn:hover {
+  scale: 1.25;
+}
+
+.cu-estrela-btn.is-apagada {
+  opacity: 0.3;
+  filter: grayscale(1);
+}
+
+/* — perfil: marca-texto e luz — */
+button.cu-marca {
+  padding: 0;
+  border: 0;
+}
+
+.cu-marcadores:not(.is-pre) button.cu-marca {
+  transition-delay: 0s;
+}
+
+.cu-marcadores:not(.is-pre) button.cu-marca:hover:not(.is-sel) {
+  transform: translateY(-6px);
+}
+
+.cu-perfil .cu-marcadores .cu-hl {
+  background-image: linear-gradient(transparent 22%, rgb(var(--hl-pick, var(--hl-mint)) / 0.8) 22% 86%, transparent 86%);
+}
+
+button.cu-luz {
+  border: 0;
+  padding: 0;
+}
+
+.cu-ajustes.is-apagada:not(.is-pre) .cu-luz {
+  background: #2f3340;
+  transition-delay: 0s;
+}
+
+.cu-ajustes.is-apagada:not(.is-pre) .cu-luz-bola {
+  transform: none;
+  background: #9aa4b4;
+  transition-delay: 0s;
+}
+
+.cu-ajustes:not(.is-pre) .cu-luz,
+.cu-ajustes:not(.is-pre) .cu-luz-bola {
+  transition-delay: 0s;
+}
+
+/* luz apagada: a carteirinha da cena vira caderno escuro */
+.cu-perfil .cu-carteirinha {
+  transition: background-color 0.42s var(--cu-ease), color 0.42s var(--cu-ease), filter 0.42s;
+}
+
+.cu-perfil.is-apagado .cu-carteirinha {
+  filter: brightness(0.62) saturate(0.8);
+}
+
+/* ═══════════════════ revisão: o fichário 3D ═══════════════════ */
+
+.cu-revisao {
+  --tab: var(--hl-mint);
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  padding: 7rem 0 2rem;
+  text-align: center;
+}
+
+.cu-revisao.is-lilac { --tab: var(--hl-lilac); }
+.cu-revisao.is-yellow { --tab: var(--hl-yellow); }
+.cu-revisao.is-pink { --tab: var(--hl-pink); }
+
+.cu-revisao-topo {
+  display: grid;
+  justify-items: center;
+  max-width: 640px;
+}
+
+.cu-revisao .cu-aba {
+  transform: none;
+  transition: background-color 0.42s var(--cu-ease);
+}
+
+.cu-revisao .cu-titulo span {
+  background-size: 100% 100%;
+}
+
+.cu-revisao .cu-lead {
+  opacity: 1;
+}
+
+.cu-fichario {
+  position: relative;
+  width: min(1040px, 100%);
+  aspect-ratio: 16 / 9;
+  min-height: 340px;
+  max-height: 72vh;
+}
+
+.cu-fichario-canvas,
+.cu-fichario-canvas canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cu-fichario-carrega {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-family: var(--cu-gochi);
+  font-size: 1.3rem;
+  color: var(--cu-muted);
+  animation: cu-toque 1.4s ease-in-out infinite;
+}
+
+.cu-fichario-controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.cu-seta {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1.5px solid var(--cu-pen);
+  border-radius: 50%;
+  color: var(--cu-pen);
+  transition: background-color 0.14s, transform 0.14s var(--cu-ease), opacity 0.14s;
+}
+
+.cu-seta:hover:not(:disabled) {
+  background: rgb(var(--pen) / 0.08);
+  transform: scale(1.06);
+}
+
+.cu-seta:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.cu-fichario-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 13.5rem;
+  justify-content: center;
+  padding: 0.55rem 1rem;
+  border-radius: 10px 10px 2px 2px;
+  background: rgb(var(--tab));
+  color: #16181d;
+  font-weight: 900;
+  font-size: 0.9rem;
+  transition: background-color 0.42s var(--cu-ease);
+}
+
+.cu-fichario-chip b {
+  font-family: "DM Mono", monospace;
+}
+
+/* ═══════════════════ final: lousa com giz ═══════════════════ */
+
+.cu-lousa :is(.cu-giz, .cu-giz-sub) {
+  position: relative;
+}
+
+.cu-lousa :is(.cu-giz-data, .cu-giz, .cu-giz-sub) {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.cu-giz-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+@media (pointer: coarse) {
+  /* no celular o dedo também rola a página: só o arrasto de lado escreve */
+  .cu-giz-canvas {
+    touch-action: pan-y;
+  }
+}
+
+.cu-giz-dica {
+  position: absolute;
+  left: 50%;
+  bottom: 0.9rem;
+  z-index: 2;
+  translate: -50% 0;
+  font-family: var(--cu-gochi);
+  font-size: 1rem;
+  color: rgb(243 241 232 / 0.6);
+  pointer-events: none;
+  transition: opacity 0.42s;
+}
+
+.cu-giz-dica.is-sumiu {
+  opacity: 0;
+}
+
+.cu-lousa .cu-carimbo-final {
+  z-index: 3;
+}
+
+button.cu-apagador {
+  z-index: 3;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: translate 0.14s var(--cu-ease);
+}
+
+button.cu-apagador:hover {
+  translate: 0 -3px;
+}
+
+button.cu-apagador.is-apagando {
+  animation: cu-apaga 0.5s var(--cu-ease);
+}
+
+@keyframes cu-apaga {
+  40% {
+    translate: 70px -40px;
+    rotate: -6deg;
+  }
+}
+
+/* ═══════════════════ celular e movimento reduzido ═══════════════════ */
+
+@media (max-width: 1023px) {
+  .cu-toque {
+    right: 0;
+    top: -1.2rem;
+    font-size: 0.85rem;
+  }
+
+  .cu-fichario {
+    aspect-ratio: 4 / 3.4;
+  }
+}
+
+/* com movimento reduzido o useTilt nem liga: --tx/--ty ficam em 0 */
+.cu-root.is-reduced .cu-toque {
+  display: none;
+}
+
+/* ═══════════════════ abertura: caderno com corpo ═══════════════════ */
+
+/* sem perspectiva no pai, o giro do caderno sai achatado */
+.cu-abertura .cu-stage {
+  perspective: 1300px;
+}
+
+@property --sway {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.cu-abertura .cu-livro3d {
+  --spin-y: 0deg;
+  --spin-x: 0deg;
+  transform:
+    translateX(calc(var(--open) * min(190px, 35vw)))
+    translateY(calc(var(--p, 0) * -4vh))
+    rotate(calc((1 - var(--open)) * -4deg))
+    rotateY(calc((var(--tx, 0) * 16 + var(--sway) * 12) * 1deg + var(--spin-y)))
+    rotateX(calc((var(--ty, 0) * -10 + 8) * 1deg + var(--spin-x)));
+  transition: transform 0.9s var(--cu-pop);
+  animation:
+    cu-livro-chega 1.1s var(--cu-ease) both,
+    cu-balanca 7s ease-in-out 1.2s infinite alternate;
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.cu-abertura .cu-livro3d.is-girando {
+  cursor: grabbing;
+  transition: transform 0.08s linear;
+}
+
+@keyframes cu-balanca {
+  from { --sway: -1; }
+  to { --sway: 1; }
+}
+
+/* contracapa e miolo ficam atrás da capa, cada folha alguns px mais funda */
+.cu-contracapa,
+.cu-miolo i {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px 14px 14px 6px;
+  pointer-events: none;
+}
+
+.cu-contracapa {
+  transform: translateZ(-22px);
+  background: #26359e;
+  box-shadow: 0 40px 50px -26px rgb(0 0 0 / 0.65);
+}
+
+.cu-miolo {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.cu-miolo i {
+  inset: 4px 6px 4px 2px;
+  transform: translateZ(calc(-4px - var(--z) * 3px));
+  background: rgb(var(--sheet));
+  box-shadow: inset 0 0 0 1px rgb(var(--rule));
+}
+
+.cu-sumario {
+  transform: translateZ(-2px);
+}
+
+/* bordas do bloco de folhas: listrinhas de papel vistas de lado */
+.cu-borda {
+  position: absolute;
+  pointer-events: none;
+  background: repeating-linear-gradient(var(--dir, 90deg), rgb(var(--sheet)) 0 2px, rgb(var(--rule)) 2px 3px);
+}
+
+.cu-borda.is-direita {
+  top: 4px;
+  bottom: 4px;
+  right: 6px;
+  width: 22px;
+  transform-origin: right center;
+  transform: rotateY(-90deg);
+  --dir: 90deg;
+}
+
+.cu-borda.is-baixo,
+.cu-borda.is-cima {
+  left: 2px;
+  right: 6px;
+  height: 22px;
+  --dir: 0deg;
+}
+
+.cu-borda.is-baixo {
+  bottom: 4px;
+  transform-origin: center bottom;
+  transform: rotateX(90deg);
+}
+
+.cu-borda.is-cima {
+  top: 4px;
+  transform-origin: center top;
+  transform: rotateX(-90deg);
+}
+
+/* — dicas da abertura — */
+.cu-dica-giro {
+  font-family: var(--cu-gochi);
+  font-size: 1.05rem;
+  color: var(--cu-red);
+  rotate: -2deg;
+}
+
+.cu-dica-giro.is-feito {
+  color: #15803d;
+}
+
+.cu-novidades {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.cu-novidades b {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: var(--cu-red);
+  color: #fff;
+  font-family: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  rotate: -4deg;
+}
+
+.cu-novidades button {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  border: 1.5px dashed var(--cu-pen);
+  color: var(--cu-pen);
+  font-family: var(--cu-gochi);
+  font-size: 0.95rem;
+  transition: background-color 0.14s, transform 0.14s var(--cu-ease);
+}
+
+.cu-novidades button:hover {
+  background: rgb(var(--pen) / 0.08);
+  transform: translateY(-1px);
+}
+
+.cu-root.is-reduced .cu-abertura .cu-livro3d {
+  animation: none;
+}
+
+.cu-abertura .cu-livro3d {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* lombada: a espessura vista pelo lado da espiral */
+.cu-borda.is-esquerda {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 22px;
+  transform-origin: left center;
+  transform: rotateY(90deg);
+  background: linear-gradient(90deg, #3346c9, #26359e);
+  border-radius: 3px;
+}
+
+/* novidades e dica de giro no alto da abertura; somem ao abrir o caderno */
+.cu-abertura-topo {
+  position: absolute;
+  top: 4.4rem;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  opacity: calc(1 - var(--p, 0) * 4);
+}
+
+@media (max-width: 1023px) {
+  .cu-abertura-topo {
+    top: 4.6rem;
+  }
+
+  .cu-novidades {
+    padding-inline: 1rem;
+  }
+}
+
+.cu-root.is-reduced .cu-abertura-topo {
+  position: relative;
+  top: auto;
+  opacity: 1;
+}

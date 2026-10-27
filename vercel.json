@@ -7,6 +7,18 @@
       "maxDuration": 300
     }
   },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), geolocation=(), payment=(), usb=(), microphone=(self), fullscreen=(self), clipboard-write=(self)" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'" }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",
