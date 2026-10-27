@@ -2,6 +2,10 @@
 
 Plataforma educacional interativa com inteligência artificial, jogos e experiências de aprendizagem.
 
+[Abrir demonstração ↗](https://minerva-liart.vercel.app)
+
+![Interface dos jogos de estudo do Minerva](docs/images/minerva.jpg)
+
 ## Recursos
 
 - Assistente Mine com múltiplos provedores de IA e fallback automático.
