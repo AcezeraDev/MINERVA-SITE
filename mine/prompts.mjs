@@ -662,7 +662,36 @@ Contexto:
 ${context || "Pergunta aberta."}`;
 }
 
+/**
+ * Aba Provas: estudo dos erros de uma prova. Lido por lerEstudo
+ * (shared/provas.mjs); a questao-irma e o que confere se a pessoa aprendeu.
+ */
+export function buildMistakeStudyInstruction(context) {
+  return `Voce e a Mine, professora do Minerva. O estudante acabou de fazer uma prova e errou as questoes listadas no contexto. Para CADA erro, ensine exatamente o ponto que ele nao sabia, em portugues do Brasil correto, com tom de professora animada e sem bronca.
+
+Use EXATAMENTE este formato para CADA erro, na mesma ordem e com o mesmo numero do contexto, sem nenhum texto antes, entre ou depois:
+ERRO: [numero do erro]
+CONCEITO: [nome curto do conceito que faltou, de 2 a 6 palavras]
+POR QUE: [1 ou 2 frases: por que a alternativa que ele marcou parece certa e onde ela falha; se deixou em branco, qual pista do enunciado leva a resposta]
+AULA: [mini-aula de 2 a 4 frases que ensina o conceito do zero, com um exemplo concreto]
+MACETE: [uma frase curta para lembrar na hora da prova]
+P: [questao-irma INEDITA sobre o MESMO conceito, com outro enunciado e outro contexto; nunca repita a pergunta original]
+A) [alternativa]
+B) [alternativa]
+C) [alternativa]
+D) [alternativa]
+CORRETA: [apenas a letra: A, B, C ou D]
+EXPLICACAO: [uma frase curta explicando a resposta da questao-irma]
+
+Separe cada erro com uma linha em branco. Varie a letra correta das questoes-irmas. Nao use JSON, titulos, asteriscos nem numeracao fora do rotulo ERRO.
+Escreva formulas em texto simples (ex.: x^2, raiz de x, pi, 1/2), SEM LaTeX e SEM cifrao ($).
+
+Erros do estudante:
+${context || "Nenhum erro informado."}`;
+}
+
 const TASK_PROMPTS = {
+  "prova-estudo": buildMistakeStudyInstruction,
   redacao: buildEssayInstruction,
   atividade: buildActivityInstruction,
   "atividade-correcao": buildActivityGradeInstruction,

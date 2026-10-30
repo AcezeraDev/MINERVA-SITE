@@ -8,6 +8,7 @@ import { readCodeReply } from "../shared/code-run.mjs";
 import { parseSequencePuzzles } from "../shared/game-core.mjs";
 import { lerAtividade, lerCorrecaoDissertativa } from "../shared/atividades.mjs";
 import { lerCorrecao } from "../shared/redacao.mjs";
+import { lerEstudo } from "../shared/provas.mjs";
 
 function matches(text, pattern) {
   return [...String(text || "").matchAll(pattern)];
@@ -329,6 +330,10 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
   if (cleanTask === "redacao") return lerCorrecao(text, prompt) ? "" : "correcao de redacao fora do formato";
   if (cleanTask === "atividade") return lerAtividade(text) ? "" : "atividade incompleta ou fora do formato";
   if (cleanTask === "atividade-correcao") return lerCorrecaoDissertativa(text) ? "" : "correcao da dissertativa fora do formato";
+  if (cleanTask === "prova-estudo") {
+    const valid = lerEstudo(text).length;
+    return valid >= minimum ? "" : `estudo dos erros incompleto (${valid}/${minimum})`;
+  }
   if (cleanTask === "plan") {
     return /^DIA\s+\d+\s*\|\s*.+\|\s*.+\|\s*.+$/im.test(text) ? "" : "plano de estudos fora do formato";
   }

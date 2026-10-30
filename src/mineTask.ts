@@ -8,7 +8,7 @@
 const reasoningReserve = 1200;
 
 export async function askMineTask(
-  payload: { task: "redacao" | "atividade" | "atividade-correcao"; prompt: string; context: string; outputTokens: number },
+  payload: { task: "redacao" | "atividade" | "atividade-correcao" | "quiz" | "prova-estudo"; prompt: string; context: string; outputTokens: number },
   options: { signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<string> {
   const controller = new AbortController();

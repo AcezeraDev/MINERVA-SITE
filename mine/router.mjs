@@ -100,7 +100,7 @@ const GAME_TASKS = new Set(["vf", "pares", "forca", "caca", "sequencia"]);
 // ingles ("I check your passport now") e trocava a pessoa na correcao; o
 // ingles da Mine e o modelo que o aluno copia, entao vai no modelo principal.
 const FAST_TASKS = new Set([...GAME_TASKS, "title", "idioma-dica"]);
-const LONG_TASKS = new Set(["atividade", "redacao"]);
+const LONG_TASKS = new Set(["atividade", "redacao", "prova-estudo"]);
 
 // Medido em producao em 2026-09-04, `caca` com 6 perguntas no gpt-5-mini:
 // 14,4 s para o pedido antigo e 17,0 s com a folga de ineditismo. O padrao de

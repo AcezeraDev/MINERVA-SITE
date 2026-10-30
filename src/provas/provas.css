@@ -1,0 +1,1140 @@
+/* Aba Provas: fazer a prova, ver o que errou e estudar aquilo. */
+
+.prv-page {
+  --prv-certa: var(--hl-mint);
+  --prv-errada: var(--hl-pink);
+  padding-bottom: 4rem;
+}
+
+.prv-card {
+  min-width: 0;
+  padding: 1.2rem 1.25rem;
+  border-radius: 1.1rem;
+  background: rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+.prv-label {
+  margin: 0.9rem 0 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: rgb(var(--pen));
+}
+
+.prv-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.prv-dica {
+  margin-top: 0.6rem;
+  font-size: 0.82rem;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-erro,
+.prv-aviso {
+  margin-top: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.6rem;
+  font-size: 0.9rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--hl-pink) / 0.18);
+}
+
+.prv-aviso {
+  background: rgb(var(--hl-yellow) / 0.22);
+}
+
+.prv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.75rem;
+  padding: 0 1.15rem;
+  border-radius: 0.8rem;
+  font-weight: 800;
+  transition: filter 140ms ease, opacity 140ms ease, background-color 140ms ease;
+}
+
+.prv-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.prv-btn-ghost {
+  color: rgb(var(--pen));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--pen) / 0.55);
+}
+
+.prv-btn-ghost.is-on {
+  background: rgb(var(--hl-yellow) / 0.3);
+  box-shadow: inset 0 0 0 1.5px rgb(var(--hl-yellow));
+  color: rgb(var(--theme-text));
+}
+
+.prv-btn-grande {
+  min-height: 3.1rem;
+  padding: 0 1.5rem;
+  font-size: 1.02rem;
+}
+
+.prv-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
+}
+
+/* ── trilha das 3 etapas ── */
+.prv-trilha {
+  position: relative;
+  display: grid;
+  gap: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (min-width: 760px) {
+  .prv-trilha {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding-top: 0.6rem;
+  }
+}
+
+.prv-trilha-traco {
+  display: none;
+  position: absolute;
+  inset: 0 2% auto;
+  width: 96%;
+  height: 40px;
+  color: rgb(var(--pen) / 0.45);
+  pointer-events: none;
+}
+
+@media (min-width: 760px) {
+  .prv-trilha-traco {
+    display: block;
+    top: 3.2rem;
+  }
+}
+
+.prv-etapa {
+  position: relative;
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem 2.4rem 1.1rem 3.6rem;
+  border-radius: 1rem;
+  background: rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+.prv-etapa b {
+  font-size: 1.02rem;
+  color: rgb(var(--theme-text));
+}
+
+.prv-etapa > span:last-child {
+  font-size: 0.86rem;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-etapa-num {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.9rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.2rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--tom) / 0.55);
+}
+
+.prv-etapa-1 { --tom: var(--hl-lilac); }
+.prv-etapa-2 { --tom: var(--hl-pink); }
+.prv-etapa-3 { --tom: var(--hl-mint); }
+
+.prv-etapa-icone {
+  position: absolute;
+  right: 0.9rem;
+  top: 0.9rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  color: rgb(var(--tom));
+}
+
+.prv-trilha-placar {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+  color: rgb(var(--pen));
+}
+
+@media (min-width: 760px) {
+  .prv-trilha-placar {
+    grid-column: 1 / -1;
+    text-align: right;
+  }
+}
+
+.prv-continuar {
+  display: grid;
+  gap: 0.2rem;
+  width: 100%;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.2rem;
+  border-radius: 1rem;
+  text-align: left;
+  background: rgb(var(--hl-yellow) / 0.16);
+  box-shadow: inset 0 0 0 1.5px rgb(var(--hl-yellow) / 0.6);
+}
+
+.prv-continuar-tag {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+  color: rgb(var(--pen));
+}
+
+.prv-continuar-titulo {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.prv-continuar-info {
+  font-size: 0.88rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* ── home ── */
+.prv-grade {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* a barra lateral come ~300px: abaixo disso as duas colunas espremem a configuração */
+@media (min-width: 1200px) {
+  .prv-grade {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  }
+}
+
+.prv-lateral {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.prv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.prv-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.4rem;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text) / 0.85);
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.7);
+}
+
+.prv-chip-grifo,
+.prv-segmento-bolha {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(var(--mint) / 0.35);
+  box-shadow: inset 0 0 0 1.5px rgb(var(--mint) / 0.8);
+}
+
+.prv-chip-cor {
+  position: relative;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+}
+
+.prv-campo {
+  display: block;
+}
+
+.prv-campo input {
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0 0.9rem;
+  border-radius: 0.75rem;
+  font-size: 0.98rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.8);
+}
+
+.prv-campo input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgb(var(--pen) / 0.7);
+}
+
+.prv-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.5rem;
+}
+
+.prv-segmento,
+.prv-filtro {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.7);
+}
+
+.prv-segmento button,
+.prv-filtro button {
+  position: relative;
+  min-height: 2.1rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-segmento button.is-on,
+.prv-filtro button.is-on {
+  color: rgb(var(--theme-text));
+}
+
+/* ── caderno de erros ── */
+.prv-caderno-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.prv-anel {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+}
+
+.prv-anel svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.prv-anel circle {
+  fill: none;
+  stroke-width: 3.2;
+}
+
+.prv-anel-fundo {
+  stroke: rgb(var(--hl-pink) / 0.35);
+}
+
+.prv-anel-traco {
+  stroke: rgb(var(--hl-mint));
+  stroke-linecap: round;
+}
+
+.prv-anel b {
+  font-size: 1.05rem;
+  color: rgb(var(--theme-text));
+}
+
+.prv-assuntos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+
+.prv-assuntos span {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text) / 0.85);
+  background: rgb(var(--hl-pink) / 0.16);
+}
+
+.prv-caderno-abas {
+  display: flex;
+  gap: 1rem;
+  margin: 1.1rem 0 0.4rem;
+  border-bottom: 1px dashed rgb(var(--line));
+}
+
+.prv-caderno-abas button {
+  padding: 0.3rem 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgb(var(--theme-muted));
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.prv-caderno-abas button.is-on {
+  color: rgb(var(--pen));
+  border-color: rgb(var(--pen));
+}
+
+.prv-erros {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.prv-erros button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.15rem 0.6rem;
+  width: 100%;
+  padding: 0.55rem 0.3rem;
+  text-align: left;
+  border-radius: 0.6rem;
+}
+
+.prv-erros button:not(:disabled):hover {
+  background: rgb(var(--panel-2));
+}
+
+.prv-erro-q {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 0.88rem;
+  color: rgb(var(--theme-text));
+}
+
+.prv-vezes {
+  grid-column: 2;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: rgb(var(--margin-line, var(--pen)));
+}
+
+.prv-status {
+  align-self: start;
+  margin-top: 0.1rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(var(--theme-text));
+}
+
+.prv-status.is-pendente { background: rgb(var(--hl-pink) / 0.4); }
+.prv-status.is-estudado { background: rgb(var(--hl-yellow) / 0.5); }
+.prv-status.is-dominado { background: rgb(var(--hl-mint) / 0.45); }
+
+.prv-vazio {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.6rem 0;
+  font-size: 0.88rem;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-historico ul {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.prv-historico li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.88rem;
+}
+
+.prv-historico li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--theme-text));
+}
+
+.prv-historico li b {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+  color: rgb(var(--pen));
+}
+
+.prv-historico li small {
+  color: rgb(var(--theme-muted));
+}
+
+/* ── prova ── */
+.prv-folha-prova,
+.prv-estudo {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.prv-barra {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.prv-barra-assunto {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.prv-relogio {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--panel-2));
+}
+
+.prv-progresso {
+  flex-basis: 100%;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgb(var(--panel-2));
+}
+
+.prv-progresso i {
+  display: block;
+  height: 100%;
+  background: rgb(var(--hl-mint));
+  transform-origin: left;
+}
+
+.prv-pontos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.prv-ponto {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: rgb(var(--theme-muted));
+  background: rgb(var(--panel));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.8);
+}
+
+.prv-ponto.is-feita {
+  color: rgb(var(--theme-text));
+  background: rgb(var(--hl-lilac) / 0.25);
+}
+
+.prv-ponto.is-duvida::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgb(var(--hl-yellow));
+  box-shadow: 0 0 0 2px rgb(var(--panel));
+}
+
+.prv-ponto-atual {
+  position: absolute;
+  inset: -3px;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 2px rgb(var(--pen));
+}
+
+.prv-questao-palco,
+.prv-estudo {
+  position: relative;
+}
+
+.prv-questao-palco {
+  perspective: 1200px;
+}
+
+.prv-questao {
+  padding: 1.5rem 1.4rem;
+  border-radius: 1.2rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 31px, rgb(var(--rule, var(--line)) / 0.35) 31px 32px),
+    rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+.prv-questao-num {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.25rem;
+  color: rgb(var(--pen));
+}
+
+.prv-questao-num small {
+  font-size: 0.95rem;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-enunciado {
+  margin: 0.4rem 0 1.1rem;
+  font-size: clamp(1.05rem, 2.4vw, 1.3rem);
+  font-weight: 700;
+  line-height: 1.45;
+  color: rgb(var(--theme-text));
+}
+
+.prv-alternativas {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.prv-alt {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.85rem;
+  text-align: left;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.8);
+}
+
+.prv-alt-grifo {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(var(--mint) / 0.28);
+  box-shadow: inset 0 0 0 2px rgb(var(--mint) / 0.85);
+}
+
+.prv-alt-letra {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  font-weight: 800;
+  background: rgb(var(--panel));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+}
+
+.prv-alt.is-marcada .prv-alt-letra {
+  color: rgb(var(--panel));
+  background: rgb(var(--pen));
+  box-shadow: none;
+}
+
+.prv-alt-texto {
+  position: relative;
+  padding-top: 0.2rem;
+  line-height: 1.4;
+}
+
+.prv-alt.is-certa {
+  background: rgb(var(--prv-certa) / 0.3);
+  box-shadow: inset 0 0 0 2px rgb(var(--prv-certa));
+}
+
+.prv-alt.is-errada {
+  background: rgb(var(--prv-errada) / 0.25);
+  box-shadow: inset 0 0 0 2px rgb(var(--prv-errada));
+}
+
+.prv-alt.is-apagada {
+  opacity: 0.5;
+}
+
+.prv-rodape {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
+}
+
+.prv-rodape-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── resultado ── */
+.prv-voltar {
+  margin-bottom: 0.8rem;
+}
+
+.prv-placar {
+  display: grid;
+  gap: 1.4rem;
+  align-items: center;
+  padding: 1.5rem;
+  border-radius: 1.3rem;
+  background:
+    radial-gradient(90% 120% at 10% 30%, rgb(var(--hl-yellow) / 0.14), transparent 60%),
+    rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+@media (min-width: 700px) {
+  .prv-placar {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
+.prv-placar h1 {
+  margin: 0.2rem 0 0.7rem;
+  font-size: clamp(1.5rem, 4vw, 2.1rem);
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.prv-carimbo {
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 9rem;
+  height: 9rem;
+  border-radius: 999px;
+  color: rgb(var(--tom));
+  border: 4px double rgb(var(--tom));
+  box-shadow: inset 0 0 0 6px rgb(var(--tom) / 0.12);
+}
+
+.prv-carimbo.is-bom { --tom: var(--hl-mint); }
+.prv-carimbo.is-medio { --tom: var(--hl-yellow); }
+.prv-carimbo.is-baixo { --tom: var(--hl-pink); }
+
+.prv-carimbo-nota {
+  font-family: "Gochi Hand", cursive;
+  font-size: 3.4rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--theme-text));
+}
+
+.prv-carimbo-rotulo {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-placar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.prv-placar-chips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.prv-placar-chips .is-certa { background: rgb(var(--prv-certa) / 0.3); }
+.prv-placar-chips .is-errada { background: rgb(var(--prv-errada) / 0.3); }
+.prv-placar-chips .is-duvida { background: rgb(var(--hl-yellow) / 0.35); }
+
+.prv-filtro {
+  margin: 1.4rem 0 0.8rem;
+}
+
+.prv-correcao {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.prv-corrigida {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 4px 0 0 rgb(var(--tom)), inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+.prv-corrigida.is-certa { --tom: var(--prv-certa); }
+.prv-corrigida.is-errada { --tom: var(--prv-errada); }
+
+.prv-corrigida-topo {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0.9rem 1rem 0.9rem 1.2rem;
+  text-align: left;
+}
+
+.prv-corrigida-marca {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--tom) / 0.45);
+}
+
+.prv-corrigida-q {
+  display: grid;
+  gap: 0.15rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: rgb(var(--theme-text));
+}
+
+.prv-corrigida-q small {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-corrigida-corpo {
+  overflow: hidden;
+}
+
+.prv-corrigida-corpo > ul {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0 1rem 0 3.8rem;
+}
+
+.prv-corrigida-corpo li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.5rem;
+  font-size: 0.92rem;
+  color: rgb(var(--theme-text) / 0.85);
+}
+
+.prv-corrigida-corpo li em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.prv-corrigida-corpo li.is-gabarito {
+  color: rgb(var(--theme-text));
+  background: rgb(var(--prv-certa) / 0.28);
+}
+
+.prv-corrigida-corpo li.is-sua {
+  background: rgb(var(--prv-errada) / 0.2);
+  text-decoration: line-through;
+  text-decoration-color: rgb(var(--prv-errada));
+  text-decoration-thickness: 2px;
+}
+
+.prv-corrigida-corpo li.is-sua em {
+  text-decoration: none;
+}
+
+.prv-branco,
+.prv-explicacao {
+  margin: 0.6rem 1rem 1rem 3.8rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-explicacao {
+  font-family: "Kalam", cursive;
+  font-size: 1rem;
+  color: rgb(var(--pen));
+}
+
+@media (max-width: 560px) {
+  .prv-corrigida-corpo > ul,
+  .prv-branco,
+  .prv-explicacao {
+    padding-left: 0;
+    margin-left: 1.2rem;
+  }
+  .prv-corrigida-corpo > ul {
+    padding-left: 1.2rem;
+    margin-left: 0;
+  }
+}
+
+/* ── estudo ── */
+.prv-estudo {
+  max-width: 1100px;
+}
+
+.prv-estudo-grade {
+  display: grid;
+  gap: 1.1rem;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .prv-estudo-grade {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  }
+}
+
+.prv-conceito {
+  margin: 0.2rem 0 0.9rem;
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.prv-conceito span {
+  background: linear-gradient(transparent 58%, rgb(var(--mint) / 0.45) 58% 92%, transparent 92%);
+}
+
+.prv-original {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.8rem;
+  font-size: 0.9rem;
+  background: rgb(var(--panel-2));
+  color: rgb(var(--theme-text) / 0.9);
+}
+
+.prv-original p:first-child {
+  font-weight: 700;
+}
+
+.prv-original p.is-sua,
+.prv-original p.is-gabarito {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+}
+
+.prv-original p.is-sua svg { color: rgb(var(--prv-errada)); flex: none; margin-top: 0.15rem; }
+.prv-original p.is-gabarito svg { color: rgb(var(--prv-certa)); flex: none; margin-top: 0.15rem; }
+
+.prv-bloco {
+  margin-top: 0.9rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.8rem;
+}
+
+.prv-bloco b {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgb(var(--theme-muted));
+}
+
+.prv-bloco p {
+  margin-top: 0.25rem;
+  line-height: 1.55;
+  color: rgb(var(--theme-text));
+}
+
+.prv-porque {
+  background: rgb(var(--hl-pink) / 0.14);
+}
+
+.prv-aula {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 27px, rgb(var(--rule, var(--line)) / 0.4) 27px 28px),
+    rgb(var(--hl-lilac) / 0.08);
+}
+
+.prv-aula p {
+  font-family: "Kalam", cursive;
+  font-size: 1.08rem;
+  line-height: 28px;
+  color: rgb(var(--pen));
+}
+
+.prv-postit {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.2rem 0.2rem 0.9rem 0.2rem;
+  color: #2a2410;
+  background: #fde68a;
+  box-shadow: 0 10px 22px -12px rgb(0 0 0 / 0.45);
+}
+
+.prv-postit span {
+  font-family: "Kalam", cursive;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.prv-postit b {
+  font-family: inherit;
+  margin-right: 0.25rem;
+}
+
+.prv-retorno {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: start;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.85rem;
+}
+
+.prv-retorno.is-certa { background: rgb(var(--prv-certa) / 0.22); }
+.prv-retorno.is-errada { background: rgb(var(--prv-errada) / 0.18); }
+
+.prv-retorno b {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.3rem;
+  font-weight: 400;
+  color: rgb(var(--theme-text));
+}
+
+.prv-retorno p {
+  font-size: 0.92rem;
+  color: rgb(var(--theme-text) / 0.9);
+}
+
+.prv-estudo-fim {
+  display: grid;
+  place-items: center;
+  min-height: 50vh;
+}
+
+.prv-fim-card {
+  max-width: 540px;
+  text-align: center;
+}
+
+.prv-fim-card h1 {
+  margin: 0.3rem 0;
+  font-size: clamp(1.4rem, 4vw, 1.9rem);
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.prv-fim-card .prv-acoes {
+  justify-content: center;
+}
+
+/* ── espera ── */
+.prv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(var(--paper, 0 0 0) / 0.72);
+}
+
+.prv-overlay-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  width: min(360px, 100%);
+  padding: 1.6rem 1.4rem;
+  border-radius: 1.2rem;
+  text-align: center;
+  background: rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+.prv-overlay-passo {
+  min-height: 1.5rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text));
+}
+
+.prv-folhas {
+  position: relative;
+  width: 120px;
+  height: 90px;
+  margin-bottom: 0.4rem;
+}
+
+.prv-folha {
+  position: absolute;
+  left: calc(50% - 30px);
+  top: 10px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  width: 60px;
+  height: 74px;
+  padding: 0 10px;
+  border-radius: 4px;
+  background: rgb(var(--panel-2));
+  box-shadow: 0 6px 16px -8px rgb(0 0 0 / 0.4), inset 0 0 0 1px rgb(var(--line));
+}
+
+.prv-folha i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: rgb(var(--pen) / 0.45);
+}
+
+.prv-folha i:nth-child(2) { width: 75%; }
+.prv-folha i:nth-child(3) { width: 55%; background: rgb(var(--hl-mint) / 0.8); }
