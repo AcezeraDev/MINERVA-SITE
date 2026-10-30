@@ -117,7 +117,6 @@ import {
   humanMinutes,
   MasteryBars,
   SessionMix,
-  StatTile,
   type MasteryRow,
 } from "./insights";
 import {
@@ -190,6 +189,9 @@ import { PencilTimer } from "./caderno/PencilTimer";
 import { InkBarChart, LevelStamp, StickerBook } from "./caderno/Progress";
 import { BookshelfPodium } from "./caderno/Bookshelf";
 import { MineFace } from "./caderno/MineFace";
+import { HomeHero } from "./home/HomeHero";
+import { Bento } from "./home/Bento";
+import { NovaMateriaFx, anunciarMateria } from "./home/NovaMateriaFx";
 import { MineWelcome } from "./caderno/MineWelcome";
 import { CadernoSplash } from "./caderno/Splash";
 import { MineTour, tourSteps } from "./caderno/MineTour";
@@ -239,42 +241,8 @@ const IdiomasView = React.lazy(() => import("./idiomas/IdiomasView").then((m) =>
 const RedacaoView = React.lazy(() => import("./redacao/RedacaoView").then((m) => ({ default: m.RedacaoView })));
 const AtividadesView = React.lazy(() => import("./atividades/AtividadesView").then((m) => ({ default: m.AtividadesView })));
 const ProvasView = React.lazy(() => import("./provas/ProvasView").then((m) => ({ default: m.ProvasView })));
-const MesaDeEstudo = React.lazy(() => import("./caderno/MesaDeEstudo"));
 const AgendaView = React.lazy(() => import("./agenda/AgendaView").then((m) => ({ default: m.AgendaView })));
 const TaskEditor = React.lazy(() => import("./agenda/TaskEditor").then((m) => ({ default: m.TaskEditor })));
-
-/**
- * A mesa 3D só no computador (tela larga e mouse), fora do tier baixo e sem
- * movimento reduzido. No resto, a Home mostra a faixa de atalhos de sempre e
- * o three.js nem é baixado.
- */
-function useMesaEnabled() {
-  const reduced = useSoftMotion();
-  const tier = useQualityTier();
-  const query = "(min-width: 1024px) and (pointer: fine)";
-  const [wide, setWide] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const onChange = () => setWide(media.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
-  return wide && !reduced && tier !== "low";
-}
-
-/** Se a cena 3D falhar (sem WebGL, driver ruim), a Home volta para os atalhos. */
-class MesaBoundary extends React.Component<{ onFail: () => void; children: React.ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  componentDidCatch() {
-    this.props.onFail();
-  }
-  render() {
-    return this.state.failed ? null : this.props.children;
-  }
-}
 
 const ComoUsarView = React.lazy(() => import("./guia/ComoUsarView").then((m) => ({ default: m.ComoUsarView })));
 const MineCode = React.lazy(() => import("./chat/MineCode").then((m) => ({ default: m.MineCode })));
@@ -2539,7 +2507,7 @@ function App() {
     if (route.view === "como-usar") return <React.Suspense fallback={<PageLoading />}><ComoUsarView /></React.Suspense>;
     if (route.view === "perfil") return <ProfileView user={user} data={userData} update={update} notify={notify} logout={logout} targetId={route.id} />;
     if (route.view === "admin") return hasAdminAccess ? <React.Suspense fallback={<PageLoading />}><AdminView data={data} syncStatus={syncStatus} databaseMode={databaseMode} section={route.id} currentUserId={user.id} onDeleteUser={requestDeleteUser} onDeleteComment={requestDeleteComment} update={update} notify={notify} setModal={setModal} /></React.Suspense> : <AdminRestrictedView />;
-    return <HomeView data={userData} displayName={displayName} accentColor={appearance.accentColor} themeMode={appearance.themeMode} setModal={setModal} update={update} openCommand={() => setCommandOpen(true)} openMine={(subjectId) => { setSelectedSubjectId(subjectId); go("mine"); }} />;
+    return <HomeView data={userData} userId={user.id} displayName={displayName} accentColor={appearance.accentColor} themeMode={appearance.themeMode} setModal={setModal} update={update} openCommand={() => setCommandOpen(true)} openMine={(subjectId) => { setSelectedSubjectId(subjectId); go("mine"); }} />;
   })();
 
   return (
@@ -2548,6 +2516,7 @@ function App() {
       {!showIntro && !isAdminPanel && (tourOpen || !user.settings.tourDone) ? (
         <MineTour name={displayName.split(" ")[0]} steps={tourSteps} onDone={finishTour} />
       ) : null}
+      <NovaMateriaFx />
       {levelCard !== null && rewards ? (
         <ConquistaCard
           info={{
@@ -3343,24 +3312,6 @@ export function PageHeader({ eyebrow, title, subtitle, action }: { eyebrow: stri
   );
 }
 
-function QuickAction({ icon: Icon, label, hint, onClick }: { icon: LucideIcon; label: string; hint: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="card-motion-surface group relative flex h-full w-full min-h-[5.4rem] items-center gap-3.5 overflow-hidden border-b border-white/10 bg-transparent p-4 text-left transition-control duration-control hover:border-mint hover:bg-white/[0.025] active:scale-[0.99]"
-    >
-      <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[.8rem] border border-white/10 text-mint transition-control duration-control group-hover:border-mint group-hover:bg-mint group-hover:text-black">
-        <Icon className="h-5 w-5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-black leading-tight">{label}</span>
-        <span className="block truncate text-[13px] text-white/50">{hint}</span>
-      </span>
-      <ArrowRight className="h-4 w-4 shrink-0 text-white/20 transition-control duration-control group-hover:translate-x-0.5 group-hover:text-mint" />
-    </button>
-  );
-}
-
 function greeting() {
   const hour = new Date().getHours();
   if (hour < 12) return "Bom dia";
@@ -3377,8 +3328,10 @@ function HomeView({
   update,
   openCommand,
   openMine,
+  userId,
 }: {
   data: ReturnType<typeof useMemoUserData>;
+  userId: string;
   displayName: string;
   accentColor: string;
   themeMode: ThemeMode;
@@ -3464,8 +3417,20 @@ function HomeView({
     })
     .sort((a, b) => b.priority - a.priority || Number(b.subject.favorite) - Number(a.subject.favorite) || a.subject.name.localeCompare(b.subject.name, "pt-BR"));
 
-  const [mesaFailed, setMesaFailed] = useState(false);
-  const mesaEnabled = useMesaEnabled() && !mesaFailed;
+  // dias com estudo na última semana, de 6 dias atrás até hoje
+  const weekDots = Array.from({ length: 7 }, (_, index) => {
+    const start = today() - (6 - index) * 86400000;
+    return data.sessions.some((session) => session.createdAt >= start && session.createdAt < start + 86400000);
+  });
+  const provasResumo = useMemo(() => {
+    try {
+      const salvo = JSON.parse(localStorage.getItem(`minerva:provas:${userId}`) || "{}");
+      const caderno: Array<{ status?: string }> = Array.isArray(salvo.caderno) ? salvo.caderno : [];
+      return { pendentes: caderno.filter((item) => item.status !== "dominado").length, feitas: Array.isArray(salvo.historico) ? salvo.historico.length : 0 };
+    } catch {
+      return { pendentes: 0, feitas: 0 };
+    }
+  }, [userId]);
 
   // Estante (padrão) ou cartões: a escolha fica neste navegador.
   const [libraryMode, setLibraryMode] = useState<"estante" | "cartoes">(() => {
@@ -3486,30 +3451,31 @@ function HomeView({
 
   return (
     <>
-      <div className="hidden sm:block">
-        <PageHeader
-          eyebrow="Área de estudos"
-          title={`${greeting()}, ${displayName}`}
-          subtitle={
-            overdue
-              ? `${overdue} ${overdue === 1 ? "tarefa atrasada" : "tarefas atrasadas"} esperando por você. Começar pela mais antiga costuma render.`
-              : dueToday
-                ? `Você tem ${dueToday} ${dueToday === 1 ? "tarefa" : "tarefas"} para hoje. Bora tirar do caminho?`
-                : "Tudo em dia. Um bom momento para adiantar um conteúdo novo."
-          }
-          action={
-            <>
-              <IconButton icon={Search} label="Busca rápida" onClick={openCommand} />
-              <IconButton icon={Settings} label="Perfil e ajustes" onClick={() => go("perfil")} />
-              <PrimaryButton onClick={() => setModal({ type: "subject" })} icon={Plus}>
-                Nova matéria
-              </PrimaryButton>
-            </>
-          }
-        />
-      </div>
+      <HomeHero
+        saudacao={greeting()}
+        nome={displayName}
+        subtitulo={
+          overdue
+            ? `${overdue} ${overdue === 1 ? "tarefa atrasada" : "tarefas atrasadas"} esperando por você. Começar pela mais antiga costuma render.`
+            : dueToday
+              ? `Você tem ${dueToday} ${dueToday === 1 ? "tarefa" : "tarefas"} para hoje. Bora tirar do caminho?`
+              : "Tudo em dia. Um bom momento para adiantar um conteúdo novo."
+        }
+        materias={subjectDesk.map(({ subject }) => ({ id: subject.id, name: subject.name, color: subject.color }))}
+        nivel={gam.level}
+        titulo={gam.title}
+        xpNivel={gam.levelXp}
+        xpPreciso={gam.levelNeed}
+        dias={days}
+        revisoes={dueCards}
+        onNovaMateria={() => setModal({ type: "subject" })}
+        onBusca={openCommand}
+        onAbrir={(id) => go("subject", id)}
+        onMine={() => go("mine")}
+        tema={themeMode}
+      />
 
-      <div className="grid gap-7">
+      <div className="mt-7 grid gap-7">
         <MineCodeNews />
         <StudyNowPanel
           nextTask={primaryTask}
@@ -3524,50 +3490,36 @@ function HomeView({
           update={update}
         />
 
+        <Bento
+          dados={{
+            nivel: gam.level,
+            titulo: gam.title,
+            xp: gam.xp,
+            xpNivel: gam.levelXp,
+            xpPreciso: gam.levelNeed,
+            dias: days,
+            semana: weekDots,
+            revisoes: dueCards,
+            focoMinutos: weekFocus,
+            sessoesSemana: weekSessions.length,
+            errosPendentes: provasResumo.pendentes,
+            provasFeitas: provasResumo.feitas,
+            tarefasHoje: dueToday,
+          }}
+          onMine={() => go("mine")}
+          onProgresso={() => go("progress")}
+          onRevisar={() => (dueBySubject[0] ? setModal({ type: "flashcards", subjectId: dueBySubject[0].subject.id }) : go("progress"))}
+          onProvas={() => go("provas")}
+          onFoco={() => go("foco")}
+          onPlano={() => go("plan")}
+          onBusca={openCommand}
+        />
+
         <ContinueStudyPanel
           data={data}
           openMaterial={(materialId) => setModal({ type: "materialView", materialId })}
           openMine={openMine}
         />
-
-        {mesaEnabled ? (
-          <section aria-label="Sua mesa de estudo">
-            <MesaBoundary onFail={() => setMesaFailed(true)}>
-            <React.Suspense fallback={<div className="caderno-mesa" />}>
-              <MesaDeEstudo
-                key={themeMode}
-                subjects={subjectDesk.slice(0, 3).map(({ subject }) => ({ id: subject.id, name: subject.name, color: subject.color }))}
-                onAction={(action) => {
-                  if (action.kind === "subject") go("subject", action.id);
-                  else if (action.kind === "search") openCommand();
-                  else go(action.kind);
-                }}
-              />
-            </React.Suspense>
-            </MesaBoundary>
-            <nav className="caderno-mesa-links" aria-label="Atalhos da mesa">
-              <button type="button" onClick={() => go("mine")}>celular · conversar com a Mine</button>
-              <button type="button" onClick={() => go("plan")}>planner · plano de estudos</button>
-              <button type="button" onClick={() => go("foco")}>lápis · sessão de foco</button>
-              <button type="button" onClick={openCommand}>lupa · busca (Ctrl + K)</button>
-            </nav>
-          </section>
-        ) : null}
-
-        <Stagger className={`grid overflow-hidden rounded-[1.1rem] border border-white/[0.08] bg-[#151a18] sm:grid-cols-2 lg:grid-cols-4 ${mesaEnabled ? "hidden" : ""}`} gap={0.04}>
-          <StaggerItem className="h-full">
-            <QuickAction icon={Bot} label="Conversar com a Mine" hint="Tire qualquer dúvida" onClick={() => go("mine")} />
-          </StaggerItem>
-          <StaggerItem className="h-full">
-            <QuickAction icon={CalendarPlus} label="Plano de estudos" hint="Cronograma até a prova" onClick={() => go("plan")} />
-          </StaggerItem>
-          <StaggerItem className="h-full">
-            <QuickAction icon={Timer} label="Sessão de foco" hint="Pomodoro com registro" onClick={() => go("foco")} />
-          </StaggerItem>
-          <StaggerItem className="h-full">
-            <QuickAction icon={Search} label="Busca rápida" hint="Ctrl + K em qualquer tela" onClick={openCommand} />
-          </StaggerItem>
-        </Stagger>
 
         <div className="grid items-start gap-6">
           <Reveal>
@@ -3651,7 +3603,7 @@ function HomeView({
         </div>
 
         <div className="hidden gap-6 lg:grid xl:grid-cols-12">
-          <Reveal className="xl:col-span-9" delay={0.04}>
+          <Reveal className="xl:col-span-12" delay={0.04}>
             <CommandDeck
               nodes={globeNodes}
               accentColor={accentColor}
@@ -3666,13 +3618,6 @@ function HomeView({
             />
           </Reveal>
 
-          <Stagger className="grid grid-cols-2 content-start overflow-hidden rounded-[1.1rem] border border-white/[0.08] bg-[#151a18] xl:col-span-3" gap={0.04}>
-            <StaggerItem className="h-full"><StatTile label="Nível" value={gam.level} detail={gam.title} accent="#B7A8CE" onClick={() => go("progress")} /></StaggerItem>
-            <StaggerItem className="h-full"><StatTile label="Sequência" value={days} detail={days === 1 ? "dia seguido" : "dias seguidos"} accent="#D98E87" spark={series} /></StaggerItem>
-            <StaggerItem className="h-full"><StatTile label="Foco (7 dias)" value={humanMinutes(weekFocus)} detail={`${weekSessions.length} sessões`} accent="#B8D6C0" onClick={() => go("foco")} /></StaggerItem>
-            <StaggerItem className="h-full"><StatTile label="Domínio" value={`${mastery}%`} detail={`${studied}/${data.materials.length} conteúdos`} accent="#A8C4D1" /></StaggerItem>
-            <StaggerItem className="col-span-2 h-full"><StatTile label="Revisões vencidas" value={dueCards} detail={dueCards ? "cartões esperando" : "nada pendente"} accent={dueCards ? "#E4B875" : "#B8D6C0"} /></StaggerItem>
-          </Stagger>
         </div>
 
         <div className="hidden gap-6 md:grid xl:grid-cols-[1.4fr_.6fr]">
@@ -10901,11 +10846,13 @@ function SubjectModal({ user, update, close, notify }: { user: User; update: (ne
       onSubmit={(event) => {
         event.preventDefault();
         if (!name.trim()) return;
+        const id = uid("subject");
         update((draft) => ({
           ...draft,
-          subjects: [...draft.subjects, { id: uid("subject"), userId: user.id, name: name.trim(), color, icon: iconName, favorite: false, createdAt: Date.now() }],
+          subjects: [...draft.subjects, { id, userId: user.id, name: name.trim(), color, icon: iconName, favorite: false, createdAt: Date.now() }],
         }));
         notify("Matéria criada.");
+        anunciarMateria({ id, name: name.trim(), color });
         close();
       }}
       className="relative"

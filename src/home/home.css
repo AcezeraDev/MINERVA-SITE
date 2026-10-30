@@ -1,0 +1,903 @@
+/* Home nova: hero com o sistema de matérias 3D, cartões bento e a cena de matéria nova. */
+
+/* ── hero ── */
+.home-hero {
+  position: relative;
+  display: grid;
+  gap: 1.25rem;
+  align-items: center;
+  padding: clamp(1.1rem, 2.4vw, 2rem);
+  border-radius: 1.6rem;
+  overflow: hidden;
+  background:
+    radial-gradient(70% 90% at 85% 50%, rgb(var(--hl-lilac) / 0.18), transparent 65%),
+    radial-gradient(50% 60% at 10% 0%, rgb(var(--hl-yellow) / 0.16), transparent 60%),
+    rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+/* a barra lateral come ~300px: duas colunas só quando o título e a cena cabem */
+@media (min-width: 1240px) {
+  .home-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    min-height: 430px;
+  }
+}
+
+.home-hero-texto {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.home-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+  color: rgb(var(--pen));
+}
+
+.home-hero-titulo {
+  margin-top: 0.35rem;
+  font-family: "Anybody Variable", "Anybody", system-ui, sans-serif;
+  font-size: clamp(2.1rem, 5.2vw, 3.9rem);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: rgb(var(--theme-text));
+  perspective: 600px;
+}
+
+.home-hero-palavra {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.home-hero-letra {
+  display: inline-block;
+  transform-origin: 50% 100%;
+}
+
+.home-hero-grifo {
+  position: relative;
+  display: inline-block;
+}
+
+.home-hero-grifo::before {
+  content: "";
+  position: absolute;
+  inset: 52% -0.12em 4% -0.08em;
+  z-index: -1;
+  border-radius: 0.2em 0.4em 0.25em 0.35em;
+  background: rgb(var(--mint) / 0.55);
+  transform-origin: left center;
+  animation: home-grifo 700ms cubic-bezier(0.22, 1, 0.36, 1) 600ms both;
+}
+
+@keyframes home-grifo {
+  from { transform: scaleX(0) skewX(-8deg); }
+  to { transform: scaleX(1) skewX(-8deg); }
+}
+
+.home-hero-sub {
+  max-width: 36rem;
+  margin-top: 0.9rem;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: rgb(var(--theme-muted));
+}
+
+.home-hero-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.3rem;
+}
+
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.85rem;
+  padding: 0 1.2rem;
+  border-radius: 0.9rem;
+  font-weight: 800;
+}
+
+.home-btn-tinta {
+  color: rgb(var(--panel));
+  background: rgb(var(--pen));
+  box-shadow: 0 14px 30px -16px rgb(var(--pen) / 0.9);
+}
+
+.home-btn-papel {
+  color: rgb(var(--theme-text));
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+  transition: box-shadow 140ms ease;
+}
+
+.home-btn-papel:hover {
+  box-shadow: inset 0 0 0 1.5px rgb(var(--pen) / 0.6);
+}
+
+.home-btn kbd,
+.home-busca-campo kbd {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: rgb(var(--theme-muted));
+  background: rgb(var(--panel));
+  box-shadow: inset 0 0 0 1px rgb(var(--line));
+}
+
+.home-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 1.4rem;
+}
+
+.home-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.85rem 0.5rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.8);
+}
+
+.home-chip b {
+  display: block;
+  font-size: 0.9rem;
+  color: rgb(var(--theme-text));
+}
+
+.home-chip small {
+  display: block;
+  font-size: 0.74rem;
+  color: rgb(var(--theme-muted));
+}
+
+.home-chip-anel {
+  position: relative;
+  width: 2.2rem;
+  height: 2.2rem;
+}
+
+.home-chip-anel svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.home-chip-anel circle {
+  fill: none;
+  stroke-width: 3.4;
+  stroke: rgb(var(--line));
+}
+
+.home-chip-anel circle + circle {
+  stroke: rgb(var(--pen));
+  stroke-linecap: round;
+}
+
+.home-chip-icone {
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0.5rem;
+  border-radius: 999px;
+  color: rgb(var(--pen));
+  background: rgb(var(--hl-yellow) / 0.35);
+}
+
+.home-chip-icone.is-quente {
+  color: #e8590c;
+  background: rgb(var(--hl-pink) / 0.35);
+}
+
+/* palco 3D */
+.home-hero-palco {
+  position: relative;
+  min-width: 0;
+  height: clamp(300px, 42vw, 440px);
+  border-radius: 1.3rem;
+}
+
+.home-sistema-canvas {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  user-select: none;
+}
+
+.home-sistema-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+.home-sistema-canvas.is-ready canvas {
+  opacity: 1;
+}
+
+.home-sistema-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  padding: 0.3rem 0.7rem;
+  border-radius: 0.5rem;
+  font-family: "Kalam", cursive;
+  font-size: 1rem;
+  white-space: nowrap;
+  pointer-events: none;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--hl-yellow) / 0.95);
+  box-shadow: 0 10px 20px -12px rgb(0 0 0 / 0.5);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.home-sistema-tip.is-on {
+  opacity: 1;
+}
+
+.home-hero-legenda {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 0.5rem;
+  left: 0.8rem;
+  text-align: center;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.98rem;
+  color: rgb(var(--theme-muted));
+  pointer-events: none;
+}
+
+/* órbita em CSS (sem WebGL) */
+.home-orbita-plana {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.home-orbita-nucleo {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 30%;
+  background: rgb(var(--pen));
+  box-shadow: 0 0 60px 10px rgb(var(--hl-yellow) / 0.45);
+  transform: rotate(45deg);
+}
+
+.home-orbita-anel {
+  position: absolute;
+  width: min(78%, 330px);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  border: 1.5px dashed rgb(var(--line));
+}
+
+.home-orbita-livro {
+  --r: min(39%, 165px);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 3.4rem;
+  margin: -1.7rem 0 0 -1.3rem;
+  border-radius: 0.25rem 0.5rem 0.5rem 0.25rem;
+  font-weight: 900;
+  color: #1d2440;
+  background: var(--cor, rgb(var(--panel-2)));
+  box-shadow: inset 4px 0 0 rgb(0 0 0 / 0.18), 0 10px 18px -10px rgb(0 0 0 / 0.5);
+  transform: rotate(var(--a)) translateY(calc(-1 * min(39vw, 165px))) rotate(calc(-1 * var(--a)));
+}
+
+.home-orbita-livro span {
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.2rem;
+  background: rgb(255 255 255 / 0.9);
+}
+
+.home-orbita-livro.is-vazio {
+  color: rgb(var(--pen));
+  background: transparent;
+  box-shadow: inset 0 0 0 2px rgb(var(--pen));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.no-motion) .home-orbita-plana {
+    animation: home-orbita 40s linear infinite;
+  }
+  html:not(.no-motion) .home-orbita-livro {
+    animation: home-orbita-reverso 40s linear infinite;
+  }
+}
+
+@keyframes home-orbita { to { transform: rotate(360deg); } }
+@keyframes home-orbita-reverso { to { rotate: -360deg; } }
+
+/* ── bento ── */
+.home-bento {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  perspective: 1400px;
+}
+
+@media (min-width: 900px) {
+  .home-bento {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: minmax(160px, auto);
+  }
+  .home-bento-celula.is-mine {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+  .home-bento-celula.is-busca {
+    grid-column: span 2;
+  }
+}
+
+.home-bento-celula {
+  min-width: 0;
+}
+
+.home-bento-celula.is-mine,
+.home-bento-celula.is-busca {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 900px) {
+  .home-bento-celula.is-mine,
+  .home-bento-celula.is-busca {
+    grid-column: span 2;
+  }
+}
+
+.home-bento-cartao {
+  --rx: 0deg;
+  --ry: 0deg;
+  --mx: 50%;
+  --my: 50%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  padding: 1rem 1.05rem;
+  overflow: hidden;
+  border-radius: 1.2rem;
+  text-align: left;
+  background: rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transform-style: preserve-3d;
+  transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease;
+}
+
+.home-bento-cartao:hover {
+  transition: transform 90ms linear, box-shadow 200ms ease;
+  box-shadow: 0 22px 40px -24px rgb(0 0 0 / 0.45), inset 0 0 0 1.5px rgb(var(--tom) / 0.7);
+}
+
+.home-bento-cartao:focus-visible {
+  outline: 2.5px solid rgb(var(--pen));
+  outline-offset: 3px;
+}
+
+/* luz que segue o mouse (ideia do magic-card) */
+.home-bento-luz {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(260px circle at var(--mx) var(--my), rgb(var(--tom) / 0.28), transparent 70%);
+  transition: opacity 200ms ease;
+}
+
+.home-bento-cartao:hover .home-bento-luz {
+  opacity: 1;
+}
+
+.home-bento-seta {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  width: 1rem;
+  height: 1rem;
+  color: rgb(var(--theme-muted));
+  opacity: 0;
+  transform: translate(-4px, 4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.home-bento-cartao:hover .home-bento-seta {
+  opacity: 1;
+  transform: none;
+}
+
+.home-bento-rotulo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgb(var(--theme-muted));
+}
+
+.home-bento-numero {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin-top: auto;
+  font-family: "Anybody Variable", system-ui, sans-serif;
+  font-size: clamp(2rem, 4vw, 2.7rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: rgb(var(--theme-text));
+  transform: translateZ(28px);
+}
+
+.home-bento-numero small {
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  color: rgb(var(--theme-muted));
+}
+
+.home-bento-texto {
+  position: relative;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  color: rgb(var(--theme-muted));
+}
+
+.is-revisoes .home-bento-texto,
+.is-provas .home-bento-texto,
+.is-foco .home-bento-texto {
+  padding-right: 3.6rem;
+}
+
+.home-bento-pe {
+  position: relative;
+  font-size: 0.74rem;
+  color: rgb(var(--theme-muted));
+}
+
+.home-bento-barra {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  margin-top: 0.3rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgb(var(--panel-2));
+}
+
+.home-bento-barra i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: rgb(var(--hl-lilac));
+  transform-origin: left;
+}
+
+/* cartão da Mine */
+.is-mine .home-bento-cartao {
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 29px, rgb(var(--rule, var(--line)) / 0.35) 29px 30px),
+    radial-gradient(80% 80% at 100% 0%, rgb(var(--hl-lilac) / 0.2), transparent 70%),
+    rgb(var(--panel));
+  padding: 1.3rem;
+  gap: 0.9rem;
+}
+
+.home-mine-linha {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transform: translateZ(22px);
+}
+
+.home-mine-rosto {
+  width: 5.5rem;
+  height: 5.5rem;
+  flex: none;
+}
+
+.home-mine-fala b {
+  display: block;
+  font-family: "Anybody Variable", system-ui, sans-serif;
+  font-size: clamp(1.3rem, 2.4vw, 1.75rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: rgb(var(--theme-text));
+}
+
+.home-mine-fala small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: rgb(var(--theme-muted));
+}
+
+.home-mine-caixa {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 3.2rem;
+  margin-top: auto;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.1rem;
+  color: rgb(var(--pen));
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--pen) / 0.35);
+}
+
+.home-mine-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: rgb(var(--pen));
+  animation: home-pisca 1s steps(1) infinite;
+}
+
+@keyframes home-pisca { 50% { opacity: 0; } }
+
+/* sequência */
+.home-semana {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.2rem;
+  width: 100%;
+  margin-top: 0.4rem;
+}
+
+.home-semana-dia {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 2.2rem;
+  border-radius: 0.55rem;
+  color: #e8590c;
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.8);
+}
+
+.home-semana-dia small {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: rgb(var(--theme-muted));
+}
+
+.home-semana-dia.is-on {
+  background: rgb(var(--hl-pink) / 0.35);
+  box-shadow: none;
+}
+
+.home-semana-dia.is-hoje {
+  box-shadow: inset 0 0 0 2px rgb(var(--pen));
+}
+
+/* pilha de cartões que abre em leque */
+/* os desenhos dos cartões ficam no canto de baixo, longe do rótulo e da seta */
+.home-pilha {
+  position: absolute;
+  right: 1.1rem;
+  bottom: 1.1rem;
+  width: 3rem;
+  height: 3.6rem;
+}
+
+.home-pilha i {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.45rem;
+  background: rgb(var(--panel));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--hl-yellow)), 0 6px 12px -8px rgb(0 0 0 / 0.5);
+  transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.home-pilha i:nth-child(1) { transform: rotate(-6deg); }
+.home-pilha i:nth-child(2) { transform: rotate(3deg); }
+.home-pilha i:nth-child(3) { background: rgb(var(--hl-yellow) / 0.6); }
+
+.home-bento-cartao:hover .home-pilha i:nth-child(1) { transform: rotate(-24deg) translate(-14px, 4px); }
+.home-bento-cartao:hover .home-pilha i:nth-child(2) { transform: rotate(14deg) translate(10px, 2px); }
+.home-bento-cartao:hover .home-pilha i:nth-child(3) { transform: translateY(-6px); }
+
+/* carimbo da prova */
+.home-carimbo {
+  position: absolute;
+  right: 1rem;
+  bottom: 1.2rem;
+  padding: 0.15rem 0.55rem;
+  border: 2.5px double rgb(var(--hl-mint));
+  border-radius: 0.4rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-text));
+  transform: rotate(-10deg);
+  transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.home-bento-cartao:hover .home-carimbo {
+  transform: rotate(-4deg) scale(1.15);
+}
+
+/* lápis do foco */
+.home-lapis {
+  position: absolute;
+  right: 1.4rem;
+  bottom: 1.2rem;
+  width: 0.55rem;
+  height: 3.4rem;
+  border-radius: 0.2rem 0.2rem 0 0;
+  background: linear-gradient(#f4c542 0 82%, #f2d3b0 82% 92%, #3c3c3c 92%);
+  transform: rotate(28deg);
+  transform-origin: 50% 90%;
+  transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.home-bento-cartao:hover .home-lapis {
+  transform: rotate(-12deg);
+}
+
+/* mini calendário do plano */
+.home-calendario {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.22rem;
+  width: 100%;
+  margin: 0.4rem 0 auto;
+}
+
+.home-calendario i {
+  aspect-ratio: 1;
+  border-radius: 0.3rem;
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.7);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.home-calendario i.is-on {
+  background: rgb(var(--hl-lilac) / 0.55);
+  box-shadow: none;
+}
+
+.home-bento-cartao:hover .home-calendario i.is-on {
+  transform: scale(1.15) rotate(-6deg);
+}
+
+/* busca */
+.home-busca-campo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  margin-top: auto;
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  color: rgb(var(--theme-muted));
+  background: rgb(var(--panel-2));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+}
+
+.home-busca-campo span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── cena de matéria nova ── */
+.nova-materia {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  background: rgb(var(--paper, 245 245 240) / 0.6);
+  animation: nm-fundo 2900ms ease both;
+  cursor: pointer;
+}
+
+@keyframes nm-fundo {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  82% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.nova-materia-palco {
+  position: relative;
+  width: 240px;
+  height: 300px;
+  perspective: 1100px;
+  animation: nm-voa 2900ms cubic-bezier(0.55, 0, 0.3, 1) both;
+}
+
+/* cai, assenta, e no fim voa para a estante (alto e à direita) */
+@keyframes nm-voa {
+  0% { transform: translateY(-80vh) rotate(-18deg) scale(0.8); }
+  22% { transform: translateY(14px) rotate(3deg) scale(1.02); }
+  30% { transform: translateY(0) rotate(0deg) scale(1); }
+  80% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(34vw, -40vh) rotate(16deg) scale(0.2); opacity: 0; }
+}
+
+.nova-materia-caderno {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(14deg);
+}
+
+.nova-materia-pagina,
+.nova-materia-capa {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.4rem 1rem 1rem 0.4rem;
+}
+
+.nova-materia-pagina {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 0.3rem;
+  padding: 1.4rem 1.2rem 1.4rem 1.8rem;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, transparent 1.3rem, rgb(232 89 89 / 0.5) 1.3rem 1.4rem, transparent 1.4rem),
+    repeating-linear-gradient(to bottom, #fffdf6 0 27px, #cfd8ee 27px 28px);
+  box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.55);
+}
+
+.nova-materia-pagina small {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  color: #6b7280;
+}
+
+.nova-materia-nome {
+  max-width: 100%;
+  font-family: "Kalam", cursive;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  color: #2b3fc4;
+  overflow-wrap: anywhere;
+  clip-path: inset(0 100% 0 0);
+  animation: nm-escreve 700ms steps(18, end) 1000ms both;
+}
+
+@keyframes nm-escreve { to { clip-path: inset(0 0 0 0); } }
+
+.nova-materia-grifo {
+  width: 70%;
+  height: 0.65rem;
+  margin-top: -0.65rem;
+  border-radius: 0.3rem;
+  background: var(--cor);
+  opacity: 0.55;
+  transform-origin: left;
+  animation: nm-grifo 420ms cubic-bezier(0.22, 1, 0.36, 1) 1650ms both;
+}
+
+@keyframes nm-grifo {
+  from { transform: scaleX(0) skewX(-10deg); }
+  to { transform: scaleX(1) skewX(-10deg); }
+}
+
+.nova-materia-capa {
+  display: grid;
+  place-items: center;
+  background:
+    repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.07) 0 2px, transparent 2px 6px),
+    var(--cor);
+  box-shadow: inset 10px 0 0 rgb(0 0 0 / 0.16), 0 30px 60px -30px rgb(0 0 0 / 0.55);
+  transform-origin: left center;
+  backface-visibility: hidden;
+  animation: nm-capa 800ms cubic-bezier(0.34, 1.3, 0.64, 1) 750ms both;
+}
+
+@keyframes nm-capa {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(-158deg); }
+}
+
+.nova-materia-etiqueta {
+  display: grid;
+  place-items: center;
+  width: 5rem;
+  height: 3.6rem;
+  border-radius: 0.5rem;
+  font-family: "Anybody Variable", system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #1d2440;
+  background: rgb(255 255 255 / 0.92);
+}
+
+.nova-materia-espiral {
+  position: absolute;
+  top: 0.8rem;
+  bottom: 0.8rem;
+  left: -0.45rem;
+  width: 0.9rem;
+  background: repeating-linear-gradient(to bottom, #9aa0ad 0 6px, transparent 6px 14px);
+  border-radius: 999px;
+}
+
+.nova-materia-carimbo {
+  position: absolute;
+  right: -2.4rem;
+  bottom: 1.4rem;
+  padding: 0.2rem 0.8rem;
+  border: 3px double #16a34a;
+  border-radius: 0.5rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.7rem;
+  color: #16a34a;
+  background: rgb(255 255 255 / 0.85);
+  animation: nm-carimbo 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 1400ms both;
+}
+
+@keyframes nm-carimbo {
+  from { opacity: 0; transform: scale(2.8) rotate(-30deg); }
+  to { opacity: 1; transform: scale(1) rotate(-12deg); }
+}
+
+/* movimento reduzido: só o cartão aparecendo e sumindo, sem voo nem capa */
+.nova-materia.is-calma {
+  animation-duration: 1400ms;
+}
+
+.nova-materia.is-calma .nova-materia-palco,
+.nova-materia.is-calma .nova-materia-capa {
+  animation: none;
+}
+
+.nova-materia.is-calma .nova-materia-capa {
+  display: none;
+}
+
+.nova-materia.is-calma .nova-materia-nome,
+.nova-materia.is-calma .nova-materia-grifo,
+.nova-materia.is-calma .nova-materia-carimbo {
+  animation: none;
+  clip-path: none;
+}
+
+@media (max-width: 560px) {
+  .nova-materia-carimbo {
+    right: -0.8rem;
+  }
+}
