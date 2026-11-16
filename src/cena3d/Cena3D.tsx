@@ -6,7 +6,6 @@
  */
 import React, { useMemo, useState } from "react";
 import { useQualityTier, useSoftMotion } from "../motion";
-import type { HumorLogin } from "./MesaLogin3D";
 
 export type ModoFolha = "escrevendo" | "corrigindo";
 export type ModoPrancheta = "parada" | "gerando";
@@ -91,27 +90,6 @@ export function CenaPrancheta({ modo, className = "" }: { modo: ModoPrancheta; c
       ) : (
         <FolhaPlana tipo="prancheta" />
       )}
-    </div>
-  );
-}
-
-const MesaLogin3D = React.lazy(() => import("./MesaLogin3D"));
-
-/**
- * Material escolar 3D atrás da tela de entrada. Sem fallback visível: os
- * rabiscos em CSS da tela já fazem esse papel quando o 3D não liga.
- */
-export function CenaLogin({ humor }: { humor: HumorLogin }) {
-  const ligada = useCena3D();
-  const [falhou, setFalhou] = useState(false);
-  if (!ligada || falhou) return null;
-  return (
-    <div className="login-mesa3d" aria-hidden>
-      <Guarda onFail={() => setFalhou(true)}>
-        <React.Suspense fallback={null}>
-          <MesaLogin3D humor={humor} />
-        </React.Suspense>
-      </Guarda>
     </div>
   );
 }
