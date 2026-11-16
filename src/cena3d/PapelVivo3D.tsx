@@ -40,8 +40,8 @@ const vertex = /* glsl */ `
 
     // a tenda: o papel sobe em volta do ponteiro, com um vinco fino no topo
     float d = distance(p.xy, uMouse);
-    float tenda = exp(-d * d / 5.5);
-    h += uHover * uLift * (tenda * 3.1 + exp(-d * d / 0.3) * 0.7);
+    float tenda = exp(-d * d / 10.0);
+    h += uHover * uLift * tenda * 0.85;
 
     // ondas de choque dos cliques
     float anel = 0.0;
@@ -53,7 +53,7 @@ const vertex = /* glsl */ `
       float raio = idade * 7.5;
       float od = distance(p.xy, o.xy);
       float frente = exp(-pow((od - raio) * 1.1, 2.0)) * exp(-idade * 1.1) * o.w;
-      h += frente * 1.25;
+      h += frente * 0.5;
       anel = max(anel, frente);
       mancha = max(mancha, (1.0 - smoothstep(raio * 0.55, raio, od)) * exp(-idade * 1.4) * o.w);
     }
@@ -93,12 +93,12 @@ const fragment = /* glsl */ `
     vec3 luz = normalize(vec3(-0.4, 0.8, 0.6));
     float difusa = clamp(dot(n, luz), 0.0, 1.0);
     // dobras viradas para a luz clareiam, as de costas escurecem como papel
-    vec3 cor = uPapel * (0.68 + 0.42 * difusa);
+    vec3 cor = uPapel * (0.8 + 0.24 * difusa);
 
     // pauta: uma linha a cada 0,9 unidade
-    float pauta = linha(vLocal.y / 0.9, 1.1 + vBrilho * 1.4 + vAnel * 1.2);
-    vec3 tinta = mix(uCaneta, uMenta, clamp(vBrilho * 1.6 + vAnel * 1.4, 0.0, 1.0));
-    cor = mix(cor, tinta, clamp(pauta * (0.36 + vBrilho * 0.7 + vAnel * 0.7), 0.0, 1.0));
+    float pauta = linha(vLocal.y / 0.9, 1.1 + vBrilho * 0.5 + vAnel * 0.5);
+    vec3 tinta = mix(uCaneta, uMenta, clamp(vBrilho * 0.9 + vAnel * 0.9, 0.0, 1.0));
+    cor = mix(cor, tinta, clamp(pauta * (0.36 + vBrilho * 0.35 + vAnel * 0.4), 0.0, 1.0));
 
     // mancha de tinta azul que se espalha do clique e desbota
     cor = mix(cor, uCaneta, vMancha * 0.16);
@@ -109,7 +109,7 @@ const fragment = /* glsl */ `
 
     // quadriculado bem fraquinho por baixo, que só aparece na tenda
     float grade = max(linha(vLocal.x / 0.9, 0.7), linha(vLocal.y / 0.9, 0.7));
-    cor = mix(cor, uMenta, grade * vBrilho * 0.35);
+    cor = mix(cor, uMenta, grade * vBrilho * 0.15);
 
     // brilho de "papel acetinado" na frente das ondas
     cor += uMenta * vAnel * 0.12;
@@ -181,7 +181,7 @@ export default function PapelVivo3D({ humor }: { humor: HumorPapel }) {
         }
         const velAlvo = h === "thinking" ? 5 : h === "shy" || h === "peek" ? 0.25 : 1;
         mola(fluxo, velAlvo, delta, 30, 9);
-        mola(lift, h === "shy" ? 0.25 : h === "teacher" ? 1.4 : 1, delta, 60, 10);
+        mola(lift, h === "shy" ? 0.25 : h === "teacher" ? 1.2 : 1, delta, 60, 10);
         const ativo = tempo - ultimoMovimento < 2.5 ? 1 : 0;
         mola(hover, ativo, delta, 40, 9);
 
