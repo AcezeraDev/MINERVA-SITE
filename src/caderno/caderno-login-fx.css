@@ -1,0 +1,516 @@
+/* Tela de entrada, camada de efeitos: mesa 3D, decoração da mesa e movimento da folha. */
+
+/* material escolar 3D: fica atrás de tudo e não pega clique */
+.login-mesa3d {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  animation: login-fade 900ms ease-out both;
+}
+
+/* o cena3d.css não carrega aqui: sem tamanho fixo o canvas cresce sem parar
+   (ResizeObserver mede o host, que estica com o canvas) */
+.login-mesa3d .login-mesa3d-host,
+.login-mesa3d canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: default;
+  pointer-events: none;
+}
+
+@keyframes login-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* papel quadriculado que some nas bordas */
+.login-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(var(--pen) / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--pen) / 0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 50%, #000 30%, transparent 80%);
+  mask-image: radial-gradient(ellipse 70% 65% at 50% 50%, #000 30%, transparent 80%);
+}
+
+/* luz de luminária respirando sobre a Mine */
+.login-lamp {
+  position: absolute;
+  left: 8%;
+  top: 10%;
+  width: 46vw;
+  height: 46vw;
+  max-width: 44rem;
+  max-height: 44rem;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgb(var(--mint) / 0.22), rgb(var(--hl-lilac) / 0.08) 45%, transparent 70%);
+  animation: login-breathe 7s ease-in-out infinite alternate;
+}
+
+@keyframes login-breathe {
+  to {
+    transform: scale(1.08) translate(2%, 3%);
+    opacity: 0.75;
+  }
+}
+
+/* mancha de caneca de café */
+.login-coffee {
+  position: absolute;
+  right: 7%;
+  bottom: 6%;
+  width: 7.5rem;
+  height: 7.5rem;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, transparent 56%, rgb(150 96 50 / 0.16) 58%, rgb(150 96 50 / 0.07) 63%, transparent 66%);
+  transform: rotate(-20deg) scaleX(1.06);
+}
+
+.login-coffee::after {
+  content: "";
+  position: absolute;
+  inset: 12% -4% -6% 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 60%, rgb(150 96 50 / 0.08) 63%, transparent 67%);
+}
+
+/* ───────── palco ───────── */
+.login-stage,
+.login-mine-wrap {
+  position: relative;
+}
+
+.login-mine-shadow {
+  display: block;
+  width: 58%;
+  height: 0.9rem;
+  margin-top: -0.2rem;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgb(0 0 0 / 0.22), transparent 70%);
+  animation: login-shadow 4.2s ease-in-out 1.2s infinite alternate;
+}
+
+@keyframes login-shadow {
+  to {
+    transform: scaleX(0.78);
+    opacity: 0.6;
+  }
+}
+
+/* seta à mão: se desenha sozinha e aponta a folha */
+.login-arrow {
+  display: none;
+}
+
+@media (min-width: 1100px) {
+  .login-arrow {
+    position: absolute;
+    right: -4.5rem;
+    top: 44%;
+    display: block;
+    width: 11rem;
+    overflow: visible;
+    pointer-events: none;
+    transform: rotate(-6deg);
+  }
+}
+
+.login-arrow path {
+  fill: none;
+  stroke: rgb(var(--pen) / 0.7);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.login-arrow-line {
+  stroke-dasharray: 260;
+  stroke-dashoffset: 260;
+  animation: login-draw 900ms cubic-bezier(0.6, 0, 0.2, 1) 1.4s forwards;
+}
+
+.login-arrow-head {
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+  animation: login-draw 260ms ease-out 2.25s forwards;
+}
+
+.login-arrow text {
+  font-family: "Gochi Hand", cursive;
+  font-size: 22px;
+  fill: rgb(var(--pen));
+  opacity: 0;
+  animation: login-fade-in 400ms ease-out 2.3s forwards;
+}
+
+@keyframes login-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes login-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* post-it com o bilhete do dia (aba Entrar) */
+.login-postit {
+  position: relative;
+  width: min(15rem, 80vw);
+  padding: 1.3rem 1.1rem 1.1rem;
+  background: linear-gradient(180deg, #fff1a6, #ffe680);
+  color: #2a2410;
+  text-align: left;
+  border-radius: 2px 2px 18px 2px;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.05), 0 18px 26px -18px rgb(0 0 0 / 0.55), inset 0 -12px 18px -14px rgb(150 110 0 / 0.35);
+  cursor: default;
+}
+
+.login-postit::after {
+  /* canto que descola */
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 0 0 18px 0;
+  background: linear-gradient(315deg, rgb(var(--paper)) 45%, #e6c94f 50%, #fff4b8 100%);
+  box-shadow: -2px -2px 4px rgb(0 0 0 / 0.08);
+}
+
+.login-postit small {
+  font-family: "DM Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+.login-postit p {
+  margin-top: 0.25rem;
+  font-family: "Kalam", cursive;
+  font-size: 1.12rem;
+  line-height: 1.3;
+}
+
+/* fita adesiva com as pontas rasgadas */
+.login-postit-tape,
+.login-tape {
+  position: absolute;
+  height: 1.4rem;
+  background:
+    repeating-linear-gradient(45deg, rgb(255 255 255 / 0.28) 0 6px, transparent 6px 12px),
+    rgb(var(--hl-lilac) / 0.75);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  clip-path: polygon(0 0, 4% 18%, 0 36%, 4% 54%, 0 72%, 4% 90%, 0 100%, 100% 100%, 96% 82%, 100% 64%, 96% 46%, 100% 28%, 96% 10%, 100% 0);
+}
+
+.login-postit-tape {
+  top: -0.65rem;
+  left: 50%;
+  width: 4.6rem;
+  transform: translateX(-50%) rotate(-4deg);
+  background:
+    repeating-linear-gradient(45deg, rgb(255 255 255 / 0.28) 0 6px, transparent 6px 12px),
+    rgb(var(--hl-mint) / 0.85);
+}
+
+/* ───────── carteirinha com inclinação e brilho holográfico ───────── */
+.login-idcard-wrap {
+  perspective: 900px;
+}
+
+.login-idcard {
+  overflow: hidden;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+.login-idcard.is-tilting {
+  transition: transform 120ms linear;
+}
+
+.login-idcard-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at var(--mx, 30%) var(--my, 20%), rgb(255 255 255 / 0.55), transparent 40%),
+    linear-gradient(115deg, transparent 30%, rgb(var(--hl-pink) / 0.4) 42%, rgb(var(--hl-lilac) / 0.4) 50%, rgb(var(--mint) / 0.4) 58%, transparent 70%);
+  background-size: 100% 100%, 250% 250%;
+  background-position: 0 0, var(--mx, 0%) var(--my, 0%);
+  mix-blend-mode: soft-light;
+  opacity: 0.5;
+  transition: opacity 200ms ease;
+}
+
+.login-idcard.is-tilting .login-idcard-sheen {
+  opacity: 1;
+}
+
+/* ───────── folha: inclina, ganha fita, clipe e luz que segue o mouse ───────── */
+.login-sheet-tilt {
+  position: relative;
+  transform: perspective(1400px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+.login-sheet-tilt.is-tilting {
+  transition: transform 160ms linear;
+}
+
+.login-tape {
+  z-index: 3;
+  width: 5.5rem;
+  pointer-events: none;
+}
+
+.login-tape-a {
+  top: 2.6rem;
+  right: -1.7rem;
+  transform: rotate(38deg);
+}
+
+.login-tape-b {
+  bottom: 0.2rem;
+  left: -1.4rem;
+  transform: rotate(-32deg);
+  background:
+    repeating-linear-gradient(45deg, rgb(255 255 255 / 0.28) 0 6px, transparent 6px 12px),
+    rgb(var(--hl-yellow) / 0.85);
+}
+
+.login-clip {
+  position: absolute;
+  z-index: 3;
+  top: 1.5rem;
+  right: 22%;
+  width: 1.2rem;
+  pointer-events: none;
+  overflow: visible;
+  transform: rotate(4deg);
+}
+
+.login-clip path {
+  fill: none;
+  stroke: rgb(var(--theme-muted));
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.login-sheet-glow {
+  position: absolute;
+  inset: 2.9rem 0 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 0.4rem 1.1rem 1.1rem 1.1rem;
+  background: radial-gradient(22rem circle at var(--mx, 50%) var(--my, 0%), rgb(var(--mint) / 0.14), transparent 60%);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.login-sheet-tilt.is-tilting .login-sheet-glow {
+  opacity: 1;
+}
+
+/* os itens da folha entram um depois do outro, como escritos na hora */
+.login-sheet > * {
+  animation: login-rise 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+.login-sheet > :nth-child(1) { animation-delay: 60ms; }
+.login-sheet > :nth-child(2) { animation-delay: 110ms; }
+.login-sheet > :nth-child(3) { animation-delay: 170ms; }
+.login-sheet > :nth-child(4) { animation-delay: 230ms; }
+.login-sheet > :nth-child(5) { animation-delay: 290ms; }
+.login-sheet > :nth-child(6) { animation-delay: 350ms; }
+.login-sheet > :nth-child(7) { animation-delay: 410ms; }
+.login-sheet > :nth-child(8) { animation-delay: 470ms; }
+
+@keyframes login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.login-sheet > .login-note {
+  animation-name: login-rise-note;
+}
+
+@keyframes login-rise-note {
+  from {
+    opacity: 0;
+    transform: translateY(12px) rotate(-2deg);
+  }
+  to {
+    transform: rotate(-2deg);
+  }
+}
+
+/* sublinhado de caneta que se desenha no foco */
+.login-field {
+  position: relative;
+}
+
+.login-line {
+  display: block;
+  height: 2.5px;
+  margin-top: -2.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgb(var(--pen)), rgb(var(--mint)));
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 420ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+.login-field:focus-within .login-line {
+  transform: scaleX(1);
+}
+
+.login-ok {
+  position: absolute;
+  right: 0.3rem;
+  bottom: 0.45rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.4rem;
+  color: rgb(var(--mint));
+  pointer-events: none;
+  animation: login-pop 420ms cubic-bezier(0.34, 1.8, 0.64, 1) both;
+}
+
+@keyframes login-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-30deg);
+  }
+}
+
+/* botão: feixe de luz correndo na borda + brilho que atravessa */
+@property --login-beam {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.login-submit {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.login-submit-text,
+.login-submit-arrow {
+  position: relative;
+  z-index: 1;
+}
+
+.login-submit-beam {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 2px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--login-beam), transparent 0 70%, rgb(var(--mint)) 85%, rgb(255 255 255 / 0.9) 90%, transparent 95%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: login-beam 3.6s linear infinite;
+}
+
+@keyframes login-beam {
+  to {
+    --login-beam: 360deg;
+  }
+}
+
+.login-submit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.22) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: login-sweep 4.5s ease-in-out 2s infinite;
+}
+
+@keyframes login-sweep {
+  0%,
+  70% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+/* abas: a selecionada ganha um risquinho */
+.login-tab {
+  position: relative;
+}
+
+.login-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0.45rem;
+  height: 3px;
+  border-radius: 3px;
+  background: rgb(20 22 27 / 0.5);
+  transform-origin: 0 50%;
+  animation: login-tab-line 320ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+@keyframes login-tab-line {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (max-width: 899px) {
+  .login-coffee,
+  .login-tape-b,
+  .login-postit {
+    display: none;
+  }
+}
+
+/* movimento reduzido: nada inclina e o que se desenha já aparece pronto */
+.login-desk.is-static .login-sheet-tilt,
+.login-desk.is-static .login-idcard,
+.no-motion .login-desk .login-sheet-tilt,
+.no-motion .login-desk .login-idcard {
+  transform: none;
+}
+
+.login-desk.is-static .login-arrow-line,
+.login-desk.is-static .login-arrow-head,
+.no-motion .login-desk .login-arrow-line,
+.no-motion .login-desk .login-arrow-head {
+  stroke-dashoffset: 0;
+}
+
+.login-desk.is-static .login-arrow text,
+.no-motion .login-desk .login-arrow text {
+  opacity: 1;
+}

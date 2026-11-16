@@ -1,7 +1,67 @@
 import React, { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Doodle, celebrate } from "./index";
+import { CenaLogin } from "../cena3d/Cena3D";
 import "./caderno-login.css";
+import "./caderno-login-fx.css";
+
+/** Bilhetinho do dia no post-it (troca a cada dia, igual para todo mundo). */
+const BILHETES = [
+  { titulo: "você sabia?", texto: "Revisar no dia seguinte faz você lembrar o dobro." },
+  { titulo: "dica da Mine", texto: "Estude 25 min, descanse 5. Seu cérebro agradece!" },
+  { titulo: "curiosidade", texto: "Um raio é 5x mais quente que a superfície do Sol." },
+  { titulo: "pra hoje", texto: "Explicar a matéria em voz alta é o melhor teste." },
+  { titulo: "você sabia?", texto: "O polvo tem três corações e sangue azul." },
+  { titulo: "dica da Mine", texto: "Errou na prova? Ótimo: agora você sabe o que estudar." },
+  { titulo: "curiosidade", texto: "A palavra mais longa do português tem 46 letras." },
+];
+
+/**
+ * Inclinação 3D que segue o ponteiro: escreve variáveis CSS direto no nó, uma
+ * vez por quadro (nada de setState por pointermove). O rect é medido na entrada.
+ */
+function useInclinacao(ref: React.RefObject<HTMLElement | null>, reduced: boolean, alcance = 7) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || reduced || !window.matchMedia("(pointer: fine)").matches) return;
+    let frame = 0;
+    let rect = el.getBoundingClientRect();
+    let last: PointerEvent | null = null;
+    const paint = () => {
+      frame = 0;
+      if (!last) return;
+      const px = (last.clientX - rect.left) / rect.width;
+      const py = (last.clientY - rect.top) / rect.height;
+      el.style.setProperty("--mx", `${(px * 100).toFixed(1)}%`);
+      el.style.setProperty("--my", `${(py * 100).toFixed(1)}%`);
+      el.style.setProperty("--ry", `${((px - 0.5) * alcance).toFixed(2)}deg`);
+      el.style.setProperty("--rx", `${((0.5 - py) * alcance).toFixed(2)}deg`);
+    };
+    const onEnter = () => {
+      rect = el.getBoundingClientRect();
+      el.classList.add("is-tilting");
+    };
+    const onMove = (event: PointerEvent) => {
+      last = event;
+      if (!frame) frame = requestAnimationFrame(paint);
+    };
+    const onLeave = () => {
+      last = null;
+      el.classList.remove("is-tilting");
+      el.style.setProperty("--rx", "0deg");
+      el.style.setProperty("--ry", "0deg");
+    };
+    el.addEventListener("pointerenter", onEnter);
+    el.addEventListener("pointermove", onMove, { passive: true });
+    el.addEventListener("pointerleave", onLeave);
+    return () => {
+      cancelAnimationFrame(frame);
+      el.removeEventListener("pointerenter", onEnter);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerleave", onLeave);
+    };
+  }, [ref, reduced, alcance]);
+}
 
 export type LoginPayload = {
   mode: "login" | "register";
@@ -137,6 +197,11 @@ export function LoginScreen({
   const [error, setError] = useState("");
   const [shake, setShake] = useState(0);
   const sheetRef = useRef<HTMLDivElement | null>(null);
+  const tiltRef = useRef<HTMLDivElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  useInclinacao(tiltRef, reduced, 6);
+  useInclinacao(cardRef, reduced, 22);
+  const bilhete = BILHETES[Math.floor(Date.now() / 86_400_000) % BILHETES.length];
 
   const first = name.trim().split(/\s+/)[0] || "";
   const secretFocus = focus === "password" || focus === "admin";
@@ -207,6 +272,14 @@ export function LoginScreen({
 
   return (
     <main className={`login-desk ${reduced ? "is-static" : ""}`}>
+      {/* papel quadriculado, mancha de café e luz de luminária */}
+      <div className="login-grid" aria-hidden />
+      <div className="login-lamp" aria-hidden />
+      <span className="login-coffee" aria-hidden />
+
+      {/* material escolar 3D flutuando (só baixa quando cabe no aparelho) */}
+      <CenaLogin humor={mood} />
+
       {/* rabiscos na mesa */}
       <div className="login-scribbles" aria-hidden>
         {[
@@ -258,19 +331,43 @@ export function LoginScreen({
             >
               <LoginMine mood={mood} reduced={reduced} />
             </motion.div>
+            <span className="login-mine-shadow" aria-hidden />
           </div>
 
+          {/* seta desenhada à mão apontando a folha */}
+          <svg className="login-arrow" viewBox="0 0 220 120" aria-hidden>
+            <path className="login-arrow-line" d="M10 90 C 60 110, 120 100, 150 60 S 196 18, 206 30" />
+            <path className="login-arrow-head" d="M188 18 L 207 30 L 190 44" />
+            <text x="30" y="70">é por aqui!</text>
+          </svg>
+
           {/* carteirinha ao vivo (criar conta) */}
-          <AnimatePresence>
-            {mode === "register" ? (
+          <AnimatePresence mode="popLayout">
+            {mode === "login" ? (
+              <motion.aside
+                key="postit"
+                className="login-postit"
+                initial={reduced ? false : { opacity: 0, y: 30, rotate: -12, scale: 0.85 }}
+                animate={{ opacity: 1, y: 0, rotate: 3, scale: 1 }}
+                exit={reduced ? { opacity: 0 } : { opacity: 0, y: 24, rotate: 14, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                whileHover={reduced ? undefined : { rotate: -1, y: -4, scale: 1.03 }}
+              >
+                <span className="login-postit-tape" aria-hidden />
+                <small>{bilhete.titulo}</small>
+                <p>{bilhete.texto}</p>
+              </motion.aside>
+            ) : (
               <motion.div
                 key="idcard"
-                className="login-idcard"
+                className="login-idcard-wrap"
                 initial={reduced ? false : { opacity: 0, y: 40, rotate: 8, scale: 0.9 }}
                 animate={{ opacity: 1, y: 0, rotate: -3, scale: 1 }}
                 exit={reduced ? { opacity: 0 } : { opacity: 0, y: 30, rotate: 10 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
               >
+               <div ref={cardRef} className="login-idcard">
+                <span className="login-idcard-sheen" aria-hidden />
                 <span className="login-idcard-hole" aria-hidden />
                 <span className="login-idcard-photo">{initialsOf(name)}</span>
                 <span className="login-idcard-info">
@@ -282,8 +379,9 @@ export function LoginScreen({
                   <span>MINERVA</span>
                   <span>desde {today}</span>
                 </span>
+               </div>
               </motion.div>
-            ) : null}
+            )}
           </AnimatePresence>
         </section>
 
@@ -296,6 +394,13 @@ export function LoginScreen({
           animate={shake && !reduced ? { x: [0, -14, 12, -8, 6, 0] } : { opacity: 1, y: 0, rotate: 0 }}
           transition={shake ? { duration: 0.45 } : { type: "spring", stiffness: 160, damping: 18, delay: 0.3 }}
         >
+         <div ref={tiltRef} className="login-sheet-tilt">
+          {/* fita adesiva e clipe segurando a folha */}
+          <span className="login-tape login-tape-a" aria-hidden />
+          <span className="login-tape login-tape-b" aria-hidden />
+          <svg className="login-clip" viewBox="0 0 30 80" aria-hidden>
+            <path d="M10 70 V 14 a 8 8 0 0 1 16 0 V 62 a 12 12 0 0 1 -24 0 V 22" />
+          </svg>
           <div className="login-tabs" role="tablist" aria-label="Entrar ou criar conta">
             {(["login", "register"] as const).map((item) => (
               <button
@@ -349,6 +454,8 @@ export function LoginScreen({
                   autoComplete="username"
                   maxLength={40}
                 />
+                <span className="login-line" aria-hidden />
+                {first ? <span className="login-ok" aria-hidden>✓</span> : null}
               </label>
 
               <label className="login-field">
@@ -377,6 +484,7 @@ export function LoginScreen({
                     {showPassword ? "🙈" : "👁"}
                   </button>
                 </span>
+                <span className="login-line" aria-hidden />
               </label>
 
               <button
@@ -422,10 +530,12 @@ export function LoginScreen({
                 type="submit"
                 className="login-submit"
                 disabled={submitting}
-                whileHover={reduced ? undefined : { y: -2, rotate: -0.6 }}
-                whileTap={{ scale: 0.97 }}
+                whileHover={reduced ? undefined : { y: -3, rotate: -0.6, scale: 1.015 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 300, damping: 18, mass: 1 }}
               >
-                {submitting ? "Abrindo o caderno..." : mode === "login" ? "Abrir meu caderno" : "Criar minha conta"}
+                <span className="login-submit-beam" aria-hidden />
+                <span className="login-submit-text">{submitting ? "Abrindo o caderno..." : mode === "login" ? "Abrir meu caderno" : "Criar minha conta"}</span>
                 <span aria-hidden className="login-submit-arrow">→</span>
               </motion.button>
 
@@ -437,6 +547,8 @@ export function LoginScreen({
               </p>
             </motion.form>
           </AnimatePresence>
+          <span className="login-sheet-glow" aria-hidden />
+         </div>
         </motion.div>
       </div>
     </main>
