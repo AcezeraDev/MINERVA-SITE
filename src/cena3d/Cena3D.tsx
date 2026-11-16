@@ -6,6 +6,8 @@
  */
 import React, { useMemo, useState } from "react";
 import { useQualityTier, useSoftMotion } from "../motion";
+import { FundoLogin } from "../caderno/FundoLogin";
+import type { HumorPapel } from "./PapelVivo3D";
 
 export type ModoFolha = "escrevendo" | "corrigindo";
 export type ModoPrancheta = "parada" | "gerando";
@@ -90,6 +92,28 @@ export function CenaPrancheta({ modo, className = "" }: { modo: ModoPrancheta; c
       ) : (
         <FolhaPlana tipo="prancheta" />
       )}
+    </div>
+  );
+}
+
+const PapelVivo3D = React.lazy(() => import("./PapelVivo3D"));
+
+/**
+ * Fundo da tela de entrada: a folha de caderno 3D que ondula com o mouse.
+ * Enquanto o three.js baixa (ou quando o 3D não liga: tier baixo, movimento
+ * reduzido, sem WebGL ou erro) fica o papel pontilhado em canvas 2D.
+ */
+export function CenaLogin({ humor, reduced }: { humor: HumorPapel; reduced: boolean }) {
+  const ligada = useCena3D();
+  const [falhou, setFalhou] = useState(false);
+  if (!ligada || falhou || reduced) return <FundoLogin reduced={reduced} />;
+  return (
+    <div className="login-papel3d" aria-hidden>
+      <Guarda onFail={() => setFalhou(true)}>
+        <React.Suspense fallback={<FundoLogin reduced={reduced} />}>
+          <PapelVivo3D humor={humor} />
+        </React.Suspense>
+      </Guarda>
     </div>
   );
 }

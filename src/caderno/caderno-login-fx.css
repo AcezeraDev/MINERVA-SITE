@@ -1,44 +1,40 @@
-/* Tela de entrada, camada de efeitos: mesa 3D, decoração da mesa e movimento da folha. */
+/* Tela de entrada, camada de efeitos: fundo vivo, decoração da mesa e movimento da folha. */
 
-/* material escolar 3D: fica atrás de tudo e não pega clique */
-.login-mesa3d {
-  position: absolute;
+/* papel pontilhado vivo (FundoLogin.tsx): preso na janela (o canvas mede
+   window.innerWidth/innerHeight), atrás de tudo e sem pegar clique */
+.login-fundo {
+  position: fixed;
   inset: 0;
   z-index: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   animation: login-fade 900ms ease-out both;
 }
 
-/* o cena3d.css não carrega aqui: sem tamanho fixo o canvas cresce sem parar
-   (ResizeObserver mede o host, que estica com o canvas) */
-.login-mesa3d .login-mesa3d-host,
-.login-mesa3d canvas {
-  position: absolute;
+/* folha 3D (PapelVivo3D.tsx): mesmo lugar do fundo 2D. O cena3d.css não
+   carrega aqui, então o host e o canvas têm tamanho fixo próprio (sem isso o
+   ResizeObserver estica o canvas sem parar) */
+.login-papel3d,
+.login-papel3d .login-papel3d-host,
+.login-papel3d canvas {
+  position: fixed;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  cursor: default;
   pointer-events: none;
+}
+
+.login-papel3d {
+  z-index: 0;
+  animation: login-fade 1200ms ease-out both;
 }
 
 @keyframes login-fade {
   from {
     opacity: 0;
   }
-}
-
-/* papel quadriculado que some nas bordas */
-.login-grid {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgb(var(--pen) / 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(var(--pen) / 0.07) 1px, transparent 1px);
-  background-size: 28px 28px;
-  -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 50%, #000 30%, transparent 80%);
-  mask-image: radial-gradient(ellipse 70% 65% at 50% 50%, #000 30%, transparent 80%);
 }
 
 /* luz de luminária respirando sobre a Mine */

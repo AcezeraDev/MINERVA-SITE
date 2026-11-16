@@ -272,13 +272,11 @@ export function LoginScreen({
 
   return (
     <main className={`login-desk ${reduced ? "is-static" : ""}`}>
-      {/* papel quadriculado, mancha de café e luz de luminária */}
-      <div className="login-grid" aria-hidden />
+      {/* folha de caderno 3D que o mouse levanta e o clique faz ondular
+          (papel pontilhado 2D enquanto carrega ou quando o 3D não cabe) */}
+      <CenaLogin humor={mood} reduced={reduced} />
       <div className="login-lamp" aria-hidden />
       <span className="login-coffee" aria-hidden />
-
-      {/* material escolar 3D flutuando (só baixa quando cabe no aparelho) */}
-      <CenaLogin humor={mood} />
 
       {/* rabiscos na mesa */}
       <div className="login-scribbles" aria-hidden>
