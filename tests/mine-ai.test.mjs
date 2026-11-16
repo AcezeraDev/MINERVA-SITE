@@ -630,3 +630,17 @@ test("pergunta sobre o ultimo/atual troca ano antigo da consulta pelo de hoje", 
   assert.deepEqual(freshenQueries(["copa 2022 final"], "Como foi a última partida da Copa de 2022?", now), ["copa 2022 final"]);
   assert.deepEqual(freshenQueries(["revolucao francesa 1789"], "Explique a Revolução Francesa", now), ["revolucao francesa 1789"]);
 });
+
+test("pergunta sobre o material do aluno nao pesquisa na web", async () => {
+  const { asksAboutOwnMaterial, webSearchMode } = await import("../mine/web.mjs");
+  // Relatorio de QA de 16/11: a resposta sobre a imagem citava 8 sites.
+  assert.equal(asksAboutOwnMaterial("Na imagem Atividade Porcentagem: qual é o código da atividade?"), true);
+  assert.equal(asksAboutOwnMaterial("o que diz o PDF que eu enviei?"), true);
+  assert.equal(asksAboutOwnMaterial("resume esse material"), true);
+  assert.equal(asksAboutOwnMaterial("quem é o presidente do Brasil hoje?"), false);
+  await withNano({ NANOGPT_API_KEY: "nano_auto" }, globalThis.fetch, async () => {
+    assert.equal(webSearchMode({ prompt: "Na imagem, qual é o preço final?" }), "off");
+    // o globo ligado vence
+    assert.equal(webSearchMode({ prompt: "Na imagem, qual é o preço final?", requested: true }), "force");
+  });
+});

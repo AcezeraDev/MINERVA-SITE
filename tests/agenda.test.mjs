@@ -48,6 +48,17 @@ test("datas com dia e mês", () => {
   assert.equal(parse("prova 31/02").dueAt, null);
 });
 
+test("data que passou ha pouco fica atrasada, e ontem e reconhecido", () => {
+  // Relatorio de QA de 16/11: "tarefa 14/11" em 16/11 ia para 14/11/2027.
+  const doisDiasAtras = shiftDays(base, -2);
+  const d = new Date(doisDiasAtras);
+  const texto = `tarefa ${d.getDate()}/${d.getMonth() + 1}`;
+  assert.equal(parse(texto).dueAt, doisDiasAtras);
+  assert.equal(parse("ler capítulo 3 ontem").dueAt, shiftDays(base, -1));
+  assert.equal(parse("ler capítulo 3 ontem").title, "Ler capítulo 3");
+  assert.equal(parse("revisar anteontem").dueAt, shiftDays(base, -2));
+});
+
 test("horas em vários formatos", () => {
   assert.equal(parse("aula 9h30").time, "09:30");
   assert.equal(parse("aula 18:45").time, "18:45");

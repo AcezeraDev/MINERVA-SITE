@@ -32,9 +32,21 @@ export function isMindMapRequest(value) {
  * conversa. No plural exige-se um verbo de criacao por perto, que e o que
  * separa o pedido de uma mencao ("essas questoes estao dificeis").
  */
+const QUIZ_NOUN = String.raw`(?:provas?|simulad[ao]s?|testes?\s+de\s+conhecimento)`;
+const CREATE_VERB = String.raw`(?:cri[ae]|criar|faz|faca|fazer|monte?|montar|gere?|gerar|elabore?|quero|queria|preciso\s+de|prepar[ae]|preparar|manda|mande|me\s+d[ae])`;
+// verbo de criacao + (me|pra mim)? + artigo/numero? + uma palavra solta? + prova
+const QUIZ_WITH_VERB = new RegExp(
+  String.raw`\b${CREATE_VERB}\s+(?:(?:me|pra\s+mim|para\s+mim)\s+)?(?:(?:uma?|outr[ao]|nova|mais\s+uma?|\d+)\s+)?(?:[a-z]+\s+)?${QUIZ_NOUN}\b`,
+);
+// a mensagem e o proprio pedido: "simulado", "prova de biologia", "um simulado sobre..."
+const QUIZ_AS_TITLE = new RegExp(String.raw`^(?:uma?\s+)?${QUIZ_NOUN}(?:\s*[?!.]*$|\s+(?:de|do|da|dos|das|sobre)\s+(?!que\b))`);
+
 export function isQuizRequest(value) {
   const normalized = normalizeIntentText(value);
-  if (/\b(?:prova|simulad[ao]s?|teste\s+de\s+conhecimento)\b/.test(normalized)) return true;
+  // "prova" sozinha nao basta: "isso prova que...?", "tenho prova amanha" e
+  // "como estudar pra prova" sao conversa. Sem verbo de criacao (ou a frase
+  // ser o proprio pedido), a mensagem segue para a Mine como pergunta normal.
+  if (QUIZ_WITH_VERB.test(normalized) || QUIZ_AS_TITLE.test(normalized)) return true;
   return /\b(?:cri[ae]|criar|faz|faca|fazer|monte?|montar|gere?|gerar|elabore?|quero|preciso\s+de)\b[^.?!]{0,24}\b(?:quest(?:oes|ao)|exercicios?|perguntas)\b/.test(
     normalized,
   );

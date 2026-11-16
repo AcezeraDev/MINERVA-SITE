@@ -130,6 +130,8 @@ export function parseQuickTask(text, options = {}) {
       [/(?:^|\s)((?:para |pra |ate )?depois de amanha)(?=\s|$|[,.!])/g, () => shiftDays(base, 2)],
       [/(?:^|\s)((?:para |pra |ate )?amanha)(?=\s|$|[,.!])/g, () => shiftDays(base, 1)],
       [/(?:^|\s)((?:para |pra |ate )?hoje)(?=\s|$|[,.!])/g, () => base],
+      [/(?:^|\s)((?:de |para |pra )?anteontem)(?=\s|$|[,.!])/g, () => shiftDays(base, -2)],
+      [/(?:^|\s)((?:de |para |pra )?ontem)(?=\s|$|[,.!])/g, () => shiftDays(base, -1)],
       [/(?:^|\s)((?:em|daqui a|daqui)\s+(\d{1,2})\s+dias?)(?=\s|$|[,.!])/g, (m) => shiftDays(base, Number(m[2]))],
       [/(?:^|\s)((?:na |para a |pra )?(?:semana que vem|proxima semana))(?=\s|$|[,.!])/g, () => shiftDays(base, 7)],
       [
@@ -148,6 +150,9 @@ export function parseQuickTask(text, options = {}) {
           }
           const sameYear = dateOf(today.getFullYear(), month, day);
           if (sameYear !== null && sameYear >= base) return sameYear;
+          // Data que passou ha pouco (ate ~2 meses) e tarefa atrasada, nao do
+          // ano que vem: "tarefa 14/11" digitada em 16/11 ia para 2027.
+          if (sameYear !== null && base - sameYear <= 62 * 86400000) return sameYear;
           return dateOf(today.getFullYear() + 1, month, day);
         },
       ],

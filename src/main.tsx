@@ -261,6 +261,7 @@ const logoMaskUrl = new URL("../assets/minerva_mark_mask.png", import.meta.url).
 const storageKey = "minerva-react-v2";
 const sessionStorageKey = "minerva-session-v1";
 const minePhotosStorageKey = "minerva-mine-photos-v1";
+const mineOpenStorageKey = "minerva-mine-open-v1";
 const mineTutorStorageKey = "minerva-mine-tutor-v1";
 const navHiddenStorageKey = "minerva-nav-hidden-v1";
 // v2 (set/2026): o site passou a abrir branco. O escuro guardado na v1 era,
@@ -531,6 +532,8 @@ export type Task = {
   repeat?: TaskRepeat;
   /** Id da cópia criada ao concluir uma tarefa que repete (evita duplicar). */
   spawnedNext?: string;
+  /** Tarefas criadas juntas pelo Plano de estudos: dá para editar ou remover o plano inteiro. */
+  planId?: string;
 };
 
 export type TaskStep = { id: string; text: string; done: boolean };
@@ -1349,6 +1352,12 @@ export function shortDate(timestamp: number) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" }).format(new Date(timestamp));
 }
 
+/** Como shortDate, mas com o ano quando ele não é o atual ("16/11/2027"). */
+export function shortDateWithYear(timestamp: number) {
+  const year = new Date(timestamp).getFullYear();
+  return year === new Date().getFullYear() ? shortDate(timestamp) : `${shortDate(timestamp)}/${year}`;
+}
+
 function timeLabel(timestamp: number) {
   return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp));
 }
@@ -1632,6 +1641,23 @@ function App() {
     setSoundsEnabled(Boolean(user?.settings.sounds));
   }, [user?.settings.sounds]);
   const pageLayerRef = useRef<HTMLDivElement | null>(null);
+  // Rede de segurança da virada de página. O AnimatePresence mode="wait" só
+  // monta a página nova quando a saída da antiga termina; às vezes essa saída
+  // nunca termina (aba em segundo plano, clique no meio da virada) e o endereço
+  // muda com a tela antiga presa até recarregar. Se, passado o tempo da
+  // virada com folga, a camada da rota atual não estiver na tela, o
+  // AnimatePresence é remontado (chave nova) e a página certa aparece.
+  const [presenceEpoch, setPresenceEpoch] = useState(0);
+  const currentPageKey = route.view === "admin" ? "admin" : `${route.view}-${route.id || ""}`;
+  useEffect(() => {
+    const check = () => {
+      const layers = [...document.querySelectorAll<HTMLElement>("[data-page-layer]")];
+      const stuck = !layers.length || layers.some((layer) => layer.dataset.pageKey !== currentPageKey);
+      if (stuck) setPresenceEpoch((value) => value + 1);
+    };
+    const timers = [window.setTimeout(check, 1600), window.setTimeout(check, 4000)];
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [currentPageKey]);
   useEffect(() => {
     const level = rewards?.level;
     if (!level) return;
@@ -1648,11 +1674,37 @@ function App() {
 
   // Trocar de matéria (ou os dados chegarem do servidor) abre a conversa mais
   // recente dela; as sugestões da conversa anterior não valem para esta.
+  // Ao recarregar, volta para a conversa que estava aberta (matéria + conversa),
+  // e não para a mais recente do site: antes, uma mensagem mandada para
+  // "Estudos gerais" fazia a conversa da matéria parecer ter sumido.
+  const mineOpenRestored = useRef(false);
   useEffect(() => {
-    setMineThreadId(threadsOf(userData.chats, selectedSubjectId)[0]?.id);
+    if (!user) return;
+    let saved: { userId?: string; subjectId?: string; threadId?: string } | null = null;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(mineOpenStorageKey) || "null");
+    } catch {}
+    if (!mineOpenRestored.current) {
+      // Espera os dados do servidor para saber se a matéria guardada existe.
+      if (syncStatus === "conectando" && !userData.subjects.length) return;
+      mineOpenRestored.current = true;
+      if (saved?.userId === user.id && saved.subjectId && saved.subjectId !== selectedSubjectId && userData.subjects.some((item) => item.id === saved!.subjectId)) {
+        setSelectedSubjectId(saved.subjectId);
+        return;
+      }
+    }
+    const threads = threadsOf(userData.chats, selectedSubjectId);
+    const keep = saved?.userId === user.id && saved.subjectId === selectedSubjectId && threads.find((item) => item.id === saved!.threadId);
+    setMineThreadId(keep ? keep.id : threads[0]?.id);
     setMineSuggestions([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSubjectId, user?.id, syncStatus === "online"]);
+  }, [selectedSubjectId, user?.id, syncStatus === "online", userData.subjects.length]);
+  useEffect(() => {
+    if (!user || !mineOpenRestored.current) return;
+    try {
+      sessionStorage.setItem(mineOpenStorageKey, JSON.stringify({ userId: user.id, subjectId: selectedSubjectId, threadId: mineThreadId }));
+    } catch {}
+  }, [user?.id, selectedSubjectId, mineThreadId]);
 
   useEffect(() => {
     if (!user || !rewards) return;
@@ -2162,6 +2214,11 @@ function App() {
                 materials: savedMaterials.length ? [...draft.materials, ...savedMaterials] : draft.materials,
               };
             });
+            // O pedido foi para outra conversa (prova ou mapa de um tema fora da
+            // matéria aberta): avisa, senão a mensagem parece ter sumido.
+            if (!replaceFrom && resolvedSubjectId !== subjectId) {
+              notify(`Seu pedido foi para a conversa ${subject ? `de ${subject.name}` : "Estudos gerais"}.`);
+            }
             if (subject && savedMaterials.length) {
               notify(savedMaterials.length === 1 ? `Anexo salvo como conteúdo em ${subject.name}.` : `${savedMaterials.length} anexos salvos como conteúdo em ${subject.name}.`);
             }
@@ -2581,10 +2638,11 @@ function App() {
               {pageCurl ? <PageCurl routeKey={`${route.view}-${route.id || ""}`} /> : <PageTurnShade routeKey={`${route.view}-${route.id || ""}`} />}
             </>
           ) : null}
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" key={presenceEpoch}>
             <motion.div
-              key={route.view === "admin" ? "admin" : `${route.view}-${route.id || ""}`}
+              key={currentPageKey}
               data-page-layer={`${route.view}-${route.id || ""}`}
+              data-page-key={currentPageKey}
               className={isAdminPanel ? "min-h-screen" : isMinePanel ? "h-full w-full" : "mx-auto w-full max-w-[1380px]"}
               variants={isAdminPanel ? pageVariants : reducedMotion || isMinePanel ? pageFadeVariants : pageCurl ? pageCurlVariants : pageFlipVariants}
               // Parada, a página não pode ficar com transform: qualquer um (até
@@ -2602,6 +2660,7 @@ function App() {
           </AnimatePresence>
         </main>
         {!isAdminPanel && !isMinePanel ? <MineBuddy route={route.view} onOpen={() => go("mine")} /> : null}
+        {!isAdminPanel ? <FocusRunningBadge userId={user.id} route={route.view} /> : null}
         {!isAdminPanel && !isMinePanel ? <MobileNav route={route.view} isAdmin={hasAdminAccess} displayName={displayName} avatar={user.settings.avatar} level={rewards?.level || 1} /> : null}
       </div>
       <ModalHost modal={modal} setModal={setModal} user={user} data={userData} update={update} notify={notify} />
@@ -4343,6 +4402,43 @@ function SubjectView({
     });
   }
 
+  /**
+   * "Mine ao lado": responde no próprio caderno da matéria, sem trocar de
+   * página (relatório de QA de 16/11). A pergunta e a resposta também entram
+   * na conversa da matéria, para continuar lá se o aluno quiser.
+   */
+  async function askAside(label: string, material: Material) {
+    const prompt = `${label} com foco no material "${material.title}".`;
+    const body = (material.content?.trim() || material.detail?.trim() || "").slice(0, 12000);
+    const others = materials
+      .filter((item) => item.id !== material.id)
+      .slice(0, 8)
+      .map((item) => `- ${item.title}: ${(item.content?.trim() || item.detail?.trim() || "").slice(0, 600) || "sem detalhe"}`)
+      .join("\n");
+    const context = [
+      `Materia: ${subject.name}.`,
+      `Material em foco: ${material.title}${material.type === "image" ? " [imagem enviada]" : ""}`,
+      body ? `Texto do material:\n${body}` : "",
+      others ? `Outros conteudos da materia (use se ajudar):\n${others}` : "",
+      "Responda de forma curta e direta: cabe num painel lateral pequeno.",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const attachments = materialsToImageAttachments([material]);
+    const assistant = await requestAssistantResponse({ prompt, history: [], context, attachments });
+    const reply = assistant.reply.trim() || "Não consegui analisar agora. Tente novamente em instantes.";
+    const now = Date.now();
+    update((draft) => ({
+      ...draft,
+      chats: [
+        ...draft.chats,
+        { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "user", text: prompt, createdAt: now },
+        { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "mine", text: reply, createdAt: now + 1 },
+      ],
+    }));
+    return reply;
+  }
+
   async function runQuick(label: string) {
     const fullPrompt = `${label} com base nos conteúdos que adicionei na matéria ${subject.name}. Use o que está cadastrado nesta matéria.`;
     update((draft) => ({
@@ -4518,6 +4614,11 @@ function SubjectView({
           openMaterial={(materialId) => setModal({ type: "materialView", materialId })}
           addMaterial={() => setModal({ type: "material", subjectId: subject.id })}
           askMine={(prompt) => void runQuick(prompt)}
+          askAside={askAside}
+          openConversation={() => {
+            setSelectedSubjectId(subject.id);
+            go("mine");
+          }}
           markStudied={(materialId) =>
             update((draft) => ({
               ...draft,
@@ -4610,7 +4711,8 @@ function SubjectNotebook({
   selectMaterial,
   openMaterial,
   addMaterial,
-  askMine,
+  askAside,
+  openConversation,
   markStudied,
 }: {
   subject: Subject;
@@ -4620,8 +4722,24 @@ function SubjectNotebook({
   openMaterial: (materialId: string) => void;
   addMaterial: () => void;
   askMine: (prompt: string) => void;
+  askAside: (label: string, material: Material) => Promise<string>;
+  openConversation: () => void;
   markStudied: (materialId: string) => void;
 }) {
+  const [aside, setAside] = useState<{ materialId: string; label: string; status: "loading" | "done" | "error"; text: string } | null>(null);
+  const asideFor = aside && aside.materialId === selectedMaterial?.id ? aside : null;
+  const runAside = (label: string) => {
+    if (!selectedMaterial || asideFor?.status === "loading") return;
+    const materialId = selectedMaterial.id;
+    setAside({ materialId, label, status: "loading", text: "" });
+    askAside(label, selectedMaterial)
+      .then((text) => setAside((current) => (current && current.materialId === materialId && current.label === label ? { ...current, status: "done", text } : current)))
+      .catch(() =>
+        setAside((current) =>
+          current && current.materialId === materialId ? { ...current, status: "error", text: "Não consegui responder agora. Tente de novo em instantes." } : current,
+        ),
+      );
+  };
   const previewText = selectedMaterial?.content?.trim() || selectedMaterial?.detail?.trim() || "Este conteúdo ainda não possui texto para pré-visualizar.";
   const MaterialIcon = selectedMaterial
     ? selectedMaterial.type === "link" ? LinkIcon : selectedMaterial.type === "file" ? Paperclip : selectedMaterial.type === "image" ? Camera : FileText
@@ -4713,13 +4831,38 @@ function SubjectNotebook({
                   ["Criar perguntas", ClipboardCheck],
                   ["Resumir em tópicos", FileText],
                 ].map(([label, Icon]) => (
-                  <button key={String(label)} type="button" onClick={() => askMine(`${label} com foco no material \"${selectedMaterial.title}\"`)} className="caderno-sn-ask group">
-                    {React.createElement(Icon as LucideIcon, { className: "h-4 w-4 shrink-0" })}
+                  <button
+                    key={String(label)}
+                    type="button"
+                    onClick={() => runAside(label as string)}
+                    disabled={asideFor?.status === "loading"}
+                    aria-pressed={asideFor?.label === label}
+                    className="caderno-sn-ask group"
+                  >
+                    {asideFor?.status === "loading" && asideFor.label === label
+                      ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                      : React.createElement(Icon as LucideIcon, { className: "h-4 w-4 shrink-0" })}
                     <span className="min-w-0 flex-1 truncate">{label as string}</span>
                     <ArrowRight className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-1" />
                   </button>
                 ))}
               </div>
+              {asideFor ? (
+                <div className="caderno-sn-answer minerva-scroll" role="status" aria-live="polite">
+                  {asideFor.status === "loading" ? (
+                    <p className="caderno-note">a Mine está lendo o material…</p>
+                  ) : asideFor.status === "error" ? (
+                    <p>{asideFor.text}</p>
+                  ) : (
+                    <MineRichText text={asideFor.text} />
+                  )}
+                  {asideFor.status !== "loading" ? (
+                    <button type="button" onClick={openConversation} className="caderno-sn-open mt-2">
+                      continuar na conversa ↗
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </aside>
           </div>
         ) : (
@@ -5015,6 +5158,69 @@ const focusTips = [
   "Termine a sessão anotando onde parou. Começar a próxima fica muito mais fácil.",
 ];
 
+type FocusState = {
+  phase: "focus" | "break";
+  longBreak: boolean;
+  cycles: number;
+  focusMin: number;
+  breakMin: number;
+  subjectId?: string;
+  running: boolean;
+  endsAt?: number;
+  remaining: number;
+};
+const focusStateKey = (userId: string) => `minerva-foco-v1-${userId}`;
+function readFocusState(userId: string): FocusState | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(focusStateKey(userId)) || "null") as FocusState | null;
+    if (!value || (value.phase !== "focus" && value.phase !== "break")) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+function writeFocusState(userId: string, state: FocusState) {
+  try {
+    localStorage.setItem(focusStateKey(userId), JSON.stringify(state));
+  } catch {}
+  window.dispatchEvent(new Event("minerva-foco"));
+}
+function focusRemainingOf(state: FocusState) {
+  if (state.running && state.endsAt) return Math.max(0, Math.round((state.endsAt - Date.now()) / 1000));
+  return Math.max(0, Math.round(state.remaining || 0));
+}
+
+/** Selo no topo enquanto o foco roda e o aluno está em outra página. */
+function FocusRunningBadge({ userId, route }: { userId: string; route: string }) {
+  const [state, setState] = useState(() => readFocusState(userId));
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const reload = () => setState(readFocusState(userId));
+    window.addEventListener("minerva-foco", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("minerva-foco", reload);
+      window.removeEventListener("storage", reload);
+    };
+  }, [userId]);
+  const active = Boolean(state?.running) && route !== "foco";
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  if (!active || !state) return null;
+  const left = focusRemainingOf(state);
+  const label = left > 0 ? `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}` : "terminou";
+  return (
+    <a href="#/foco" className="focus-running-badge" aria-label={`${state.phase === "focus" ? "Foco" : "Pausa"} em andamento: ${label}. Voltar ao Foco.`}>
+      <Timer className="h-4 w-4" />
+      <span>{state.phase === "focus" ? "Foco" : "Pausa"}</span>
+      <strong>{label}</strong>
+    </a>
+  );
+}
+
 function FocusView({
   data,
   user,
@@ -5028,22 +5234,51 @@ function FocusView({
 }) {
   const subjects = data.subjects;
   const reducedFocusMotion = useSoftMotion();
-  const [focusMin, setFocusMin] = useState(() => Math.min(Math.max(user.settings.focusMinutes || 25, 1), 240));
-  const [breakMin, setBreakMin] = useState(5);
-  const [phase, setPhase] = useState<"focus" | "break">("focus");
-  const [longBreak, setLongBreak] = useState(false);
-  const [remaining, setRemaining] = useState(focusMin * 60);
-  const [running, setRunning] = useState(false);
-  const [cycles, setCycles] = useState(0);
-  const [subjectId, setSubjectId] = useState<string | undefined>(subjects[0]?.id);
+  // A sessão fica guardada no aparelho: trocar de página, recarregar ou ir
+  // ver a Agenda não zera mais o cronômetro (relatório de QA de 16/11). O
+  // tempo conta pelo horário de término, então também segue certo com a aba
+  // em segundo plano.
+  const [saved] = useState(() => readFocusState(user.id));
+  const [focusMin, setFocusMin] = useState(() => saved?.focusMin ?? Math.min(Math.max(user.settings.focusMinutes || 25, 1), 240));
+  const [breakMin, setBreakMin] = useState(() => saved?.breakMin ?? 5);
+  const [phase, setPhase] = useState<"focus" | "break">(() => saved?.phase ?? "focus");
+  const [longBreak, setLongBreak] = useState(() => saved?.longBreak ?? false);
+  const [remaining, setRemaining] = useState(() => (saved ? focusRemainingOf(saved) : focusMin * 60));
+  const [running, setRunning] = useState(() => Boolean(saved?.running));
+  const [cycles, setCycles] = useState(() => saved?.cycles ?? 0);
+  const [subjectId, setSubjectId] = useState<string | undefined>(() => (saved?.subjectId && subjects.some((item) => item.id === saved.subjectId) ? saved.subjectId : subjects[0]?.id));
   const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * focusTips.length));
   const timerRef = useRef<HTMLDivElement | null>(null);
+  const endsAtRef = useRef<number | null>(saved?.running && saved.endsAt ? saved.endsAt : null);
+
+  useEffect(() => {
+    if (running && endsAtRef.current === null) endsAtRef.current = Date.now() + remaining * 1000;
+    if (!running) endsAtRef.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running]);
 
   useEffect(() => {
     if (!running || remaining <= 0) return;
-    const timer = setTimeout(() => setRemaining((value) => value - 1), 1000);
+    const timer = setTimeout(() => {
+      const endsAt = endsAtRef.current;
+      setRemaining((value) => (endsAt ? Math.max(0, Math.round((endsAt - Date.now()) / 1000)) : value - 1));
+    }, 1000);
     return () => clearTimeout(timer);
   }, [running, remaining]);
+
+  useEffect(() => {
+    writeFocusState(user.id, {
+      phase,
+      longBreak,
+      cycles,
+      focusMin,
+      breakMin,
+      subjectId,
+      running,
+      endsAt: running ? endsAtRef.current ?? Date.now() + remaining * 1000 : undefined,
+      remaining,
+    });
+  }, [user.id, phase, longBreak, cycles, focusMin, breakMin, subjectId, running, remaining]);
 
   useEffect(() => {
     if (!running || remaining > 0) return;
@@ -5508,7 +5743,7 @@ function WeeklyStudyReport({ data, dailyGoal }: { data: ReturnType<typeof useMem
 
   return (
     <Reveal delay={0.04}>
-      <section className="overflow-hidden rounded-[1.2rem] border border-white/[0.08] bg-[#121815]">
+      <section className="overflow-hidden rounded-[1.2rem] border border-white/[0.08] bg-[rgb(var(--sheet))]">
         <header className="flex flex-col gap-3 border-b border-white/[0.08] px-5 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-6 sm:py-5">
           <div>
             <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.18em] text-mint"><TrendingUp className="h-3.5 w-3.5" /> Relatório da semana</p>
@@ -5537,7 +5772,7 @@ function WeeklyStudyReport({ data, dailyGoal }: { data: ReturnType<typeof useMem
                 [studiedMaterials, "conteúdos"],
                 [accuracy === undefined ? "—" : `${accuracy}%`, "acerto"],
               ].map(([value, label]) => (
-                <div key={String(label)} className="bg-[#151c18] p-3.5">
+                <div key={String(label)} className="bg-[rgb(var(--panel))] p-3.5">
                   <p className="font-display text-xl font-black tabular">{value}</p>
                   <p className="mt-1 text-[9px] font-black uppercase tracking-[.11em] text-white/30">{label}</p>
                 </div>
@@ -5796,8 +6031,11 @@ function RankingView({
   }, [carregar]);
 
   function alternarAmigo(row: RankingRow) {
-    const jaEra = friends.some((item) => item.toLowerCase() === row.name.toLowerCase());
-    const proximos = jaEra ? friends.filter((item) => item.toLowerCase() !== row.name.toLowerCase()) : [...friends, row.name];
+    // O servidor só manda o nome da conta de quem já é amigo; os outros viram
+    // amigos pelo id (o servidor reconhece os dois).
+    const chaves = [row.name, row.id].filter(Boolean).map((item) => item.toLowerCase());
+    const jaEra = row.friend || friends.some((item) => chaves.includes(item.toLowerCase()));
+    const proximos = jaEra ? friends.filter((item) => !chaves.includes(item.toLowerCase())) : [...friends, row.name || row.id];
     update((draft) => ({
       ...draft,
       users: draft.users.map((item) => (item.id === user.id ? { ...item, settings: { ...item.settings, friends: proximos } } : item)),
@@ -8691,11 +8929,28 @@ const planPaceSteps: Record<PlanPace, string[]> = {
   intenso: ["Revisar teoria", "Resolver exercícios", "Fazer resumo", "Revisão final"],
 };
 
-const planPaceHints: Record<PlanPace, string> = {
-  leve: "cerca de 2 tarefas por matéria",
-  normal: "cerca de 3 tarefas por matéria",
-  intenso: "cerca de 4 tarefas por matéria",
+/**
+ * Quantas tarefas o plano tem, pelo ritmo. Antes o ritmo virava só uma frase
+ * no pedido e a Mine fazia sempre uma tarefa por dia: Normal e Intenso davam o
+ * mesmo plano (relatório de QA de 16/11). Agora o total é um número, pedido à
+ * Mine e conferido na volta.
+ */
+const planPaceRate: Record<PlanPace, number> = { leve: 0.5, normal: 1, intenso: 2 };
+const planPaceDaily: Record<PlanPace, string> = {
+  leve: "uma tarefa a cada 2 dias",
+  normal: "cerca de 1 tarefa por dia",
+  intenso: "cerca de 2 tarefas por dia",
 };
+function planTarget(pace: PlanPace, days: number, subjects: number) {
+  const scale = Math.max(1, subjects / 2);
+  const raw = Math.round(days * planPaceRate[pace] * scale);
+  const minimum = Math.max(1, subjects) * (pace === "leve" ? 1 : pace === "normal" ? 2 : 3);
+  return Math.min(Math.max(raw, minimum), Math.min(80, days * 4));
+}
+function planPaceHint(pace: PlanPace, days: number, subjects: number) {
+  const total = planTarget(pace, days, Math.max(subjects, 1));
+  return `${total} ${total === 1 ? "tarefa" : "tarefas"} · ${planPaceDaily[pace]}`;
+}
 
 function parsePlanText(text: string, subjects: Subject[], maxDays: number): Array<{ subjectId: string; title: string; note: string; day: number }> {
   type PlanRow = { subjectId: string; title: string; note: string; day: number };
@@ -8842,8 +9097,52 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
   const [manualTitle, setManualTitle] = useState("");
   const [manualSubject, setManualSubject] = useState("");
   const [manualDay, setManualDay] = useState(1);
+  // Plano que voltou da agenda para edição: ao salvar, mantém o mesmo id.
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   const chosen = data.subjects.filter((item) => selected.includes(item.id));
+  const target = planTarget(pace, days, chosen.length);
+
+  // O último plano salvo, reconhecido pelas tarefas que levam o mesmo planId.
+  const savedPlan = (() => {
+    const byPlan = new Map<string, Task[]>();
+    for (const task of data.tasks) {
+      if (!task.planId) continue;
+      byPlan.set(task.planId, [...(byPlan.get(task.planId) || []), task]);
+    }
+    let latest: { id: string; tasks: Task[]; createdAt: number } | null = null;
+    for (const [id, tasks] of byPlan) {
+      const createdAt = Math.max(...tasks.map((task) => task.createdAt));
+      if (!latest || createdAt > latest.createdAt) latest = { id, tasks, createdAt };
+    }
+    return latest;
+  })();
+
+  function editSavedPlan() {
+    if (!savedPlan) return;
+    const pending = savedPlan.tasks.filter((task) => !task.done);
+    const ids = new Set(pending.map((task) => task.id));
+    update((current) => ({ ...current, tasks: current.tasks.filter((task) => !ids.has(task.id)) }));
+    setDraft(pending.map((task) => ({ ...task, id: uid("draft") })).sort((a, b) => a.dueAt - b.dueAt));
+    setFromMine(false);
+    setEditingPlanId(savedPlan.id);
+    setConfirmRemove(false);
+    notify("O plano voltou para cá. Ajuste e salve de novo na agenda.");
+  }
+
+  function removeSavedPlan() {
+    if (!savedPlan) return;
+    if (!confirmRemove) {
+      setConfirmRemove(true);
+      return;
+    }
+    const pending = savedPlan.tasks.filter((task) => !task.done);
+    const ids = new Set(pending.map((task) => task.id));
+    update((current) => ({ ...current, tasks: current.tasks.filter((task) => !ids.has(task.id)) }));
+    setConfirmRemove(false);
+    notify(`${pending.length} ${pending.length === 1 ? "tarefa do plano saiu" : "tarefas do plano saíram"} da agenda.`);
+  }
   const allSelected = selected.length === data.subjects.length && data.subjects.length > 0;
 
   function toDraft(rows: Array<{ subjectId: string; title: string; note: string; day: number }>): Task[] {
@@ -8867,27 +9166,42 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
     return pool.length ? pool[step % pool.length] : undefined;
   }
 
+  /** `count` tarefas alternando matérias e etapas, espalhadas do dia 1 ao último. */
+  function quickRows(count: number) {
+    const steps = planPaceSteps[pace];
+    const rows: Array<{ subjectId: string; title: string; note: string; day: number }> = [];
+    for (let slot = 0; slot < count; slot += 1) {
+      const subject = chosen[slot % chosen.length];
+      // a etapa avança junto com o tempo: teoria no começo, revisão no fim
+      const stepIndex = Math.min(steps.length - 1, Math.floor((slot / Math.max(count, 1)) * steps.length));
+      const day = Math.min(days, 1 + Math.floor((slot * (days - 1)) / Math.max(count - 1, 1)));
+      rows.push({
+        subjectId: subject.id,
+        title: `${steps[stepIndex]}: ${subject.name}`,
+        note: materialFor(subject.id, slot)?.title || "",
+        day,
+      });
+    }
+    return rows;
+  }
+
   function generateQuick() {
     if (!chosen.length) return;
     setError("");
-    const steps = planPaceSteps[pace];
-    const total = chosen.length * steps.length;
-    const rows: Array<{ subjectId: string; title: string; note: string; day: number }> = [];
-    let slot = 0;
-    steps.forEach((step, stepIndex) => {
-      chosen.forEach((subject) => {
-        const day = Math.min(days, 1 + Math.floor((slot * (days - 1)) / Math.max(total - 1, 1)));
-        slot += 1;
-        rows.push({
-          subjectId: subject.id,
-          title: `${step}: ${subject.name}`,
-          note: materialFor(subject.id, stepIndex)?.title || "",
-          day,
-        });
-      });
-    });
-    setDraft(toDraft(rows));
+    setDraft(toDraft(quickRows(target)));
     setFromMine(false);
+  }
+
+  /** Confere o total que a Mine devolveu: corta o excesso por igual e completa a falta. */
+  function fitToTarget(rows: Array<{ subjectId: string; title: string; note: string; day: number }>) {
+    if (rows.length > Math.ceil(target * 1.25)) {
+      const sorted = [...rows].sort((a, b) => a.day - b.day);
+      return Array.from({ length: target }, (_, index) => sorted[Math.floor((index * sorted.length) / target)]);
+    }
+    if (rows.length < Math.floor(target * 0.8)) {
+      return [...rows, ...quickRows(target - rows.length)];
+    }
+    return rows;
   }
 
   function generateWithMine() {
@@ -8902,7 +9216,7 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
     });
     const context = [
       `Total de dias ate a prova: ${days} (o dia ${days} e a vespera da prova).`,
-      `Ritmo desejado: ${pace} (${planPaceHints[pace]}).`,
+      `Ritmo desejado: ${pace}. Crie EXATAMENTE ${target} tarefas no total (${planPaceDaily[pace]}), somando todas as materias. Pode haver dias sem tarefa e dias com mais de uma.`,
       "Materias e conteudos:",
       ...contextLines,
     ].join("\n");
@@ -8913,7 +9227,7 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
           setError("A Mine não conseguiu montar o plano agora. Tente de novo ou use o plano rápido.");
           return;
         }
-        setDraft(toDraft(rows));
+        setDraft(toDraft(fitToTarget(rows)));
         setFromMine(true);
       })
       .catch(() => setError("A Mine não conseguiu montar o plano agora. Tente de novo ou use o plano rápido."))
@@ -9023,7 +9337,7 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
                     aria-label="Dias até a prova"
                     className="w-20 rounded-lg border border-white/12 bg-black/40 px-2 py-1 text-[13px] tabular text-mint outline-none transition focus:border-mint/60"
                   />
-                  <span className="text-white/45">· prova em {shortDate(addDays(days))}</span>
+                  <span className="text-white/45">· prova em {shortDateWithYear(addDays(days))}</span>
                 </span>
                 <input
                   value={days}
@@ -9055,18 +9369,16 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
                     </button>
                   ))}
                 </div>
-                <AnimatePresence mode="wait">
-                  <motion.p
-                    key={pace}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.2 }}
-                    className="mt-2 text-[11px] font-bold text-white/40"
-                  >
-                    {planPaceHints[pace]}
-                  </motion.p>
-                </AnimatePresence>
+                {/* só entrada: com mode="wait" a dica antiga podia ficar presa na tela */}
+                <motion.p
+                  key={pace}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-2 text-[11px] font-bold text-white/40"
+                >
+                  {planPaceHint(pace, days, chosen.length)}
+                </motion.p>
               </div>
               {error ? (
                 <motion.p
@@ -9195,8 +9507,10 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
                 <PrimaryButton
                   icon={CalendarCheck}
                   onClick={() => {
-                    update((data) => ({ ...data, tasks: [...data.tasks, ...draft.map((task) => ({ ...task, id: uid("task") }))] }));
+                    const planId = editingPlanId || uid("plan");
+                    update((data) => ({ ...data, tasks: [...data.tasks, ...draft.map((task) => ({ ...task, id: uid("task"), planId }))] }));
                     setDraft([]);
+                    setEditingPlanId(null);
                     notify("Plano adicionado à agenda.");
                     celebrate(window.innerWidth / 2, window.innerHeight * 0.35, { count: 70, spread: 1.6 });
                     mineSays("Plano no caderno! Já tá tudo na agenda.", "wow");
@@ -9215,7 +9529,7 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-bold text-white/50">
               <span>{draft.length} tarefas</span>
               <span>{new Set(draft.map((task) => task.subjectId)).size} matérias</span>
-              <span>até {shortDate(draft[draft.length - 1].dueAt)}</span>
+              <span>até {shortDateWithYear(draft[draft.length - 1].dueAt)}</span>
               {fromMine && (
                 <span className="inline-flex items-center gap-1.5 text-mint">
                   <Sparkles className="h-3.5 w-3.5" />
@@ -9224,7 +9538,15 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
               )}
               <button
                 type="button"
-                onClick={() => setDraft([])}
+                onClick={() => {
+                  // Descartar a edição de um plano salvo devolve as tarefas à agenda.
+                  if (editingPlanId) {
+                    const planId = editingPlanId;
+                    update((data) => ({ ...data, tasks: [...data.tasks, ...draft.map((task) => ({ ...task, id: uid("task"), planId }))] }));
+                    setEditingPlanId(null);
+                  }
+                  setDraft([]);
+                }}
                 className="ml-auto font-black text-white/45 underline-offset-4 transition hover:text-red-200 hover:underline"
               >
                 Descartar
@@ -9279,10 +9601,37 @@ function PlanView({ data, update, user, notify }: { data: ReturnType<typeof useM
                 </div>
               </motion.div>
             ))}
+            {!generating && !draft.length && savedPlan ? (
+              <div className="rounded-2xl border border-mint/25 bg-mint/[0.06] p-4">
+                <p className="font-black">Último plano salvo na agenda</p>
+                <p className="mt-1 text-[13px] font-bold text-white/55">
+                  {savedPlan.tasks.length} {savedPlan.tasks.length === 1 ? "tarefa" : "tarefas"} · {savedPlan.tasks.filter((task) => task.done).length} feitas · até{" "}
+                  {shortDateWithYear(Math.max(...savedPlan.tasks.map((task) => task.dueAt)))}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={editSavedPlan}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-4 py-2 text-[13px] font-black text-white/80 transition hover:border-mint/40 hover:text-white"
+                  >
+                    <Pencil className="h-4 w-4" /> Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeSavedPlan}
+                    onBlur={() => setConfirmRemove(false)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-roseGlow/30 bg-roseGlow/10 px-4 py-2 text-[13px] font-black text-roseGlow transition hover:bg-roseGlow/20"
+                  >
+                    <Trash2 className="h-4 w-4" /> {confirmRemove ? "Confirmar: tirar da agenda" : "Remover da agenda"}
+                  </button>
+                </div>
+                <p className="mt-2 text-[12px] font-bold text-white/40">Editar ou remover mexe só nas tarefas ainda não feitas.</p>
+              </div>
+            ) : null}
             {!generating && !draft.length ? (
               <EmptyState
                 icon={CalendarPlus}
-                title="Sem cronograma ainda"
+                title={savedPlan ? "Montar outro plano" : "Sem cronograma ainda"}
                 text="Escolha as matérias, ajuste os dias e peça para a Mine montar seu plano até a prova."
               />
             ) : null}

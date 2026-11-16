@@ -50,6 +50,17 @@ const LOCAL_ACTION = /^(?:por favor[, ]*)?(?:crie|criar|adicione|adicionar|salve
 const LANGUAGE_EXERCISE = /\b(traduza|traduzir|tradu[cç][aã]o|como se (?:escreve|diz)|frases? em (?:ingl[eê]s|espanhol|franc[eê]s)|simple past|passado simples)\b/i;
 const FOLLOWUP = /^(?:e\b|o segundo\b|a segunda\b|(?:quanto|quando|qual|quem)\b.{0,35}\b(?:ele|ela|isso|esse|essa|dele|dela|vai ser|acontece|custa|assumiu|segundo|segunda)\b)/i;
 
+const OWN_MATERIAL = /\b(?:n[ao]s?|dess[ae]s?|nest[ae]s?|ness[ae]s?|d[ao]s?|essa|esse|esta|este)\s+(?:imagem|imagens|foto|fotos|arquivo|arquivos|pdf|material|materiais|conte[uú]dos?|texto|documento|anexo|anexos|print|slide|slides|apostila|resumo)\b|\bque (?:eu )?(?:enviei|mandei|anexei|adicionei|subi|coloquei)\b/i;
+
+/**
+ * A pergunta fala do material do aluno. So o texto decide: as imagens da
+ * materia viajam como anexo em toda mensagem do chat dela, entao "ter anexo"
+ * nao diz que a pergunta e sobre o anexo.
+ */
+export function asksAboutOwnMaterial(prompt = "") {
+  return OWN_MATERIAL.test(String(prompt || ""));
+}
+
 function previousQuestion(history) {
   return String((Array.isArray(history) ? [...history].reverse() : []).find((message) => message?.role === "user")?.text ||
     (Array.isArray(history) ? [...history].reverse() : []).find((message) => message?.role === "user")?.content || "");
@@ -74,6 +85,11 @@ function needsFreshInformation(text) {
  */
 export function webSearchMode({ requested = false, prompt = "", task = "", history = [] } = {}) {
   if (task || !webSearchEnabled()) return "off";
+  // Pergunta sobre o material do proprio aluno ("na imagem...", "no PDF que
+  // enviei") se responde com o material: a busca na web trazia 8 sites como
+  // "fontes" de um dado que so existia na imagem (relatorio de QA de 16/11).
+  // O globo ligado ou um pedido explicito de pesquisa continuam valendo.
+  if (!requested && !EXPLICIT.test(String(prompt || "")) && asksAboutOwnMaterial(prompt)) return "off";
   if (shouldSearchWeb({ requested, prompt, task, history })) return "force";
   return autoSearchEnabled() ? "auto" : "off";
 }

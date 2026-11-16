@@ -60,6 +60,15 @@ const modes: Array<{ id: AgendaMode; label: string; icon: typeof List }> = [
 ];
 const priorityRank = { alta: 0, media: 1, baixa: 2 } as const;
 const weekdayLong = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
+/** "domingo 14/11", com o ano quando não é o atual ("domingo 14/11/2027"), e "ontem"/"atrasada". */
+function dueLabel(dueAt: number, offset: number) {
+  if (offset === 0) return "hoje";
+  if (offset === 1) return "amanhã";
+  if (offset === -1) return "ontem (atrasada)";
+  const year = new Date(dueAt).getFullYear();
+  const date = `${weekdayLong.format(new Date(dueAt)).replace("-feira", "")} ${shortDate(dueAt)}${year !== new Date().getFullYear() ? `/${year}` : ""}`;
+  return offset < 0 ? `${date} (atrasada)` : date;
+}
 const examples = ["prova de química sexta 14h !", "ler capítulo 4 de história amanhã", "lista de matemática toda quarta", "seminário em 10 dias #port", "revisar biologia dia 12"];
 
 function fold(text: string) {
@@ -629,14 +638,14 @@ function QuickAdd({
     }));
     if (buttonRef.current) celebrateFrom(buttonRef.current, { count: 14, spread: 0.6 });
     const offset = Math.round((dueAt - today()) / 86400000);
-    notify(`Anotado para ${offset === 0 ? "hoje" : offset === 1 ? "amanhã" : `${weekdayLong.format(new Date(dueAt))}, ${shortDate(dueAt)}`}.`);
+    notify(`Anotado para ${dueLabel(dueAt, offset)}.`);
     setText("");
   };
 
   const chips: Array<{ key: string; icon: typeof Clock; label: string; tone?: string }> = [];
   if (text.trim()) {
     const offset = Math.round((dueAt - today()) / 86400000);
-    chips.push({ key: "date", icon: CalendarDays, label: parsed.dueAt === null ? "hoje (padrão)" : offset === 0 ? "hoje" : offset === 1 ? "amanhã" : `${weekdayLong.format(new Date(dueAt)).replace("-feira", "")} ${shortDate(dueAt)}` });
+    chips.push({ key: "date", icon: CalendarDays, label: parsed.dueAt === null ? "hoje (padrão)" : dueLabel(dueAt, offset) });
     if (parsed.time) chips.push({ key: "time", icon: Clock, label: parsed.time });
     if (subject) chips.push({ key: "subject", icon: Tag, label: subject.name, tone: subject.color });
     if (parsed.kind) chips.push({ key: "kind", icon: Sparkles, label: taskKinds.find((kind) => kind.id === parsed.kind)?.label || "" });

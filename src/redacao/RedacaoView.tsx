@@ -131,6 +131,7 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
       gravarLocal(chaveGuardadas, [guardada, ...lerLocal<Guardada[]>(chaveGuardadas, [])].slice(0, 15));
       setResultado(guardada);
       setFase("resultado");
+      window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
       window.setTimeout(() => {
         floatXp(`+${xp} XP`, notaRef.current);
         if (correcao.total >= 700) celebrateFrom(notaRef.current, { count: 40 });
@@ -172,9 +173,12 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
         }
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        {fase === "resultado" && resultado ? (
-          <motion.div key="resultado" initial={reduced ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+      {/* Só entrada, sem AnimatePresence mode="wait": a saída do editor ficava
+          presa em opacidade 0 (com o relógio do overlay e a cena 3D rodando) e o
+          resultado nunca montava; o aluno via a página em branco. Mesmo
+          remédio da aba Provas. */}
+      {fase === "resultado" && resultado ? (
+          <motion.div key="resultado" initial={reduced ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <Resultado
               guardada={resultado}
               notaRef={notaRef}
@@ -185,7 +189,7 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
             />
           </motion.div>
         ) : (
-          <motion.div key="escrever" className="red-grid" initial={reduced ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+          <motion.div key="escrever" className="red-grid" initial={reduced ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <aside className="red-aside">
               <div className="red-hero">
                 {fase === "escrever" ? <CenaFolha modo="escrevendo" className="red-hero-cena" /> : <div className="red-hero-cena" />}
@@ -303,7 +307,6 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
             </section>
           </motion.div>
         )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {fase === "corrigindo" ? (

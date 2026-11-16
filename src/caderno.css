@@ -491,3 +491,40 @@ html.is-tab-hidden *::before,
 html.is-tab-hidden *::after {
   animation-play-state: paused !important;
 }
+
+/* ───────────────────────── selo do foco em andamento ─────────────────────────
+   Aparece no topo quando o cronômetro do Foco roda e o aluno foi para outra
+   página: o tempo continua, e um toque volta ao Foco. */
+.focus-running-badge {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1.5px solid rgb(var(--pen) / 0.55);
+  background: rgb(var(--sheet));
+  color: rgb(var(--theme-text));
+  box-shadow: var(--card-shadow);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.focus-running-badge strong {
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--pen));
+}
+.focus-running-badge:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 2px;
+}
+@media (max-width: 767px) {
+  .focus-running-badge {
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 5.25rem);
+  }
+}

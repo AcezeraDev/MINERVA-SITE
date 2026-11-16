@@ -39,6 +39,33 @@ test("conversa normal com a palavra questao NAO vira prova", () => {
   }
 });
 
+test("a palavra prova no meio de uma pergunta NAO vira pedido de prova", () => {
+  // Relatorio de QA de 16/11: "Esse resultado prova alguma coisa?" sumia da
+  // conversa e virava "Posso montar sua prova de Alguma coisa" em outra conversa.
+  for (const frase of [
+    "Esse resultado prova alguma coisa?",
+    "Esse resultado prova que a luz vermelha sempre aumenta a fotossíntese?",
+    "isso prova que a hipótese estava certa?",
+    "tenho prova amanhã, me ajuda a revisar porcentagem",
+    "como estudar pra prova de química?",
+    "quero saber se isso prova alguma coisa",
+    "prova de que a Terra é redonda?",
+  ]) {
+    assert.equal(isQuizRequest(frase), false, `nao deveria virar prova: ${frase}`);
+  }
+  for (const frase of [
+    "simulado",
+    "prova de biologia",
+    "um simulado sobre a revolução francesa",
+    "me dá uma prova de química",
+    "faz outra prova",
+    "prepara um mini simulado de física",
+    "quero 2 provas de história",
+  ]) {
+    assert.equal(isQuizRequest(frase), true, `deveria virar prova: ${frase}`);
+  }
+});
+
 test("flashcards sao reconhecidos, e cartao solto nao dispara nada", () => {
   assert.equal(isFlashcardRequest("crie flashcards de biologia"), true);
   assert.equal(isFlashcardRequest("faz uns flash cards sobre mitose"), true);

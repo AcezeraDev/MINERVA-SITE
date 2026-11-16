@@ -379,6 +379,37 @@ html:not(.theme-light) .caderno-sn-stamp {
   background: linear-gradient(transparent 55%, rgb(255 143 177 / 0.55) 55% 92%, transparent 92%);
 }
 
+.caderno-sn-ask:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.caderno-sn-ask[aria-pressed="true"] {
+  background: linear-gradient(transparent 55%, rgb(255 230 90 / 0.7) 55% 92%, transparent 92%);
+}
+
+/* Resposta da "Mine ao lado", dentro do próprio post-it. O post-it é papel
+   amarelo nos dois temas, então o texto fica sempre escuro aqui. */
+.caderno-sn-answer {
+  margin-top: 0.8rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.35rem;
+  background: rgb(255 255 255 / 0.62);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #2b2410;
+}
+
+.caderno-sn-answer :where(p, li, h1, h2, h3, h4, h5, strong, em, span, td, th) {
+  color: #2b2410;
+}
+
+.caderno-sn-answer .caderno-note {
+  color: #5a4c1a;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .caderno-sn-stamp {
     animation: none;

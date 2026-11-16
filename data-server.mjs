@@ -6,6 +6,7 @@ import pg from "pg";
 import { loadLocalEnv } from "./gemini-server.mjs";
 import { gamificationStats, levelFromXp, rankingWindows, totalXp, unlockedAchievements, xpSince } from "./shared/xp.mjs";
 import { dailyChallengeKey, leagueFromPoints, seasonPoints } from "./shared/game-meta.mjs";
+import { nomePublico } from "./shared/nome-publico.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
 import { MINE_IMAGE_DAILY_LIMIT, MineImageError, generateMineImage } from "./mine/image-gen.mjs";
 import { MINE_VOICE_DAILY_LIMIT, MineVoiceError, synthesizeVoice } from "./mine/voice.mjs";
@@ -654,7 +655,10 @@ async function handleRegister(req, res) {
     name,
     isAdmin: wantsAdmin,
     createdAt: Date.now(),
-    settings: defaultSettings(name),
+    // Conta nova nao aparece para os outros ate a pessoa ligar "Aparecer no
+    // ranking" no Perfil (relatorio de QA de 16/11). As contas antigas ficam
+    // como estavam: o padrao geral (defaultSettings) nao mudou.
+    settings: { ...defaultSettings(name), hideFromRanking: true },
   });
   const nextData = await saveData({ ...store.data, users: [...store.data.users, user] });
   await saveCredential(user.id, await hashPassword(password));
@@ -717,8 +721,11 @@ function scopesByUser(data, ids) {
   return map;
 }
 
-function publicName(user) {
-  return String(user.settings?.displayName || user.name || "").trim() || String(user.name || "");
+function publicName(user, { own = false } = {}) {
+  const nome = String(user.settings?.displayName || user.name || "").trim() || String(user.name || "");
+  // Quem olha de fora ve "Maria S." (e "Estudante" no lugar de palavrao); o
+  // dono ve o proprio nome inteiro.
+  return nomePublico(nome, { inteiro: own });
 }
 
 function publicAvatarUrl(user) {
@@ -736,8 +743,11 @@ function leaderboardRow(user, scope, windows, { you = false, friend = false } = 
     .sort((a, b) => Number(a.durationMs || Infinity) - Number(b.durationMs || Infinity))[0];
   return {
     id: user.id,
-    name: user.name,
-    displayName: publicName(user),
+    // O nome da conta e o login: so vai para o proprio dono e para quem ja e
+    // amigo (que digitou esse nome). Os demais recebem vazio e sao marcados
+    // como amigo pelo id.
+    name: you || friend ? user.name : "",
+    displayName: publicName(user, { own: you }),
     avatar: publicAvatarUrl(user),
     you: Boolean(you),
     friend: Boolean(friend),
@@ -793,7 +803,7 @@ async function handleLeaderboard(req, res) {
   const rows = escolhidos.map((user) =>
     leaderboardRow(user, scopes.get(user.id), windows, {
       you: user.id === me.id,
-      friend: friendNames.has(String(user.name || "").trim().toLowerCase()),
+      friend: friendNames.has(String(user.name || "").trim().toLowerCase()) || friendNames.has(String(user.id).toLowerCase()),
     }),
   );
 
@@ -822,8 +832,8 @@ async function handleProfile(req, res, targetId) {
   const eu = alvo.id === session.userId;
   const base = {
     id: alvo.id,
-    name: alvo.name,
-    displayName: publicName(alvo),
+    name: eu ? alvo.name : "",
+    displayName: publicName(alvo, { own: eu }),
     avatar: publicAvatarUrl(alvo),
     bio: String(alvo.settings?.bio || ""),
     createdAt: Number(alvo.createdAt || 0),
