@@ -13,6 +13,7 @@ import {
   Sigma,
   Sparkles,
   Star,
+  Table2,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -332,7 +333,21 @@ function TableBlock({ block }: { block: Extract<Block, { type: "table" }> }) {
     const cells = block.rows.map((row) => row[column]).filter((cell) => cell && cell !== "-" && cell !== "—");
     return cells.length > 0 && cells.every((cell) => NUMERIC_CELL.test(cell.replace(/\*\*/g, "")));
   });
+  // Copiar com tabulação: cola célula por célula no Excel e no Planilhas.
+  const plain = (cell: string) => cell.replace(/\*\*|==|`/g, "").replace(/\$([^$]+)\$/g, "$1");
+  const tsv = [block.header, ...block.rows].map((row) => row.map(plain).join("\t")).join("\n");
   return (
+    <figure className="mrt-tablecard" style={{ "--mrt-cols": block.header.length } as React.CSSProperties}>
+      <figcaption className="mrt-tablecard__bar">
+        <span className="mrt-chip mrt-chip--table">
+          <Table2 aria-hidden />
+          Tabela
+        </span>
+        <span className="mrt-tablecard__meta">
+          {block.rows.length} {block.rows.length === 1 ? "linha" : "linhas"}
+        </span>
+        <CopyChip text={tsv} label="Copiar tabela para colar no Excel" />
+      </figcaption>
     <div className="mrt-table" role="region" aria-label="Tabela" tabIndex={0}>
       <table>
         <thead>
@@ -350,7 +365,7 @@ function TableBlock({ block }: { block: Extract<Block, { type: "table" }> }) {
               {row.map((cell, column) => (
                 <td
                   key={column}
-                  className={numeric[column] ? "mrt-num" : undefined}
+                  className={numeric[column] ? "mrt-num" : column === 0 && cell.length <= 14 ? "mrt-nowrap" : undefined}
                   style={{ textAlign: numeric[column] ? "right" : block.align[column] }}
                 >
                   <Inline text={cell} />
@@ -361,6 +376,7 @@ function TableBlock({ block }: { block: Extract<Block, { type: "table" }> }) {
         </tbody>
       </table>
     </div>
+    </figure>
   );
 }
 
