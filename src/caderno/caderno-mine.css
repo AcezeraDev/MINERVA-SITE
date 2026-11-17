@@ -435,6 +435,12 @@
   background: linear-gradient(rgb(var(--mint) / 0.55), rgb(var(--mint) / 0.55)) no-repeat 0 80% / 100% 42%;
 }
 
+/* O emoji 3D e o texto do título são filhos do título, mas não levam o grifo:
+   o título continua como era antes do emoji virar imagem. */
+:is(.mine-gpt-message.is-mine, .mine-streaming) :is(.mrt-h2, .mrt-h3) > :is(.mrt-emoji3d, .mrt-heading-text, .mrt-emoji-native) {
+  background: none;
+}
+
 :is(.mine-gpt-message.is-mine, .mine-streaming) :is(.mrt-p, .mrt-list) strong {
   font-weight: 700;
   color: rgb(var(--pen));

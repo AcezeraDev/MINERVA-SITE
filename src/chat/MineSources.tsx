@@ -17,6 +17,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import "./mine-sources.css";
+import { visibleReasoning } from "../../shared/reasoning-lang.mjs";
 
 /*
  * Pesquisa na web do jeito dos chats grandes (out/2026):
@@ -370,11 +371,13 @@ function useElapsed(running: boolean) {
  */
 export function MineWorking({
   status,
-  reasoning,
+  reasoning: rawReasoning,
 }: {
   status: MineSearchStatus | null;
   reasoning: string;
 }) {
+  // Pensamento em inglês não vai para a tela (shared/reasoning-lang.mjs).
+  const reasoning = visibleReasoning(rawReasoning);
   const seconds = useElapsed(true);
   const [showReasoning, setShowReasoning] = useState(false);
   const label =
@@ -434,12 +437,13 @@ export function MineWorking({
 
 /** "Pensou por 6 s" acima da resposta pronta; abre o raciocínio guardado. */
 export function MineThought({
-  reasoning,
+  reasoning: rawReasoning,
   seconds,
 }: {
   reasoning?: string;
   seconds?: number;
 }) {
+  const reasoning = visibleReasoning(rawReasoning);
   const [open, setOpen] = useState(false);
   if (!reasoning && !seconds) return null;
   const label = seconds

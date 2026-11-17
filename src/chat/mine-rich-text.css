@@ -107,6 +107,30 @@
   transform: translateY(-0.08em) rotate(45deg);
 }
 
+/* Emoji 3D do título (shared/emoji-3d.mjs). Um pouco maior que a letra, como
+   um adesivo no caderno; a sombra leve descola do papel. */
+.mrt-emoji3d {
+  flex: none;
+  width: 1.55em;
+  height: 1.55em;
+  align-self: center;
+  /* margem negativa: o adesivo cresce sem empurrar a pauta do caderno */
+  margin-block: -0.2em;
+  margin-right: -0.2em;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.18));
+  user-select: none;
+}
+
+.mrt-h3 .mrt-emoji3d {
+  display: inline-block;
+  width: 1.4em;
+  height: 1.4em;
+  margin-block: -0.2em;
+  margin-right: 0.35em;
+  vertical-align: -0.3em;
+}
+
 .mrt-h3 {
   margin-top: 1.2em !important;
   font-family: "Anybody Variable", "Atkinson Hyperlegible Next Variable", sans-serif;

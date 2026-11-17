@@ -75,3 +75,29 @@ test("grafico e esquema nao vao para o gerador de imagem", () => {
   assert.equal(asksToGenerateImage("faz um esquema do ciclo da água"), false);
   assert.equal(asksToGenerateImage("desenha um gato astronauta"), true);
 });
+
+test("emoji do titulo: separa do texto e acha a versao 3D, com ou sem fe0f", async () => {
+  const { splitLeadingEmoji, emoji3dPath, HEADING_EMOJIS } = await import("../shared/emoji-3d.mjs");
+  assert.deepEqual(splitLeadingEmoji("🧭 Entendendo o tema"), { emoji: "🧭", rest: "Entendendo o tema" });
+  assert.equal(splitLeadingEmoji("1. Passo").emoji, "");
+  assert.equal(emoji3dPath("✏"), emoji3dPath("✏️"));
+  assert.equal(emoji3dPath("🦄"), "");
+  // todo emoji que o prompt oferece tem o arquivo 3D
+  const { existsSync } = await import("node:fs");
+  for (const emoji of HEADING_EMOJIS.split(" ")) {
+    const path = emoji3dPath(emoji);
+    assert.ok(path && existsSync(`public${path}`), `falta o 3D de ${emoji}`);
+  }
+});
+
+test("pensamento em ingles fica fora da tela; em portugues aparece", async () => {
+  const { looksEnglish, visibleReasoning } = await import("../shared/reasoning-lang.mjs");
+  const en = "I need to provide answers for an image that lacks a store or date. The PDF code is AUR-731, and the image code is IMG-482. It appears that explicit identification isn't available in the image.";
+  const pt = "O estudante quer saber a loja e a data da compra. Na imagem não aparece nenhuma das duas, então preciso dizer isso e mostrar os códigos que estão no PDF e na foto.";
+  assert.equal(looksEnglish(en), true);
+  assert.equal(looksEnglish(pt), false);
+  assert.equal(visibleReasoning(en), "");
+  assert.equal(visibleReasoning(pt), pt);
+  // citacao curta em ingles dentro do pensamento em portugues nao derruba
+  assert.equal(looksEnglish(`${pt} A frase "the book is on the table" esta certa.`), false);
+});

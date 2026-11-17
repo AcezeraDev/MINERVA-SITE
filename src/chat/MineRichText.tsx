@@ -20,6 +20,7 @@ import { MineCitation } from "./MineSources";
 import { SitePreview, isSitePage } from "./SitePreview";
 import { InlineRunner } from "./CodeRunner";
 import { MineChart, MineSvgFigure } from "./MineChart";
+import { emoji3dPath, splitLeadingEmoji } from "../../shared/emoji-3d.mjs";
 import { openInMineCode, runnableLanguage } from "./runner";
 import { CALLOUT_TITLES, labelOf, parseBlocks, parseInline, type Block, type CalloutKind, type InlineToken, type ListBlock } from "../../shared/chat-markdown.mjs";
 
@@ -439,6 +440,28 @@ function Paragraph({ text, bare = false }: { text: string; bare?: boolean }) {
   return <p className="mrt-p">{content}</p>;
 }
 
+/**
+ * Título com o emoji do começo em 3D (Fluent Emoji, public/emoji/). Emoji fora
+ * do conjunto continua o do sistema; o texto do título não muda.
+ */
+function HeadingText({ text }: { text: string }) {
+  const { emoji, rest } = splitLeadingEmoji(text);
+  const src = emoji ? emoji3dPath(emoji) : "";
+  if (!emoji) return <Inline text={text} />;
+  return (
+    <>
+      {src ? (
+        <img className="mrt-emoji3d" src={src} alt={emoji} width={28} height={28} draggable={false} decoding="async" />
+      ) : (
+        <span className="mrt-emoji-native">{emoji}</span>
+      )}
+      <span className="mrt-heading-text">
+        <Inline text={rest} />
+      </span>
+    </>
+  );
+}
+
 function Blocks({ blocks, streaming }: { blocks: Block[]; streaming: boolean }) {
   return (
     <>
@@ -449,11 +472,11 @@ function Blocks({ blocks, streaming }: { blocks: Block[]; streaming: boolean }) 
             return block.level <= 2 ? (
               <h3 key={key} className="mrt-h2">
                 <span className="mrt-h2__mark" aria-hidden />
-                <Inline text={block.text} />
+                <HeadingText text={block.text} />
               </h3>
             ) : (
               <h4 key={key} className="mrt-h3">
-                <Inline text={block.text} />
+                <HeadingText text={block.text} />
               </h4>
             );
           case "paragraph":
