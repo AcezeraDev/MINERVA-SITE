@@ -34,7 +34,7 @@ DATABASE_URL=postgresql://usuario:senha@host:5432/banco
 DATABASE_SSL=true
 ADMIN_ACCESS_PASSWORD=troque-esta-senha
 
-# IA da Mine: NanoGPT (modelo principal openai/gpt-6-luna, busca na web e de imagens)
+# IA da Mine: NanoGPT (modelo principal anthropic/claude-haiku-5.5, busca na web e de imagens)
 NANOGPT_API_KEY=sua-chave-nanogpt
 
 PUBLIC_APP_ORIGIN=https://minerva-liart.vercel.app

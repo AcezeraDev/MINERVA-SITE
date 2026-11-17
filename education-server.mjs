@@ -311,7 +311,8 @@ function wikipediaApiUrl(lang, params) {
   url.searchParams.set("formatversion", "2");
   url.searchParams.set("prop", "pageimages|info");
   url.searchParams.set("piprop", "thumbnail");
-  url.searchParams.set("pithumbsize", "960");
+  // 1280 px: a foto do artigo abre o visualizador em tela cheia; 960 ficava borrada.
+  url.searchParams.set("pithumbsize", "1280");
   url.searchParams.set("inprop", "url");
   for (const [name, value] of Object.entries(params)) url.searchParams.set(name, value);
   return url;
@@ -739,6 +740,45 @@ export function scoreStyledImage(image, asked, query, style) {
   return coreHits * 3 + restHits + (styleHit ? 4 : 0) + (ratio ? profile.shape(ratio, image.width || 0) : 0) + (STYLE_HOSTS[style]?.test(host) ? 1 : 0);
 }
 
+// ---------------------------------------------------------------------------
+// Qualidade da foto (nov/2026)
+//
+// A relevância sozinha deixava passar foto de banco de imagem com marca d'água
+// atravessada (Shutterstock, Alamy, Dreamstime...) e miniatura de 300 px que
+// estoura no visualizador. Agora a qualidade soma na ordem: foto grande e site
+// confiável sobem; banco de imagem só entra se não houver outra coisa.
+
+const WATERMARK_HOSTS = /(?:^|\.)(?:shutterstock\.com|alamy\.[a-z.]+|dreamstime\.com|istockphoto\.com|gettyimages\.[a-z.]+|depositphotos\.com|123rf\.com|stock\.adobe\.com|bigstockphoto\.com|canstockphoto\.[a-z.]+|vectorstock\.com|agefotostock\.com|pond5\.com|stockfresh\.com|colourbox\.com|fotosearch\.[a-z.]+|superstock\.com|mediastorehouse\.com|lookandlearn\.com)$/i;
+const TRUSTED_IMAGE_HOSTS = /(?:^|\.)(?:wikimedia\.org|wikipedia\.org|nasa\.gov|esa\.int|britannica\.com|nationalgeographic\.com|si\.edu|nhm\.ac\.uk|metmuseum\.org|louvre\.fr|unsplash\.com|pexels\.com|flickr\.com|staticflickr\.com|noaa\.gov|usgs\.gov|ibge\.gov\.br|gov\.br|embrapa\.br|fiocruz\.br|usp\.br|unicamp\.br|edu|ac\.uk)$/i;
+
+/** O arquivo ou a página vêm de um banco de imagem com marca d'água? */
+export function isWatermarkedImage(image) {
+  return WATERMARK_HOSTS.test(hostOfUrl(image.pageUrl)) || WATERMARK_HOSTS.test(hostOfUrl(image.full)) || /\b(?:shutterstock|alamy|dreamstime|istock|getty ?images|depositphotos|123rf)\b/i.test(`${image.source || ""} ${image.title || ""}`);
+}
+
+/** Pontos de qualidade somados à relevância: tamanho e procedência. */
+export function imageQualityBonus(image) {
+  const side = Math.min(Number(image.width) || 0, Number(image.height) || 0);
+  let bonus = 0;
+  if (side >= 1000) bonus += 3;
+  else if (side >= 700) bonus += 2;
+  else if (side >= 450) bonus += 1;
+  else if (side && side < 300) bonus -= 2;
+  // Panorama 4:1 ou tira fina fica ilegível no cartão da galeria.
+  const ratio = image.width && image.height ? image.width / image.height : 1;
+  if (ratio > 3 || ratio < 0.33) bonus -= 2;
+  if (TRUSTED_IMAGE_HOSTS.test(hostOfUrl(image.pageUrl)) || TRUSTED_IMAGE_HOSTS.test(hostOfUrl(image.full))) bonus += 2;
+  if (SOCIAL_HOSTS.test(hostOfUrl(image.pageUrl))) bonus -= 1;
+  return bonus;
+}
+
+/** Banco de imagem vai para o fim, e só fica se a galeria precisar dele para ter 3 fotos. */
+function dropWatermarked(list) {
+  const clean = list.filter((item) => !isWatermarkedImage(item.candidate));
+  if (clean.length >= 3) return clean;
+  return [...clean, ...list.filter((item) => isWatermarkedImage(item.candidate))];
+}
+
 async function searchWebImageList(query, style = "") {
   if (!webSearchEnabled() || isUnsafeQuery(query)) return [];
   const asked = significantWords(query);
@@ -783,9 +823,10 @@ async function searchWebImageList(query, style = "") {
     const scored = candidates
       .map(({ candidate, order }) => ({ candidate, order, score: scoreStyledImage(candidate, asked, query, style) }))
       .filter((item) => item.score !== null)
+      .map((item) => ({ ...item, score: item.score + imageQualityBonus(item.candidate) }))
       .sort((a, b) => b.score - a.score || a.order - b.order);
     console.log(`[image] web estilo=${style} buscas=${searches.length} imagens=${images.length} aceitas=${scored.length}`);
-    return scored.map((item) => item.candidate);
+    return dropWatermarked(scored).map((item) => item.candidate);
   }
   const rank = (loose) =>
     candidates
@@ -804,10 +845,12 @@ async function searchWebImageList(query, style = "") {
       if (score !== null) scored.push({ candidate, order, score });
     }
   }
-  // Mais relevante primeiro; empate mantém a ordem da busca.
+  // Mais relevante e de melhor qualidade primeiro; empate mantém a ordem da busca.
+  scored = scored.map((item) => ({ ...item, score: item.score + imageQualityBonus(item.candidate) }));
   scored.sort((a, b) => b.score - a.score || a.order - b.order);
-  console.log(`[image] web imagens=${images.length} aceitas=${scored.length}`);
-  return scored.map((item) => item.candidate);
+  const final = dropWatermarked(scored);
+  console.log(`[image] web imagens=${images.length} aceitas=${scored.length} marca_dagua=${scored.length - final.filter((item) => !isWatermarkedImage(item.candidate)).length}`);
+  return final.map((item) => item.candidate);
 }
 
 async function searchWebImage(query) {

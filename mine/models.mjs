@@ -14,18 +14,33 @@ function envEffort(name, fallback) {
   return ["none", "minimal", "low", "medium", "high", "xhigh"].includes(value) ? value : fallback;
 }
 
+// Os modelos da Anthropic na NanoGPT so aceitam low/medium/high/xhigh/max:
+// "none" e "minimal" (validos na OpenAI) viram "low" em vez de erro 400.
+function effortFor(modelId, effort) {
+  if (/^anthropic\//i.test(modelId) && (effort === "none" || effort === "minimal")) return "low";
+  return effort;
+}
+
 const CAPABILITIES = { text: true, image: true, video: false, audio: false, pdf: true, tools: true, reasoning: true };
 
-/** Modelo principal: responde o chat. */
+/**
+ * Modelo principal: responde o chat.
+ *
+ * Nov/2026: trocou do openai/gpt-6-luna para o Claude Haiku 5.5. Mesmo preco
+ * na NanoGPT (US$ 0,10/0,50 por milhao), le imagem e PDF, chama ferramentas, e
+ * escreve melhor os blocos visuais do chat (grafico, SVG, tabela, pagina).
+ * Acima de 100 mil tokens de contexto o preco sobe 5x: o historico ja e cortado
+ * bem antes disso (messages.mjs).
+ */
 export const MINE_MODEL = {
   alias: "mine",
   displayName: "Mine",
   provider: "nanogpt",
   get providerModel() {
-    return envModel("NANOGPT_MODEL", "openai/gpt-6-luna");
+    return envModel("NANOGPT_MODEL", "anthropic/claude-haiku-5.5");
   },
   get providerParams() {
-    return { reasoning_effort: envEffort("MINE_REASONING_EFFORT", "medium") };
+    return { reasoning_effort: effortFor(this.providerModel, envEffort("MINE_REASONING_EFFORT", "medium")) };
   },
   capabilities: CAPABILITIES,
 };
@@ -41,7 +56,7 @@ export const MINE_TASK_MODEL = {
     return MINE_MODEL.providerModel;
   },
   get providerParams() {
-    return { reasoning_effort: envEffort("MINE_TASK_REASONING_EFFORT", "low") };
+    return { reasoning_effort: effortFor(MINE_MODEL.providerModel, envEffort("MINE_TASK_REASONING_EFFORT", "low")) };
   },
 };
 

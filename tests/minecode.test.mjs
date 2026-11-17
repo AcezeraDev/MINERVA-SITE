@@ -298,7 +298,7 @@ test("MineCode no router: erro de sintaxe depois do streaming é refeito pelo se
     assert.equal(streamed, reply(broken));
     assert.equal(result.reply, reply(goodSite));
   });
-  assert.deepEqual(calls.map((call) => [call.model, Boolean(call.stream)]), [["openai/gpt-6.1-sol", true], ["openai/gpt-6-luna", false]]); // site/3D: Sol primeiro, luna refaz
+  assert.deepEqual(calls.map((call) => [call.model, Boolean(call.stream)]), [["openai/gpt-6.1-sol", true], ["anthropic/claude-haiku-5.5", false]]); // site/3D: Sol primeiro, o principal (Haiku) refaz
   assert.match(JSON.stringify(calls[1].messages), /versao anterior deste arquivo saiu com defeito/);
 });
 

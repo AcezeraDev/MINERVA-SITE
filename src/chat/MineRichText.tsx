@@ -19,6 +19,7 @@ import {
 import { MineCitation } from "./MineSources";
 import { SitePreview, isSitePage } from "./SitePreview";
 import { InlineRunner } from "./CodeRunner";
+import { MineChart, MineSvgFigure } from "./MineChart";
 import { openInMineCode, runnableLanguage } from "./runner";
 import { CALLOUT_TITLES, labelOf, parseBlocks, parseInline, type Block, type CalloutKind, type InlineToken, type ListBlock } from "../../shared/chat-markdown.mjs";
 
@@ -251,11 +252,17 @@ const LANGUAGE_NAMES: Record<string, string> = {
   kt: "Kotlin",
 };
 
+const CHART_LANGS = new Set(["grafico", "gráfico", "chart"]);
+
 /**
- * Bloco de código. Página HTML completa vira prévia do site funcionando;
+ * Bloco de código. ```grafico vira gráfico e ```svg vira esquema (MineChart);
+ * página HTML completa vira prévia do site funcionando;
  * Python e JavaScript ganham o botão Executar e "Abrir no MineCode".
  */
 const CodeBlock = memo(function CodeBlock({ code, lang, open }: { code: string; lang: string; open: boolean }) {
+  // Gráfico e esquema só se desenham com a cerca fechada; chegando, aparecem como código.
+  if (!open && CHART_LANGS.has(lang)) return <MineChart source={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
+  if (!open && (lang === "svg" || (lang === "xml" && /^\s*<svg[\s>]/i.test(code)))) return <MineSvgFigure source={code} fallback={<CodeBox code={code} lang="xml" open={false} />} />;
   const runnable = !open ? runnableLanguage(lang) : null;
   if (!open && isSitePage(code, lang)) return <SitePreview code={code} codeView={<CodeBox code={code} lang={lang} open={false} />} />;
   if (!runnable) return <CodeBox code={code} lang={lang} open={open} />;

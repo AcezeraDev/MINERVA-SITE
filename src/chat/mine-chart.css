@@ -1,0 +1,280 @@
+/*
+ * Gráfico e esquema da Mine (src/chat/MineChart.tsx).
+ *
+ * O cartão usa rgb(var(--panel)) — o mesmo fundo contra o qual a paleta do
+ * gráfico foi validada (#ffffff de dia, #1a2030 à noite). Se --panel mudar,
+ * INK.surface em MineChart.tsx muda junto.
+ */
+
+.mviz {
+  margin-inline: 0;
+  overflow: hidden;
+  border: 1px solid var(--mrt-border, rgb(var(--theme-text) / 0.09));
+  border-radius: 1.05em;
+  background: rgb(var(--panel));
+  box-shadow: var(--card-shadow);
+}
+
+.mviz__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7em;
+  padding: 0.8em 1em 0.2em;
+}
+
+.mviz__chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4em;
+  margin-top: 0.15em;
+  padding: 0.18em 0.62em 0.2em 0.5em;
+  border-radius: 999px;
+  background: rgb(var(--violet, 150 130 240) / 0.14);
+  color: rgb(var(--theme-text) / 0.8);
+  font-size: 0.68em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mviz__chip svg {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+.mviz__titles {
+  display: grid;
+  gap: 0.1em;
+  min-width: 0;
+}
+
+.mviz__title {
+  color: rgb(var(--theme-text));
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.mviz__subtitle {
+  color: rgb(var(--theme-text) / 0.62);
+  font-size: 0.85em;
+}
+
+.mviz__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em 1em;
+  margin: 0;
+  padding: 0.45em 1em 0;
+  list-style: none;
+  color: rgb(var(--theme-text) / 0.78);
+  font-size: 0.82em;
+}
+
+.mviz__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
+.mviz__legend i {
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 3px;
+}
+
+.mviz__legend b {
+  color: rgb(var(--theme-text));
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.mviz__plot {
+  position: relative;
+  padding: 0.5em 0.6em 0.2em;
+  touch-action: pan-y;
+}
+
+.mviz-svg {
+  display: block;
+  max-width: 100%;
+  margin-inline: auto;
+  overflow: visible;
+}
+
+.mviz-svg text {
+  font-variant-numeric: tabular-nums;
+}
+
+.mviz-svg path[d],
+.mviz-svg circle {
+  transition: opacity 150ms ease;
+}
+
+.mviz-hover-col:hover {
+  fill: rgb(var(--theme-text) / 0.05);
+}
+
+.mviz-tip {
+  position: absolute;
+  z-index: 2;
+  min-width: 8.5em;
+  max-width: 15em;
+  padding: 0.5em 0.7em;
+  border: 1px solid rgb(var(--theme-text) / 0.12);
+  border-radius: 0.7em;
+  background: rgb(var(--graphite));
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.45);
+  color: rgb(var(--theme-text));
+  font-size: 0.8em;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 10px));
+}
+
+.mviz-tip p {
+  margin: 0;
+}
+
+.mviz-tip__title {
+  margin-bottom: 0.25em !important;
+  font-weight: 700;
+}
+
+.mviz-tip__row {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  color: rgb(var(--theme-text) / 0.75);
+}
+
+.mviz-tip__row i {
+  flex: none;
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 2px;
+}
+
+.mviz-tip__row b {
+  margin-left: auto;
+  padding-left: 0.8em;
+  color: rgb(var(--theme-text));
+  font-variant-numeric: tabular-nums;
+}
+
+.mviz__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4em;
+  padding: 0.35em 0.6em 0.6em 1em;
+}
+
+.mviz__source {
+  color: rgb(var(--theme-text) / 0.55);
+  font-size: 0.75em;
+}
+
+.mviz__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.2em;
+}
+
+.mviz-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.38em 0.65em;
+  border-radius: 0.6em;
+  color: rgb(var(--theme-text) / 0.72);
+  font-size: 0.74em;
+  font-weight: 800;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.mviz-btn:hover,
+.mviz-btn:focus-visible,
+.mviz-btn[aria-pressed="true"] {
+  background: rgb(var(--theme-text) / 0.08);
+  color: rgb(var(--theme-text) / 0.95);
+}
+
+.mviz-btn svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.mviz-table {
+  max-height: 18em;
+  margin: 0.2em 1em 0.4em;
+  overflow: auto;
+  border: 1px solid rgb(var(--theme-text) / 0.09);
+  border-radius: 0.7em;
+  scrollbar-width: thin;
+}
+
+.mviz-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+
+.mviz-table th,
+.mviz-table td {
+  padding: 0.45em 0.8em;
+  border-bottom: 1px solid rgb(var(--theme-text) / 0.07);
+  text-align: left;
+}
+
+.mviz-table th {
+  position: sticky;
+  top: 0;
+  background: rgb(var(--panel-2));
+  color: rgb(var(--theme-text) / 0.8);
+  font-size: 0.85em;
+  font-weight: 800;
+}
+
+.mviz-table .mviz-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Esquema: papel claro sempre — o desenho da IA presume fundo branco e texto escuro. */
+.mviz__paper {
+  margin: 0.5em 0.8em 0.2em;
+  padding: 0.8em;
+  border-radius: 0.8em;
+  background: #fbfaf6;
+  background-image: linear-gradient(rgba(29, 43, 184, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(29, 43, 184, 0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.mviz__paper img {
+  display: block;
+  width: 100%;
+  max-height: 34em;
+  margin-inline: auto;
+  object-fit: contain;
+}
+
+.mviz--figure .mrt-codebox {
+  margin: 0.4em 0.8em;
+}
+
+.mviz-broken__note {
+  margin: 0 0 0.4em;
+  color: rgb(var(--theme-text) / 0.6);
+  font-size: 0.82em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mviz-btn,
+  .mviz-svg path[d],
+  .mviz-svg circle {
+    transition: none;
+  }
+}

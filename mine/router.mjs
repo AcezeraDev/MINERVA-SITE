@@ -123,7 +123,7 @@ function gameAttemptMs() {
 
 /**
  * Cadeia do MineCode. Sites (skill de front-end) vao para o modelo forte
- * (MINE_SITE_MODEL, GPT-6.1 Sol) com o gpt-6-luna de reserva. Medido em
+ * (MINE_SITE_MODEL, GPT-6.1 Sol) com o principal (hoje o Claude Haiku 5.5; era o gpt-6-luna) de reserva. Medido em
  * 17/out/2026 com o mesmo pedido de hero 3D: o GLM em "low" entregava pagina
  * generica e em "high" estourou 150 s; o luna fez um site bonito em 57-70 s.
  * Python/JS seguem no GLM, mais barato e rapido para codigo curto.

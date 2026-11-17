@@ -41,17 +41,28 @@ test("pool de chaves separa, limpa e remove duplicatas", () => {
   assert.deepEqual(parseProviderKeys(" a , b;b\nc ", "b", "cole-sua-chave-aqui"), ["a", "b", "c"]);
 });
 
-test("a Mine tem um modelo so, gpt-6-luna na NanoGPT, com reserva interna", () => {
+test("a Mine tem um modelo so, Claude Haiku 5.5 na NanoGPT, com reserva interna", () => {
   const previous = process.env.NANOGPT_MODEL;
   delete process.env.NANOGPT_MODEL;
   try {
     assert.equal(MINE_MODEL.provider, "nanogpt");
-    assert.equal(MINE_MODEL.providerModel, "openai/gpt-6-luna");
-    assert.equal(MINE_TASK_MODEL.providerModel, "openai/gpt-6-luna");
+    assert.equal(MINE_MODEL.providerModel, "anthropic/claude-haiku-5.5");
+    assert.equal(MINE_TASK_MODEL.providerModel, "anthropic/claude-haiku-5.5");
     assert.equal(MINE_TASK_MODEL.providerParams.reasoning_effort, "low");
     assert.equal(MINE_FAST_MODEL.provider, "nanogpt");
   } finally {
     if (previous !== undefined) process.env.NANOGPT_MODEL = previous;
+  }
+});
+
+test("Haiku nao recebe esforco none/minimal (a Anthropic recusa): vira low", () => {
+  const previous = process.env.MINE_TASK_REASONING_EFFORT;
+  process.env.MINE_TASK_REASONING_EFFORT = "none";
+  try {
+    assert.equal(MINE_TASK_MODEL.providerParams.reasoning_effort, "low");
+  } finally {
+    if (previous === undefined) delete process.env.MINE_TASK_REASONING_EFFORT;
+    else process.env.MINE_TASK_REASONING_EFFORT = previous;
   }
 });
 
@@ -125,7 +136,7 @@ test("roteador repete o mesmo modelo com a segunda chave dentro do pedido", asyn
       assert.equal(result.alias, "mine");
     },
   );
-  assert.deepEqual(models, ["openai/gpt-6-luna", "openai/gpt-6-luna"]);
+  assert.deepEqual(models, ["anthropic/claude-haiku-5.5", "anthropic/claude-haiku-5.5"]);
 });
 
 test("se o principal falha, a reserva interna responde", async () => {
@@ -143,7 +154,7 @@ test("se o principal falha, a reserva interna responde", async () => {
       assert.equal(result.displayName, "Mine");
     },
   );
-  assert.deepEqual(models, ["openai/gpt-6-luna", "openai/gpt-5.4-mini"]);
+  assert.deepEqual(models, ["anthropic/claude-haiku-5.5", "openai/gpt-5.4-mini"]);
 });
 
 test("busca na web injeta resultados numerados e devolve as fontes", async () => {

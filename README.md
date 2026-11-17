@@ -6,7 +6,7 @@ Produção: https://minerva-liart.vercel.app
 
 ## Recursos
 
-- Assistente Mine na NanoGPT: um modelo só (`openai/gpt-6-luna`), reserva interna automática, pesquisa na web com fontes citadas e fotos da Wikipédia com reserva na internet.
+- Assistente Mine na NanoGPT: um modelo só (`anthropic/claude-haiku-5.5`, o Claude Haiku 5.5), reserva interna automática, pesquisa na web com fontes citadas, fotos da Wikipédia e da internet (sem banco de imagem com marca d'água), gráficos de verdade (bloco `grafico`) e esquemas em SVG.
 - Jogos educacionais interativos com XP, progressão e desafios.
 - Área administrativa e acompanhamento de dados.
 - Busca de livros e publicações com Open Library e Crossref.

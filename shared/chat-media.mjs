@@ -347,7 +347,9 @@ const CREATE_REQUEST = new RegExp(String.raw`(?:^|[^\p{L}])${CREATE_VERB}(?![\p{
 const DRAW_ALONE = /(?:^|[^\p{L}])(?:desenh[ae]|desenhar|ilustr[ae]|ilustrar|pint[ae])(?![\p{L}])\s+(?:uma?|o|a|meu|minha|pra|para|me)\b/iu;
 // "Faz um resumo com imagem" ou "cria uma lista": o substantivo aparece, mas o
 // pedido é de texto. Esses casos ficam com a busca/texto.
-const TEXT_FIRST = /(?:^|[^\p{L}])(?:resumo|lista|texto|reda[cç][aã]o|exerc[ií]cios?|quest(?:ão|ao|ões|oes)|prova|plano|tabela|mapa\s+mental|flashcards?)(?![\p{L}])/iu;
+// Nov/2026: gráfico, esquema e diagrama também ficam aqui — a Mine desenha
+// esses em código (```grafico / ```svg), com número e rótulo legíveis.
+const TEXT_FIRST = /(?:^|[^\p{L}])(?:resumo|lista|texto|reda[cç][aã]o|exerc[ií]cios?|quest(?:ão|ao|ões|oes)|prova|plano|tabela|mapa\s+mental|flashcards?|gr[aá]ficos?|esquemas?|diagramas?|fluxogramas?|organogramas?|linha\s+do\s+tempo)(?![\p{L}])/iu;
 
 /** A pessoa pediu para a Mine CRIAR uma imagem (e não buscar uma foto)? */
 export function asksToGenerateImage(text) {

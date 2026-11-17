@@ -100,7 +100,8 @@ function calloutFromLine(line) {
 // ---------------------------------------------------------------------------
 // Blocos
 
-const FENCE = /^\s{0,3}(`{3,}|~{3,})\s*([\w#+.-]*)\s*$/;
+// \p{L}: "```gráfico" também abre bloco (sem ele, o acento quebrava a cerca).
+const FENCE = /^\s{0,3}(`{3,}|~{3,})\s*([\p{L}\w#+.-]*)\s*$/u;
 const HEADING = /^\s{0,3}(#{1,4})\s+(.+?)\s*#*\s*$/;
 const RULE = /^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/;
 const QUOTE = /^\s{0,3}>\s?(.*)$/;
