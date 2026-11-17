@@ -235,6 +235,9 @@ import { setTaskDone, type TaskKind, type TaskPriority, type TaskRepeat } from "
 // Telas pesadas e usadas por poucos (ou só às vezes) chegam sob demanda: o
 // pacote inicial fica com o que todo aluno abre ao entrar.
 import { AdminSkeleton } from "./admin/AdminSkeleton";
+import { focusRemainingOf, readFocusState, writeFocusState, type FocusState } from "./foco/focus-store";
+import { FocusWidget } from "./foco/FocusWidget";
+import { FocusQuickStart } from "./foco/FocusQuickStart";
 const AdminView = React.lazy(() => import("./admin/AdminPanel").then((m) => ({ default: m.AdminView })));
 const GamesView = React.lazy(() => import("./games/GamesPanel").then((m) => ({ default: m.GamesView })));
 const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({ default: m.AtelieView })));
@@ -1882,6 +1885,32 @@ function App() {
     setToast(message);
   }
 
+  /**
+   * O tempo de uma fase do Foco acabou com o aluno em outra tela (a ficha do
+   * canto avisou). Mesmas consequências da aba Foco: sessão registrada (vale
+   * XP), confete saindo da ficha e a Mine comemorando.
+   */
+  function handleFocusPhaseDone(finished: FocusState, result: { finishedFocus: boolean; isLong: boolean }, anchor: Element | null) {
+    const current = user;
+    if (!current) return;
+    if (current.settings.focusVibrate !== false && "vibrate" in navigator) navigator.vibrate?.(450);
+    if (!result.finishedFocus) {
+      notify("A pausa acabou. Pronto para o próximo ciclo?");
+      return;
+    }
+    if (finished.subjectId) {
+      const subjectId = finished.subjectId;
+      update((draft) => ({
+        ...draft,
+        sessions: [...draft.sessions, { id: uid("session"), userId: current.id, subjectId, title: `Sessão de foco (${finished.focusMin} min)`, kind: "Foco", createdAt: Date.now() }],
+      }));
+    }
+    celebrateFrom(anchor, { count: 44, spread: 1.2 });
+    floatXp(`+${xpPerAction.focus} XP`, anchor);
+    mineSays(result.isLong ? "4 ciclos! Hora da pausa longa!" : "Sessão concluída! Respira um pouco.", "wow");
+    notify(result.isLong ? "4 ciclos completos! Você merece uma pausa longa." : "Sessão de foco concluída! Hora da pausa.");
+  }
+
   async function authenticate(payload: AuthPayload) {
     const endpoint = payload.mode === "login" ? "/api/login" : "/api/register";
     const response = await apiJson<{ token: string; user: User; data: AppData }>(endpoint, {
@@ -1958,6 +1987,7 @@ function App() {
     if (route.view === "mine") {
       return (
         <MineView
+          userId={user.id}
           data={userData}
           input={mineInput}
           setInput={setMineInput}
@@ -2661,7 +2691,7 @@ function App() {
           </AnimatePresence>
         </main>
         {!isAdminPanel && !isMinePanel ? <MineBuddy route={route.view} onOpen={() => go("mine")} /> : null}
-        {!isAdminPanel ? <FocusRunningBadge userId={user.id} route={route.view} /> : null}
+        {!isAdminPanel ? <FocusWidget userId={user.id} route={route.view} subjects={userData.subjects} onPhaseDone={handleFocusPhaseDone} /> : null}
         {!isAdminPanel && !isMinePanel ? <MobileNav route={route.view} isAdmin={hasAdminAccess} displayName={displayName} avatar={user.settings.avatar} level={rewards?.level || 1} /> : null}
       </div>
       <ModalHost modal={modal} setModal={setModal} user={user} data={userData} update={update} notify={notify} />
@@ -3256,7 +3286,7 @@ function MobileNav({ route, isAdmin, displayName, avatar, level }: { route: View
         ) : null}
       </AnimatePresence>
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 flex items-stretch gap-1 border-t border-white/10 bg-[#141a17]/98 px-2 pb-1 pt-1.5 shadow-[0_-16px_45px_-30px_rgba(0,0,0,.95)] backdrop-blur-md lg:hidden">
+      <nav data-focus-avoid className="safe-bottom fixed inset-x-0 bottom-0 z-40 flex items-stretch gap-1 border-t border-white/10 bg-[#141a17]/98 px-2 pb-1 pt-1.5 shadow-[0_-16px_45px_-30px_rgba(0,0,0,.95)] backdrop-blur-md lg:hidden">
         {primary.map((item) => {
           const Icon = item.icon;
           const active = route === item.view;
@@ -5159,68 +5189,7 @@ const focusTips = [
   "Termine a sessão anotando onde parou. Começar a próxima fica muito mais fácil.",
 ];
 
-type FocusState = {
-  phase: "focus" | "break";
-  longBreak: boolean;
-  cycles: number;
-  focusMin: number;
-  breakMin: number;
-  subjectId?: string;
-  running: boolean;
-  endsAt?: number;
-  remaining: number;
-};
-const focusStateKey = (userId: string) => `minerva-foco-v1-${userId}`;
-function readFocusState(userId: string): FocusState | null {
-  try {
-    const value = JSON.parse(localStorage.getItem(focusStateKey(userId)) || "null") as FocusState | null;
-    if (!value || (value.phase !== "focus" && value.phase !== "break")) return null;
-    return value;
-  } catch {
-    return null;
-  }
-}
-function writeFocusState(userId: string, state: FocusState) {
-  try {
-    localStorage.setItem(focusStateKey(userId), JSON.stringify(state));
-  } catch {}
-  window.dispatchEvent(new Event("minerva-foco"));
-}
-function focusRemainingOf(state: FocusState) {
-  if (state.running && state.endsAt) return Math.max(0, Math.round((state.endsAt - Date.now()) / 1000));
-  return Math.max(0, Math.round(state.remaining || 0));
-}
-
-/** Selo no topo enquanto o foco roda e o aluno está em outra página. */
-function FocusRunningBadge({ userId, route }: { userId: string; route: string }) {
-  const [state, setState] = useState(() => readFocusState(userId));
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const reload = () => setState(readFocusState(userId));
-    window.addEventListener("minerva-foco", reload);
-    window.addEventListener("storage", reload);
-    return () => {
-      window.removeEventListener("minerva-foco", reload);
-      window.removeEventListener("storage", reload);
-    };
-  }, [userId]);
-  const active = Boolean(state?.running) && route !== "foco";
-  useEffect(() => {
-    if (!active) return;
-    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [active]);
-  if (!active || !state) return null;
-  const left = focusRemainingOf(state);
-  const label = left > 0 ? `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}` : "terminou";
-  return (
-    <a href="#/foco" className="focus-running-badge" aria-label={`${state.phase === "focus" ? "Foco" : "Pausa"} em andamento: ${label}. Voltar ao Foco.`}>
-      <Timer className="h-4 w-4" />
-      <span>{state.phase === "focus" ? "Foco" : "Pausa"}</span>
-      <strong>{label}</strong>
-    </a>
-  );
-}
+// Estado do Foco e widget do canto: src/foco/ (focus-store.ts, FocusWidget.tsx).
 
 function FocusView({
   data,
@@ -7246,6 +7215,7 @@ function useDictation(input: string, setInput: (value: string) => void) {
 }
 
 function MineView({
+  userId,
   data,
   input,
   setInput,
@@ -7282,6 +7252,7 @@ function MineView({
   goToPlan,
   goHome,
 }: {
+  userId: string;
   data: ReturnType<typeof useMemoUserData>;
   input: string;
   setInput: (value: string) => void;
@@ -7702,7 +7673,7 @@ function MineView({
       </aside>
 
       <div className="mine-main relative flex h-full min-h-0 min-w-0 flex-col bg-[#111310]">
-        <header className="caderno-minecode-chat-header mine-header relative flex min-h-[3.75rem] shrink-0 items-center justify-between gap-2 px-3 py-2 sm:gap-3 md:px-5">
+        <header data-focus-avoid className="caderno-minecode-chat-header mine-header relative flex min-h-[3.75rem] shrink-0 items-center justify-between gap-2 px-3 py-2 sm:gap-3 md:px-5">
           <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <button
               type="button"
@@ -7737,6 +7708,7 @@ function MineView({
           <MineCodeDesktopButton />
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <FocusQuickStart userId={userId} subjectId={selectedSubject?.id} subjectName={selectedSubject?.name} />
             <HandwritingToggle />
             <button
               type="button"
@@ -7897,7 +7869,7 @@ function MineView({
           </AnimatePresence>
         </div>
 
-        <div className="mine-composer-area relative shrink-0 bg-gradient-to-t from-[#111310] via-[#111310]/98 to-transparent px-2.5 pb-2.5 pt-3 sm:px-5 sm:pb-4 sm:pt-4">
+        <div data-focus-avoid className="mine-composer-area relative shrink-0 bg-gradient-to-t from-[#111310] via-[#111310]/98 to-transparent px-2.5 pb-2.5 pt-3 sm:px-5 sm:pb-4 sm:pt-4">
           {activeSuggestions.length ? (
             <div className="mine-next mx-auto mb-2.5 max-w-[48rem]">
               <p className="mine-next__label">

@@ -502,7 +502,7 @@ export function MineBuddy({ route, onOpen }: { route: string; onOpen: () => void
 
   const mood = bubble?.mood || "idle";
   return (
-    <div ref={rootRef} className={`caderno-buddy ${bubble ? "is-talking" : ""}`} data-mood={mood} data-tour="buddy">
+    <div ref={rootRef} className={`caderno-buddy ${bubble ? "is-talking" : ""}`} data-mood={mood} data-tour="buddy" data-focus-avoid>
       {bubble ? (
         <motion.div
           key={bubble.key}

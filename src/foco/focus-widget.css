@@ -1,0 +1,575 @@
+/*
+ * Ficha do Foco no canto (FocusWidget.tsx) e atalho do chat (FocusQuickStart.tsx).
+ * Mesmo mundo da aba Foco: folha pautada, fita, letra à mão e o lápis.
+ * Cores só pelos tokens do caderno (src/caderno.css), então segue o tema.
+ */
+
+.focus-float {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 55;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.focus-float:active {
+  cursor: grabbing;
+}
+
+/* ───────────── ficha aberta ───────────── */
+
+.focus-card {
+  --focus-tape: rgb(var(--hl-mint) / 0.62);
+  position: relative;
+  width: 15.75rem;
+  padding: 0.95rem 0.85rem 0.55rem 1rem;
+  border: 1px solid rgb(var(--line) / 0.85);
+  border-radius: 0.85rem;
+  background-color: rgb(var(--sheet));
+  /* pauta do caderno, bem leve, alinhada com a linha dos minutos */
+  background-image: linear-gradient(to bottom, transparent calc(1.6rem - 1px), rgb(var(--rule) / 0.55) calc(1.6rem - 1px), rgb(var(--rule) / 0.55) 1.6rem, transparent 1.6rem);
+  background-size: 100% 1.6rem;
+  background-position: 0 0.35rem;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.05), 0 14px 32px -16px rgb(0 0 0 / 0.42), 0 4px 10px -6px rgb(0 0 0 / 0.2);
+  color: rgb(var(--theme-text));
+}
+
+.focus-float[data-phase="break"] .focus-card {
+  --focus-tape: rgb(var(--hl-yellow) / 0.7);
+}
+
+/* fita adesiva: segura a ficha no caderno */
+.focus-card__tape {
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  width: 4.6rem;
+  height: 1.15rem;
+  translate: -50% 0;
+  rotate: -3deg;
+  background: var(--focus-tape);
+  clip-path: polygon(3% 0, 97% 6%, 100% 48%, 96% 100%, 4% 94%, 0 52%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  pointer-events: none;
+}
+
+.focus-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 1.6rem;
+}
+
+.focus-card__label {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  font-family: "Gochi Hand", "Kalam", cursive;
+  font-size: 1.12rem;
+  line-height: 1;
+  color: rgb(var(--pen));
+  white-space: nowrap;
+}
+
+.focus-card__subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.focus-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.15rem;
+}
+
+.focus-card__time {
+  margin: 0;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 2.15rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--theme-text));
+}
+
+.focus-card__colon.is-ticking {
+  animation: focus-colon 1s steps(1) infinite;
+}
+
+@keyframes focus-colon {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.focus-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.focus-card__icon {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.65rem;
+  color: rgb(var(--theme-text) / 0.66);
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.focus-card__icon svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.focus-card__icon:hover {
+  background: rgb(var(--theme-text) / 0.07);
+  color: rgb(var(--theme-text));
+}
+
+.focus-card__icon:active {
+  transform: scale(0.92);
+}
+
+.focus-card__icon--main {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+  box-shadow: 0 6px 14px -8px rgb(var(--pen) / 0.9);
+}
+
+.focus-card__icon--main:hover {
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+  filter: brightness(1.08);
+}
+
+.focus-card__icon--main svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
+.focus-card__icon--quiet {
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-right: -0.3rem;
+}
+
+.focus-card__icon:focus-visible,
+.focus-card__move:focus-visible,
+.focus-pill:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 2px;
+}
+
+/* lápis em miniatura */
+.focus-card__pencil {
+  display: block;
+  width: 100%;
+  height: 1rem;
+  margin-top: 0.55rem;
+  overflow: visible;
+}
+
+.focus-card__graphite {
+  stroke: rgb(var(--pen) / 0.55);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.focus-card__pencil-body {
+  transition: transform 1s linear;
+}
+
+.focus-card__wood {
+  fill: #e8c79b;
+}
+
+.focus-card__lead {
+  fill: #2b2f3a;
+}
+
+.focus-card__paint {
+  fill: #f2b93b;
+}
+
+.focus-card__pencil-body[data-phase="break"] .focus-card__paint {
+  fill: #86c5a8;
+}
+
+.focus-card__paint-shine {
+  fill: rgb(255 255 255 / 0.32);
+}
+
+.focus-card__ferrule {
+  fill: #b9bfc9;
+}
+
+.focus-card__eraser {
+  fill: rgb(var(--hl-pink));
+}
+
+.focus-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.3rem;
+}
+
+.focus-card__note {
+  font-family: "Gochi Hand", "Kalam", cursive;
+  font-size: 1rem;
+  line-height: 1.2;
+  color: rgb(var(--theme-text) / 0.6);
+  transform: rotate(-1.2deg);
+  transform-origin: left center;
+}
+
+/* pegador: três pontinhos; toque muda de canto, arrastar move */
+.focus-card__move {
+  display: flex;
+  gap: 3px;
+  padding: 0.45rem 0.3rem;
+  border-radius: 0.5rem;
+  cursor: grab;
+}
+
+.focus-card__move span {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgb(var(--theme-text) / 0.32);
+}
+
+.focus-card__move:hover span {
+  background: rgb(var(--theme-text) / 0.6);
+}
+
+/* ───────────── pílula recolhida ───────────── */
+
+.focus-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem 0.5rem 0.7rem;
+  border: 1px solid rgb(var(--line) / 0.85);
+  border-radius: 999px;
+  background: rgb(var(--sheet));
+  box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.45), 0 2px 6px -3px rgb(0 0 0 / 0.2);
+  color: rgb(var(--theme-text));
+  cursor: pointer;
+}
+
+.focus-pill > svg {
+  width: 1rem;
+  height: 1rem;
+  color: rgb(var(--pen));
+}
+
+.focus-pill__time {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-pill__live {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: rgb(var(--hl-mint));
+  box-shadow: 0 0 0 3px rgb(var(--hl-mint) / 0.25);
+  animation: focus-live 2s ease-in-out infinite;
+}
+
+.focus-float[data-phase="break"] .focus-pill__live {
+  background: rgb(var(--hl-yellow));
+  box-shadow: 0 0 0 3px rgb(var(--hl-yellow) / 0.25);
+}
+
+.focus-pill .focus-pill__paused {
+  width: 0.85rem;
+  height: 0.85rem;
+  color: rgb(var(--theme-text) / 0.5);
+}
+
+@keyframes focus-live {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ───────────── atalho do chat da Mine ───────────── */
+
+.focus-quick {
+  position: relative;
+}
+
+.focus-quick__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.5rem;
+  padding: 0 0.7rem;
+  border-radius: 0.75rem;
+  color: rgb(var(--theme-text) / 0.62);
+  font-size: 0.82rem;
+  font-weight: 800;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.focus-quick__trigger svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.focus-quick__trigger:hover,
+.focus-quick__trigger[aria-expanded="true"] {
+  background: rgb(var(--theme-text) / 0.07);
+  color: rgb(var(--theme-text));
+}
+
+.focus-quick__trigger[data-active] {
+  color: rgb(var(--pen));
+}
+
+.focus-quick__trigger[data-active] .focus-quick__clock {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-quick__trigger:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 2px;
+}
+
+.focus-quick__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 60;
+  width: min(19rem, calc(100vw - 1.5rem));
+  padding: 1.05rem 0.9rem 0.8rem;
+  border: 1px solid rgb(var(--line) / 0.85);
+  border-radius: 0.95rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 22px 44px -22px rgb(0 0 0 / 0.55), 0 6px 14px -8px rgb(0 0 0 / 0.25);
+  color: rgb(var(--theme-text));
+  transform-origin: top right;
+}
+
+.focus-quick__title {
+  margin: 0 0.15rem;
+  font-family: "Anybody Variable", "Atkinson Hyperlegible Next Variable", sans-serif;
+  font-size: 1.02rem;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+}
+
+.focus-quick__hint {
+  margin: 0.25rem 0.15rem 0.7rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: rgb(var(--theme-text) / 0.62);
+}
+
+.focus-quick__hint strong {
+  color: rgb(var(--theme-text) / 0.9);
+}
+
+.focus-quick__options {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.focus-quick__option {
+  display: grid;
+  grid-template-columns: 3.1rem 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.7rem;
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+
+.focus-quick__option:hover,
+.focus-quick__option:focus-visible {
+  background: rgb(var(--theme-text) / 0.06);
+  outline: none;
+}
+
+.focus-quick__option:focus-visible {
+  box-shadow: inset 0 0 0 2px rgb(var(--pen) / 0.7);
+}
+
+.focus-quick__minutes {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  color: rgb(var(--pen));
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-quick__minutes small {
+  margin-left: 0.1rem;
+  font-size: 0.7rem;
+  letter-spacing: 0;
+  color: rgb(var(--theme-text) / 0.55);
+}
+
+.focus-quick__name {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.focus-quick__detail {
+  display: block;
+  font-size: 0.74rem;
+  color: rgb(var(--theme-text) / 0.6);
+}
+
+.focus-quick__go {
+  width: 1rem;
+  height: 1rem;
+  color: rgb(var(--theme-text) / 0.35);
+}
+
+.focus-quick__option:hover .focus-quick__go {
+  color: rgb(var(--pen));
+}
+
+.focus-quick__live {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.1rem 0.15rem 0.2rem;
+}
+
+.focus-quick__live-time {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-quick__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.focus-quick__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid rgb(var(--line) / 0.9);
+  border-radius: 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgb(var(--theme-text) / 0.85);
+  transition: background-color 140ms ease;
+}
+
+.focus-quick__btn svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.focus-quick__btn:hover {
+  background: rgb(var(--theme-text) / 0.06);
+}
+
+.focus-quick__btn--main {
+  border-color: transparent;
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+}
+
+.focus-quick__btn--main:hover {
+  background: rgb(var(--pen));
+  filter: brightness(1.08);
+}
+
+.focus-quick__btn:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 2px;
+}
+
+.focus-quick__link {
+  display: block;
+  margin: 0.7rem 0.15rem 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text) / 0.58);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgb(var(--theme-text) / 0.25);
+}
+
+.focus-quick__link:hover {
+  color: rgb(var(--pen));
+}
+
+/* Celular: o topo do chat é apertado — só o ícone. Com sessão ativa, um
+   pontinho no ícone; os minutos já estão na ficha do canto. */
+@media (max-width: 639px) {
+  .focus-quick__trigger {
+    position: relative;
+    width: 2.5rem;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .focus-quick__trigger :is(.focus-quick__word, .focus-quick__clock) {
+    display: none;
+  }
+
+  .focus-quick__trigger[data-active]::after {
+    content: "";
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: rgb(var(--hl-mint));
+    box-shadow: 0 0 0 2px rgb(var(--sheet));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-card__colon.is-ticking,
+  .focus-pill__live {
+    animation: none;
+  }
+
+  .focus-card__pencil-body {
+    transition: none;
+  }
+}
