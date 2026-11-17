@@ -234,6 +234,7 @@ import { setTaskDone, type TaskKind, type TaskPriority, type TaskRepeat } from "
 
 // Telas pesadas e usadas por poucos (ou só às vezes) chegam sob demanda: o
 // pacote inicial fica com o que todo aluno abre ao entrar.
+import { AdminSkeleton } from "./admin/AdminSkeleton";
 const AdminView = React.lazy(() => import("./admin/AdminPanel").then((m) => ({ default: m.AdminView })));
 const GamesView = React.lazy(() => import("./games/GamesPanel").then((m) => ({ default: m.GamesView })));
 const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({ default: m.AtelieView })));
@@ -2563,7 +2564,7 @@ function App() {
     if (route.view === "about") return <AboutView />;
     if (route.view === "como-usar") return <React.Suspense fallback={<PageLoading />}><ComoUsarView /></React.Suspense>;
     if (route.view === "perfil") return <ProfileView user={user} data={userData} update={update} notify={notify} logout={logout} targetId={route.id} />;
-    if (route.view === "admin") return hasAdminAccess ? <React.Suspense fallback={<PageLoading />}><AdminView data={data} syncStatus={syncStatus} databaseMode={databaseMode} section={route.id} currentUserId={user.id} onDeleteUser={requestDeleteUser} onDeleteComment={requestDeleteComment} update={update} notify={notify} setModal={setModal} /></React.Suspense> : <AdminRestrictedView />;
+    if (route.view === "admin") return hasAdminAccess ? <React.Suspense fallback={<AdminSkeleton />}><AdminView data={data} syncStatus={syncStatus} databaseMode={databaseMode} section={route.id} currentUserId={user.id} onDeleteUser={requestDeleteUser} onDeleteComment={requestDeleteComment} update={update} notify={notify} setModal={setModal} themeMode={appearance.themeMode} onToggleTheme={() => changeAppearance({ themeMode: appearance.themeMode === "dark" ? "light" : "dark" })} /></React.Suspense> : <AdminRestrictedView />;
     return <HomeView data={userData} userId={user.id} displayName={displayName} accentColor={appearance.accentColor} themeMode={appearance.themeMode} setModal={setModal} update={update} openCommand={() => setCommandOpen(true)} openMine={(subjectId) => { setSelectedSubjectId(subjectId); go("mine"); }} />;
   })();
 
