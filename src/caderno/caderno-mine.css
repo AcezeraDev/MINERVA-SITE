@@ -54,6 +54,13 @@
 }
 
 /* ───────────────── compositor ───────────────── */
+/* Camada própria acima da conversa: o palco de boas-vindas (.mine-welcome-stage)
+ * tem z-index 1 e, sem isto, os cartões de sugestão cobriam o menu "+", que
+ * abre para cima a partir do compositor. */
+.mine-composer-area {
+  z-index: 5;
+}
+
 .mine-composer-area,
 .theme-light .mine-composer-area,
 .theme-light .mine-chatgpt-shell .mine-composer-area {
