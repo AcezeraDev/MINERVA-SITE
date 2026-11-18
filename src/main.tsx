@@ -250,6 +250,7 @@ const TaskEditor = React.lazy(() => import("./agenda/TaskEditor").then((m) => ({
 
 const ComoUsarView = React.lazy(() => import("./guia/ComoUsarView").then((m) => ({ default: m.ComoUsarView })));
 const MineCode = React.lazy(() => import("./chat/MineCode").then((m) => ({ default: m.MineCode })));
+const Pets = React.lazy(() => import("./pets/Pets"));
 const MindmapModal = React.lazy(() => import("./mindmap/MindmapPanel").then((m) => ({ default: m.MindmapModal })));
 
 /** Enquanto um pedaço do caderno carrega: um lápis girando no meio da folha. */
@@ -432,6 +433,8 @@ export type User = {
     mineStyle: "simples" | "equilibrada" | "profunda";
     reminders: boolean;
     reducedMotion?: boolean;
+    /** Mine andando pelas abas. Padrão: ligada. ("turma" vem de quando eram três robôs e vale como ligada.) */
+    pets?: "off" | "mine" | "turma";
     /** Sons do caderno (lápis, página, carimbo). Desligados por padrão. */
     sounds?: boolean;
     /** Já fez o tour guiado da Mine. */
@@ -2691,6 +2694,12 @@ function App() {
           </AnimatePresence>
         </main>
         {!isAdminPanel && !isMinePanel ? <MineBuddy route={route.view} onOpen={() => go("mine")} /> : null}
+        {/* Mine andando pelas abas: fora do chat e do admin, e nunca com movimento reduzido ou modo leve. */}
+        {!isAdminPanel && !isMinePanel && !lowFx && user.settings.pets !== "off" ? (
+          <React.Suspense fallback={null}>
+            <Pets />
+          </React.Suspense>
+        ) : null}
         {!isAdminPanel ? <FocusWidget userId={user.id} route={route.view} subjects={userData.subjects} onPhaseDone={handleFocusPhaseDone} /> : null}
         {!isAdminPanel && !isMinePanel ? <MobileNav route={route.view} isAdmin={hasAdminAccess} displayName={displayName} avatar={user.settings.avatar} level={rewards?.level || 1} /> : null}
       </div>
@@ -10718,6 +10727,13 @@ function OwnProfileView({ user, data, update, notify, logout }: { user: User; da
                 hint="Desliga o fundo 3D e as transições. Bom em máquinas mais lentas."
                 on={!!s.reducedMotion}
                 onChange={(v) => setSetting({ reducedMotion: v })}
+              />
+              <ToggleSwitch
+                icon={Bot}
+                label="Mine andando pelo site"
+                hint={s.reducedMotion ? "Some enquanto \"Reduzir animações\" estiver ligado." : "Ela passeia pelas abas e brinca com você: arraste, jogue, faça carinho ou pare o mouse num card."}
+                on={s.pets !== "off"}
+                onChange={(v) => setSetting({ pets: v ? "mine" : "off" })}
               />
             </div>
           </GlassCard>
