@@ -406,6 +406,17 @@ export function mineSays(text: string, mood: BuddyMood = "happy") {
   window.dispatchEvent(new CustomEvent("caderno:mine", { detail: { text, mood } }));
 }
 
+/**
+ * Abre o balão de conversa da mini Mine com uma pergunta pronta. `contexto`
+ * vai para a Mine (os números da simulação, o resumo do texto…) e `titulo`
+ * aparece no topo do balão.
+ */
+export function mineConversa(pergunta: string, contexto = "", titulo = "sua dúvida") {
+  window.dispatchEvent(new CustomEvent("caderno:mine-conversa", { detail: { pergunta, contexto, titulo } }));
+}
+
+const MineConversa = React.lazy(() => import("./MineConversa").then((m) => ({ default: m.MineConversa })));
+
 const routeTips: Record<string, string[]> = {
   home: ["Bora começar pelo que está atrasado?", "Risca uma tarefa e ganha XP!"],
   agenda: ["Arrasta os bilhetes entre os dias!", "Semana cheia? Espalha as tarefas."],
@@ -430,11 +441,27 @@ const routeTips: Record<string, string[]> = {
  * dica na primeira visita de cada aba e comemora quando alguém chama
  * `mineSays`. Clicar leva para a conversa.
  */
-export function MineBuddy({ route, onOpen }: { route: string; onOpen: () => void }) {
+export function MineBuddy({ route, onOpen, onOpenWith }: { route: string; onOpen: () => void; onOpenWith?: (texto: string) => void }) {
   const reduced = useSoftMotion();
   const eyesRef = useRef<SVGGElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [bubble, setBubble] = useState<{ text: string; mood: BuddyMood; key: number } | null>(null);
+  const [conversa, setConversa] = useState<{ pergunta: string; contexto: string; titulo: string; key: number } | null>(null);
+
+  useEffect(() => {
+    const onConversa = (event: Event) => {
+      const detail = (event as CustomEvent<{ pergunta: string; contexto: string; titulo: string }>).detail;
+      if (!detail?.pergunta) return;
+      window.clearTimeout(timer.current);
+      setBubble(null);
+      setConversa({ pergunta: detail.pergunta, contexto: detail.contexto || "", titulo: detail.titulo || "sua dúvida", key: Date.now() });
+    };
+    window.addEventListener("caderno:mine-conversa", onConversa);
+    return () => window.removeEventListener("caderno:mine-conversa", onConversa);
+  }, []);
+
+  // Trocar de aba fecha a conversa: o assunto dela era a tela anterior.
+  useEffect(() => setConversa(null), [route]);
   const [blink, setBlink] = useState(false);
   const seen = useRef<Set<string>>(new Set());
   const timer = useRef<number | undefined>(undefined);
@@ -500,10 +527,25 @@ export function MineBuddy({ route, onOpen }: { route: string; onOpen: () => void
     };
   }, [reduced]);
 
-  const mood = bubble?.mood || "idle";
+  const mood = conversa ? "happy" : bubble?.mood || "idle";
   return (
-    <div ref={rootRef} className={`caderno-buddy ${bubble ? "is-talking" : ""}`} data-mood={mood} data-tour="buddy" data-focus-avoid>
-      {bubble ? (
+    <div ref={rootRef} className={`caderno-buddy ${bubble || conversa ? "is-talking" : ""} ${conversa ? "is-conversando" : ""}`} data-mood={mood} data-tour="buddy" data-focus-avoid>
+      {conversa ? (
+        <React.Suspense fallback={<div className="mine-conversa mine-conversa-carregando" aria-hidden />}>
+          <MineConversa
+            inicio={conversa}
+            reduced={reduced}
+            onFechar={() => setConversa(null)}
+            onAbrirChat={(falas) => {
+              const ultima = [...falas].reverse().find((fala) => fala.role === "user" && !fala.oculta);
+              setConversa(null);
+              if (onOpenWith) onOpenWith(ultima?.text || conversa.pergunta);
+              else onOpen();
+            }}
+          />
+        </React.Suspense>
+      ) : null}
+      {bubble && !conversa ? (
         <motion.div
           key={bubble.key}
           className="caderno-buddy-bubble"

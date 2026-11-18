@@ -162,7 +162,7 @@ export const tourSteps: TourStep[] = [
   { title: "Oi, {nome}! Eu sou a Mine.", text: "Esse é o seu caderno de estudos. Deixa eu te mostrar onde fica cada coisa? Leva menos de um minuto." },
   { target: "home", title: "Início", text: "Sua página do dia: o que merece atenção agora, a sequência de estudos e as matérias." },
   { target: "agenda", title: "Agenda", text: "Tarefas e provas num quadro de post-its. Dá pra arrastar de um dia pro outro." },
-  { target: "foco", title: "Foco", text: "Um lápis que vai sendo gasto enquanto você estuda. Cada sessão vale XP." },
+  { target: "laboratorio", title: "Laboratório", text: "Simulações de física e química pra mexer. Eu explico o que acontece com os seus números." },
   { target: "mine", title: "Conversar comigo", text: "Me pergunta qualquer coisa. Eu também faço mapa mental, prova e flashcards da sua matéria." },
   { target: "games", title: "Games", text: "Jogos montados com o conteúdo das suas matérias. Estudar jogando também conta!" },
   { target: "ranking", title: "Ranking", text: "A estante da turma: cada livro é XP. Quanto mais você estuda, mais alta fica a sua pilha." },

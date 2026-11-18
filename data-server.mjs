@@ -7,6 +7,23 @@ import { loadLocalEnv } from "./gemini-server.mjs";
 import { gamificationStats, levelFromXp, rankingWindows, totalXp, unlockedAchievements, xpSince } from "./shared/xp.mjs";
 import { dailyChallengeKey, leagueFromPoints, seasonPoints } from "./shared/game-meta.mjs";
 import { nomePublico } from "./shared/nome-publico.mjs";
+import { parseQuiz } from "./shared/study-parsers.mjs";
+import {
+  PERGUNTAS_POR_DUELO,
+  SALA_EXPIRA_MS,
+  abandonar,
+  avancar,
+  codigoValido,
+  conferirSumico,
+  criarDuelo,
+  entrarNoDuelo,
+  limparPerguntas,
+  novoCodigo,
+  responder,
+  vistaDe,
+} from "./shared/duelo.mjs";
+import { perguntasDaReserva } from "./shared/duelo-reserva.mjs";
+import { runMineRequest } from "./mine/router.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
 import { MINE_IMAGE_DAILY_LIMIT, MineImageError, generateMineImage } from "./mine/image-gen.mjs";
 import { MINE_VOICE_DAILY_LIMIT, MineVoiceError, synthesizeVoice } from "./mine/voice.mjs";
@@ -728,6 +745,185 @@ function publicName(user, { own = false } = {}) {
   return nomePublico(nome, { inteiro: own });
 }
 
+/* ------------------------------------------------------------------------ *
+ * Duelo (nov/2026). As regras vivem em shared/duelo.mjs; aqui só guarda e
+ * busca o estado. Tabela própria, fora do JSON central: o duelo muda a cada
+ * segundo e regravar o site inteiro a cada resposta seria caro e brigaria
+ * com os salvamentos de todo mundo.
+ * ------------------------------------------------------------------------ */
+const DUELO_DIARIO = 20;
+const duelosLocais = new Map();
+let duelosProntos = false;
+
+async function prepararDuelos() {
+  if (!pool || duelosProntos) return;
+  await ensurePostgres();
+  await pool.query(`
+    create table if not exists minerva_duelos (
+      codigo text primary key,
+      dados jsonb not null,
+      atualizado timestamptz not null default now()
+    )
+  `);
+  duelosProntos = true;
+}
+
+/** Lê, muda e grava um duelo sob bloqueio de linha: duas respostas no mesmo segundo não se apagam. */
+async function mudarDuelo(codigo, mutador) {
+  if (pool) {
+    await prepararDuelos();
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      const linha = await client.query(`select dados from minerva_duelos where codigo = $1 for update`, [codigo]);
+      if (!linha.rows[0]) {
+        await client.query("rollback");
+        return null;
+      }
+      const estado = linha.rows[0].dados;
+      const saida = await mutador(estado);
+      await client.query(`update minerva_duelos set dados = $2::jsonb, atualizado = now() where codigo = $1`, [codigo, JSON.stringify(estado)]);
+      await client.query("commit");
+      return { estado, saida };
+    } catch (error) {
+      await client.query("rollback").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  const estado = duelosLocais.get(codigo);
+  if (!estado) return null;
+  const saida = await mutador(estado);
+  return { estado, saida };
+}
+
+async function guardarNovoDuelo(estado) {
+  if (pool) {
+    await prepararDuelos();
+    // Faxina barata: duelos de ontem não servem para mais nada.
+    await pool.query(`delete from minerva_duelos where atualizado < now() - interval '1 day'`);
+    const feito = await pool.query(`insert into minerva_duelos (codigo, dados) values ($1, $2::jsonb) on conflict (codigo) do nothing returning codigo`, [estado.codigo, JSON.stringify(estado)]);
+    return feito.rowCount > 0;
+  }
+  if (duelosLocais.has(estado.codigo)) return false;
+  duelosLocais.set(estado.codigo, estado);
+  return true;
+}
+
+async function salasAbertas() {
+  const limite = Date.now() - SALA_EXPIRA_MS;
+  const lista = pool
+    ? (await (async () => {
+        await prepararDuelos();
+        const r = await pool.query(`select dados from minerva_duelos where dados->>'status' = 'sala' and atualizado > now() - interval '15 minutes' order by atualizado desc limit 12`);
+        return r.rows.map((row) => row.dados);
+      })())
+    : [...duelosLocais.values()].filter((item) => item.status === "sala");
+  return lista
+    .filter((item) => Number(item.criadoEm) > limite)
+    .map((item) => ({ codigo: item.codigo, tema: item.tema, dono: item.jogadores[0]?.nome || "Alguém", donoId: item.jogadores[0]?.id || "", criadoEm: item.criadoEm }));
+}
+
+async function perguntasDoDuelo(tema) {
+  const resultado = await runMineRequest({
+    task: "quiz",
+    prompt: `Gere ${PERGUNTAS_POR_DUELO + 1} questoes de multipla escolha sobre ${tema}, com nivel de dificuldade media; e um duelo de rapidez, entao use enunciados curtos (ate 25 palavras) e alternativas curtas. Distribua a letra correta entre A, B, C e D.`,
+    context: `Tema solicitado: ${tema}. Use conhecimento geral confiavel e adequado ao ensino medio brasileiro.`,
+    maxTokens: 3200,
+  });
+  return limparPerguntas(parseQuiz(resultado?.reply || ""));
+}
+
+async function handleDuelo(req, res) {
+  const session = await requireSession(req, res);
+  if (!session) return;
+  const body = await readJson(req).catch(() => ({}));
+  const acao = String(body.acao || "");
+  const agora = Date.now();
+  const store = await readStore();
+  const user = store.data.users.find((item) => item.id === session.userId);
+  if (!user) {
+    sendError(req, res, 401, "Conta não encontrada. Entre novamente.");
+    return;
+  }
+  const eu = { id: user.id, nome: publicName(user) };
+
+  if (acao === "abertas") {
+    const salas = (await salasAbertas()).map((sala) => ({ ...sala, minha: sala.donoId === eu.id }));
+    sendJson(req, res, 200, { salas: salas.map(({ donoId: _id, ...resto }) => resto) });
+    return;
+  }
+
+  if (acao === "criar") {
+    const tema = String(body.tema || "").replace(/\s+/g, " ").trim().slice(0, 120);
+    if (tema.length < 3) {
+      sendError(req, res, 400, "Escolha um tema para o duelo.");
+      return;
+    }
+    const usado = await takeQuota(eu.id, "duelo", DUELO_DIARIO);
+    if (usado === null) {
+      sendJson(req, res, 429, { error: `Você já criou ${DUELO_DIARIO} duelos hoje. Entre na sala de um colega ou volte amanhã!`, code: "quota" });
+      return;
+    }
+    let perguntas = [];
+    try {
+      perguntas = await perguntasDoDuelo(tema);
+    } catch {
+      perguntas = [];
+    }
+    // A Mine falhou: o duelo sai com a reserva de conhecimentos gerais.
+    const daReserva = perguntas.length < 3;
+    if (daReserva) perguntas = perguntasDaReserva(PERGUNTAS_POR_DUELO);
+    const temaFinal = daReserva ? "Conhecimentos gerais" : tema;
+    for (let tentativa = 0; tentativa < 6; tentativa += 1) {
+      const estado = criarDuelo({ codigo: novoCodigo(), tema: temaFinal, dono: eu, perguntas, contraMine: Boolean(body.contraMine), agora: Date.now() });
+      if (await guardarNovoDuelo(estado)) {
+        sendJson(req, res, 200, {
+          duelo: vistaDe(estado, eu.id, Date.now()),
+          aviso: daReserva ? `A Mine não conseguiu criar perguntas sobre "${tema}" agora, então o duelo usa perguntas de conhecimentos gerais.` : "",
+        });
+        return;
+      }
+    }
+    sendError(req, res, 500, "Não deu para abrir a sala agora. Tente de novo.");
+    return;
+  }
+
+  const codigo = String(body.codigo || "").trim().toUpperCase();
+  if (!codigoValido(codigo)) {
+    sendError(req, res, 400, "Código de sala inválido. São 5 letras e números.");
+    return;
+  }
+
+  const feito = await mudarDuelo(codigo, (estado) => {
+    if (acao === "entrar") {
+      const r = entrarNoDuelo(estado, eu, agora);
+      if (!r.ok) return r;
+    } else if (!estado.jogadores.some((item) => item.id === eu.id)) {
+      return { ok: false, erro: "Você não está neste duelo." };
+    }
+    estado.vistoEm = { ...(estado.vistoEm || {}), [eu.id]: agora };
+    if (acao === "responder") return responder(estado, eu.id, Math.floor(Number(body.indice)), Number(body.escolha), agora);
+    if (acao === "sair") {
+      abandonar(estado, eu.id, "saiu", agora);
+      return { ok: true };
+    }
+    avancar(estado, agora);
+    conferirSumico(estado, agora);
+    return { ok: true };
+  });
+  if (!feito) {
+    sendError(req, res, 404, "Sala não encontrada. Confira o código.");
+    return;
+  }
+  if (!feito.saida.ok && acao !== "responder") {
+    sendError(req, res, 409, feito.saida.erro || "Não deu para fazer isso agora.");
+    return;
+  }
+  sendJson(req, res, 200, { duelo: vistaDe(feito.estado, eu.id, agora), aviso: feito.saida.ok ? "" : feito.saida.erro || "" });
+}
+
 function publicAvatarUrl(user) {
   return user.settings?.avatar ? `/api/avatar?userId=${encodeURIComponent(user.id)}` : "";
 }
@@ -1004,6 +1200,11 @@ export async function handleDataRequest(req, res) {
 
     if (url.pathname === "/api/atelie-ia" && (req.method === "POST" || req.method === "GET")) {
       await handleAtelieIa(req, res);
+      return true;
+    }
+
+    if (url.pathname === "/api/duelo" && req.method === "POST") {
+      await handleDuelo(req, res);
       return true;
     }
 

@@ -38,6 +38,33 @@ export const redacoesPorDia = 3;
 export const atividadeXpMax = 40;
 export const atividadesPorDia = 5;
 
+/**
+ * Laboratório, Leitura e Duelo (nov/2026): mesmo esquema da redação, XP com
+ * teto por sessão e por dia, recalculado aqui em vez de confiar no cliente.
+ */
+export const labXpMax = 10;
+export const labPorDia = 6;
+export const leituraXpMax = 30;
+export const leiturasPorDia = 4;
+export const dueloXpMax = 30;
+export const duelosPorDia = 6;
+
+/** Desafio do Laboratório cumprido: 10 XP fixos. */
+export function labXp() {
+  return labXpMax;
+}
+
+/** 10 XP por ler até o fim e 4 por pergunta de interpretação certa. */
+export function leituraXp(acertos) {
+  return Math.min(leituraXpMax, 10 + Math.max(0, Math.floor(Number(acertos) || 0)) * 4);
+}
+
+/** 10 XP por jogar o duelo até o fim, mais 20 pela vitória ou 10 pelo empate. */
+export function dueloXp(resultado) {
+  const bonus = resultado === "vitoria" ? 20 : resultado === "empate" ? 10 : 0;
+  return Math.min(dueloXpMax, 10 + bonus);
+}
+
 /** 10 XP por entregar a redação e até 30 pela nota (0 a 1000). */
 export function redacaoXp(total) {
   const nota = Math.max(0, Math.min(1000, Number(total) || 0));
@@ -75,6 +102,9 @@ export const xpActions = [
   [`Guardar um desenho pintado no Ateliê (até ${drawingsPerDay} por dia)`, xpPerAction.drawing],
   [`Entregar uma redação corrigida (pela nota, até ${redacoesPorDia} por dia)`, redacaoXpMax],
   [`Finalizar uma atividade (pelos acertos, até ${atividadesPorDia} por dia)`, atividadeXpMax],
+  [`Cumprir um desafio do Laboratório (até ${labPorDia} por dia)`, labXpMax],
+  [`Terminar uma leitura e responder as perguntas (até ${leiturasPorDia} por dia)`, leituraXpMax],
+  [`Vencer um duelo (até ${duelosPorDia} duelos por dia)`, dueloXpMax],
 ];
 
 export const levelTitles = [
@@ -123,6 +153,12 @@ export const achievementList = [
   { id: "redacao-10", title: "Caneta afiada", text: "Entregue 10 redações.", xp: 80, target: 10, stat: "redacoes" },
   { id: "atividade-1", title: "Tarefa entregue", text: "Finalize sua primeira atividade.", xp: 20, target: 1, stat: "atividades" },
   { id: "atividade-15", title: "Aluno exemplar", text: "Finalize 15 atividades.", xp: 80, target: 15, stat: "atividades" },
+  { id: "lab-1", title: "Cientista de jaleco", text: "Cumpra um desafio do Laboratório.", xp: 20, target: 1, stat: "labs" },
+  { id: "lab-12", title: "Prêmio de ciências", text: "Cumpra 12 desafios do Laboratório.", xp: 80, target: 12, stat: "labs" },
+  { id: "leitura-1", title: "Leitor atento", text: "Termine sua primeira leitura com a Mine.", xp: 20, target: 1, stat: "leituras" },
+  { id: "leitura-10", title: "Rato de biblioteca", text: "Termine 10 leituras.", xp: 80, target: 10, stat: "leituras" },
+  { id: "duelo-1", title: "Primeiro duelo", text: "Jogue um duelo até o fim.", xp: 20, target: 1, stat: "duelos" },
+  { id: "duelo-10", title: "Duelista", text: "Jogue 10 duelos.", xp: 80, target: 10, stat: "duelos" },
   { id: "arte-10", title: "Artista da Minerva", text: "Guarde 10 desenhos pintados no Ateliê.", xp: 60, target: 10, stat: "drawings" },
 ];
 
@@ -204,6 +240,12 @@ export function gamificationStats(scope, now = Date.now()) {
     redacaoXp: cappedKindXp(sessions, "Redação", redacaoXpMax, redacoesPorDia),
     atividades: sessions.filter((item) => item.kind === "Atividade").length,
     atividadeXp: cappedKindXp(sessions, "Atividade", atividadeXpMax, atividadesPorDia),
+    labs: sessions.filter((item) => item.kind === "Laboratório").length,
+    labXp: cappedKindXp(sessions, "Laboratório", labXpMax, labPorDia),
+    leituras: sessions.filter((item) => item.kind === "Leitura").length,
+    leituraXp: cappedKindXp(sessions, "Leitura", leituraXpMax, leiturasPorDia),
+    duelos: sessions.filter((item) => item.kind === "Duelo").length,
+    dueloXp: cappedKindXp(sessions, "Duelo", dueloXpMax, duelosPorDia),
     mineMessages: list(scope?.chats).filter((item) => item.role === "user").length,
     cardReviews: flashcards.reduce((sum, card) => sum + (Number(card.reps) || 0), 0),
     mastered: flashcards.filter((card) => (Number(card.level) || 0) >= 4).length,
@@ -228,6 +270,9 @@ export function totalXp(stats) {
     (Number(stats.idiomaXp) || 0) +
     (Number(stats.redacaoXp) || 0) +
     (Number(stats.atividadeXp) || 0) +
+    (Number(stats.labXp) || 0) +
+    (Number(stats.leituraXp) || 0) +
+    (Number(stats.dueloXp) || 0) +
     stats.mineMessages * xpPerAction.mineMessage +
     stats.cardReviews * xpPerAction.cardReview +
     (Number(stats.drawings) || 0) * xpPerAction.drawing;
@@ -276,6 +321,9 @@ export function xpSince(scope, since) {
       .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0) +
     cappedKindXp(sessions, "Redação", redacaoXpMax, redacoesPorDia, from) +
     cappedKindXp(sessions, "Atividade", atividadeXpMax, atividadesPorDia, from) +
+    cappedKindXp(sessions, "Laboratório", labXpMax, labPorDia, from) +
+    cappedKindXp(sessions, "Leitura", leituraXpMax, leiturasPorDia, from) +
+    cappedKindXp(sessions, "Duelo", dueloXpMax, duelosPorDia, from) +
     list(scope?.chats).filter((item) => item.role === "user" && after(item.createdAt)).length * xpPerAction.mineMessage +
     list(scope?.flashcards).filter((item) => after(item.lastReviewedAt)).length * xpPerAction.cardReview +
     countedDrawings(sessions, from) * xpPerAction.drawing

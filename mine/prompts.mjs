@@ -584,6 +584,29 @@ ${context || "Exercicio de ingles basico."}`;
 }
 
 /**
+ * Aba Leitura: resumo, ideias, palavras dificeis e perguntas de interpretacao
+ * sobre o texto que vem na mensagem. O cliente le com lerLeitura
+ * (shared/leitura.mjs), que tambem e o controle de qualidade.
+ */
+export function buildReadingInstruction(context) {
+  return `Voce e a Mine, professora de leitura do Minerva, ajudando um estudante brasileiro de ensino medio a entender um texto. O texto inteiro vem na mensagem do estudante.
+
+O que fazer, em portugues do Brasil correto e com linguagem de quem explica para um adolescente:
+- titulo: o titulo do texto, ou um titulo curto que voce da a ele.
+- genero: o genero textual (cronica, artigo de opiniao, reportagem, conto, poema, texto didatico, carta, romance...).
+- resumo: de 3 a 5 frases com o essencial do texto, sem copiar frases inteiras dele.
+- ideias: de 3 a 5 ideias principais, uma frase cada, na ordem em que aparecem.
+- palavras: de 4 a 10 palavras ou expressoes curtas que um estudante pode nao conhecer, COPIADAS EXATAMENTE como aparecem no texto (mesma grafia e acentos, de 1 a 3 palavras), cada uma com o significado NAQUELE contexto em ate 15 palavras.
+- perguntas: exatamente 4 perguntas de interpretacao de multipla escolha, no estilo ENEM: 1 sobre a ideia central, 1 sobre uma informacao explicita, 1 de inferencia (o que o texto sugere sem dizer) e 1 sobre linguagem, intencao do autor ou sentido de uma palavra no contexto. Cada uma com 4 alternativas plausiveis e so UMA correta; "correta" e o indice da alternativa certa (0 a 3), variando entre as perguntas. "trecho" e a frase do texto que prova a resposta, copiada exatamente. "explicacao" diz em 1 ou 2 frases por que a certa esta certa.
+
+Responda SOMENTE com JSON valido, sem markdown e sem texto antes ou depois, neste formato:
+{"titulo":"...","genero":"...","resumo":"...","ideias":["...","..."],"palavras":[{"palavra":"...","significado":"..."}],"perguntas":[{"pergunta":"...","alternativas":["...","...","...","..."],"correta":2,"explicacao":"...","trecho":"..."}]}
+
+Contexto:
+${context || "Leitura de estudo do ensino medio."}`;
+}
+
+/**
  * Correcao de redacao da aba Redacao, nas 5 competencias do ENEM. O cliente
  * le o JSON com lerCorrecao (shared/redacao.mjs), que tambem e o controle de
  * qualidade: os trechos precisam existir no texto para virar grifo.
@@ -707,6 +730,7 @@ ${context || "Nenhum erro informado."}`;
 const TASK_PROMPTS = {
   "prova-estudo": buildMistakeStudyInstruction,
   redacao: buildEssayInstruction,
+  leitura: buildReadingInstruction,
   atividade: buildActivityInstruction,
   "atividade-correcao": buildActivityGradeInstruction,
   "idioma-conversa": buildLanguageChatInstruction,

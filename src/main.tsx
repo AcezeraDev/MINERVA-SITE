@@ -91,6 +91,7 @@ import {
   HeartPulse,
   Languages,
   NotebookPen,
+  Swords,
   ClipboardList,
   Landmark,
   Pencil,
@@ -244,6 +245,9 @@ const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({
 const IdiomasView = React.lazy(() => import("./idiomas/IdiomasView").then((m) => ({ default: m.IdiomasView })));
 const RedacaoView = React.lazy(() => import("./redacao/RedacaoView").then((m) => ({ default: m.RedacaoView })));
 const AtividadesView = React.lazy(() => import("./atividades/AtividadesView").then((m) => ({ default: m.AtividadesView })));
+const LaboratorioView = React.lazy(() => import("./laboratorio/LaboratorioView").then((m) => ({ default: m.LaboratorioView })));
+const LeituraView = React.lazy(() => import("./leitura/LeituraView").then((m) => ({ default: m.LeituraView })));
+const DueloView = React.lazy(() => import("./duelo/DueloView").then((m) => ({ default: m.DueloView })));
 const ProvasView = React.lazy(() => import("./provas/ProvasView").then((m) => ({ default: m.ProvasView })));
 const AgendaView = React.lazy(() => import("./agenda/AgendaView").then((m) => ({ default: m.AgendaView })));
 const TaskEditor = React.lazy(() => import("./agenda/TaskEditor").then((m) => ({ default: m.TaskEditor })));
@@ -403,6 +407,9 @@ type View =
   | "atividades"
   | "provas"
   | "redacao"
+  | "leitura"
+  | "laboratorio"
+  | "duelo"
   | "foco"
   | "progress"
   | "ranking"
@@ -900,6 +907,9 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
   { view: "atividades", label: "Atividades", icon: ClipboardList },
   { view: "provas", label: "Prova e erros", icon: ClipboardCheck },
   { view: "redacao", label: "Redação", icon: NotebookPen },
+  { view: "leitura", label: "Leitura", icon: BookOpen },
+  { view: "laboratorio", label: "Laboratório", icon: FlaskConical },
+  { view: "duelo", label: "Duelo", icon: Swords },
   { view: "foco", label: "Foco", icon: Timer },
   { view: "progress", label: "Progresso", icon: Activity },
   { view: "ranking", label: "Ranking", icon: Trophy },
@@ -919,14 +929,22 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
 
 /** A barra lateral agrupa os destinos em quatro blocos para virar uma lista escaneável. */
 const navGroups: Array<{ label: string; views: View[] }> = [
-  { label: "Estudo", views: ["home", "agenda", "atividades", "provas", "redacao", "foco", "progress", "ranking"] },
-  { label: "Inteligência", views: ["mine", "games", "idiomas", "atelie", "search", "plan"] },
+  { label: "Estudo", views: ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "progress", "ranking"] },
+  { label: "Inteligência", views: ["mine", "games", "duelo", "idiomas", "atelie", "search", "plan"] },
   { label: "Comunidade", views: ["comments", "suggestions"] },
   { label: "Conta", views: ["como-usar", "about", "perfil", "admin"] },
 ];
 
 /** Barra inferior mobile: só os 4 destinos de uso diário; o resto vive na gaveta "Mais". */
-const mobilePrimary: View[] = ["home", "agenda", "foco", "mine"];
+const mobilePrimary: View[] = ["home", "agenda", "atividades", "mine"];
+
+/**
+ * Telas que continuam existindo (os links e atalhos funcionam) mas não
+ * aparecem em nenhum menu. O Foco saiu do menu em nov/2026: o cronômetro
+ * segue abrindo pelos botões "Iniciar foco", pela paleta e pela ficha que a
+ * Mine liga pelo chat.
+ */
+const hiddenFromMenu: View[] = ["foco"];
 
 function navItemOf(view: View) {
   return navItems.find((item) => item.view === view);
@@ -2588,6 +2606,9 @@ function App() {
     if (route.view === "atelie") return <React.Suspense fallback={<PageLoading />}><AtelieView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "redacao") return <React.Suspense fallback={<PageLoading />}><RedacaoView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "atividades") return <React.Suspense fallback={<PageLoading />}><AtividadesView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "leitura") return <React.Suspense fallback={<PageLoading />}><LeituraView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "laboratorio") return <React.Suspense fallback={<PageLoading />}><LaboratorioView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "duelo") return <React.Suspense fallback={<PageLoading />}><DueloView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "provas") return <React.Suspense fallback={<PageLoading />}><ProvasView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "idiomas") return <React.Suspense fallback={<PageLoading />}><IdiomasView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "search") return <SearchView data={userData} user={user} query={query} setQuery={setQuery} update={update} notify={notify} />;
@@ -2693,7 +2714,15 @@ function App() {
             </motion.div>
           </AnimatePresence>
         </main>
-        {!isAdminPanel && !isMinePanel ? <MineBuddy route={route.view} onOpen={() => go("mine")} /> : null}
+        {!isAdminPanel && !isMinePanel ? <MineBuddy
+            route={route.view}
+            onOpen={() => go("mine")}
+            onOpenWith={(texto) => {
+              setSelectedSubjectId(undefined);
+              setMineInput(texto);
+              go("mine");
+            }}
+          /> : null}
         {/* Mine andando pelas abas: fora do chat e do admin, e nunca com movimento reduzido ou modo leve. */}
         {!isAdminPanel && !isMinePanel && !lowFx && user.settings.pets !== "off" ? (
           <React.Suspense fallback={null}>
@@ -3226,7 +3255,7 @@ function MobileNav({ route, isAdmin, displayName, avatar, level }: { route: View
   const [open, setOpen] = useState(false);
   const reduced = useSoftMotion();
   const primary = mobilePrimary.map(navItemOf).filter(Boolean) as Array<{ view: View; label: string; icon: LucideIcon }>;
-  const rest = navItems.filter((item) => !mobilePrimary.includes(item.view) && (item.view !== "admin" || isAdmin));
+  const rest = navItems.filter((item) => !mobilePrimary.includes(item.view) && !hiddenFromMenu.includes(item.view) && (item.view !== "admin" || isAdmin));
   const restActive = rest.some((item) => item.view === route);
 
   useEffect(() => {
@@ -5673,6 +5702,12 @@ const achievementIcons: Record<string, LucideIcon> = {
   "arte-10": Star,
   "idioma-1": Languages,
   "idioma-12": Globe,
+  "lab-1": FlaskConical,
+  "lab-12": Rocket,
+  "leitura-1": BookOpen,
+  "leitura-10": Brain,
+  "duelo-1": Swords,
+  "duelo-10": Trophy,
 };
 
 function buildAchievements(stats: XpStats): Achievement[] {
@@ -11920,7 +11955,7 @@ function buildAssistantContext(data: ReturnType<typeof useMemoUserData>, user: U
     "Quando o usuário pedir para analisar, resumir, explicar ou corrigir 'o conteúdo', 'os anexos' ou 'o que enviei', use o texto dos conteúdos listados acima como fonte principal da resposta.",
     "Tarefas:",
     taskLines.join("\n") || "- nenhuma",
-    "Rotas disponíveis: home, agenda, atividades, provas, redacao, progress, mine, games, search, plan, comments, suggestions, about e settings.",
+    "Rotas disponíveis: home, agenda, atividades, provas, redacao, leitura, laboratorio, duelo, progress, mine, games, search, plan, comments, suggestions, about e settings.",
   ].join("\n");
 }
 
@@ -13181,7 +13216,7 @@ function applyAssistantActions(data: AppData, userId: string, actions: Assistant
     }
 
     if (action.type === "navigate") {
-      const allowed: View[] = ["home", "agenda", "atividades", "provas", "redacao", "progress", "ranking", "mine", "games", "atelie", "idiomas", "search", "plan", "comments", "suggestions", "about", "perfil"];
+      const allowed: View[] = ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "duelo", "progress", "ranking", "mine", "games", "atelie", "idiomas", "search", "plan", "comments", "suggestions", "about", "perfil"];
       if (action.view === "subject") {
         const subject = findSubject(next.subjects.filter((item) => item.userId === userId), action);
         if (subject) route = { view: "subject", id: subject.id };

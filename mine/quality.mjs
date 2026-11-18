@@ -8,6 +8,7 @@ import { readCodeReply } from "../shared/code-run.mjs";
 import { parseSequencePuzzles } from "../shared/game-core.mjs";
 import { lerAtividade, lerCorrecaoDissertativa } from "../shared/atividades.mjs";
 import { lerCorrecao } from "../shared/redacao.mjs";
+import { lerLeitura } from "../shared/leitura.mjs";
 import { lerEstudo } from "../shared/provas.mjs";
 
 function matches(text, pattern) {
@@ -328,6 +329,8 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
   if (cleanTask === "minecode") return mineCodeIssues(text).issue;
   // A redacao vem no prompt: os trechos grifados precisam existir nela.
   if (cleanTask === "redacao") return lerCorrecao(text, prompt) ? "" : "correcao de redacao fora do formato";
+  // O texto lido vem no prompt: as palavras grifadas precisam existir nele.
+  if (cleanTask === "leitura") return lerLeitura(text, prompt) ? "" : "leitura fora do formato ou com menos de 3 perguntas";
   if (cleanTask === "atividade") return lerAtividade(text) ? "" : "atividade incompleta ou fora do formato";
   if (cleanTask === "atividade-correcao") return lerCorrecaoDissertativa(text) ? "" : "correcao da dissertativa fora do formato";
   if (cleanTask === "prova-estudo") {

@@ -13,6 +13,12 @@ export type XpStatKey =
   | "redacaoXp"
   | "atividades"
   | "atividadeXp"
+  | "labs"
+  | "labXp"
+  | "leituras"
+  | "leituraXp"
+  | "duelos"
+  | "dueloXp"
   | "mineMessages"
   | "cardReviews"
   | "mastered"
@@ -52,6 +58,15 @@ export const redacoesPorDia: number;
 export const atividadeXpMax: number;
 export const atividadesPorDia: number;
 export function redacaoXp(total: number): number;
+export const labXpMax: number;
+export const labPorDia: number;
+export const leituraXpMax: number;
+export const leiturasPorDia: number;
+export const dueloXpMax: number;
+export const duelosPorDia: number;
+export function labXp(): number;
+export function leituraXp(acertos: number): number;
+export function dueloXp(resultado: "vitoria" | "empate" | "derrota"): number;
 export function atividadeXp(acertos: number): number;
 export const xpActions: Array<[string, number]>;
 export const levelTitles: ReadonlyArray<{ level: number; title: string }>;
