@@ -10,6 +10,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { corDoToken, criarPalco, mola, type Palco } from "../cena3d/palco";
+import { aoCutucar } from "../pets/bus";
 
 export type MateriaOrbita = { id: string; name: string; color: string };
 
@@ -366,7 +367,22 @@ export default function Sistema3D({
     host.addEventListener("pointercancel", onUp);
     requestAnimationFrame(() => host.classList.add("is-ready"));
 
+    // a Mine (pets) chutou ou pulou perto: o sistema gira para longe dela e solta uma onda
+    const pararMine = aoCutucar((c) => {
+      const r = host.getBoundingClientRect();
+      if (c.x < r.left - 80 || c.x > r.right + 80 || c.y < r.top - 120 || c.y > r.bottom + 120 || arrasto.ativo) return;
+      const lado = Math.sign(c.x - (r.left + r.width / 2)) || 1;
+      arrasto.inercia += -lado * 0.045 * c.forca;
+      if (ondas.length < 4) {
+        const onda = new THREE.Mesh(geoOnda, new THREE.MeshBasicMaterial({ color: 0x39f59a, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }));
+        onda.rotation.x = Math.PI / 2;
+        sistema.add(onda);
+        ondas.push({ malha: onda, t: 0 });
+      }
+    });
+
     return () => {
+      pararMine();
       host.removeEventListener("pointerdown", onDown);
       host.removeEventListener("pointermove", onMove);
       host.removeEventListener("pointerup", onUp);

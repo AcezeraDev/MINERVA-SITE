@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { buildLandmark } from "./predios";
+import { aoCutucar } from "../pets/bus";
 
 export type StopState = "locked" | "open" | "next" | "done";
 export type CityStop = { id: string; emoji: string; label: string; place: string; color: string; state: StopState };
@@ -392,6 +393,27 @@ export default function CidadePopUp({
     canvas.addEventListener("pointerup", onUp);
     canvas.addEventListener("pointerleave", onLeave);
 
+    // a Mine (pets) pulou ou chutou perto: o prédio mais próximo dela salta e a cidade se inclina
+    const projetado = new THREE.Vector3();
+    const pararMine = aoCutucar((c) => {
+      const rect = canvas.getBoundingClientRect();
+      if (c.x < rect.left - 60 || c.x > rect.right + 60 || c.y < rect.top - 140 || c.y > rect.bottom + 140 || drag) return;
+      const nx = ((c.x - rect.left) / rect.width) * 2 - 1;
+      let melhor: Building | null = null;
+      let dist = 0.35;
+      for (const building of buildings) {
+        building.hinge.getWorldPosition(projetado).project(camera);
+        const d = Math.abs(projetado.x - nx);
+        if (d < dist) { dist = d; melhor = building; }
+      }
+      if (melhor) melhor.lift = Math.max(melhor.lift, 0.35 + 0.25 * Math.min(1, c.forca));
+      if (!pointerInside) {
+        tiltTarget = THREE.MathUtils.clamp(nx, -1, 1) * 0.05 * Math.min(1, c.forca + 0.3);
+        window.setTimeout(() => { if (!disposed && !pointerInside) { tiltTarget = 0; wake(); } }, 1400);
+      }
+      wake();
+    });
+
     focusRef.current = (id) => {
       const index = stops.findIndex((stop) => stop.id === id);
       if (index < 0) return;
@@ -519,6 +541,7 @@ export default function CidadePopUp({
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp);
       canvas.removeEventListener("pointerleave", onLeave);
+      pararMine();
       disposables.forEach((item) => item.dispose());
       renderer.dispose();
       renderer.forceContextLoss();

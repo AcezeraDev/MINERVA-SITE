@@ -19,6 +19,7 @@
  */
 
 import { abaDe, type Truque } from "./abas";
+import { cutucar, minePos, ouvindo } from "./bus";
 
 export type PetsHandle = { destroy(): void };
 
@@ -50,6 +51,8 @@ const PLAT_SEL = [
   "h1",
   "h2",
 ].join(",");
+/* telas 3D que respondem à Mine (palco das cenas e cidade dos Idiomas) */
+const SEL_3D = ".cena3d-canvas, .home-sistema-canvas canvas, .idi-city3d-canvas canvas";
 const INTERACTIVE = "button,a[href],input,textarea,select,label,[role=button],[role=tab],[contenteditable=''],[contenteditable=true]";
 
 const FALAS = ["bora estudar!", "isso cai na prova!", "+10 XP", "olha isso!", "anota aí!", "tô de olho", "uhuul!", "foco, hein!", "me faz carinho?", "me arrasta!"];
@@ -227,10 +230,135 @@ export function startPets(): PetsHandle {
   }
   function emote(e: string, t: number) { S.expr = e; S.exprT = t; }
 
+  /* o bloco sente o peso: afunda e balança como gangorra para o lado em que
+     ela pousou (rotate/translate individuais, sem brigar com o transform do React) */
   function hit(p: Plat, imp: number) {
-    if (p.kind === "floor" || !p.el || imp < 0.25) return;
-    const d = (1.5 + 5 * imp).toFixed(1);
-    (p.el as HTMLElement).animate([{ translate: "0 0" }, { translate: `0 ${d}px` }, { translate: "0 -1px" }, { translate: "0 0" }], { duration: 520, easing: "ease-out" });
+    if (p.kind === "floor" || !p.el || imp < 0.15) return;
+    const e = p.el as HTMLElement;
+    const w = Math.max(1, p.x2 - p.x1), off = clamp(((S.x - (p.x1 + p.x2) / 2) / (w / 2)), -1, 1);
+    const a = off * (0.5 + 2.2 * imp) * clamp(320 / w, 0.25, 1.4), d = 1.5 + 5 * imp;
+    e.animate([
+      { translate: "0 0", rotate: "0deg" },
+      { translate: `0 ${d.toFixed(1)}px`, rotate: `${a.toFixed(2)}deg`, offset: 0.18 },
+      { translate: "0 -1px", rotate: `${(-a * 0.45).toFixed(2)}deg`, offset: 0.48 },
+      { translate: "0 0.5px", rotate: `${(a * 0.18).toFixed(2)}deg`, offset: 0.74 },
+      { translate: "0 0", rotate: "0deg" },
+    ], { duration: 700 + 300 * imp, easing: "ease-out" });
+    near3D(imp);
+  }
+  /* pulou ou pousou perto de uma tela 3D: avisa a cena */
+  function near3D(forca: number) {
+    if (!ouvindo() || forca < 0.15) return;
+    const c = find3D();
+    if (c && Math.abs(S.x - clamp(S.x, c.left, c.right)) < 90 && S.y > c.top - 140 && S.y < c.bottom + 140) cutucar({ x: S.x, y: S.y, forca });
+  }
+  function find3D(): DOMRect | null {
+    let best: DOMRect | null = null, bd = 1e9;
+    document.querySelectorAll(SEL_3D).forEach((e) => {
+      const r = e.getBoundingClientRect();
+      if (r.width < 120 || r.height < 90 || r.bottom < TOP_SAFE || r.top > innerHeight) return;
+      const d = Math.abs(S.x - clamp(S.x, r.left, r.right)) + Math.abs(S.y - clamp(S.y, r.top, r.bottom));
+      if (d < bd) { bd = d; best = r; }
+    });
+    return best;
+  }
+
+  /* ---------- letras dos títulos ----------
+     A letra original fica invisível por um realce do navegador (CSS Custom
+     Highlight, cor transparente) e uma cópia dela pula, voa ou é carregada.
+     Nada no DOM do React é tocado. Sem suporte ao realce, isto desliga. */
+  const HL: any = (window as any).Highlight && (CSS as any).highlights ? new (window as any).Highlight() : null;
+  if (HL) (CSS as any).highlights.set("mpet-oculta", HL);
+  type Letra = { ch: string; range: Range; r: DOMRect; cs: CSSStyleDeclaration };
+  function letrasDe(el: Element | null): Letra[] {
+    if (!el || !HL) return [];
+    const out: Letra[] = [];
+    const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode() as Text | null; n; n = tw.nextNode() as Text | null) {
+      const t = n.data, pe = n.parentElement;
+      if (!pe) continue;
+      const cs = getComputedStyle(pe);
+      // texto pintado por gradiente não some com o realce: deixa quieto
+      if (cs.webkitTextFillColor && cs.webkitTextFillColor !== cs.color) continue;
+      for (let i = 0; i < t.length && out.length < 80; i++) {
+        if (!t[i].trim()) continue;
+        const range = document.createRange();
+        range.setStart(n, i); range.setEnd(n, i + 1);
+        const r = range.getBoundingClientRect();
+        if (r.width < 2) continue;
+        out.push({ ch: t[i], range, r, cs });
+      }
+    }
+    // só a primeira linha do título: é nela que a Mine pisa
+    const top = Math.min(...out.map((l) => l.r.top));
+    return out.filter((l) => l.r.top < top + l.r.height * 0.5);
+  }
+  function copiaDe(L: Letra) {
+    const d = document.createElement("span");
+    d.className = "mpet-letra";
+    d.textContent = L.ch;
+    const st = d.style, cs = L.cs;
+    st.font = cs.font;
+    st.fontFamily = cs.fontFamily; st.fontSize = cs.fontSize; st.fontWeight = cs.fontWeight; st.fontStyle = cs.fontStyle;
+    st.letterSpacing = "0"; st.textTransform = cs.textTransform;
+    st.color = cs.color === "rgba(0, 0, 0, 0)" ? INK : cs.color;
+    st.width = L.r.width + "px"; st.height = L.r.height + "px"; st.lineHeight = L.r.height + "px";
+    st.transform = `translate(${L.r.left}px,${L.r.top}px)`;
+    layer.appendChild(d);
+    HL.add(L.range);
+    return d;
+  }
+  const soltas = new Set<{ d: HTMLElement; range: Range }>();
+  function devolve(x: { d: HTMLElement; range: Range }) { x.d.remove(); HL?.delete(x.range); soltas.delete(x); }
+  /* passo em cima de título: a letra debaixo do pé afunda e volta */
+  let pisadaT = 0;
+  function pisada(dt: number) {
+    if (!HL || !S.on || S.on.kind !== "title" || Math.abs(S.vx) < 20) return;
+    pisadaT -= dt;
+    if (pisadaT > 0) return;
+    pisadaT = 0.13;
+    const L = letrasDe(S.on.el).find((l) => S.x >= l.r.left - 1 && S.x <= l.r.right + 1);
+    if (!L || [...soltas].some((x) => x.range.startContainer === L.range.startContainer && x.range.startOffset === L.range.startOffset)) return;
+    const d = copiaDe(L), x = { d, range: L.range };
+    soltas.add(x);
+    const base = `translate(${L.r.left}px,${L.r.top}px)`;
+    d.animate([{ transform: base }, { transform: `${base} translateY(${(L.r.height * 0.09).toFixed(1)}px) scaleY(.88)` }, { transform: base }], { duration: 300, easing: "ease-out" }).onfinish = () => devolve(x);
+  }
+  /* letra na mão da Mine (truque "letra") */
+  let carregada: { d: HTMLElement; range: Range; r: DOMRect; t: number; fase: number } | null = null;
+  function pegaLetra() {
+    const ls = letrasDe(S.on && S.on.el);
+    if (!ls.length) return false;
+    const L = ls.reduce((a, b) => (Math.abs((b.r.left + b.r.right) / 2 - S.x) < Math.abs((a.r.left + a.r.right) / 2 - S.x) ? b : a));
+    const d = copiaDe(L);
+    carregada = { d, range: L.range, r: L.r, t: 0, fase: 0 };
+    soltas.add(carregada);
+    const nome = L.ch.toUpperCase();
+    say(pick([`peguei o ${nome}!`, `olha o ${nome}!`, `esse ${nome} é meu!`]), 1.8);
+    return true;
+  }
+  /* chuta a letra: ela voa girando e volta de bumerangue */
+  function chutaLetra() {
+    const ls = letrasDe(S.on && S.on.el);
+    if (!ls.length) return false;
+    const ahead = ls.filter((l) => Math.sign((l.r.left + l.r.right) / 2 - S.x) === S.face && Math.abs((l.r.left + l.r.right) / 2 - S.x) < 90);
+    const L = ahead.length ? ahead[0] : pick(ls);
+    const d = copiaDe(L), x = { d, range: L.range };
+    soltas.add(x);
+    const b = `translate(${L.r.left}px,${L.r.top}px)`, dir = S.face;
+    d.animate([
+      { transform: `${b}` },
+      { transform: `${b} translate(${dir * 140}px,-110px) rotate(${dir * 280}deg)`, offset: 0.35 },
+      { transform: `${b} translate(${dir * 230}px,-30px) rotate(${dir * 520}deg)`, offset: 0.6 },
+      { transform: `${b} translate(${dir * 60}px,-60px) rotate(${dir * 680}deg)`, offset: 0.85 },
+      { transform: `${b} rotate(${dir * 720}deg)` },
+    ], { duration: 1800, easing: "cubic-bezier(.3,.1,.4,1)" }).onfinish = () => { devolve(x); if (S.vis) floaty("✓", "#1FBF74"); };
+    say(pick(["gol!", "chutei a letra!", "volta, letrinha!"]), 1.6);
+    return true;
+  }
+  function soltaTudo() {
+    soltas.forEach((x) => devolve(x));
+    carregada = null;
   }
   function puff(imp: number) {
     const n = 3 + Math.round(imp * 4);
@@ -283,7 +411,7 @@ export function startPets(): PetsHandle {
     if (S.state === "act") { S.state = "idle"; S.t = rnd(0.4, 1); }
   }
   function setPose(name: string, dur: number) { if (S.act) endAct(); S.state = "pose"; S.pose = name; S.t = dur; S.fxT = 0; }
-  function interrupt() { endAct(); S.trick = null; S.lk = null; S.pose = null; S.target = null; S.catching = false; }
+  function interrupt() { if (carregada) soltaTudo(); S.hops = 0; S.want3d = false; endAct(); S.trick = null; S.lk = null; S.pose = null; S.target = null; S.catching = false; }
 
   /* tontura: estrelinhas girando em volta da cabeça */
   function startDizzy(dur?: number) {
@@ -501,8 +629,62 @@ export function startPets(): PetsHandle {
       fim: () => "plano pronto!",
     },
   };
-  function startTrick(name: Truque) {
-    const tr = TRUQUES[name];
+  type Acao = Truque | "pulapula" | "bater" | "letra" | "chuteletra" | "chute3d";
+  const ACOES: Record<Acao, Tr> = {
+    ...TRUQUES,
+    // pula-pula no card: três pulinhos, o card balança a cada um
+    pulapula: {
+      d: 0,
+      pose: () => {},
+      inicio: () => { S.hops = 3; hopUp(); say(pick(["pula-pula!", "boing boing!", "trampolim!"]), 1.4); return false; },
+    },
+    // bate no card como numa porta
+    bater: {
+      d: 2.2, fx: 0.45, fala: ["toc toc!", "tem alguém aí?"],
+      pose: (o, T, t) => { const k = (t % 0.45) / 0.45; o.aR = k < 0.5 ? -40 - k * 80 : -80 + (k - 0.5) * 160; o.aL = 14; o.hd = 10; o.lean = 7; o.sit = 6; o.face = "o"; },
+      tick: () => {
+        floaty("toc", "#8B5E3C");
+        if (S.on && S.on.el) (S.on.el as HTMLElement).animate([{ translate: "0 0" }, { translate: "0 2px" }, { translate: "0 0" }], { duration: 160 });
+        near3D(0.35);
+      },
+      fim: () => pick(["ninguém atende...", "acho que tá vazio!", "alô?"]),
+    },
+    // pega uma letra do título e brinca com ela
+    letra: {
+      d: 3.4,
+      pose: (o, T, t) => {
+        if (t < 0.45) { o.aL = -40; o.aR = 40; o.hd = 12; o.sit = 10; o.face = "o"; }
+        else if (t < 2.5) { o.aL = 165; o.aR = -165; o.bob = -Math.abs(Math.sin(T * 6)) * 3; o.face = "happy"; o.hd = Math.sin(T * 4) * 4; }
+        else { o.aL = 150; o.aR = -150; o.face = "laugh"; o.bob = -6; }
+      },
+      inicio: () => pegaLetra(),
+    },
+    chuteletra: {
+      d: 1.6,
+      pose: (o, T, t) => { if (t < 0.3) { o.lR = -30; o.aL = 30; o.aR = -30; } else if (t < 0.6) { o.lR = 70; o.lL = -8; o.aL = -40; o.aR = 50; o.lean = -6; o.face = "laugh"; } else { o.face = "happy"; o.aR = -150; } },
+      inicio: () => { if (!chutaLetra()) return false; return true; },
+    },
+    // chuta a tela 3D mais perto
+    chute3d: {
+      d: 1.8, fx: 0.32,
+      pose: (o, T, t) => { if (t < 0.3) { o.lR = -30; o.aL = 30; o.aR = -30; o.face = "sly"; } else if (t < 0.65) { o.lR = 75; o.lL = -8; o.aL = -40; o.aR = 50; o.lean = -6; o.face = "laugh"; } else { o.aL = 150; o.aR = -150; o.face = "happy"; } },
+      tick: (k) => {
+        if (k !== 0) return;
+        const c = find3D();
+        if (!c) return;
+        cutucar({ x: clamp(S.x + S.face * 40, c.left, c.right), y: clamp(S.y - 30, c.top, c.bottom), forca: 1 });
+        floaty(pick(["pow!", "boing!", "plim!"]), "#9682F0");
+        puff(0.7);
+      },
+      fim: () => pick(["olha girando!", "3D é demais!", "mexeu!"]),
+    },
+  };
+  function hopUp() {
+    if (!S.on) return;
+    S.on = null; S.state = "air"; S.vy = -520 - (3 - S.hops) * 90; S.vx = rnd(-30, 30); S.sq = 1.2; S.antV -= 260;
+  }
+  function startTrick(name: Acao) {
+    const tr = ACOES[name];
     if (!tr || !S.on || !S.vis) return;
     interrupt();
     if (tr.inicio && !tr.inicio()) return;
@@ -511,7 +693,7 @@ export function startPets(): PetsHandle {
     if (tr.fala && tr.fala.length && S.talking <= 0) say(pick(tr.fala), 1.8);
   }
   function endTrick() {
-    const tr = S.trick && TRUQUES[S.trick as Truque];
+    const tr = S.trick && ACOES[S.trick as Acao];
     S.trick = null; S.lk = null; el.dataset.p = "";
     S.state = "idle"; S.t = rnd(0.5, 1.1);
     const f = tr && tr.fim ? tr.fim() : null;
@@ -519,7 +701,7 @@ export function startPets(): PetsHandle {
   }
   function trickPose(T: number) {
     const o: Pose = { lL: 0, lR: 0, aL: 10, aR: -10, bob: -1 - Math.sin(T * 2), hd: 0, shake: 0, sit: 0, lean: 0, face: "smile", lk: null };
-    const tr = S.trick && TRUQUES[S.trick as Truque];
+    const tr = S.trick && ACOES[S.trick as Acao];
     if (tr) tr.pose(o, T, S.actT);
     return o;
   }
@@ -568,6 +750,23 @@ export function startPets(): PetsHandle {
     if (Pn === FLOOR && S.x > FLOOR.x2) { S.target = null; S.tx = FLOOR.x2 - rnd(20, 120); S.state = "walk"; return; }
     if (mouse.follow) { followPlan(); return; }
     const A = aba();
+    // brincar com o que está debaixo dos pés ou ali perto
+    const r0 = Math.random();
+    if (Pn.kind === "title" && HL && r0 < 0.3) { startTrick(Math.random() < 0.5 ? "letra" : "chuteletra"); if (S.state === "trick") return; }
+    if (Pn.kind === "card" && r0 < 0.1) { startTrick("pulapula"); if (!S.on) return; }
+    if (Pn.kind === "card" && r0 > 0.9) { startTrick("bater"); if (S.state === "trick") return; }
+    if (ouvindo() && Math.random() < 0.3) {
+      const c = find3D();
+      if (c) {
+        const gap = Math.abs(S.x - clamp(S.x, c.left, c.right));
+        if (gap < 60 && S.y > c.top - 120 && S.y < c.bottom + 140) { S.face = Math.sign((c.left + c.right) / 2 - S.x) || S.face; startTrick("chute3d"); return; }
+        // vai até a beirada da tela 3D, no chão ou card logo abaixo dela
+        const alvoX = S.x < c.left ? c.left - 30 : S.x > c.right ? c.right + 30 : S.x;
+        let best: Plat = FLOOR;
+        for (const q of world.plats) if (alvoX >= q.x1 && alvoX <= q.x2 && q.y >= c.bottom - 40 && q.y < best.y) best = q;
+        S.want3d = true; goTo(best, alvoX); return;
+      }
+    }
     if (Math.random() < 0.2) { startTrick(A.truque); if (S.state === "trick" || !S.on) return; }
     if (Math.random() < 0.38) { startAct(pickAct()); return; }
     const cands = world.plats.filter((q) => q !== Pn && q.x2 - q.x1 > 40 && Math.abs((q.x1 + q.x2) / 2 - S.x) < 700 && S.y - q.y < 380);
@@ -675,6 +874,7 @@ export function startPets(): PetsHandle {
     if (S.catchCD > 0) S.catchCD -= dt;
     S.rub = Math.max(0, S.rub - 260 * dt);
     if (!S.on) return;
+    pisada(dt);
     S.t -= dt; S.talk -= dt;
     if (S.state !== "idle") S.look = 0;
     if (S.talk <= 0 && S.state === "idle" && S.talking <= 0) {
@@ -690,6 +890,11 @@ export function startPets(): PetsHandle {
       case "walk":
         if (walkTo(dt, SPEED)) {
           if (S.target) { S.state = "crouch"; S.t = 0.17; S.sq = 0.8; } else { S.state = "idle"; S.t = mouse.follow ? 0.1 : rnd(0.6, 1.8); }
+          if (!S.target && S.want3d) {
+            S.want3d = false;
+            const c = find3D();
+            if (c && Math.abs(S.x - clamp(S.x, c.left, c.right)) < 70) { S.face = Math.sign((c.left + c.right) / 2 - S.x) || S.face; startTrick("chute3d"); }
+          }
         }
         break;
       case "crouch": S.vx = 0; if (S.t <= 0) launch(); break;
@@ -701,7 +906,7 @@ export function startPets(): PetsHandle {
         if (S.t <= 0) endAct();
         break;
       case "trick": {
-        const tr = TRUQUES[S.trick as Truque];
+        const tr = ACOES[S.trick as Acao];
         if (!tr) { S.state = "idle"; break; }
         S.actT += dt; S.fxT -= dt;
         if (S.trick === "lupa") {
@@ -743,12 +948,26 @@ export function startPets(): PetsHandle {
       return;
     }
     if (S.forceDizzy) { S.forceDizzy = false; startDizzy(); return; } // três cliques
+    if (S.hops > 0) {
+      S.hops--;
+      floaty("boing", "#FF6F9A");
+      if (S.hops > 0) { S.t = 0.06; hopUp(); return; }
+      emote("laugh", 1.2); setPose("cheer", 1); return;
+    }
     if (S.stamp) { S.stamp = false; S.sq = 0.6; hit(p, 0.9); stampAt(); emote("laugh", 1); return; }
     // queda forte depois de ser arremessada ou solta lá do alto: tontura.
     // Descer sozinha de um card até o chão não conta (em tela alta isso daria tontura toda vez).
     if ((wasThrown && vyIn > 950) || (wasHeld && vyIn > 1550)) { startDizzy(); return; }
     if (wasThrown) { emote("laugh", 1.2); say(pick(["wiii!", "de novo!", "que voo!"]), 1.4); return; }
     if (imp > 0.55) emote("blink", 0.22);
+    // pulou até a tela 3D que queria chutar
+    if (S.want3d) {
+      const c = find3D();
+      if (c && Math.abs(S.x - clamp(S.x, c.left, c.right)) < 70 && S.y > c.top - 140 && S.y < c.bottom + 160) {
+        S.want3d = false; S.face = Math.sign((c.left + c.right) / 2 - S.x) || S.face;
+        later(() => { if (S.vis && S.on && S.state === "idle") startTrick("chute3d"); }, 250);
+      }
+    }
   }
   function physics(dt: number) {
     if (S.state === "drag") return;
@@ -857,6 +1076,27 @@ export function startPets(): PetsHandle {
         const a = T * 5 + i * 2.09, z = Math.sin(a);
         d.style.transform = `translate(${(S.x - 8 + Math.cos(a) * 30).toFixed(1)}px,${(S.y - H - 8 + z * 7).toFixed(1)}px) scale(${(0.75 + z * 0.25).toFixed(2)})`;
       });
+    }
+    minePos.x = S.x; minePos.y = S.y; minePos.vis = S.vis;
+    if (carregada) {
+      const L = carregada, t = S.state === "trick" && S.trick === "letra" ? S.actT : 99;
+      const hx = S.x - L.r.width / 2, hy = S.y - H - L.r.height * 0.85 + S.sitY - 4;
+      if (t < 0.45) {
+        const k = t / 0.45, e = 1 - (1 - k) * (1 - k);
+        L.d.style.transform = `translate(${(L.r.left + (hx - L.r.left) * e).toFixed(1)}px,${(L.r.top + (hy - L.r.top) * e - Math.sin(k * Math.PI) * 30).toFixed(1)}px)`;
+      } else if (t < 2.5) {
+        L.d.style.transform = `translate(${hx.toFixed(1)}px,${(hy + Math.sin(T * 6) * 3).toFixed(1)}px) rotate(${(Math.sin(T * 3) * 12).toFixed(1)}deg)`;
+      } else {
+        // joga de volta: a letra sobe girando e cai no lugar dela
+        const fromX = hx, fromY = hy;
+        const x = carregada;
+        carregada = null;
+        x.d.animate([
+          { transform: `translate(${fromX}px,${fromY}px)` },
+          { transform: `translate(${(fromX + x.r.left) / 2}px,${Math.min(fromY, x.r.top) - 120}px) rotate(${S.face * 300}deg)`, offset: 0.5 },
+          { transform: `translate(${x.r.left}px,${x.r.top}px) rotate(${S.face * 720}deg)` },
+        ], { duration: 900, easing: "cubic-bezier(.3,.2,.4,1)", fill: "forwards" }).onfinish = () => { devolve(x); if (S.vis) { say(pick(["de volta no lugar!", "ufa, coube!", "devolvido!"]), 1.4); sparkle(x.r.left + x.r.width / 2, x.r.top + x.r.height / 2); } };
+      }
     }
     let ground: Plat | null = null;
     for (const p of world.plats) if ((p === FLOOR || (S.x >= p.x1 - 4 && S.x <= p.x2 + 4)) && p.y >= S.y - 1 && (!ground || p.y < ground.y)) ground = p;
@@ -983,7 +1223,7 @@ export function startPets(): PetsHandle {
   const aba = () => abaDe(route);
   function readRoute() { route = (location.hash.replace(/^#\/?/, "").split("/")[0] || "home").toLowerCase(); }
   function leave() {
-    S.vis = false; S.pose = null; S.tumble = 0; S.catching = false; S.thrown = false; S.stamp = false; S.trickSoon = 0; S.talking = 0; endAct(); endDizzy(); S.state = "off";
+    S.vis = false; S.pose = null; S.tumble = 0; S.catching = false; S.thrown = false; S.stamp = false; S.hops = 0; S.want3d = false; S.trickSoon = 0; S.talking = 0; minePos.vis = false; soltaTudo(); endAct(); endDizzy(); S.state = "off";
     drag.pending = false; drag.active = false; el.classList.remove("dragging");
     sayEl.classList.remove("on"); el.classList.add("gone"); sh.classList.add("gone");
   }
@@ -1057,6 +1297,7 @@ export function startPets(): PetsHandle {
     const dy = lastScroll - scrollY;
     lastScroll = scrollY;
     if (!dy) return;
+    if (soltas.size) soltaTudo();
     for (const p of world.plats) if (p !== FLOOR) p.y += dy;
     if (S.on && S.on !== FLOOR) S.y += dy;
   }
@@ -1098,7 +1339,7 @@ export function startPets(): PetsHandle {
     S,
     world,
     dizzy: () => startDizzy(),
-    trick: (n?: Truque) => startTrick(n || aba().truque),
+    trick: (n?: Acao) => startTrick(n || aba().truque),
     state: () => `mine:${S.state}${S.act ? "/" + S.act : ""}${S.pose ? "/" + S.pose : ""}@${Math.round(S.x)},${Math.round(S.y)}`,
   };
 
@@ -1116,6 +1357,9 @@ export function startPets(): PetsHandle {
       removeEventListener("scroll", onScroll);
       removeEventListener("hashchange", onHash);
       document.removeEventListener("visibilitychange", onVisibility);
+      soltaTudo();
+      if (HL) (CSS as any).highlights.delete("mpet-oculta");
+      minePos.vis = false;
       layer.remove();
       delete (window as any).__pets;
     },

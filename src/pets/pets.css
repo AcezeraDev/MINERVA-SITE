@@ -134,3 +134,18 @@ html:not(.theme-light) .mpet-puff { background: #5c6a8c; }
   white-space: nowrap;
 }
 html:not(.theme-light) .mpet-stamp { background: rgba(20, 20, 24, 0.55); color: #ff7b7f; border-color: #ff7b7f; }
+
+/* letras dos títulos: a original some pelo realce e a cópia brinca com a Mine */
+::highlight(mpet-oculta) { color: transparent; text-shadow: none; }
+.mpet-letra {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: pre;
+  pointer-events: none;
+  transform-origin: 50% 60%;
+  will-change: transform;
+}

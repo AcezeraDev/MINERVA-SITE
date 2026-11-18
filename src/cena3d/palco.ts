@@ -6,6 +6,7 @@
  * objeto (nada de setState por pointermove) e tudo descartado ao desmontar.
  */
 import * as THREE from "three";
+import { aoCutucar, minePos, perto } from "../pets/bus";
 
 export type Palco = {
   scene: THREE.Scene;
@@ -13,6 +14,8 @@ export type Palco = {
   renderer: THREE.WebGLRenderer;
   /** Ponteiro em -1..1 relativo ao palco, já suavizado a cada quadro. */
   pointer: { x: number; y: number; alvoX: number; alvoY: number; dentro: boolean };
+  /** A Mine (pets) perto do palco: `cutucao` sobe quando ela bate/pula e decai sozinho; `lado` é de onde veio (-1 esquerda, 1 direita). */
+  mine: { cutucao: number; lado: number; olhando: boolean };
   /** Guarda geometrias, materiais e texturas para o dispose do fim. */
   guardar: <T extends { dispose: () => void }>(item: T) => T;
   destruir: () => void;
@@ -68,6 +71,20 @@ export function criarPalco(host: HTMLElement, tick: (tempo: number, delta: numbe
   host.addEventListener("pointermove", onMove);
   host.addEventListener("pointerleave", onLeave);
 
+  // A Mine andando pelo site: a cena olha para ela quando o mouse não está em
+  // cima e dá um tranco quando ela cutuca. Rect medido no máximo 4x/s.
+  const mine = { cutucao: 0, lado: 0, olhando: false };
+  let rectMine = host.getBoundingClientRect();
+  let medidoMine = 0;
+  const pararCutucao = aoCutucar((c) => {
+    const r = host.getBoundingClientRect();
+    if (c.x < r.left - 80 || c.x > r.right + 80 || c.y < r.top - 120 || c.y > r.bottom + 120) return;
+    mine.cutucao = Math.min(1.6, mine.cutucao + c.forca);
+    mine.lado = Math.sign(c.x - (r.left + r.width / 2)) || 1;
+    pointer.alvoX = Math.max(-1, Math.min(1, pointer.alvoX - mine.lado * 0.7 * c.forca));
+    ligar();
+  });
+
   let visivel = true;
   let ativo = !document.hidden;
   let quadro = 0;
@@ -79,11 +96,31 @@ export function criarPalco(host: HTMLElement, tick: (tempo: number, delta: numbe
     if (!visivel || !ativo) return;
     const delta = Math.min(0.05, (agora - anterior) / 1000);
     anterior = agora;
+    if (!pointer.dentro) {
+      if (agora - medidoMine > 250) { medidoMine = agora; rectMine = host.getBoundingClientRect(); }
+      if (perto(rectMine, 220)) {
+        mine.olhando = true;
+        pointer.alvoX = Math.max(-1, Math.min(1, ((minePos.x - rectMine.left) / rectMine.width) * 2 - 1));
+        pointer.alvoY = Math.max(-1, Math.min(1, -(((minePos.y - 50 - rectMine.top) / rectMine.height) * 2 - 1)));
+      } else if (mine.olhando) {
+        mine.olhando = false;
+        pointer.alvoX = 0;
+        pointer.alvoY = 0;
+      }
+    }
     // mola simples para o ponteiro: a cena acompanha, não gruda
     pointer.x += (pointer.alvoX - pointer.x) * Math.min(1, delta * 6);
     pointer.y += (pointer.alvoY - pointer.y) * Math.min(1, delta * 6);
     tick((agora - relogio.inicio) / 1000, delta);
-    renderer.render(scene, camera);
+    if (mine.cutucao > 0.01) {
+      // tranco do cutucão: a câmera sacode e assenta
+      const t = (agora - relogio.inicio) / 1000;
+      const dx = Math.sin(t * 38) * mine.cutucao * 0.14, dy = Math.abs(Math.cos(t * 31)) * mine.cutucao * 0.08;
+      camera.position.x += dx; camera.position.y += dy;
+      renderer.render(scene, camera);
+      camera.position.x -= dx; camera.position.y -= dy;
+      mine.cutucao *= Math.exp(-delta * 4.5);
+    } else renderer.render(scene, camera);
     quadro = requestAnimationFrame(laco);
   };
   const ligar = () => {
@@ -109,8 +146,10 @@ export function criarPalco(host: HTMLElement, tick: (tempo: number, delta: numbe
     camera,
     renderer,
     pointer,
+    mine,
     guardar,
     destruir: () => {
+      pararCutucao();
       cancelAnimationFrame(quadro);
       io.disconnect();
       ro.disconnect();
