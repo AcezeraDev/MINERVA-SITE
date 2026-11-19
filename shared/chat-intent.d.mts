@@ -2,6 +2,8 @@ export function normalizeIntentText(value: string): string;
 export function isMindMapRequest(value: string): boolean;
 export function isQuizRequest(value: string): boolean;
 export function isFlashcardRequest(value: string): boolean;
+export function wantsGuidedQuiz(value: string): boolean;
+export function inlineMaterialFromPrompt(value: string): string;
 export function topicAfter(value: string, gatilho: RegExp): string;
 export function mindMapTopicFromPrompt(value: string): string;
 export function quizTopicFromPrompt(value: string): string;
