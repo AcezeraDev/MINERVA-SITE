@@ -16,9 +16,13 @@ import {
   codigoValido,
   conferirSumico,
   criarDuelo,
+  embaralharPergunta,
   entrarNoDuelo,
+  lerConferencia,
   limparPerguntas,
   novoCodigo,
+  perguntasConferidas,
+  textoParaConferir,
   responder,
   vistaDe,
 } from "./shared/duelo.mjs";
@@ -825,14 +829,36 @@ async function salasAbertas() {
     .map((item) => ({ codigo: item.codigo, tema: item.tema, dono: item.jogadores[0]?.nome || "Alguém", donoId: item.jogadores[0]?.id || "", criadoEm: item.criadoEm }));
 }
 
+// Pede de sobra: a conferência descarta as questões em que o gabarito não bate.
+const PERGUNTAS_GERADAS = PERGUNTAS_POR_DUELO + 3;
+
 async function perguntasDoDuelo(tema) {
   const resultado = await runMineRequest({
     task: "quiz",
-    prompt: `Gere ${PERGUNTAS_POR_DUELO + 1} questoes de multipla escolha sobre ${tema}, com nivel de dificuldade media; e um duelo de rapidez, entao use enunciados curtos (ate 25 palavras) e alternativas curtas. Distribua a letra correta entre A, B, C e D.`,
+    // A certa vai SEMPRE em A e o servidor embaralha (ver shared/duelo.mjs):
+    // pedir ao modelo para espalhar a letra fazia o gabarito apontar a errada.
+    prompt: `Gere ${PERGUNTAS_GERADAS} questoes de multipla escolha sobre o tema "${tema}", com nivel de dificuldade media. Todas as questoes precisam ser exatamente sobre esse tema, nada de outros assuntos. E um duelo de rapidez: enunciados curtos (ate 25 palavras) e alternativas curtas. Use apenas fatos que voce tem certeza que sao verdadeiros; se nao tiver certeza de um fato, troque a questao. A alternativa correta deve ser SEMPRE a A, e as outras tres claramente erradas para quem conhece o assunto. A letra sera embaralhada depois, entao escreva sempre CORRETA: A.`,
     context: `Tema solicitado: ${tema}. Use conhecimento geral confiavel e adequado ao ensino medio brasileiro.`,
-    maxTokens: 3200,
+    maxTokens: 4000,
   });
-  return limparPerguntas(parseQuiz(resultado?.reply || ""));
+  const geradas = limparPerguntas(parseQuiz(resultado?.reply || ""), PERGUNTAS_GERADAS).map((item) => embaralharPergunta(item));
+  if (geradas.length < 3) return geradas;
+  let respostas = null;
+  try {
+    const conferencia = await runMineRequest({
+      task: "duelo-conferir",
+      prompt: textoParaConferir(geradas),
+      context: `Tema: ${tema}`,
+      maxTokens: 600,
+    });
+    respostas = lerConferencia(conferencia?.reply || "", geradas.length);
+  } catch {
+    respostas = null;
+  }
+  // Sem conferência (IA fora do ar) vale o gabarito com a certa em A, que já
+  // não sofre da troca de letra; com ela, só o que as duas leituras concordam.
+  const conferidas = respostas && respostas.some((r) => r >= 0) ? perguntasConferidas(geradas, respostas) : geradas;
+  return conferidas.slice(0, PERGUNTAS_POR_DUELO);
 }
 
 async function handleDuelo(req, res) {

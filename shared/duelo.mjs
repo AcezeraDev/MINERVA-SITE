@@ -58,7 +58,7 @@ export function jogadaDaMine(codigo, indice, correta) {
   return { ms, escolha: acerta ? correta : errada };
 }
 
-export function limparPerguntas(lista) {
+export function limparPerguntas(lista, limite = PERGUNTAS_POR_DUELO) {
   return (Array.isArray(lista) ? lista : [])
     .map((item) => ({
       pergunta: String(item?.question ?? item?.pergunta ?? "").trim().slice(0, 400),
@@ -67,7 +67,49 @@ export function limparPerguntas(lista) {
       explicacao: String(item?.explanation ?? item?.explicacao ?? "").trim().slice(0, 400),
     }))
     .filter((item) => item.pergunta && item.alternativas.length === 4 && item.alternativas.every(Boolean) && item.correta >= 0 && item.correta <= 3)
-    .slice(0, PERGUNTAS_POR_DUELO);
+    .slice(0, limite);
+}
+
+/*
+ * Gabarito confiável (nov/2026). Pedir ao modelo que "distribua a letra
+ * correta entre A, B, C e D" fazia ele trocar a LETRA do gabarito sem mover a
+ * resposta (Creeper em B, gabarito C). Agora a Mine escreve a certa sempre em
+ * A, o servidor embaralha as alternativas e uma segunda leitura, sem o
+ * gabarito, responde cada questão: só fica a questão em que as duas batem.
+ */
+
+/** Embaralha as alternativas levando junto o índice da correta. */
+export function embaralharPergunta(pergunta, aleatorio = Math.random) {
+  const ordem = pergunta.alternativas.map((_, i) => i);
+  for (let i = ordem.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(aleatorio() * (i + 1));
+    [ordem[i], ordem[j]] = [ordem[j], ordem[i]];
+  }
+  return { ...pergunta, alternativas: ordem.map((i) => pergunta.alternativas[i]), correta: ordem.indexOf(pergunta.correta) };
+}
+
+/** Questões sem gabarito, numeradas, para a conferência. */
+export function textoParaConferir(perguntas) {
+  return perguntas
+    .map((item, n) => [`${n + 1}. ${item.pergunta}`, ...item.alternativas.map((alt, i) => `${"ABCD"[i]}) ${alt}`)].join("\n"))
+    .join("\n\n");
+}
+
+/** Lê "1: B" por linha; questão sem resposta (ou "?") fica -1. */
+export function lerConferencia(texto, total) {
+  const respostas = Array.from({ length: total }, () => -1);
+  for (const linha of String(texto || "").split(/\r?\n/)) {
+    const m = linha.trim().match(/^(?:quest[aã]o\s*)?(\d{1,2})\s*[:.)\-]\s*\(?([A-D])\b/i);
+    if (!m) continue;
+    const n = Number(m[1]) - 1;
+    if (n >= 0 && n < total) respostas[n] = m[2].toUpperCase().charCodeAt(0) - 65;
+  }
+  return respostas;
+}
+
+/** Fica só a questão em que a conferência marcou a mesma alternativa do gabarito. */
+export function perguntasConferidas(perguntas, respostas) {
+  return perguntas.filter((item, n) => respostas[n] === item.correta);
 }
 
 export function criarDuelo({ codigo, tema, dono, perguntas, contraMine = false, agora = Date.now() }) {

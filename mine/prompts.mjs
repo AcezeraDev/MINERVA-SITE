@@ -169,6 +169,19 @@ Contexto da materia:
 ${context || "Tema geral."}`;
 }
 
+// Conferencia do Duelo: a Mine responde as questoes que ela mesma gerou, sem
+// ver o gabarito. Questao em que a resposta nao bate com o gabarito sai.
+export function buildDuelCheckInstruction(context) {
+  return `Voce e um professor conferindo um quiz antes de ele ir para os alunos. Para cada questao numerada, escolha a UNICA alternativa correta, pensando com cuidado nos fatos. Se a questao tiver mais de uma alternativa certa, nenhuma certa, ou um fato duvidoso, responda "?" para ela.
+
+Responda SOMENTE com uma linha por questao, neste formato, sem mais nada:
+1: B
+2: ?
+3: D
+
+${context || ""}`;
+}
+
 // Modelos menores copiam placeholders entre colchetes em vez de preenche-los,
 // entao aqui a forma e ensinada por um exemplo ja preenchido de outro tema.
 export function buildMindmapInstruction(context) {
@@ -738,6 +751,7 @@ const TASK_PROMPTS = {
   minecode: buildMineCodeInstruction,
   title: buildTitleInstruction,
   quiz: buildQuizInstruction,
+  "duelo-conferir": buildDuelCheckInstruction,
   mindmap: buildMindmapInstruction,
   flashcards: buildFlashcardsInstruction,
   plan: buildPlanInstruction,

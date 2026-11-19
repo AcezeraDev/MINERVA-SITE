@@ -102,3 +102,21 @@ test("XP novo entra no total com teto diário", () => {
   assert.equal(stats.labXp, 10);
   assert.ok(totalXp(stats) >= stats.dueloXp + stats.leituraXp + stats.labXp);
 });
+
+test("gabarito confiável: embaralha levando a correta e só fica o que a conferência confirma", async () => {
+  const { embaralharPergunta, lerConferencia, perguntasConferidas, textoParaConferir } = await import("../shared/duelo.mjs");
+  const base = { pergunta: "Qual mob explode?", alternativas: ["Creeper", "Zumbi", "Aranha", "Esqueleto"], correta: 0, explicacao: "O creeper explode." };
+  for (let s = 0; s < 20; s += 1) {
+    let x = s / 20;
+    const p = embaralharPergunta(base, () => ((x = (x * 9301 + 0.49297) % 1)));
+    assert.equal(p.alternativas[p.correta], "Creeper");
+    assert.deepEqual([...p.alternativas].sort(), [...base.alternativas].sort());
+  }
+  const lista = [base, { ...base, correta: 2 }, { ...base, correta: 3 }];
+  const texto = textoParaConferir(lista);
+  assert.match(texto, /^1\. Qual mob explode\?\nA\) Creeper/);
+  assert.doesNotMatch(texto, /explode\./);
+  const respostas = lerConferencia("1: A\n2: ?\nQuestão 3) D", 3);
+  assert.deepEqual(respostas, [0, -1, 3]);
+  assert.equal(perguntasConferidas(lista, respostas).length, 2);
+});

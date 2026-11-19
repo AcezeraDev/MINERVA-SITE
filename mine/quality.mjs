@@ -312,6 +312,7 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
   if (cleanTask === "forca") return validateHangman(text, minimum);
   if (cleanTask === "caca") return validateWordSearch(text, minimum);
   if (cleanTask === "quiz") return validateQuiz(text, minimum);
+  if (cleanTask === "duelo-conferir") return /^\s*\d{1,2}\s*[:.)\-]\s*(?:[A-D]\b|\?)/im.test(text) ? "" : "conferencia do duelo fora do formato";
   if (cleanTask === "flashcards") return validateFlashcards(text, minimum);
   if (cleanTask === "sequencia") {
     const valid = parseSequencePuzzles(text).length;
