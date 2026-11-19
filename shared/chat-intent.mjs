@@ -88,10 +88,38 @@ function stripRequestQualifiers(topic) {
   return out;
 }
 
+/**
+ * Pedido de exercicio em ritmo de tutoria: "uma questao por vez", "sem revelar
+ * o gabarito", "miniquiz". O cartao de prova gera tudo de uma vez com gabarito;
+ * esse pedido e conversa, e a Mine faz uma pergunta e espera.
+ */
+export function wantsGuidedQuiz(value) {
+  const normalized = normalizeIntentText(value);
+  return /\b(?:um[ao]\s+(?:questao|pergunta|exercicio)\s+(?:por|de\s+cada)\s+vez|sem\s+(?:revelar|mostrar|dar|entregar|me\s+dar)\s+(?:o\s+|a\s+)?(?:gabarito|resposta)|mini\s*-?\s*quiz)\b/.test(normalized);
+}
+
+/**
+ * Material colado na propria mensagem: dados depois de dois-pontos ou em
+ * outra linha. Nesse caso o tema nao e uma materia, e o conteudo e a fonte.
+ */
+export function inlineMaterialFromPrompt(value) {
+  const text = String(value || "").trim();
+  const quebra = text.indexOf("\n");
+  const doisPontos = text.indexOf(":");
+  const corte = [quebra, doisPontos].filter((index) => index >= 0).sort((a, b) => a - b)[0];
+  if (corte === undefined) return "";
+  const resto = text.slice(corte + 1).trim();
+  return resto.length >= 30 ? resto : "";
+}
+
 /** Extrai o tema depois do gatilho e limpa o que sobra de linguagem falada. */
 export function topicAfter(value, gatilho) {
   const match = String(value || "").trim().match(gatilho);
   const topic = match?.[1]
+    // O tema e so a oracao do pedido: o que vem depois de dois-pontos, de uma
+    // quebra de linha ou de "com base em" e material, nao titulo de materia.
+    ?.split(/[:\n]|(?:^|\s+)(?:com\s+base|a\s+partir|basead[oa]s?|usando|segundo)\b|,\s/i)[0]
+    ?.replace(/(?:^|\s+)(?:n?est[ae]s?|n?ess[ae]s?|d?ess[ae]s?|d?est[ae]s?)\s+(?:anota[cç][aã]o|ficha|texto|material|conte[uú]do|dados)$/i, "")
     ?.replace(/[?!.]+$/g, "")
     // `(?:^|\s+)` e nao `\s+`: em "quero uma prova pra mim" o complemento e a
     // captura inteira, sem espaco antes, e exigir o espaco fazia "pra mim"

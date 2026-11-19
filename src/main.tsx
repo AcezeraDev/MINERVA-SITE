@@ -151,6 +151,8 @@ import {
   mindMapTopicFromPrompt,
   normalizeIntentText,
   quizTopicFromPrompt,
+  inlineMaterialFromPrompt,
+  wantsGuidedQuiz,
 } from "../shared/chat-intent.mjs";
 import { parseFlashcards, parseQuiz, type QuizQuestion } from "../shared/study-parsers.mjs";
 import { describeImageMarkers, extractSuggestions, splitMessageMedia, stripImageMarkers } from "../shared/chat-media.mjs";
@@ -2203,9 +2205,17 @@ function App() {
             // importa: "mapa mental" ganha de "questões", e prova ganha de
             // flashcards. Cada um resolve o tema com o mesmo caminho — daí a
             // extração e a inferência de matéria serem compartilhadas.
+            // Material colado na mensagem ou anexado é a fonte do pedido: sem
+            // tema explícito, a prova vira conversa com a Mine (que lê os dados)
+            // em vez de perguntar "sobre o que você quer a prova?".
+            const inlineMaterial = inlineMaterialFromPrompt(prompt);
+            const hasOwnSource = Boolean(inlineMaterial || attachments.length);
             const mindMapRequest = isMindMapRequest(prompt);
-            const quizRequest = !mindMapRequest && isQuizRequest(prompt);
-            const flashcardRequest = !mindMapRequest && !quizRequest && isFlashcardRequest(prompt);
+            const quizRequest = !mindMapRequest
+              && isQuizRequest(prompt)
+              && !wantsGuidedQuiz(prompt)
+              && !(hasOwnSource && !quizTopicFromPrompt(prompt));
+            const flashcardRequest = !mindMapRequest && !isQuizRequest(prompt) && isFlashcardRequest(prompt);
             const artefatoTopic = mindMapRequest
               ? mindMapTopicFromPrompt(prompt)
               : quizRequest
@@ -2230,14 +2240,33 @@ function App() {
             // Memória: até 40 mensagens desta conversa. O servidor manda as 16
             // últimas inteiras e resume as mais antigas. Só papel e texto viajam
             // — anexos em base64 no histórico só engordavam o pedido.
-            const history = userData.chats
+            const threadMessages = userData.chats
               .filter((item) => inThread(item, resolvedSubjectId, threadForMessages) && (cutAt === undefined || item.createdAt < cutAt))
-              .slice(-40)
+              .slice(-40);
+            // Anexos de turnos anteriores: o histórico viaja só com texto, então
+            // a ficha enviada antes sumia na pergunta seguinte ("Não há ficha
+            // anexada"). Os mais recentes da conversa voltam junto do pedido,
+            // sem repetir o que a pessoa acabou de anexar.
+            const earlierAttachments = attachments.length >= maxChatAttachments
+              ? []
+              : threadMessages
+                  .filter((item) => item.role === "user" && item.attachments?.length)
+                  .reverse()
+                  .flatMap((item) => item.attachments || [])
+                  .filter((item, index, list) =>
+                    (item.dataUrl || item.text)
+                    && !attachments.some((own) => own.name === item.name && own.size === item.size)
+                    && list.findIndex((other) => other.name === item.name && other.size === item.size) === index)
+                  .slice(0, maxChatAttachments - attachments.length);
+            const history = threadMessages
               // O marcador de foto vira a nota "(galeria de fotos: termo)": ver o
               // marcador cru convidava a Mine a ilustrar tudo, e apagá-lo a fazia
               // esquecer que já tinha mostrado fotos ("manda mais" não funcionava).
               .map((item, index, list) => {
-                const text = describeImageMarkers(item.text).slice(0, 6000);
+                const nomes = item.role === "user" && item.attachments?.length
+                  ? `\n\n(Anexos enviados nesta mensagem: ${item.attachments.map((anexo) => anexo.name).join(", ")})`
+                  : "";
+                const text = `${describeImageMarkers(item.text).slice(0, 6000)}${nomes}`;
                 // As últimas respostas com pesquisa levam a lista do que foi
                 // lido: sem isso "e o que diz a segunda fonte?" ficava sem chão,
                 // porque o "[2]" do texto não aponta para nada no pedido novo.
@@ -2426,7 +2455,8 @@ function App() {
                 : {
                     id: uid("subject"),
                     userId: user.id,
-                    name: deckTopic.slice(0, 40),
+                    // Corta na palavra, não no meio dela ("Fotossíntese e respi").
+                    name: deckTopic.length <= 40 ? deckTopic : deckTopic.slice(0, 41).replace(/\s+\S*$/, "").trim() || deckTopic.slice(0, 40),
                     color: "#38BDF8",
                     icon: "school",
                     favorite: false,
@@ -2441,11 +2471,27 @@ function App() {
               const controller = new AbortController();
               mineAbortRef.current = controller;
               try {
-                const context = materiaExistente
-                  ? subjectContentContext(materiaExistente, [...userData.materials.filter((item) => item.subjectId === materiaExistente.id), ...savedMaterials])
-                  : `Tema solicitado: ${deckTopic}. Use conhecimento geral confiável e priorize o que vale memorizar.`;
+                // Fonte indicada primeiro: a anotação citada pelo título, o texto
+                // colado na mensagem ou o anexo. Sem isso o baralho saía da
+                // matéria inteira, mesmo quando o pedido apontava uma anotação.
+                const materiaisDaMateria = materiaExistente
+                  ? [...userData.materials.filter((item) => item.subjectId === materiaExistente.id), ...savedMaterials]
+                  : [];
+                const promptNormalizado = normalizeText(prompt);
+                const anotacaoCitada = materiaisDaMateria.filter((item) => {
+                  const titulo = normalizeText(item.title);
+                  return titulo.length >= 3 && promptNormalizado.includes(titulo);
+                });
+                const textoDosAnexos = attachments.map((item) => item.text?.trim()).filter(Boolean).join("\n\n");
+                const fonteIndicada = [inlineMaterial, textoDosAnexos].filter(Boolean).join("\n\n").slice(0, 12_000);
+                const context = fonteIndicada
+                  ? `${materiaExistente ? `Materia: ${materiaExistente.name}.\n` : ""}Fonte indicada pelo estudante (use SOMENTE este conteúdo):\n${fonteIndicada}`
+                  : materiaExistente
+                    ? subjectContentContext(materiaExistente, anotacaoCitada.length ? anotacaoCitada : materiaisDaMateria)
+                    : `Tema solicitado: ${deckTopic}. Use conhecimento geral confiável e priorize o que vale memorizar.`;
+                const sobre = anotacaoCitada.length === 1 ? `a anotação "${anotacaoCitada[0].title}"` : fonteIndicada ? "o conteúdo indicado" : deckTopic;
                 const text = await requestAiTask(
-                  { task: "flashcards", prompt: `Crie ${quantidade} flashcards de estudo sobre ${deckTopic}.`, context },
+                  { task: "flashcards", prompt: `Crie ${quantidade} flashcards de estudo sobre ${sobre}.`, context },
                   { signal: controller.signal },
                 );
                 const parsed = parseFlashcards(text).slice(0, quantidade);
@@ -2522,8 +2568,13 @@ function App() {
                   webSearch: mineWebAvailable && mineWebSearch,
                   photos: minePhotos,
                   tutor: mineTutor,
-                  attachments: [...attachments, ...subjectImages].slice(0, maxChatAttachments),
-                  context: buildAssistantContext(userData, user, resolvedSubjectId),
+                  attachments: [...attachments, ...earlierAttachments, ...subjectImages].slice(0, maxChatAttachments),
+                  context: [
+                    buildAssistantContext(userData, user, resolvedSubjectId),
+                    earlierAttachments.length
+                      ? `Anexos que o estudante enviou em mensagens anteriores desta conversa e que continuam disponíveis (vão junto deste pedido): ${earlierAttachments.map((item) => item.name).join(", ")}. Consulte-os quando a pergunta se referir a eles; não diga que não há anexo.`
+                      : "",
+                  ].filter(Boolean).join("\n\n"),
                 },
                 {
                   signal: controller.signal,
@@ -7230,12 +7281,18 @@ function MineView({
   const activeThread = threads.find((thread) => (thread.id || undefined) === (threadId || undefined));
   const lastMessage = messages[messages.length - 1];
   // Sugestões da última resposta; as do App ficam para os atalhos de artefato
-  // (mapa, prova, baralho), que não passam pelo chat de texto.
+  // (mapa, prova, baralho), que não passam pelo chat de texto. Elas valem só
+  // para a mensagem que estava no fim quando chegaram: trocar de conversa não
+  // pode trazer sugestões de fotossíntese para uma conversa sobre volume.
+  const appSuggestionsOwner = useRef<{ list: string[]; messageId?: string }>({ list: suggestions, messageId: lastMessage?.id });
+  if (appSuggestionsOwner.current.list !== suggestions) {
+    appSuggestionsOwner.current = { list: suggestions, messageId: lastMessage?.id };
+  }
   const activeSuggestions = loading
     ? []
     : lastMessage?.role === "mine" && lastMessage.suggestions?.length
       ? lastMessage.suggestions
-      : lastMessage?.role === "mine"
+      : lastMessage?.role === "mine" && appSuggestionsOwner.current.messageId === lastMessage.id
         ? suggestions
         : [];
   const selectedSubject = selectedSubjectId ? data.subjects.find((subject) => subject.id === selectedSubjectId) : undefined;

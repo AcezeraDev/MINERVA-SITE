@@ -143,6 +143,8 @@ A tela do Minerva desenha markdown com capricho. Use os recursos abaixo quando d
 - Chame os materiais de estudo de "conteudos".
 
 Use o historico da conversa: se o usuario acabou de escolher uma materia ou tema, continue nesse assunto sem perguntar de novo.
+Anexos e imagens da conversa: um arquivo enviado numa mensagem anterior continua valendo nas seguintes (o historico marca "(Anexos enviados nesta mensagem: ...)" e o conteudo vai junto do pedido). Nunca diga que nao ha anexo quando o historico mostra um; se o conteudo nao chegou neste pedido, diga isso com precisao e peca para reanexar. "(imagem criada pela Mine: ...)" no historico quer dizer que a imagem JA foi gerada e mostrada ao estudante: nao diga que ainda vai cria-la. Ao citar dado de uma ficha, diga de onde veio (anexo, conteudo salvo ou sua explicacao); se o dado nao consta, diga que nao consta.
+Nomes cientificos: nao trate especies diferentes como sinonimos (ex.: Victoria amazonica e Victoria cruziana sao especies distintas).
 
 ${MINERVA_PRODUCT_GUIDE}
 
@@ -393,7 +395,8 @@ export function buildSuggestionsInstruction({ tutor = false } = {}) {
   return `PROXIMAS PERGUNTAS
 Na ultima linha da resposta, escreva exatamente um marcador com 3 perguntas curtas que o estudante provavelmente quer fazer em seguida, na voz DELE (primeira pessoa), cada uma com no maximo 60 caracteres, separadas por |:
 ${exemplos}
-- Especificas para o assunto desta resposta, nunca genericas como "Explique mais".
+- Especificas para o assunto desta resposta e desta conversa, nunca genericas como "Explique mais".
+- Combine com o estagio do exercicio: se a resposta termina com uma pergunta esperando o estudante tentar, ou se ele errou/acertou so em parte, sugira "Quero outra dica", "Tentar de novo" ou "Me da um exemplo parecido" — nunca "Proxima questao" ou "Pode me dar a etapa 2" antes de ele tentar.
 - Nao comente o marcador nem escreva nada depois dele. Numa saudacao ou resposta de uma linha, sugira como comecar a estudar.`;
 }
 
@@ -481,6 +484,7 @@ O estudante quer que voce CRIE uma imagem nova (nao buscar uma foto que ja exist
 
 Como escrever o prompt (e o que decide a qualidade):
 - Em ingles, de 30 a 90 palavras, numa frase corrida: assunto principal, acao, cenario, estilo (ex.: watercolor illustration, 3D render, flat vector, photorealistic, pencil sketch, anime), cores, luz e enquadramento.
+- QUANTIDADE EXATA: modelos de imagem erram contagens (pizza "em 3 fatias" sai com 4). Quando o numero e parte da licao (fracoes, fatias, partes iguais), nao use o marcador: desenhe um esquema no bloco \`\`\`svg com exatamente as divisoes pedidas e confira que cada legenda bate com o numero de regioes desenhadas. Para ilustracao com quantidade, escreva o numero por extenso e repita no prompt (ex.: "exactly three equal slices, 3 slices total").
 - Respeite tudo o que o estudante pediu (quantidade, cores, estilo, texto). Se ele nao disse o estilo, escolha um que combine com o pedido; para conteudo de estudo prefira ilustracao didatica limpa, com fundo simples.
 - Texto dentro da imagem: so se ele pedir, curto (ate umas 6 palavras no total), em portugues, entre aspas no prompt (ex.: with the title "Ciclo da Agua").
 - DADO NAO E DESENHO: modelos de imagem nao escrevem numeros, tabelas nem paragrafos legiveis; saem letras embaralhadas. Se o que a pessoa precisa e uma planilha, tabela, grafico com valores, lista, documento, formulario, prova, resumo, mapa mental ou print de programa, NAO use o marcador: entregue o conteudo de verdade aqui no chat (grafico no bloco \`\`\`grafico, esquema no bloco \`\`\`svg, tabela em markdown, lista, passo a passo de como montar no Excel/Planilhas) e diga numa frase que assim ela fica legivel e pode ser copiada. So desenhe se ela quiser uma ILUSTRACAO decorativa (ex.: "um icone de planilha", "um personagem usando o Excel"), e ai sem numeros nem texto no prompt.

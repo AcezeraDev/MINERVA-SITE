@@ -220,7 +220,11 @@
   inset: 0;
   z-index: 200;
   display: grid;
+  /* Coluna presa à largura da tela: sem isso a trilha "auto" crescia até a
+     largura natural da foto e empurrava Fechar para fora (a 778 px, ~932 px). */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
   background: rgba(4, 7, 6, 0.94);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -231,6 +235,7 @@
   display: flex;
   align-items: center;
   gap: 0.9rem;
+  min-width: 0;
   padding: max(0.75rem, env(safe-area-inset-top)) 1rem 0.75rem 1.1rem;
 }
 
@@ -325,6 +330,9 @@
 .mine-lightbox__stage {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
   min-height: 0;
   place-items: center;
   padding: 0.5rem 4.5rem;

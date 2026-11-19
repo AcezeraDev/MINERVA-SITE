@@ -9,7 +9,27 @@ import {
   isQuizRequest,
   mindMapTopicFromPrompt,
   quizTopicFromPrompt,
+  inlineMaterialFromPrompt,
+  wantsGuidedQuiz,
 } from "../shared/chat-intent.mjs";
+
+test("miniquiz e 'uma por vez' vão para a conversa, não para o cartão de prova", () => {
+  assert.equal(wantsGuidedQuiz("Faça um miniquiz com esses dados"), true);
+  assert.equal(wantsGuidedQuiz("crie questões, uma questão por vez, sem revelar o gabarito"), true);
+  assert.equal(wantsGuidedQuiz("monte uma prova de biologia"), false);
+});
+
+test("material colado depois de dois-pontos é fonte, não tema", () => {
+  const pedido = "Crie questões com base nesta anotação: 12 bolhas/min a 20 °C e 18 bolhas/min a 30 °C";
+  assert.match(inlineMaterialFromPrompt(pedido), /^12 bolhas/);
+  assert.equal(quizTopicFromPrompt(pedido), "");
+  assert.equal(inlineMaterialFromPrompt("monte uma prova de biologia"), "");
+});
+
+test("tema de flashcards para antes de 'com base em' e ignora 'desta anotação'", () => {
+  assert.equal(flashcardTopicFromPrompt("crie 3 flashcards de fotossíntese com base na anotação da aula 2"), "Fotossíntese");
+  assert.equal(flashcardTopicFromPrompt("crie flashcards desta anotação"), "");
+});
 
 test("pedido de prova e reconhecido nas formas que as pessoas escrevem", () => {
   for (const frase of [
