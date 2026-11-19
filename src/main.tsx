@@ -180,6 +180,7 @@ import {
   doodleFor,
   floatXp,
   launchPlane,
+  mineConversa,
   mineSays,
   pageFadeVariants,
   pageFlipVariants,
@@ -190,8 +191,8 @@ import { PencilTimer } from "./caderno/PencilTimer";
 import { InkBarChart, LevelStamp, StickerBook } from "./caderno/Progress";
 import { BookshelfPodium } from "./caderno/Bookshelf";
 import { MineFace } from "./caderno/MineFace";
-import { HomeHero } from "./home/HomeHero";
-import { Bento } from "./home/Bento";
+import { HomeEstante, type DiaSemana, type ItemFicha, type MateriaEstante } from "./home/HomeEstante";
+import type { AvisoCaderno } from "./home/Sistema3D";
 import { NovaMateriaFx, anunciarMateria } from "./home/NovaMateriaFx";
 import { MineWelcome } from "./caderno/MineWelcome";
 import { CadernoSplash } from "./caderno/Splash";
@@ -215,6 +216,7 @@ import {
   unlockedAchievements,
   xpActions,
   xpPerAction,
+  xpSince,
   type AchievementRule,
   type XpStats,
 } from "../shared/xp.mjs";
@@ -3560,316 +3562,155 @@ function HomeView({
     }
   }, [userId]);
 
-  // Estante (padrão) ou cartões: a escolha fica neste navegador.
-  const [libraryMode, setLibraryMode] = useState<"estante" | "cartoes">(() => {
-    try {
-      return localStorage.getItem("minerva-biblioteca-v1") === "cartoes" ? "cartoes" : "estante";
-    } catch {
-      return "estante";
-    }
-  });
-  const chooseLibraryMode = (mode: "estante" | "cartoes") => {
-    setLibraryMode(mode);
-    try {
-      localStorage.setItem("minerva-biblioteca-v1", mode);
-    } catch {
-      /* sem armazenamento: vale só nesta visita */
-    }
+  // ── Estante em órbita (nov/2026): uma matéria por vez, a mais urgente primeiro ──
+  const diaCurto = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const quandoProva = (dueAt: number) => {
+    const dias = Math.round((dueAt - today()) / 86400000);
+    if (dias <= 0) return "prova hoje";
+    if (dias === 1) return "prova amanhã";
+    return `prova ${diaCurto[new Date(dueAt).getDay()]}`;
   };
+  const estanteMaterias: MateriaEstante[] = data.subjects
+    .map((subject) => {
+      const materials = data.materials.filter((item) => item.subjectId === subject.id);
+      const tasks = pendingTasks.filter((task) => task.subjectId === subject.id);
+      const atrasadas = tasks.filter((task) => task.dueAt < today());
+      const deHoje = tasks.filter((task) => task.dueAt >= today() && task.dueAt < today() + 86400000);
+      const prova = tasks.find((task) => task.kind === "prova" && task.dueAt >= today() && task.dueAt < today() + 8 * 86400000);
+      const reviews = data.flashcards.filter((card) => card.subjectId === subject.id && card.dueAt <= now).length;
+      const continuar = materials.filter((item) => !item.studied).sort((a, b) => b.createdAt - a.createdAt)[0];
+      const aviso: AvisoCaderno | undefined = atrasadas.length
+        ? { texto: `${atrasadas.length} ${atrasadas.length === 1 ? "atrasada" : "atrasadas"}`, tom: "rosa" }
+        : prova
+          ? { texto: quandoProva(prova.dueAt), tom: "amarelo" }
+          : deHoje.length
+            ? { texto: `${deHoje.length} pra hoje`, tom: "amarelo" }
+            : undefined;
+      const itens: ItemFicha[] = [];
+      atrasadas.slice(0, 2).forEach((task) =>
+        itens.push({ id: task.id, tipo: "atrasada", titulo: task.title, detalhe: `era para ${shortDate(task.dueAt)}`, onClick: () => go("agenda") }),
+      );
+      deHoje.slice(0, 2).forEach((task) =>
+        itens.push({ id: task.id, tipo: task.kind === "prova" ? "prova" : "hoje", titulo: task.title, detalhe: task.time ? `hoje às ${task.time}` : "vence hoje", onClick: () => go("agenda") }),
+      );
+      if (prova && !deHoje.includes(prova)) itens.push({ id: prova.id, tipo: "prova", titulo: prova.title, detalhe: `${quandoProva(prova.dueAt).replace("prova ", "")}, ${shortDate(prova.dueAt)} · treine na aba Provas`, onClick: () => go("provas") });
+      if (reviews) itens.push({ id: `rev-${subject.id}`, tipo: "revisao", titulo: `Revisar ${reviews} ${reviews === 1 ? "flashcard" : "flashcards"}`, detalhe: "leva poucos minutos", onClick: () => setModal({ type: "flashcards", subjectId: subject.id }) });
+      if (continuar) itens.push({ id: continuar.id, tipo: "continuar", titulo: continuar.title, detalhe: "conteúdo ainda não estudado", onClick: () => setModal({ type: "materialView", materialId: continuar.id }) });
+      const proxima = tasks.find((task) => task.dueAt >= today() + 86400000 && task !== prova);
+      if (proxima) itens.push({ id: proxima.id, tipo: "tarefa", titulo: proxima.title, detalhe: `${dateLabel(proxima.dueAt).toLowerCase()}, ${shortDate(proxima.dueAt)}`, onClick: () => go("agenda") });
+      const dias = prova ? Math.max(0, Math.round((prova.dueAt - today()) / 86400000)) : 99;
+      return {
+        urgencia: atrasadas.length * 10000 + (prova ? (8 - dias) * 600 : 0) + deHoje.length * 300 + reviews * 10 + (subject.favorite ? 5 : 0),
+        materia: {
+          id: subject.id,
+          name: subject.name,
+          color: subject.color,
+          icon: iconMap[subject.icon] || BookOpen,
+          conteudos: materials.length,
+          estudados: materials.filter((item) => item.studied).length,
+          aviso,
+          itens: itens.slice(0, 4),
+          // a fala da Mine no balão: o próximo passo mais útil, dito como dica
+          // O balão diz o porquê e o próximo passo; o nome da tarefa já está na
+          // ficha e no bilhete, e repetir foi o que deixou a Home confusa.
+          dica: atrasadas.length
+            ? "Resolver o que passou do prazo primeiro deixa o resto da semana mais leve. Quer que eu te ajude a começar?"
+            : prova
+              ? `${dias <= 0 ? "Prova hoje!" : dias === 1 ? "Prova amanhã!" : `Faltam ${dias} dias.`} Revisar um pouco por dia rende mais que virar a noite. Bora treinar comigo?`
+              : reviews
+                ? "Revisar no dia certo faz você lembrar o dobro. São uns 5 minutinhos!"
+                : continuar
+                  ? "Quer que eu explique o próximo conteúdo antes de você ler? Fica bem mais fácil."
+                  : materials.length
+                    ? `Você estudou tudo de ${subject.name}! Um jogo ou um duelo ajuda a fixar.`
+                    : "Coloca o primeiro conteúdo e eu monto flashcards e resumos pra você.",
+        },
+      };
+    })
+    .sort((a, b) => b.urgencia - a.urgencia || a.materia.name.localeCompare(b.materia.name, "pt-BR"))
+    .map((entry) => entry.materia);
+
+  // faixa "próximos 7 dias": as tarefas de todas as matérias, dia a dia
+  const corDaMateria = (subjectId: string) => data.subjects.find((subject) => subject.id === subjectId)?.color || "#94A3B8";
+  const proximosDias: DiaSemana[] = Array.from({ length: 7 }, (_, indice) => {
+    const inicio = today() + indice * 86400000;
+    const dia = new Date(inicio);
+    return {
+      chave: String(inicio),
+      rotulo: indice === 0 ? "hoje" : indice === 1 ? "amanhã" : diaCurto[dia.getDay()],
+      data: shortDate(inicio),
+      hoje: indice === 0,
+      tarefas: pendingTasks
+        .filter((task) => (indice === 0 ? task.dueAt < inicio + 86400000 : task.dueAt >= inicio && task.dueAt < inicio + 86400000))
+        .map((task) => ({ id: task.id, titulo: task.title, cor: corDaMateria(task.subjectId), prova: task.kind === "prova" })),
+    };
+  });
+
+  const maisUrgente = estanteMaterias[0];
+  const semMateria = pendingTasks.filter((task) => !data.subjects.some((subject) => subject.id === task.subjectId)).length;
+  // A fala da Mine no hero: o resumo do dia inteiro, de todas as matérias
+  // (a ficha cuida dos detalhes de uma matéria só).
+  const totalAtrasadas = pendingTasks.filter((task) => task.dueAt < today()).length;
+  const totalHoje = pendingTasks.filter((task) => task.dueAt >= today() && task.dueAt < today() + 86400000).length;
+  const proximaProva = pendingTasks.find((task) => task.kind === "prova" && task.dueAt >= today() && task.dueAt < today() + 8 * 86400000);
+  const provaMateria = proximaProva ? data.subjects.find((subject) => subject.id === proximaProva.subjectId)?.name : undefined;
+  const diasProva = proximaProva ? Math.round((proximaProva.dueAt - today()) / 86400000) : 0;
+  const quandoLongo = diasProva <= 0 ? "hoje" : diasProva === 1 ? "amanhã" : `na ${new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(new Date(proximaProva?.dueAt || 0))}`;
+  const partes = [
+    totalAtrasadas ? `${totalAtrasadas} ${totalAtrasadas === 1 ? "tarefa atrasada" : "tarefas atrasadas"}` : "",
+    totalHoje ? `${totalHoje} ${totalHoje === 1 ? "entrega" : "entregas"} pra hoje` : "",
+    proximaProva ? `prova${provaMateria ? ` de ${provaMateria}` : ""} ${quandoLongo}` : "",
+    dueCards ? `${dueCards} ${dueCards === 1 ? "flashcard" : "flashcards"} pra revisar` : "",
+  ].filter(Boolean);
+  const juntar = (lista: string[]) => (lista.length > 1 ? `${lista.slice(0, -1).join(", ")} e ${lista[lista.length - 1]}` : lista[0] || "");
+  const fraseEstante = !estanteMaterias.length
+    ? "Eu sou a Mine! Crie sua primeira matéria e ela vira um caderno girando aqui em volta de mim. Aí eu ajudo a estudar tudo o que você colocar nele."
+    : partes.length
+      ? `Hoje tem ${juntar(partes)}. Eu começaria por ${maisUrgente.name}: já deixei a ficha aberta aí embaixo.`
+      : `Tudo em dia por aqui! ${data.materials.length ? `Você já estudou ${studied} de ${data.materials.length} conteúdos.` : ""} Bom dia pra adiantar um conteúdo ou testar o que já sabe num jogo.`;
+  const dataHoje = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
   return (
-    <>
-      <HomeHero
-        saudacao={greeting()}
-        nome={displayName}
-        subtitulo={
-          overdue
-            ? `${overdue} ${overdue === 1 ? "tarefa atrasada" : "tarefas atrasadas"} esperando por você. Começar pela mais antiga costuma render.`
-            : dueToday
-              ? `Você tem ${dueToday} ${dueToday === 1 ? "tarefa" : "tarefas"} para hoje. Bora tirar do caminho?`
-              : "Tudo em dia. Um bom momento para adiantar um conteúdo novo."
-        }
-        materias={subjectDesk.map(({ subject }) => ({ id: subject.id, name: subject.name, color: subject.color }))}
-        nivel={gam.level}
-        titulo={gam.title}
-        xpNivel={gam.levelXp}
-        xpPreciso={gam.levelNeed}
-        dias={days}
-        revisoes={dueCards}
-        onNovaMateria={() => setModal({ type: "subject" })}
-        onBusca={openCommand}
-        onAbrir={(id) => go("subject", id)}
-        onMine={() => go("mine")}
-        tema={themeMode}
-      />
-
-      <div className="mt-7 grid gap-7">
-        <MineCodeNews />
-        <StudyNowPanel
-          nextTask={primaryTask}
-          subject={primarySubject}
-          dueCards={dueCards}
-          dueBySubject={dueBySubject}
-          dueToday={dueToday}
-          days={days}
-          weekFocus={weekFocus}
-          pendingTasks={pendingTasks}
-          setModal={setModal}
-          update={update}
-        />
-
-        <Bento
-          dados={{
-            nivel: gam.level,
-            titulo: gam.title,
-            xp: gam.xp,
-            xpNivel: gam.levelXp,
-            xpPreciso: gam.levelNeed,
-            dias: days,
-            semana: weekDots,
-            revisoes: dueCards,
-            focoMinutos: weekFocus,
-            sessoesSemana: weekSessions.length,
-            errosPendentes: provasResumo.pendentes,
-            provasFeitas: provasResumo.feitas,
-            tarefasHoje: dueToday,
-          }}
-          onMine={() => go("mine")}
-          onProgresso={() => go("progress")}
-          onRevisar={() => (dueBySubject[0] ? setModal({ type: "flashcards", subjectId: dueBySubject[0].subject.id }) : go("progress"))}
-          onProvas={() => go("provas")}
-          onFoco={() => go("foco")}
-          onPlano={() => go("plan")}
-          onBusca={openCommand}
-        />
-
-        <ContinueStudyPanel
-          data={data}
-          openMaterial={(materialId) => setModal({ type: "materialView", materialId })}
-          openMine={openMine}
-        />
-
-        <div className="grid items-start gap-6">
-          <Reveal>
-            <section className="card-ambient-surface studio-library relative overflow-hidden rounded-[1.35rem] border border-white/[0.08] bg-[#171c1a] p-5 md:p-7">
-              <header className="relative flex flex-col gap-4 border-b border-white/[0.09] pb-5 md:flex-row md:items-end md:justify-between">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.18em] text-mint">
-                    <LayoutDashboard className="h-3.5 w-3.5" />
-                    Biblioteca ativa
-                  </p>
-                  <h2 className="mt-2.5 font-display text-[2rem] font-black leading-none tracking-[-.04em] md:text-[2.65rem]">Suas matérias</h2>
-                  <p className="mt-2 text-[13px] font-bold text-white/42">
-                    {data.subjects.length
-                      ? `${data.subjects.length} ${data.subjects.length === 1 ? "matéria" : "matérias"} · ${data.materials.length} ${
-                          data.materials.length === 1 ? "conteúdo" : "conteúdos"
-                        } · ${mastery}% estudado`
-                      : "Crie a primeira matéria e comece a organizar o semestre."}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  {data.subjects.length ? (
-                    <div role="group" aria-label="Como mostrar as matérias" className="caderno-library-switch">
-                      <button type="button" aria-pressed={libraryMode === "estante"} onClick={() => chooseLibraryMode("estante")}>
-                        Estante
-                      </button>
-                      <button type="button" aria-pressed={libraryMode === "cartoes"} onClick={() => chooseLibraryMode("cartoes")}>
-                        Cartões
-                      </button>
-                    </div>
-                  ) : null}
-                  <SecondaryButton onClick={() => go("search")} icon={Search}>Buscar</SecondaryButton>
-                  <PrimaryButton onClick={() => setModal({ type: "subject" })} icon={Plus}>Nova matéria</PrimaryButton>
-                </div>
-              </header>
-
-              {data.subjects.length && libraryMode === "estante" ? (
-                <div className="relative mt-9">
-                  <Estante
-                    books={subjectDesk.map(({ subject, materials, nextTask, reviews, overdueTasks }) => ({
-                      id: subject.id,
-                      name: subject.name,
-                      color: subject.color,
-                      icon: iconMap[subject.icon],
-                      materials: materials.length,
-                      studiedPercent: percent(materials.filter((item) => item.studied).length, Math.max(materials.length, 1)),
-                      dueReviews: reviews,
-                      overdueTasks,
-                      favorite: subject.favorite,
-                      nextAction: overdueTasks ? nextTask?.title : reviews ? `revisar ${reviews} ${reviews === 1 ? "cartão" : "cartões"}` : nextTask?.title,
-                    }))}
-                    onOpen={(id) => go("subject", id)}
-                    onCreate={() => setModal({ type: "subject" })}
-                  />
-                </div>
-              ) : null}
-
-              <div className={`relative mt-6 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3 ${libraryMode === "estante" ? "hidden" : ""}`}>
-                {subjectDesk.map(({ subject, materials, nextTask, reviews, overdueTasks }, index) => (
-                  <SubjectCard
-                    key={subject.id}
-                    subject={subject}
-                    index={index}
-                    materials={materials}
-                    nextTask={nextTask}
-                    dueReviews={reviews}
-                    overdueTasks={overdueTasks}
-                  />
-                ))}
-              </div>
-
-              {!data.subjects.length ? (
-                <EmptyState
-                  icon={Rocket}
-                  title="Monte sua primeira matéria"
-                  text="Reúna arquivos, links e anotações. A partir daqui, tarefas, revisões e a Mine passam a usar o mesmo contexto."
-                  action={<PrimaryButton onClick={() => setModal({ type: "subject" })} icon={Plus}>Criar matéria</PrimaryButton>}
-                />
-              ) : null}
-            </section>
-          </Reveal>
-        </div>
-
-        <div className="hidden gap-6 lg:grid xl:grid-cols-12">
-          <Reveal className="xl:col-span-12" delay={0.04}>
-            <CommandDeck
-              nodes={globeNodes}
-              accentColor={accentColor}
-              themeMode={themeMode}
-              latestTitle={latest?.title}
-              days={days}
-              materials={data.materials.length}
-              studied={studied}
-              pending={pendingTasks.length}
-              dueCards={dueCards}
-              onCreate={() => setModal({ type: "subject" })}
-            />
-          </Reveal>
-
-        </div>
-
-        <div className="hidden gap-6 md:grid xl:grid-cols-[1.4fr_.6fr]">
-          <Reveal delay={0.05}>
-            <GlassCard className="h-full">
-              <SectionTitle icon={Flame} title="Constância" hint="cada quadrado é um dia de estudo" />
-              <div className="mt-5">
-                <ConsistencyHeatmap sessions={data.sessions} />
-              </div>
-              <div className="mt-6 border-t border-white/[0.08] pt-5">
-                <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[.16em] text-white/40">
-                  <TrendingUp className="h-3.5 w-3.5 text-mint" />
-                  ritmo recente
-                </div>
-                <div className="mt-4">
-                  <ActivityChart sessions={data.sessions} />
-                </div>
-              </div>
-            </GlassCard>
-          </Reveal>
-
-          <div className="grid content-start gap-6">
-            <Reveal delay={0.08} direction="left">
-              <MinePromo />
-            </Reveal>
-            <Reveal delay={0.11} direction="left">
-              <GlassCard className="h-full">
-                <SectionTitle icon={Activity} title="Como você estuda" hint="tipos de sessão" />
-                <div className="mt-6">
-                  <SessionMix sessions={data.sessions} />
-                </div>
-              </GlassCard>
-            </Reveal>
-          </div>
-        </div>
-
-        <div className="grid content-start gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {data.subjects.length ? (
-            <Reveal delay={0.06}>
-              <GlassCard className="h-full">
-                <SectionTitle icon={Target} title="Domínio por matéria" hint="conteúdos marcados como estudados" />
-                <div className="mt-4">
-                  <MasteryBars rows={masteryRows} onSelect={(id) => go("subject", id)} />
-                </div>
-              </GlassCard>
-            </Reveal>
-          ) : null}
-
-          {dueBySubject.length ? (
-            <Reveal delay={0.1}>
-              <GlassCard className="h-full">
-                <SectionTitle icon={Layers} title="Revisões de hoje" hint="repetição espaçada" />
-                <div className="mt-4 space-y-2.5">
-                  {dueBySubject.slice(0, 3).map(({ subject, due }) => (
-                    <motion.button
-                      key={subject.id}
-                      onClick={() => setModal({ type: "flashcards", subjectId: subject.id })}
-                      whileHover={{ x: 4 }}
-                      transition={spring.snappy}
-                      className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 text-left transition-colors hover:border-mint/35 hover:bg-white/[0.07]"
-                    >
-                      <span
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-black"
-                        style={{ backgroundColor: subject.color, boxShadow: `0 0 20px ${subject.color}44` }}
-                      >
-                        <Layers className="h-[18px] w-[18px]" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-black leading-tight">{subject.name}</span>
-                        <span className="block text-[13px] text-white/48">
-                          {due} {due === 1 ? "cartão vencido" : "cartões vencidos"}
-                        </span>
-                      </span>
-                      <span className="grid h-7 min-w-7 shrink-0 place-items-center rounded-full bg-mint/15 px-2 text-xs font-black text-mint">{due}</span>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-white/25 transition group-hover:translate-x-0.5 group-hover:text-mint" />
-                    </motion.button>
-                  ))}
-                </div>
-              </GlassCard>
-            </Reveal>
-          ) : null}
-
-          <Reveal delay={0.14}>
-            <GlassCard className="h-full">
-              <SectionTitle
-                icon={CalendarCheck}
-                title="Próximas tarefas"
-                action={
-                  pendingTasks.length > 4 ? (
-                    <button onClick={() => go("agenda")} className="text-[13px] font-black text-mint transition hover:text-white">
-                      Ver todas
-                    </button>
-                  ) : undefined
-                }
-              />
-              <div className="mt-4 space-y-2.5">
-                {pendingTasks.slice(0, 4).map((task) => {
-                  const subject = data.subjects.find((item) => item.id === task.subjectId);
-                  return (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
-                      subject={subject}
-                      toggle={() =>
-                        update((draft) => ({
-                          ...draft,
-                          tasks: setTaskDone(draft.tasks, task.id, undefined),
-                        }))
-                      }
-                    />
-                  );
-                })}
-                {!pendingTasks.length ? (
-                  <div className="flex items-center gap-3 rounded-2xl border border-mint/20 bg-mint/[0.07] p-4">
-                    <CheckCircle2 className="h-5 w-5 shrink-0 text-mint" />
-                    <p className="text-sm font-bold text-white/70">Tudo em dia por aqui.</p>
-                  </div>
-                ) : null}
-              </div>
-            </GlassCard>
-          </Reveal>
-        </div>
-      </div>
-    </>
+    <HomeEstante
+      saudacao={greeting()}
+      nome={displayName}
+      frase={fraseEstante}
+      materias={estanteMaterias}
+      nivel={gam.level}
+      titulo={gam.title}
+      xpNivel={gam.levelXp}
+      xpPreciso={gam.levelNeed}
+      dias={days}
+      semana={weekDots}
+      tema={themeMode}
+      atalhos={[
+        { id: "mine", label: "Mine", icon: Bot, tom: "lilas", onClick: () => go("mine") },
+        { id: "agenda", label: "Agenda", icon: CalendarDays, tom: "amarelo", onClick: () => go("agenda") },
+        { id: "provas", label: "Provas", icon: ClipboardCheck, tom: "rosa", onClick: () => go("provas") },
+        { id: "games", label: "Games", icon: Gamepad2, tom: "menta", onClick: () => go("games") },
+        { id: "duelo", label: "Duelo", icon: Swords, tom: "lilas", onClick: () => go("duelo") },
+      ]}
+      onAbrir={(id) => go("subject", id)}
+      onPerguntar={(id) => {
+        const materia = estanteMaterias.find((item) => item.id === id);
+        if (!materia) return;
+        const conteudos = data.materials.filter((item) => item.subjectId === id).slice(0, 12).map((item) => `- ${item.title}${item.studied ? " (estudado)" : ""}`);
+        mineConversa(
+          `Me ajuda a estudar ${materia.name} agora? Por onde eu começo?`,
+          `O estudante esta na Home do Minerva olhando a materia "${materia.name}". Conteudos cadastrados:\n${conteudos.join("\n") || "- nenhum ainda"}\nO que ele tem para fazer nela: ${materia.itens.map((item) => `${item.titulo} (${item.detalhe})`).join("; ") || "nada pendente"}.`,
+          materia.name,
+        );
+      }}
+      onNovaMateria={() => setModal({ type: "subject" })}
+      dataHoje={dataHoje}
+      proximos={proximosDias}
+      xpHoje={xpSince(data, today())}
+      estudados={studied}
+      conteudos={data.materials.length}
+      onAgenda={() => go("agenda")}
+      onMine={() => go("mine")}
+      onProgresso={() => go("progress")}
+    />
   );
 }
 

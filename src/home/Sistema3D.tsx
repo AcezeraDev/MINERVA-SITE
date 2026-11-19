@@ -12,7 +12,9 @@ import * as THREE from "three";
 import { corDoToken, criarPalco, mola, type Palco } from "../cena3d/palco";
 import { aoCutucar } from "../pets/bus";
 
-export type MateriaOrbita = { id: string; name: string; color: string };
+/** Bilhete colado no caderno: prazo ou pendência da matéria. */
+export type AvisoCaderno = { texto: string; tom: "amarelo" | "rosa" };
+export type MateriaOrbita = { id: string; name: string; color: string; aviso?: AvisoCaderno };
 
 type Caderno = {
   id: string;
@@ -26,9 +28,91 @@ type Caderno = {
   /** 0 = chegando da câmera, 1 = em órbita. */
   chegada: number;
   nome: string;
+  /** Bilhete acima do caderno (some quando a matéria fica em dia). */
+  postit: THREE.Sprite | null;
+  avisoChave: string;
 };
 
+/** O rosto da Mine (o mesmo SVG do MineFace, viewBox 120) desenhado num canvas. */
+function texturaDaMine() {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(256 / 120, 256 / 120);
+  ctx.lineWidth = 3.4;
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#1d2440";
+  const caixa = (x: number, y: number, w: number, h: number, r: number, cor: string) => {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.fillStyle = cor;
+    ctx.fill();
+    ctx.stroke();
+  };
+  ctx.beginPath();
+  ctx.moveTo(60, 14);
+  ctx.lineTo(60, 30);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(60, 11, 7, 0, Math.PI * 2);
+  ctx.fillStyle = "#39f59a";
+  ctx.fill();
+  ctx.stroke();
+  caixa(10, 54, 14, 30, 6, "#39f59a");
+  caixa(96, 54, 14, 30, 6, "#39f59a");
+  caixa(20, 30, 80, 80, 26, "#ffffff");
+  caixa(31, 46, 58, 42, 16, "#e8ecf4");
+  ctx.fillStyle = "#1d2440";
+  for (const cx of [47, 73]) {
+    ctx.beginPath();
+    ctx.ellipse(cx, 64, 5, 6.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.moveTo(52, 77);
+  ctx.quadraticCurveTo(60, 84, 68, 77);
+  ctx.stroke();
+  const textura = new THREE.CanvasTexture(canvas);
+  textura.colorSpace = THREE.SRGBColorSpace;
+  textura.anisotropy = 4;
+  return textura;
+}
+
+/** Post-it desenhado num canvas, com a letra à mão do caderno. */
+function texturaDoPostit(aviso: AvisoCaderno) {
+  // bilhete largo (5:3), com fita no alto e o prazo numa linha só, grande
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 192;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.fillRect(14, 30, 300, 154);
+  ctx.fillStyle = aviso.tom === "rosa" ? "#ffb3c1" : "#f4f05a";
+  ctx.fillRect(8, 24, 300, 154);
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillRect(118, 8, 84, 34);
+  ctx.fillStyle = "#1d2440";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  let tamanho = 72;
+  ctx.font = `400 ${tamanho}px "Gochi Hand", "Patrick Hand", "Comic Sans MS", cursive`;
+  while (ctx.measureText(aviso.texto).width > 270 && tamanho > 40) {
+    tamanho -= 4;
+    ctx.font = `400 ${tamanho}px "Gochi Hand", "Patrick Hand", "Comic Sans MS", cursive`;
+  }
+  ctx.fillText(aviso.texto, 158, 106);
+  const textura = new THREE.CanvasTexture(canvas);
+  textura.colorSpace = THREE.SRGBColorSpace;
+  textura.anisotropy = 4;
+  return textura;
+}
+
 const raios = [2.35, 3.25, 4.15];
+/** Cadernos 1,5× maiores: com o tamanho antigo eles sumiam no palco largo. */
+const ESCALA_CADERNO = 1.5;
+/** O caderno escolhido para ~35° à direita da frente, para não atravessar a Mine. */
+const DESVIO_FRENTE = 0.62;
 const tamanhoCapa = new THREE.Vector3(0.62, 0.84, 0.14);
 
 /** Capa desenhada num canvas: cor da matéria, etiqueta branca e a inicial. */
@@ -62,21 +146,27 @@ function texturaDaCapa(nome: string, cor: string) {
 
 export default function Sistema3D({
   materias,
+  selecionada = null,
   onAbrir,
+  onSelecionar,
   onCriar,
   onNucleo,
 }: {
   materias: MateriaOrbita[];
+  /** Caderno em destaque: fica levantado, parado e é trazido para a frente. */
+  selecionada?: string | null;
   onAbrir: (id: string) => void;
+  /** Sem este callback, clicar abre a matéria direto (comportamento antigo). */
+  onSelecionar?: (id: string) => void;
   onCriar: () => void;
   onNucleo: () => void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const tipRef = useRef<HTMLDivElement | null>(null);
   const palcoRef = useRef<Palco | null>(null);
-  const apiRef = useRef<{ sincronizar: (lista: MateriaOrbita[]) => void } | null>(null);
-  const callbacks = useRef({ onAbrir, onCriar, onNucleo });
-  callbacks.current = { onAbrir, onCriar, onNucleo };
+  const apiRef = useRef<{ sincronizar: (lista: MateriaOrbita[]) => void; selecionar: (id: string | null) => void } | null>(null);
+  const callbacks = useRef({ onAbrir, onSelecionar, onCriar, onNucleo });
+  callbacks.current = { onAbrir, onSelecionar, onCriar, onNucleo };
 
   useEffect(() => {
     const host = hostRef.current;
@@ -84,6 +174,7 @@ export default function Sistema3D({
     const cadernos = new Map<string, Caderno>();
     const fantasmas: THREE.Group[] = [];
     let hover: string | null = null;
+    let escolhido: string | null = null;
     let nucleoHover = false;
     const giro = { alvo: 0.35, v: 0.35, vel: 0 };
     const arrasto = { ativo: false, x: 0, ultimoX: 0, moveu: 0, inercia: 0 };
@@ -98,27 +189,41 @@ export default function Sistema3D({
       if (!arrasto.ativo) {
         giro.alvo += arrasto.inercia;
         arrasto.inercia *= 0.94;
-        giro.alvo += delta * 0.06;
+        // com um caderno em destaque o sistema para de girar sozinho
+        if (!escolhido) giro.alvo += delta * 0.06;
       }
       sistema.rotation.y = mola(giro, giro.alvo, delta, 90, 16);
       // afasta a câmera em palco estreito para a órbita de fora caber inteira
       const meiaLargura = Math.tan(THREE.MathUtils.degToRad(p.camera.fov / 2)) * p.camera.aspect;
-      p.camera.position.z = Math.max(11, 5.3 / meiaLargura);
+      // 8.8 de perto: na Estante em órbita a área é larga e os cadernos sumiam a 11
+      p.camera.position.z = Math.max(8.2, 5.2 / meiaLargura);
       // parallax suave da câmera pelo ponteiro
       p.camera.position.x = p.pointer.x * 0.9;
-      p.camera.position.y = 2.2 + p.pointer.y * 0.6;
-      p.camera.lookAt(0, 0.5, 0);
+      // câmera mais alta: a órbita vira uma elipse mais aberta e enche o palco
+      p.camera.position.y = 4.1 + p.pointer.y * 0.6;
+      p.camera.lookAt(0, -0.35, 0);
 
-      nucleo.rotation.y = tempo * 0.35;
-      nucleo.rotation.x = Math.sin(tempo * 0.4) * 0.25;
-      aramado.rotation.y = -tempo * 0.22;
-      const pulso = 1 + Math.sin(tempo * 1.8) * 0.035 + (nucleoHover ? 0.08 : 0);
-      nucleo.scale.setScalar(pulso);
+      // a Mine flutua de leve e cresce um pouco quando o ponteiro passa nela
+      const pulso = 1 + Math.sin(tempo * 1.8) * 0.03 + (nucleoHover ? 0.1 : 0);
+      nucleo.scale.setScalar(2.3 * pulso);
+      nucleo.position.y = 0.35 + Math.sin(tempo * 1.2) * 0.08;
       brilho.scale.setScalar(2.6 + Math.sin(tempo * 1.8) * 0.12);
       poeira.rotation.y = tempo * 0.012;
 
       for (const caderno of cadernos.values()) {
-        const parado = hover === caderno.id;
+        const parado = hover === caderno.id || escolhido === caderno.id;
+        const eleito = escolhido === caderno.id;
+        // com um caderno escolhido, os outros recuam um pouco e os bilhetes
+        // deles passam a respeitar a profundidade (não cobrem mais o escolhido)
+        const coadjuvante = Boolean(escolhido) && !eleito;
+        if (caderno.postit) {
+          const m = caderno.postit.material;
+          m.rotation = 0.06 + Math.sin(tempo * 1.7 + caderno.fase) * 0.05;
+          m.depthTest = coadjuvante;
+          m.opacity = coadjuvante ? 0.82 : 1;
+          caderno.postit.renderOrder = eleito ? 4 : 2;
+          caderno.postit.scale.set(coadjuvante ? 0.78 : 0.95, coadjuvante ? 0.47 : 0.57, 1);
+        }
         if (!parado) caderno.angulo += delta * caderno.velocidade;
         caderno.chegada = Math.min(1, caderno.chegada + delta * 0.62);
         const e = 1 - Math.pow(1 - caderno.chegada, 3);
@@ -127,11 +232,18 @@ export default function Sistema3D({
         const oy = Math.sin(tempo * 1.1 + caderno.fase) * 0.12;
         // chega de perto da câmera (no espaço do sistema girado) até a órbita
         const lev = mola(caderno.levanta, parado ? 1 : 0, delta, 220, 20);
-        caderno.grupo.position.set(ox * e + (1 - e) * 0.5, oy * e + (1 - e) * 3.4 + lev * 0.45, oz * e + (1 - e) * 7);
-        caderno.grupo.rotation.y = -caderno.angulo + Math.PI / 2 + (1 - e) * Math.PI * 4 - sistema.rotation.y * lev;
-        caderno.grupo.rotation.z = Math.sin(tempo * 0.9 + caderno.fase) * 0.08 + (1 - e) * 0.6;
-        caderno.grupo.rotation.x = -0.25 * lev;
-        caderno.grupo.scale.setScalar(1 + lev * 0.35 + (1 - e) * 1.2);
+        caderno.grupo.position.set(ox * e + (1 - e) * 0.5, oy * e + (1 - e) * 3.4 + lev * 0.85, oz * e + (1 - e) * 7);
+        // levantado, o caderno vira a capa para a câmera (rotação no mundo ≈ 0,
+        // com um leve giro para o centro, já que ele fica à direita): o giro vai
+        // pelo caminho mais curto, sem dar voltas
+        const base = -caderno.angulo + Math.PI / 2 + (1 - e) * Math.PI * 4;
+        const deFrente = -sistema.rotation.y - 0.32;
+        const falta = THREE.MathUtils.euclideanModulo(deFrente - base + Math.PI, Math.PI * 2) - Math.PI;
+        caderno.grupo.rotation.y = base + falta * lev;
+        caderno.grupo.rotation.z = Math.sin(tempo * 0.9 + caderno.fase) * 0.08 * (1 - lev) + (1 - e) * 0.6;
+        caderno.grupo.rotation.x = -0.18 * lev;
+        const tamanho = eleito ? 1 + lev * 0.6 : coadjuvante ? 0.85 + lev * 0.3 : 1 + lev * 0.3;
+        caderno.grupo.scale.setScalar(ESCALA_CADERNO * tamanho + (1 - e) * 1.2);
       }
       fantasmas.forEach((fantasma, indice) => {
         const angulo = tempo * 0.18 + (indice * Math.PI * 2) / 3;
@@ -196,18 +308,12 @@ export default function Sistema3D({
     sistema.rotation.x = 0.12;
     scene.add(sistema);
 
-    // núcleo: a "mente" da Mine, facetada, com um aramado girando ao contrário
-    const nucleo = new THREE.Mesh(
-      guardar(new THREE.IcosahedronGeometry(0.82, 1)),
-      guardar(new THREE.MeshStandardMaterial({ color: tinta, roughness: 0.35, metalness: 0.15, flatShading: true, emissive: tinta, emissiveIntensity: 0.25 })),
-    );
+    // núcleo: a própria Mine (o mesmo rosto da margem do caderno), sempre de
+    // frente para a câmera. Antes era um globo de arame que não lembrava ela.
+    const nucleo = new THREE.Sprite(guardar(new THREE.SpriteMaterial({ map: guardar(texturaDaMine()), transparent: true, depthWrite: false })));
     nucleo.userData.id = "nucleo";
+    nucleo.position.y = 0.35;
     sistema.add(nucleo);
-    const aramado = new THREE.Mesh(
-      guardar(new THREE.IcosahedronGeometry(1.18, 1)),
-      guardar(new THREE.MeshBasicMaterial({ color: tinta, wireframe: true, transparent: true, opacity: 0.35 })),
-    );
-    sistema.add(aramado);
     const brilho = new THREE.Sprite(
       guardar(
         new THREE.SpriteMaterial({
@@ -262,6 +368,28 @@ export default function Sistema3D({
     const materialMiolo = guardar(new THREE.MeshStandardMaterial({ color: 0xfbfaf4, roughness: 0.9 }));
     const geoOnda = guardar(new THREE.RingGeometry(0.96, 1, 64));
 
+    // bilhete acima do caderno, sempre de frente para a câmera (um sprite):
+    // preso na capa ele virava de lado com a órbita e ninguém lia o prazo
+    const colarAviso = (caderno: Caderno, aviso: AvisoCaderno | undefined) => {
+      const chave = aviso ? `${aviso.tom}:${aviso.texto}` : "";
+      if (chave === caderno.avisoChave) return;
+      caderno.avisoChave = chave;
+      if (caderno.postit) {
+        caderno.grupo.remove(caderno.postit);
+        const antigo = caderno.postit.material;
+        antigo.map?.dispose();
+        antigo.dispose();
+        caderno.postit = null;
+      }
+      if (!aviso) return;
+      const postit = new THREE.Sprite(new THREE.SpriteMaterial({ map: texturaDoPostit(aviso), transparent: true, depthTest: false }));
+      postit.position.set(0, tamanhoCapa.y / 2 + 0.36, 0);
+      postit.scale.set(0.95, 0.57, 1);
+      postit.renderOrder = 2;
+      caderno.grupo.add(postit);
+      caderno.postit = postit;
+    };
+
     const adicionar = (materia: MateriaOrbita, indice: number, anima: boolean) => {
       const cor = new THREE.Color(materia.color);
       const textura = guardar(texturaDaCapa(materia.name, materia.color));
@@ -286,7 +414,10 @@ export default function Sistema3D({
         levanta: { v: 0, vel: 0 },
         chegada: anima ? 0 : 1,
         nome: materia.name,
+        postit: null,
+        avisoChave: "",
       });
+      colarAviso(cadernos.get(materia.id)!, materia.aviso);
       if (anima) {
         const onda = new THREE.Mesh(geoOnda, new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }));
         onda.rotation.x = Math.PI / 2;
@@ -303,15 +434,19 @@ export default function Sistema3D({
       const ids = new Set(lista.map((item) => item.id));
       for (const [id, caderno] of cadernos) {
         if (!ids.has(id)) {
+          colarAviso(caderno, undefined);
           sistema.remove(caderno.grupo);
           cadernos.delete(id);
         }
       }
       lista.forEach((materia, indice) => {
         const existente = cadernos.get(materia.id);
-        if (existente) existente.nome = materia.name;
-        else adicionar(materia, indice, anima);
+        if (existente) {
+          existente.nome = materia.name;
+          colarAviso(existente, materia.aviso);
+        } else adicionar(materia, indice, anima);
       });
+      if (escolhido) selecionar(escolhido);
       // sem matéria: três cadernos de arame chamando para criar a primeira
       fantasmas.forEach((g) => sistema.remove(g));
       fantasmas.length = 0;
@@ -327,7 +462,22 @@ export default function Sistema3D({
         }
       }
     };
-    apiRef.current = { sincronizar };
+    /**
+     * Traz o caderno para a frente da câmera. Com o grupo girado em θ no eixo
+     * y, um ponto no ângulo a da órbita fica na frente (+z) quando θ = a − π/2;
+     * entre as voltas equivalentes, fica a mais próxima do giro atual.
+     */
+    const selecionar = (id: string | null) => {
+      escolhido = id;
+      const caderno = id ? cadernos.get(id) : undefined;
+      if (!caderno) return;
+      // a − θ = π/2 − desvio: fica na frente, mas deslocado para a direita
+      const alvo = caderno.angulo - Math.PI / 2 + DESVIO_FRENTE;
+      const voltas = Math.round((giro.alvo - alvo) / (Math.PI * 2));
+      giro.alvo = alvo + voltas * Math.PI * 2;
+      arrasto.inercia = 0;
+    };
+    apiRef.current = { sincronizar, selecionar };
 
     const onDown = (event: PointerEvent) => {
       arrasto.ativo = true;
@@ -359,6 +509,8 @@ export default function Sistema3D({
       if (!id) return;
       if (id === "nucleo") callbacks.current.onNucleo();
       else if (id === "fantasma") callbacks.current.onCriar();
+      // com seleção: o primeiro toque escolhe o caderno, o segundo abre
+      else if (callbacks.current.onSelecionar && escolhido !== id) callbacks.current.onSelecionar(id);
       else callbacks.current.onAbrir(id);
     };
     host.addEventListener("pointerdown", onDown);
@@ -388,17 +540,22 @@ export default function Sistema3D({
       host.removeEventListener("pointerup", onUp);
       host.removeEventListener("pointercancel", onUp);
       ondas.forEach((onda) => (onda.malha.material as THREE.Material).dispose());
+      // as texturas dos post-its não passam pelo `guardar` (trocam a cada aviso)
+      cadernos.forEach((caderno) => colarAviso(caderno, undefined));
       apiRef.current = null;
       palcoRef.current = null;
       palco.destruir();
     };
   }, []);
 
-  const chave = materias.map((item) => `${item.id}:${item.name}`).join("|");
+  const chave = materias.map((item) => `${item.id}:${item.name}:${item.aviso?.tom || ""}:${item.aviso?.texto || ""}`).join("|");
   useEffect(() => {
     apiRef.current?.sincronizar(materias);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chave]);
+  useEffect(() => {
+    apiRef.current?.selecionar(selecionada);
+  }, [selecionada]);
 
   return (
     <div ref={hostRef} className="home-sistema-canvas" style={{ touchAction: "pan-y" }}>

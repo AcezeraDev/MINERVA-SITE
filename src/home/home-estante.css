@@ -1,0 +1,986 @@
+/* Aba Início, "Estante em órbita": órbita + ficha direto na folha, fileira de
+   lombadas e régua. Nada de cartão dentro de cartão: a página é o caderno. */
+
+.he-page {
+  display: grid;
+  gap: 1.1rem;
+  padding-bottom: 3rem;
+}
+
+/* ── hero: a Mine apresenta o dia. Rosto grande, data à mão, saudação e a
+   fala dela com o resumo de todas as matérias; dois caminhos para começar. ── */
+.he-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem 1.6rem;
+  padding: 0.4rem 0 0.6rem;
+}
+
+.he-hero-mine {
+  display: block;
+  width: clamp(5.5rem, 11vw, 9rem);
+  aspect-ratio: 1;
+  /* a Mine "aparece" no papel com o marca-texto atrás, como um grifo */
+  background: radial-gradient(closest-side, rgb(var(--mint) / 0.45), transparent 72%);
+}
+
+.he-hero-mine svg {
+  width: 100%;
+  height: 100%;
+}
+
+.he-hero-texto {
+  min-width: 0;
+}
+
+.he-hero-data {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.2rem;
+  color: rgb(var(--theme-muted));
+}
+
+.he-hero-data::first-letter {
+  text-transform: uppercase;
+}
+
+.he-hero-fala {
+  margin-top: 0.55rem;
+  max-width: 54ch;
+  font-family: "Gochi Hand", cursive;
+  font-size: clamp(1.2rem, 1.9vw, 1.45rem);
+  line-height: 1.32;
+  color: rgb(var(--pen));
+}
+
+.he-hero-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.9rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 640px) {
+  .he-hero {
+    grid-template-columns: 1fr;
+  }
+  .he-hero-mine {
+    width: 4.6rem;
+  }
+  .he-hero-acoes .he-btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ── recadinho da Mine dentro da ficha: a dica daquela matéria ── */
+.he-ficha-dica {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.3rem;
+  padding: 0.2rem 0;
+  text-align: left;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  color: rgb(var(--pen));
+  transition: transform 140ms ease;
+}
+
+.he-ficha-dica:hover {
+  transform: translateX(3px);
+}
+
+.he-ficha-dica-rosto {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+}
+
+.he-ficha-dica-rosto svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── topo: uma linha de saudação e uma frase que aponta o próximo passo ── */
+.he-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.9rem 1.5rem;
+}
+
+.he-saudacao {
+  font-family: "Anybody Variable", "Anybody", system-ui, sans-serif;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  color: rgb(var(--theme-text));
+  text-wrap: balance;
+}
+
+.he-nome {
+  background: linear-gradient(transparent 58%, rgb(var(--mint) / 0.75) 58%, rgb(var(--mint) / 0.75) 92%, transparent 92%);
+  mix-blend-mode: var(--hl-blend);
+  padding: 0 0.08em;
+}
+
+.he-frase {
+  margin-top: 0.45rem;
+  max-width: 60ch;
+  font-size: 1.02rem;
+  line-height: 1.5;
+  color: rgb(var(--theme-text) / 0.78);
+}
+
+.he-topo-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.he-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.55rem 1.05rem;
+  border-radius: 0.85rem;
+  font-weight: 800;
+  font-size: 0.93rem;
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms ease;
+}
+
+.he-btn:hover {
+  transform: translateY(-2px);
+}
+
+.he-btn:active {
+  transform: translateY(1px);
+}
+
+.he-btn-papel {
+  color: rgb(var(--theme-text));
+  background: rgb(var(--panel));
+  box-shadow: 0 1px 0 rgb(var(--line)), inset 0 0 0 1.5px rgb(var(--line));
+}
+
+/* ── palco: órbita e ficha direto na folha pautada, sem moldura ── */
+.he-palco {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1180px) {
+  .he-palco {
+    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+    /* o hero ocupa ~14rem: o palco cede altura para a ficha ainda caber inteira */
+    grid-template-rows: minmax(clamp(400px, calc(100dvh - 31rem), 560px), auto) auto;
+    column-gap: 1.6rem;
+    margin-right: 2.5rem;
+  }
+}
+
+.he-orbita {
+  position: relative;
+  min-height: 320px;
+}
+
+@media (min-width: 1180px) {
+  .he-orbita {
+    min-height: 0;
+  }
+}
+
+/* o canvas do Sistema3D ocupa a área inteira */
+.he-orbita .home-sistema-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.he-orbita-legenda {
+  position: absolute;
+  left: 0.4rem;
+  bottom: 0.2rem;
+  right: 0.4rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+  pointer-events: none;
+}
+
+/* ── órbita plana (celular, modo leve): a Mine no centro, bilhetes com prazo ── */
+.he-plana {
+  --raio: min(28vw, 104px);
+  /* a legenda mora embaixo: a órbita centraliza acima dela */
+  bottom: 1.6rem;
+}
+
+@media (min-width: 1180px) {
+  .he-plana {
+    --raio: min(13vw, 170px);
+  }
+}
+
+.he-plana .home-orbita-anel {
+  width: calc(var(--raio) * 2);
+}
+
+.he-plana-mine {
+  display: block;
+  width: 5.2rem;
+  height: 5.2rem;
+}
+
+.he-plana-mine svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* a órbita plana gira inteira: a Mine gira ao contrário para ficar em pé */
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.no-motion) .he-plana-mine {
+    animation: home-orbita-reverso 40s linear infinite;
+  }
+}
+
+.he-plana .home-orbita-livro {
+  overflow: visible;
+  transform: rotate(var(--a)) translateY(calc(-1 * var(--raio))) rotate(calc(-1 * var(--a)));
+}
+
+.he-plana .home-orbita-livro.is-escolhido {
+  outline: 3px solid rgb(var(--pen));
+  outline-offset: 3px;
+  z-index: 2;
+}
+
+.he-plana-postit {
+  position: absolute;
+  bottom: calc(100% + 0.15rem);
+  left: 50%;
+  translate: -50% 0;
+  rotate: -4deg;
+  padding: 0 0.3rem;
+  font-family: "Gochi Hand", cursive;
+  /* a letra à mão tem corpo baixo: abaixo de 1rem ela some no celular */
+  font-size: 1rem;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: nowrap;
+  color: #14161b;
+  box-shadow: 0 2px 3px rgb(0 0 0 / 0.2);
+}
+
+.he-plana-postit.is-amarelo {
+  background: #f4f05a;
+}
+
+.he-plana-postit.is-rosa {
+  background: #ffb3c1;
+}
+
+/* ── ficha da matéria: uma folha solta presa sobre a página ── */
+.he-lado {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  perspective: 1200px;
+}
+
+@media (min-width: 1180px) {
+  .he-lado {
+    align-self: center;
+  }
+}
+
+.he-ficha {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem 1.3rem 1.2rem;
+  border-radius: 0.4rem 1.1rem 1.1rem 1.1rem;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 31px, rgb(var(--rule) / 0.55) 31px 32px),
+    rgb(var(--sheet));
+  box-shadow: 0 18px 34px -24px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(var(--line) / 0.8);
+  transform-origin: left center;
+}
+
+@media (min-width: 1180px) {
+  .he-ficha {
+    min-height: 26rem;
+  }
+}
+
+.he-ficha-aba {
+  position: absolute;
+  top: -0.7rem;
+  left: 1.1rem;
+  width: 5.5rem;
+  height: 0.95rem;
+  border-radius: 0.45rem 0.45rem 0 0;
+  background: var(--cor, rgb(var(--hl-mint)));
+}
+
+.he-ficha-troca {
+  display: flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: 0.1rem;
+  margin: -0.5rem -0.6rem -0.3rem 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--theme-muted));
+}
+
+.he-ficha-troca button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+  color: rgb(var(--theme-text));
+}
+
+.he-ficha-troca button:hover {
+  background: rgb(var(--pen) / 0.1);
+}
+
+.he-ficha-topo {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.he-ficha-icone {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.8rem;
+  color: #14161b;
+  background: var(--cor, rgb(var(--hl-mint)));
+}
+
+.he-ficha h2 {
+  font-family: "Anybody Variable", "Anybody", system-ui, sans-serif;
+  font-size: clamp(1.45rem, 2.4vw, 1.9rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: rgb(var(--theme-text));
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.he-ficha-numeros {
+  margin-top: 0.3rem;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--theme-text) / 0.72);
+}
+
+/* o marca-texto cobre o número na proporção do que já foi estudado */
+.he-grifo {
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+  background: linear-gradient(90deg, rgb(var(--mint) / 0.8) var(--p), transparent var(--p)) 0 62% / 100% 0.62em no-repeat;
+  mix-blend-mode: var(--hl-blend);
+}
+
+.he-ficha-sub {
+  margin-top: 0.2rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: rgb(var(--pen));
+}
+
+/* itens escritos na pauta: etiqueta de marca-texto, título e seta, sem caixa */
+.he-ficha-lista {
+  display: grid;
+}
+
+.he-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.4rem 0.2rem;
+  text-align: left;
+  border-bottom: 1px dashed rgb(var(--line));
+  transition: transform 140ms ease;
+}
+
+.he-item:hover {
+  transform: translateX(4px);
+}
+
+.he-item:hover .he-item-texto strong {
+  text-decoration: underline;
+  text-decoration-color: rgb(var(--pen) / 0.5);
+  text-underline-offset: 3px;
+}
+
+.he-item-tag {
+  flex: none;
+  min-width: 4.6rem;
+  padding: 0.1rem 0.45rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.98rem;
+  text-align: center;
+  color: #14161b;
+  background: rgb(var(--hl-lilac));
+  rotate: -2deg;
+}
+
+.he-item.is-atrasada .he-item-tag {
+  background: rgb(var(--hl-pink));
+}
+
+.he-item.is-prova .he-item-tag,
+.he-item.is-hoje .he-item-tag {
+  background: rgb(var(--hl-yellow));
+}
+
+.he-item.is-continuar .he-item-tag {
+  background: rgb(var(--hl-mint));
+}
+
+.he-item-texto {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.he-item-texto strong {
+  overflow: hidden;
+  font-size: 0.93rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgb(var(--theme-text));
+}
+
+.he-item-texto small {
+  font-size: 0.78rem;
+  color: rgb(var(--theme-text) / 0.65);
+}
+
+.he-item-seta {
+  flex: none;
+  color: rgb(var(--theme-muted));
+}
+
+.he-ficha-vazia {
+  font-size: 0.93rem;
+  line-height: 1.5;
+  color: rgb(var(--theme-text) / 0.78);
+}
+
+.he-ficha-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
+}
+
+.he-ficha-acoes .he-btn {
+  flex: 1 1 auto;
+}
+
+.he-ficha.is-vazia {
+  justify-content: center;
+  gap: 1rem;
+}
+
+.he-ficha.is-vazia p {
+  max-width: 46ch;
+  line-height: 1.55;
+  color: rgb(var(--theme-text) / 0.8);
+}
+
+.he-ficha.is-vazia .he-btn {
+  align-self: flex-start;
+}
+
+/* ── abas de fichário: no celular, uma fileira de etiquetas ── */
+.he-fichario {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.he-aba {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 42px;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.75rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: #14161b;
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.he-aba svg {
+  flex: none;
+}
+
+.he-aba.is-lilas {
+  background: rgb(var(--hl-lilac));
+}
+.he-aba.is-amarelo {
+  background: rgb(var(--hl-yellow));
+}
+.he-aba.is-rosa {
+  background: rgb(var(--hl-pink));
+}
+.he-aba.is-menta {
+  background: rgb(var(--hl-mint));
+}
+
+/* No computador, as abas saem de trás da ficha, em pé e com o nome
+   sempre visível, como as divisórias de um fichário. */
+@media (min-width: 1180px) {
+  .he-fichario {
+    position: absolute;
+    top: 50%;
+    right: -2.5rem;
+    translate: 0 -50%;
+    flex-direction: column;
+    gap: 0.25rem;
+    z-index: 0;
+  }
+
+  .he-aba {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    width: 2.75rem;
+    min-height: 0;
+    padding: 0.6rem 0 0.7rem 0.3rem;
+    border-radius: 0 0.75rem 0.75rem 0;
+    font-size: 0.78rem;
+    box-shadow: 4px 6px 12px -9px rgb(0 0 0 / 0.5);
+  }
+
+  .he-aba span {
+    writing-mode: vertical-rl;
+    letter-spacing: 0.02em;
+  }
+
+  .he-aba:hover,
+  .he-aba:focus-visible {
+    transform: translateX(4px);
+  }
+}
+
+/* ── fileira: os mesmos cadernos em lombadas, para escolher no teclado e no celular ── */
+.he-fileira {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.6rem 0.2rem 0.8rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line)) transparent;
+}
+
+/* No celular a fileira é o seletor principal: vem logo depois da órbita. */
+.he-orbita {
+  order: 1;
+}
+.he-fileira {
+  order: 2;
+}
+.he-lado {
+  order: 3;
+}
+.he-fichario {
+  order: 4;
+}
+
+@media (min-width: 1180px) {
+  .he-orbita,
+  .he-lado {
+    grid-row: 1;
+  }
+  .he-fileira {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    padding-bottom: 0.2rem;
+  }
+}
+
+.he-caderno {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: none;
+  min-height: 46px;
+  padding: 0.45rem 0.9rem 0.45rem 0.45rem;
+  scroll-snap-align: start;
+  border-radius: 0.4rem 0.8rem 0.8rem 0.4rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--sheet));
+  box-shadow: 0 1px 0 rgb(var(--line)), inset 0 0 0 1px rgb(var(--line) / 0.8);
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms ease;
+}
+
+.he-caderno:hover {
+  transform: translateY(-2px);
+}
+
+.he-caderno.is-on {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 18px -12px rgb(0 0 0 / 0.5), inset 0 0 0 2px rgb(var(--pen));
+}
+
+.he-caderno-lombada {
+  width: 0.65rem;
+  align-self: stretch;
+  border-radius: 0.2rem;
+  background: var(--cor);
+}
+
+.he-caderno-postit {
+  padding: 0.05rem 0.4rem;
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.92rem;
+  font-weight: 400;
+  color: #14161b;
+  rotate: 3deg;
+  box-shadow: 0 2px 4px -2px rgb(0 0 0 / 0.35);
+}
+
+.he-caderno-postit.is-amarelo {
+  background: #f4f05a;
+}
+
+.he-caderno-postit.is-rosa {
+  background: #ffb3c1;
+}
+
+/* ── próximos 7 dias: uma agenda de papel em sete colunas ── */
+.he-semana {
+  display: grid;
+  gap: 0.5rem;
+}
+
+@media (min-width: 1180px) {
+  .he-semana {
+    margin-right: 2.5rem;
+  }
+}
+
+.he-semana-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.he-semana-topo h2 {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.3rem;
+  font-weight: 400;
+  color: rgb(var(--pen));
+}
+
+.he-semana-dias {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(8.5rem, 1fr);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line)) transparent;
+  border-top: 1.5px solid rgb(var(--line));
+  border-bottom: 1.5px solid rgb(var(--line));
+}
+
+.he-dia + .he-dia {
+  border-left: 1px dashed rgb(var(--line));
+}
+
+.he-dia button {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 6.2rem;
+  padding: 0.55rem 0.6rem 0.65rem;
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+
+.he-dia button:hover {
+  background: rgb(var(--pen) / 0.05);
+}
+
+.he-dia-nome {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.he-dia-nome small {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--theme-muted));
+}
+
+/* hoje fica grifado de marca-texto, como na agenda de papel */
+.he-dia.is-hoje .he-dia-nome {
+  justify-self: start;
+  padding: 0 0.25rem;
+  background: linear-gradient(transparent 45%, rgb(var(--mint) / 0.7) 45%);
+  mix-blend-mode: var(--hl-blend);
+}
+
+.he-dia-tarefas {
+  display: grid;
+  gap: 0.25rem;
+}
+
+/* um ponto da cor da matéria e o título inteiro, em até duas linhas */
+.he-dia-tarefa {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: rgb(var(--theme-text) / 0.85);
+}
+
+.he-dia-ponto {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.3em;
+  border-radius: 999px;
+}
+
+.he-dia-tarefa > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.he-semana-livres {
+  display: none;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* No celular, colunas que rolam de lado cortavam o texto: vira uma lista só
+   com os dias que têm tarefa, e os livres viram uma linha no fim. */
+@media (max-width: 640px) {
+  .he-semana-dias {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow: visible;
+  }
+  .he-dia + .he-dia {
+    border-left: 0;
+    border-top: 1px dashed rgb(var(--line));
+  }
+  .he-dia.is-livre {
+    display: none;
+  }
+  .he-dia button {
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    min-height: 0;
+  }
+  .he-semana-livres {
+    display: block;
+  }
+}
+
+.he-dia-tarefa.is-prova {
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+}
+
+.he-dia-mais {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgb(var(--theme-muted));
+}
+
+.he-dia-livre {
+  font-family: "Gochi Hand", cursive;
+  font-size: 0.95rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* ── régua: progresso como a régua do estojo ── */
+.he-regua {
+  display: grid;
+  gap: 0.7rem 1.2rem;
+  align-items: center;
+  padding: 0.9rem 0.2rem 0;
+}
+
+@media (min-width: 900px) {
+  .he-regua {
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  }
+}
+
+.he-xp-hoje {
+  font-weight: 800;
+  color: rgb(var(--pen));
+}
+
+.he-regua-total {
+  font-size: 0.82rem;
+  color: rgb(var(--theme-text) / 0.8);
+}
+
+.he-regua-total strong {
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--theme-text));
+}
+
+@media (min-width: 1180px) {
+  .he-regua {
+    margin-right: 2.5rem;
+  }
+}
+
+.he-regua-nivel {
+  display: grid;
+  line-height: 1.15;
+}
+
+.he-regua-nivel strong {
+  font-family: "Anybody Variable", "Anybody", system-ui, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: rgb(var(--theme-text));
+}
+
+.he-regua-nivel span {
+  font-size: 0.8rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* traços de centímetro e milímetro desenhados em gradiente */
+.he-regua-barra {
+  position: relative;
+  height: 2.6rem;
+  overflow: hidden;
+  border-radius: 0.45rem;
+  background:
+    repeating-linear-gradient(90deg, rgb(var(--theme-text) / 0.55) 0 1.5px, transparent 1.5px 10%) 0 0 / 100% 0.85rem no-repeat,
+    repeating-linear-gradient(90deg, rgb(var(--theme-text) / 0.28) 0 1px, transparent 1px 2%) 0 0 / 100% 0.45rem no-repeat,
+    rgb(var(--hl-yellow) / 0.28);
+  box-shadow: inset 0 0 0 1px rgb(var(--line));
+}
+
+.he-regua-tinta {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: rgb(var(--mint) / 0.7);
+  mix-blend-mode: var(--hl-blend);
+}
+
+.he-regua-texto {
+  position: absolute;
+  left: 0.7rem;
+  bottom: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--theme-text));
+}
+
+.he-regua-dias {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text) / 0.8);
+}
+
+.he-regua-semana {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.he-regua-semana i {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 0.2rem;
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+}
+
+.he-regua-semana i.is-on {
+  background: rgb(var(--mint));
+  box-shadow: none;
+}
+
+.he-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: rgb(var(--pen));
+}
+
+.he-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.he-page :focus-visible {
+  outline: 3px solid rgb(var(--pen));
+  outline-offset: 2px;
+}
+
+.he-page ::selection {
+  background: rgb(var(--mint) / 0.55);
+  color: rgb(var(--theme-text));
+}
+
+@media (max-width: 640px) {
+  .he-ficha {
+    padding: 1.2rem 1rem 1rem;
+  }
+  .he-topo-acoes .he-btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .he-btn,
+  .he-item,
+  .he-aba,
+  .he-caderno {
+    transition: none;
+  }
+}
