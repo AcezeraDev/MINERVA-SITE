@@ -142,7 +142,17 @@ async function readBody(response) {
 }
 
 /** Texto util de uma pagina, ou "" se nao deu para ler. */
-export async function readPage(rawUrl, query, { signal, timeoutMs = PAGE_TIMEOUT_MS } = {}) {
+export async function readPage(rawUrl, query, options = {}) {
+  return (await openPage(rawUrl, query, options)).text;
+}
+
+/**
+ * Abre uma pagina e devolve `{ text, title, url }` (url final, depois dos
+ * redirecionamentos). Usado pelo Controle Mine, que mostra o titulo do que
+ * abriu. Em falha, `text` vem vazio.
+ */
+export async function openPage(rawUrl, query, { signal, timeoutMs = PAGE_TIMEOUT_MS, limit = PAGE_TEXT_CHARS } = {}) {
+  const empty = { text: "", title: "", url: String(rawUrl || "") };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const onAbort = () => controller.abort();
@@ -164,16 +174,17 @@ export async function readPage(rawUrl, query, { signal, timeoutMs = PAGE_TIMEOUT
         current = location ? await publicHttps(new URL(location, current).toString()) : null;
         continue;
       }
-      if (!response.ok) return "";
+      if (!response.ok) return empty;
       const type = String(response.headers.get("content-type") || "").toLowerCase();
-      if (!type.includes("html") && !type.startsWith("text/plain")) return "";
+      if (!type.includes("html") && !type.startsWith("text/plain")) return empty;
       const raw = await readBody(response);
       const paragraphs = type.startsWith("text/plain") ? raw.split(/\n{2,}/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean) : htmlToParagraphs(raw);
-      return relevantText(paragraphs, query);
+      const title = decodeEntities(raw.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").replace(/\s+/g, " ").trim().slice(0, 160);
+      return { text: relevantText(paragraphs, query, limit), title, url: current.toString() };
     }
-    return "";
+    return empty;
   } catch {
-    return "";
+    return empty;
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);

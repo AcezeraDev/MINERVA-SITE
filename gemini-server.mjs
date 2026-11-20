@@ -194,6 +194,7 @@ export async function handleGeminiRequest(req, res) {
       webSearch: payload.webSearch === true,
       photos: payload.photos === true,
       tutor: payload.tutor === true,
+      controle: payload.controle === true,
       maxTokens,
     });
 
@@ -254,6 +255,7 @@ async function streamResponse(req, res, { task, payload, maxTokens }) {
       webSearch: payload.webSearch === true,
       photos: payload.photos === true,
       tutor: payload.tutor === true,
+      controle: payload.controle === true,
       maxTokens,
       signal: controller.signal,
       onDelta: deliverDeltas
@@ -293,6 +295,7 @@ async function streamResponse(req, res, { task, payload, maxTokens }) {
       queries: result.queries || [],
       reasoning: String(result.reasoning || "").slice(0, 20_000),
       suggestions: result.suggestions || [],
+      visits: result.visits || [],
     });
     res.end();
   } catch (error) {

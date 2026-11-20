@@ -56,6 +56,7 @@ import {
   Shield,
   Sparkles,
   Lightbulb,
+  MousePointer2,
   Star,
   Sun,
   Target,
@@ -158,6 +159,7 @@ import { parseFlashcards, parseQuiz, type QuizQuestion } from "../shared/study-p
 import { describeImageMarkers, extractSuggestions, splitMessageMedia, stripImageMarkers } from "../shared/chat-media.mjs";
 import { MineRichText } from "./chat/MineRichText";
 import { MineSourcesButton, MineSourcesProvider, MineThought, MineWorking, type MineSearchStatus } from "./chat/MineSources";
+import { cleanVisits, MineControlePanel, MineControleVisits, type MineVisit } from "./chat/MineControle";
 import { MineAnswerActions, VersionSwitch } from "./chat/MineAnswerActions";
 import { branchSlice, switchBranch, versionInfo } from "./chat/branches";
 import { MineImageGallery } from "./chat/MineImageGallery";
@@ -575,6 +577,8 @@ export type ChatMessage = {
   attachments?: ChatAttachment[];
   /** Fontes da web citadas na resposta, quando a pesquisa esteve ligada. */
   sources?: MineSource[];
+  /** Sites e vídeos abertos pelo Controle Mine nesta resposta. */
+  visits?: MineVisit[];
   /** Mapa mental visual gerado na conversa e reaberto sem uma nova chamada de IA. */
   mindmap?: Mindmap;
   /** Cartão de opções da prova, respondido dentro da própria conversa. */
@@ -703,6 +707,7 @@ type AssistantResponse = {
   sources?: MineSource[];
   queries?: string[];
   reasoning?: string;
+  visits?: MineVisit[];
 };
 
 export type Session = {
@@ -1451,6 +1456,11 @@ function App() {
     setMinePhotosState(enabled);
     saveMinePhotos(enabled);
   }, []);
+  // Controle Mine: só quando o estudante liga no chat, e não fica salvo — cada
+  // visita abre sites de verdade, então é escolha da conversa, não do aparelho.
+  const [mineControle, setMineControle] = useState(false);
+  const [mineVisits, setMineVisits] = useState<MineVisit[]>([]);
+  const [mineControleLive, setMineControleLive] = useState(false);
   const [mineTutor, setMineTutorState] = useState(() => readMineTutor());
   const setMineTutor = useCallback((enabled: boolean) => {
     setMineTutorState(enabled);
@@ -2032,6 +2042,10 @@ function App() {
           webSearchAvailable={mineWebAvailable}
           tutor={mineTutor}
           setTutor={setMineTutor}
+          controle={mineControle}
+          setControle={setMineControle}
+          controleLive={mineControleLive}
+          liveVisits={mineVisits}
           threadId={mineThreadId}
           setThreadId={(threadId) => {
             setMineThreadId(threadId);
@@ -2555,6 +2569,8 @@ function App() {
             setMineStreamText("");
             setMineStatus(null);
             setMineReasoning("");
+            setMineVisits([]);
+            setMineControleLive(mineControle);
             mineStreamRef.current = "";
             const controller = new AbortController();
             mineAbortRef.current = controller;
@@ -2568,6 +2584,7 @@ function App() {
                   webSearch: mineWebAvailable && mineWebSearch,
                   photos: minePhotos,
                   tutor: mineTutor,
+                  controle: mineControle || undefined,
                   attachments: [...attachments, ...earlierAttachments, ...subjectImages].slice(0, maxChatAttachments),
                   context: [
                     buildAssistantContext(userData, user, resolvedSubjectId),
@@ -2584,6 +2601,11 @@ function App() {
                   },
                   onStatus: setMineStatus,
                   onReasoning: setMineReasoning,
+                  onVisit: (visit) =>
+                    setMineVisits((list) => {
+                      const at = list.findIndex((item) => item.url === visit.url);
+                      return at < 0 ? [...list, visit].slice(0, 8) : list.map((item, index) => (index === at ? visit : item));
+                    }),
                 },
               );
               setMineSuggestions(assistant.suggestions || []);
@@ -2603,6 +2625,7 @@ function App() {
                   reasoning: assistant.reasoning ? assistant.reasoning.slice(0, 20_000) : undefined,
                   thoughtSeconds: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
                   suggestions: assistant.suggestions?.length ? assistant.suggestions : undefined,
+                  visits: assistant.visits?.length ? assistant.visits : undefined,
                   tutor: mineTutor || undefined,
                   createdAt: Date.now() + 1,
                 };
@@ -6712,6 +6735,7 @@ const MineMessageList = React.memo(function MineMessageList({
             {message.role === "mine" && message.quiz ? <QuizChatPreview quiz={message.quiz} onOpen={() => onOpenQuiz(message)} /> : null}
             {message.role === "mine" && message.deck ? <DeckChatPreview deck={message.deck} onOpen={() => onOpenDeck(message)} /> : null}
             <ChatAttachments attachments={message.attachments} tone={message.role === "user" ? "user" : "dark"} />
+            {message.role !== "user" && message.visits?.length ? <MineControleVisits visits={message.visits} /> : null}
             {message.role !== "user" ? <MineSourcesButton sources={message.sources} queries={message.queries} /> : null}
             {message.role !== "user" ? (
               (() => {
@@ -7171,6 +7195,10 @@ function MineView({
   webSearchAvailable,
   tutor,
   setTutor,
+  controle,
+  setControle,
+  controleLive,
+  liveVisits,
   threadId,
   setThreadId,
   newThread,
@@ -7208,6 +7236,11 @@ function MineView({
   webSearchAvailable: boolean;
   tutor: boolean;
   setTutor: (value: boolean) => void;
+  controle: boolean;
+  setControle: (value: boolean) => void;
+  /** O pedido em andamento saiu com o Controle Mine ligado. */
+  controleLive: boolean;
+  liveVisits: MineVisit[];
   threadId?: string;
   setThreadId: (threadId: string | undefined) => void;
   newThread: () => void;
@@ -7770,6 +7803,7 @@ function MineView({
                     aria-live="polite"
                   >
                     <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.14em] text-white/38"><span>Mine</span></div>
+                    {controleLive ? <div className="mb-3"><MineControlePanel status={searchStatus} visits={liveVisits} answering /></div> : null}
                     {reasoning ? <MineThought reasoning={reasoning} /> : null}
                     {/* A ponta da caneta no fim do texto vem do CSS (.mine-streaming). */}
                     <MineSourcesProvider sources={searchStatus?.sources}>
@@ -7786,6 +7820,7 @@ function MineView({
                 >
                   <span className="mt-1"><MineAvatar size="sm" thinking /></span>
                   <div className="min-w-0 flex-1 pt-0.5">
+                    {controleLive ? <div className="mb-2"><MineControlePanel status={searchStatus} visits={liveVisits} answering={false} /></div> : null}
                     <MineWorking status={searchStatus} reasoning={reasoning} />
                   </div>
                 </motion.article>
@@ -7981,6 +8016,15 @@ function MineView({
                       </span>
                       {tutor ? <Check className="mine-menu__check h-4 w-4" /> : null}
                     </button>
+                    {/* Controle Mine: a Mine abre sites e vídeos na sua frente. */}
+                    <button type="button" role="menuitemcheckbox" aria-checked={controle} className={"mine-menu__item " + (controle ? "is-on" : "")} onClick={() => setControle(!controle)}>
+                      <MousePointer2 className="h-4 w-4" />
+                      <span>
+                        Controle Mine
+                        <span className="mine-menu__detail">Ver a Mine abrir sites, tirar prints e resumir vídeos</span>
+                      </span>
+                      {controle ? <Check className="mine-menu__check h-4 w-4" /> : null}
+                    </button>
                     <div className="mine-menu__sep" />
                     <p className="mine-menu__label">Estudar</p>
                     <button
@@ -8072,6 +8116,15 @@ function MineView({
                     <Lightbulb aria-hidden className="h-3.5 w-3.5" />
                     Tutor
                     <button type="button" className="mine-tool-pill__off" onClick={() => setTutor(false)} aria-label="Desligar modo tutor" disabled={loading}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ) : null}
+                {controle ? (
+                  <span className="mine-tool-pill">
+                    <MousePointer2 aria-hidden className="h-3.5 w-3.5" />
+                    Controle Mine
+                    <button type="button" className="mine-tool-pill__off" onClick={() => setControle(false)} aria-label="Desligar Controle Mine" disabled={loading}>
                       <X className="h-3 w-3" />
                     </button>
                   </span>
@@ -11892,12 +11945,13 @@ export async function requestAssistantResponse(payload: {
  * pedaços, e as fontes da web quando houve pesquisa.
  */
 async function streamAssistantResponse(
-  payload: { prompt: string; history: MineHistoryItem[]; context: string; attachments?: ChatAttachment[]; webSearch?: boolean; photos?: boolean; tutor?: boolean },
+  payload: { prompt: string; history: MineHistoryItem[]; context: string; attachments?: ChatAttachment[]; webSearch?: boolean; photos?: boolean; tutor?: boolean; controle?: boolean },
   options: {
     onDelta: (text: string) => void;
     signal: AbortSignal;
     onStatus?: (status: MineSearchStatus) => void;
     onReasoning?: (text: string) => void;
+    onVisit?: (visit: MineVisit) => void;
   },
 ): Promise<AssistantResponse> {
   const response = await fetch(mineEndpoint, {
@@ -11947,6 +12001,8 @@ async function streamAssistantResponse(
         stage?: string;
         queries?: unknown;
         reasoning?: string;
+        visit?: unknown;
+        visits?: unknown;
       };
       try {
         event = JSON.parse(raw.slice(5).trim());
@@ -11960,6 +12016,9 @@ async function streamAssistantResponse(
       } else if (event.type === "reasoning") {
         thought += event.text || "";
         options.onReasoning?.(thought);
+      } else if (event.type === "status" && (event.stage === "visiting" || event.stage === "visited")) {
+        const [visit] = cleanVisits([event.visit]);
+        if (visit) options.onVisit?.(visit);
       } else if (event.type === "status" && (event.stage === "searching" || event.stage === "reading")) {
         options.onStatus?.({
           stage: event.stage,
@@ -11980,6 +12039,7 @@ async function streamAssistantResponse(
             : undefined,
           queries: Array.isArray(event.queries) ? event.queries.filter((item): item is string => typeof item === "string").slice(0, 3) : undefined,
           reasoning: typeof event.reasoning === "string" && event.reasoning.trim() ? event.reasoning.trim() : thought.trim() || undefined,
+          visits: cleanVisits(event.visits),
         };
       } else if (event.type === "error") {
         const error = new Error(event.error || "Não consegui responder agora.") as Error & { code?: string; partial?: string };
