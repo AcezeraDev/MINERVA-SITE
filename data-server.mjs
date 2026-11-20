@@ -27,6 +27,19 @@ import {
   vistaDe,
 } from "./shared/duelo.mjs";
 import { perguntasDaReserva } from "./shared/duelo-reserva.mjs";
+import {
+  chamaMine,
+  codigoSalaValido,
+  conversaParaMine,
+  criarSala,
+  entrarNaSala,
+  fotoValida,
+  limparTextoMensagem,
+  novoCodigoSala,
+  sairDaSala,
+  tocarNaSala,
+  vistaSala,
+} from "./shared/sala.mjs";
 import { runMineRequest } from "./mine/router.mjs";
 import { pageForPanel } from "./mine/page-reader.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
@@ -944,6 +957,318 @@ async function handleDuelo(req, res) {
   sendJson(req, res, 200, { duelo: vistaDe(feito.estado, eu.id, agora), aviso: feito.saida.ok ? "" : feito.saida.erro || "" });
 }
 
+
+/* ------------------------------------------------------------------------ *
+ * Sala de estudo em grupo (nov/2026): chat com a Mine, fotos e chamada de
+ * voz direta entre os navegadores. As regras vivem em shared/sala.mjs.
+ *
+ * Três tabelas próprias (fora do JSON central, como o Duelo): o estado da
+ * sala (quem está, quem está na chamada), as mensagens e os "sinais" da
+ * chamada — os recados que dois navegadores trocam para se conectar
+ * (oferta/resposta WebRTC). O servidor só repassa os sinais; a voz em si
+ * vai de um navegador ao outro e não passa por aqui.
+ * ------------------------------------------------------------------------ */
+const SALA_DIARIA = 15;
+const SALA_MINE_DIARIA = 80;
+const salasLocais = new Map();
+const mensagensLocais = [];
+const sinaisLocais = [];
+let sequenciaLocal = 0;
+let salasProntas = false;
+
+async function prepararSalas() {
+  if (!pool || salasProntas) return;
+  await ensurePostgres();
+  await pool.query(`
+    create table if not exists minerva_salas (
+      codigo text primary key,
+      dados jsonb not null,
+      atualizado timestamptz not null default now()
+    );
+    create table if not exists minerva_sala_msgs (
+      id bigserial primary key,
+      codigo text not null,
+      autor_id text not null,
+      autor text not null,
+      tipo text not null,
+      texto text not null default '',
+      foto text,
+      criado timestamptz not null default now()
+    );
+    create index if not exists minerva_sala_msgs_codigo on minerva_sala_msgs (codigo, id);
+    create table if not exists minerva_sala_sinais (
+      id bigserial primary key,
+      codigo text not null,
+      de text not null,
+      para text not null,
+      dados jsonb not null,
+      criado timestamptz not null default now()
+    );
+    create index if not exists minerva_sala_sinais_para on minerva_sala_sinais (codigo, para, id);
+  `);
+  salasProntas = true;
+}
+
+/** Lê, muda e grava a sala sob bloqueio de linha (duas consultas no mesmo segundo não se apagam). */
+async function mudarSala(codigo, mutador) {
+  if (pool) {
+    await prepararSalas();
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      const linha = await client.query(`select dados from minerva_salas where codigo = $1 for update`, [codigo]);
+      if (!linha.rows[0]) {
+        await client.query("rollback");
+        return null;
+      }
+      const estado = linha.rows[0].dados;
+      const saida = await mutador(estado);
+      await client.query(`update minerva_salas set dados = $2::jsonb, atualizado = now() where codigo = $1`, [codigo, JSON.stringify(estado)]);
+      await client.query("commit");
+      return { estado, saida };
+    } catch (error) {
+      await client.query("rollback").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  const estado = salasLocais.get(codigo);
+  if (!estado) return null;
+  return { estado, saida: await mutador(estado) };
+}
+
+async function lerSala(codigo) {
+  if (pool) {
+    await prepararSalas();
+    const r = await pool.query(`select dados from minerva_salas where codigo = $1`, [codigo]);
+    return r.rows[0]?.dados || null;
+  }
+  return salasLocais.get(codigo) || null;
+}
+
+async function guardarNovaSala(estado) {
+  if (pool) {
+    await prepararSalas();
+    // Faxina barata: sala parada há dois dias não volta mais.
+    await pool.query(`delete from minerva_sala_msgs where codigo in (select codigo from minerva_salas where atualizado < now() - interval '2 days')`);
+    await pool.query(`delete from minerva_salas where atualizado < now() - interval '2 days'`);
+    await pool.query(`delete from minerva_sala_sinais where criado < now() - interval '10 minutes'`);
+    const feito = await pool.query(`insert into minerva_salas (codigo, dados) values ($1, $2::jsonb) on conflict (codigo) do nothing returning codigo`, [estado.codigo, JSON.stringify(estado)]);
+    return feito.rowCount > 0;
+  }
+  if (salasLocais.has(estado.codigo)) return false;
+  salasLocais.set(estado.codigo, estado);
+  return true;
+}
+
+async function gravarMensagem({ codigo, autorId, autor, tipo, texto = "", foto = null }) {
+  if (pool) {
+    await prepararSalas();
+    const r = await pool.query(
+      `insert into minerva_sala_msgs (codigo, autor_id, autor, tipo, texto, foto) values ($1, $2, $3, $4, $5, $6) returning id`,
+      [codigo, autorId, autor, tipo, texto, foto],
+    );
+    return Number(r.rows[0].id);
+  }
+  const id = ++sequenciaLocal;
+  mensagensLocais.push({ id, codigo, autorId, autor, tipo, texto, foto, em: Date.now() });
+  return id;
+}
+
+const linhaMensagem = (m) => ({ id: Number(m.id), tipo: m.tipo, autorId: m.autor_id ?? m.autorId, autor: m.autor, texto: m.texto || "", temFoto: Boolean(m.tem_foto ?? m.foto), em: m.criado ? new Date(m.criado).getTime() : m.em });
+
+/** Mensagens depois de `desde` (sem a foto: ela vem à parte, sob pedido). Na primeira consulta, as últimas 50. */
+async function mensagensDesde(codigo, desde, limite = 50) {
+  if (pool) {
+    await prepararSalas();
+    const r = desde > 0
+      ? await pool.query(`select id, autor_id, autor, tipo, texto, foto is not null as tem_foto, criado from minerva_sala_msgs where codigo = $1 and id > $2 order by id asc limit $3`, [codigo, desde, limite])
+      : await pool.query(`select * from (select id, autor_id, autor, tipo, texto, foto is not null as tem_foto, criado from minerva_sala_msgs where codigo = $1 order by id desc limit $2) t order by id asc`, [codigo, limite]);
+    return r.rows.map(linhaMensagem);
+  }
+  const daSala = mensagensLocais.filter((m) => m.codigo === codigo);
+  return (desde > 0 ? daSala.filter((m) => m.id > desde).slice(0, limite) : daSala.slice(-limite)).map(linhaMensagem);
+}
+
+async function fotoDaMensagem(codigo, id) {
+  if (pool) {
+    await prepararSalas();
+    const r = await pool.query(`select foto from minerva_sala_msgs where codigo = $1 and id = $2`, [codigo, id]);
+    return r.rows[0]?.foto || "";
+  }
+  return mensagensLocais.find((m) => m.codigo === codigo && m.id === id)?.foto || "";
+}
+
+async function gravarSinal(codigo, de, para, dados) {
+  if (pool) {
+    await prepararSalas();
+    await pool.query(`insert into minerva_sala_sinais (codigo, de, para, dados) values ($1, $2, $3, $4::jsonb)`, [codigo, de, para, JSON.stringify(dados)]);
+    return;
+  }
+  sinaisLocais.push({ id: ++sequenciaLocal, codigo, de, para, dados, em: Date.now() });
+}
+
+/** Sinais para mim; quem lê, apaga (cada recado é entregue uma vez). */
+async function pegarSinais(codigo, para) {
+  if (pool) {
+    await prepararSalas();
+    const r = await pool.query(`delete from minerva_sala_sinais where codigo = $1 and para = $2 and criado > now() - interval '2 minutes' returning id, de, dados`, [codigo, para]);
+    return r.rows.sort((a, b) => Number(a.id) - Number(b.id)).map((row) => ({ de: row.de, dados: row.dados }));
+  }
+  const meus = [];
+  for (let i = sinaisLocais.length - 1; i >= 0; i -= 1) {
+    const item = sinaisLocais[i];
+    if (item.codigo === codigo && item.para === para) {
+      meus.unshift({ de: item.de, dados: item.dados });
+      sinaisLocais.splice(i, 1);
+    }
+  }
+  return meus;
+}
+
+/** A Mine lê a conversa (e a foto mais recente) e responde ao grupo. */
+async function mineNaSala(codigo, pedido) {
+  await mudarSala(codigo, (sala) => {
+    sala.mineDigitando = Date.now();
+    return { ok: true };
+  });
+  let texto = "";
+  try {
+    const recentes = await mensagensDesde(codigo, 0, 30);
+    const comFoto = [...recentes].reverse().slice(0, 8).find((m) => m.temFoto && m.tipo === "texto");
+    const foto = comFoto ? await fotoDaMensagem(codigo, comFoto.id) : "";
+    const tipoFoto = /^data:(image\/[a-z]+);/.exec(foto)?.[1] || "image/jpeg";
+    const resultado = await runMineRequest({
+      task: "sala-grupo",
+      prompt: pedido,
+      context: conversaParaMine(recentes),
+      attachments: foto ? [{ type: tipoFoto, name: "foto-do-grupo.jpg", dataUrl: foto }] : [],
+      maxTokens: 2000,
+    });
+    texto = String(resultado?.reply || "").trim();
+  } catch {
+    texto = "";
+  }
+  await gravarMensagem({ codigo, autorId: "mine", autor: "Mine", tipo: "mine", texto: texto || "Não consegui pensar agora. Me chamem de novo daqui a pouquinho!" });
+  await mudarSala(codigo, (sala) => {
+    sala.mineDigitando = 0;
+    return { ok: true };
+  });
+}
+
+async function handleSala(req, res) {
+  const session = await requireSession(req, res);
+  if (!session) return;
+  const body = await readJson(req).catch(() => ({}));
+  const acao = String(body.acao || "");
+  const agora = Date.now();
+  const euId = session.userId;
+
+  // criar e entrar precisam do nome e da foto; o resto só do id da sessão
+  const quemSou = async () => {
+    const store = await readStore();
+    const user = store.data.users.find((item) => item.id === euId);
+    return user ? { id: user.id, nome: publicName(user), avatar: publicAvatarUrl(user) } : null;
+  };
+
+  if (acao === "criar") {
+    const eu = await quemSou();
+    if (!eu) return sendError(req, res, 401, "Conta não encontrada. Entre novamente.");
+    if ((await takeQuota(euId, "sala", SALA_DIARIA)) === null) {
+      return sendJson(req, res, 429, { error: `Você já abriu ${SALA_DIARIA} salas hoje. Entre na sala de um colega ou volte amanhã!`, code: "quota" });
+    }
+    for (let tentativa = 0; tentativa < 6; tentativa += 1) {
+      const estado = criarSala({ codigo: novoCodigoSala(), nome: body.nome, dono: eu, agora });
+      if (await guardarNovaSala(estado)) {
+        await gravarMensagem({ codigo: estado.codigo, autorId: "sistema", autor: "", tipo: "sistema", texto: `${eu.nome} abriu a sala` });
+        return sendJson(req, res, 200, { sala: vistaSala(estado, euId, agora) });
+      }
+    }
+    return sendError(req, res, 500, "Não deu para abrir a sala agora. Tente de novo.");
+  }
+
+  const codigo = String(body.codigo || "").trim().toUpperCase();
+  if (!codigoSalaValido(codigo)) return sendError(req, res, 400, "Código de sala inválido. São 6 letras e números.");
+
+  if (acao === "entrar") {
+    const eu = await quemSou();
+    if (!eu) return sendError(req, res, 401, "Conta não encontrada. Entre novamente.");
+    const feito = await mudarSala(codigo, (sala) => entrarNaSala(sala, eu, agora));
+    if (!feito) return sendError(req, res, 404, "Sala não encontrada. Confira o código.");
+    if (!feito.saida.ok) return sendError(req, res, 409, feito.saida.erro);
+    if (feito.saida.novo) await gravarMensagem({ codigo, autorId: "sistema", autor: "", tipo: "sistema", texto: `${eu.nome} entrou na sala` });
+    return sendJson(req, res, 200, { sala: vistaSala(feito.estado, euId, agora) });
+  }
+
+  if (acao === "sync") {
+    const feito = await mudarSala(codigo, (sala) =>
+      tocarNaSala(sala, euId, agora, {
+        naChamada: typeof body.naChamada === "boolean" ? body.naChamada : undefined,
+        mudo: typeof body.mudo === "boolean" ? body.mudo : undefined,
+        digitando: Boolean(body.digitando),
+      }),
+    );
+    if (!feito) return sendError(req, res, 404, "Essa sala não existe mais.");
+    if (!feito.saida.ok) return sendError(req, res, 403, feito.saida.erro);
+    const [mensagens, sinais] = await Promise.all([mensagensDesde(codigo, Math.max(0, Number(body.desde) || 0)), pegarSinais(codigo, euId)]);
+    return sendJson(req, res, 200, { sala: vistaSala(feito.estado, euId, agora), mensagens, sinais, aviso: feito.saida.aviso || "" });
+  }
+
+  // daqui para baixo, só quem é da sala
+  const sala = await lerSala(codigo);
+  if (!sala) return sendError(req, res, 404, "Essa sala não existe mais.");
+  const eu = sala.membros.find((m) => m.id === euId);
+  if (!eu) return sendError(req, res, 403, "Você não está nesta sala.");
+
+  if (acao === "enviar") {
+    const texto = limparTextoMensagem(body.texto);
+    const foto = body.foto ? String(body.foto) : "";
+    if (foto && !fotoValida(foto)) return sendError(req, res, 400, "Essa foto não deu para mandar. Tente uma imagem menor.");
+    if (!texto && !foto) return sendError(req, res, 400, "Mensagem vazia.");
+    const id = await gravarMensagem({ codigo, autorId: euId, autor: eu.nome, tipo: "texto", texto, foto: foto || null });
+    const pedeMine = Boolean(body.mine) || chamaMine(texto);
+    if (pedeMine) {
+      if ((await takeQuota(euId, "sala-mine", SALA_MINE_DIARIA)) === null) {
+        await gravarMensagem({ codigo, autorId: "sistema", autor: "", tipo: "sistema", texto: `${eu.nome} já chamou a Mine ${SALA_MINE_DIARIA} vezes hoje` });
+      } else {
+        await mineNaSala(codigo, `${eu.nome} chamou voce na ultima mensagem. Responda ao grupo.`);
+      }
+    }
+    return sendJson(req, res, 200, { ok: true, id });
+  }
+
+  if (acao === "resumo") {
+    if ((await takeQuota(euId, "sala-mine", SALA_MINE_DIARIA)) === null) return sendError(req, res, 429, "A Mine já respondeu muito por hoje nesta conta.");
+    await mineNaSala(codigo, `${eu.nome} pediu um RESUMO DA SESSAO: faca um resumo do que o grupo estudou, o que ficou claro, o que ainda gerou duvida e 3 perguntas rapidas para revisar.`);
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  if (acao === "foto") {
+    const foto = await fotoDaMensagem(codigo, Math.floor(Number(body.id)));
+    if (!foto) return sendError(req, res, 404, "Foto não encontrada.");
+    return sendJson(req, res, 200, { foto });
+  }
+
+  if (acao === "sinal") {
+    const para = String(body.para || "");
+    const dados = body.dados && typeof body.dados === "object" ? body.dados : null;
+    if (!dados || !sala.membros.some((m) => m.id === para) || JSON.stringify(dados).length > 30_000) {
+      return sendError(req, res, 400, "Sinal inválido.");
+    }
+    await gravarSinal(codigo, euId, para, dados);
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  if (acao === "sair") {
+    await mudarSala(codigo, (s) => ({ ok: sairDaSala(s, euId) }));
+    await gravarMensagem({ codigo, autorId: "sistema", autor: "", tipo: "sistema", texto: `${eu.nome} saiu da sala` });
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  return sendError(req, res, 400, "Ação desconhecida.");
+}
+
 function publicAvatarUrl(user) {
   return user.settings?.avatar ? `/api/avatar?userId=${encodeURIComponent(user.id)}` : "";
 }
@@ -1237,6 +1562,11 @@ export async function handleDataRequest(req, res) {
 
     if (url.pathname === "/api/duelo" && req.method === "POST") {
       await handleDuelo(req, res);
+      return true;
+    }
+
+    if (url.pathname === "/api/sala" && req.method === "POST") {
+      await handleSala(req, res);
       return true;
     }
 

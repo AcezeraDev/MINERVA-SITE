@@ -98,6 +98,7 @@ import {
   Pencil,
   Gamepad2,
   Box,
+  Headphones,
   PanelLeftClose,
   PanelLeftOpen,
   type LucideIcon,
@@ -262,6 +263,7 @@ const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({
 const IdiomasView = React.lazy(() => import("./idiomas/IdiomasView").then((m) => ({ default: m.IdiomasView })));
 const RedacaoView = React.lazy(() => import("./redacao/RedacaoView").then((m) => ({ default: m.RedacaoView })));
 const AtividadesView = React.lazy(() => import("./atividades/AtividadesView").then((m) => ({ default: m.AtividadesView })));
+const SalaView = React.lazy(() => import("./sala/SalaView").then((m) => ({ default: m.SalaView })));
 const CuboView = React.lazy(() => import("./cubo/CuboView").then((m) => ({ default: m.CuboView })));
 const LaboratorioView = React.lazy(() => import("./laboratorio/LaboratorioView").then((m) => ({ default: m.LaboratorioView })));
 const LeituraView = React.lazy(() => import("./leitura/LeituraView").then((m) => ({ default: m.LeituraView })));
@@ -433,6 +435,7 @@ type View =
   | "mine"
   | "games"
   | "cubo"
+  | "sala"
   | "atelie"
   | "idiomas"
   | "search"
@@ -943,6 +946,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
   { view: "mine", label: "Mine", icon: Bot },
   { view: "games", label: "Games com a Mine", icon: Gamepad2 },
   { view: "cubo", label: "Cubo Mágico", icon: Box },
+  { view: "sala", label: "Sala de estudo", icon: Headphones },
   { view: "atelie", label: "Ateliê da Mine", icon: Palette },
   { view: "idiomas", label: "Idiomas com a Mine", icon: Languages },
   { view: "search", label: "Busca", icon: Search },
@@ -958,7 +962,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
 /** A barra lateral agrupa os destinos em quatro blocos para virar uma lista escaneável. */
 const navGroups: Array<{ label: string; views: View[] }> = [
   { label: "Estudo", views: ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "progress", "ranking"] },
-  { label: "Inteligência", views: ["mine", "games", "cubo", "duelo", "idiomas", "atelie", "search", "plan"] },
+  { label: "Inteligência", views: ["mine", "sala", "games", "cubo", "duelo", "idiomas", "atelie", "search", "plan"] },
   { label: "Comunidade", views: ["comments", "suggestions"] },
   { label: "Conta", views: ["como-usar", "about", "perfil", "admin"] },
 ];
@@ -2772,6 +2776,7 @@ function App() {
     if (route.view === "atividades") return <React.Suspense fallback={<PageLoading />}><AtividadesView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "leitura") return <React.Suspense fallback={<PageLoading />}><LeituraView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "laboratorio") return <React.Suspense fallback={<PageLoading />}><LaboratorioView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "sala") return <React.Suspense fallback={<PageLoading />}><SalaView user={user} codigoRota={route.id} /></React.Suspense>;
     if (route.view === "cubo") return <React.Suspense fallback={<PageLoading />}><CuboView user={user} /></React.Suspense>;
     if (route.view === "duelo") return <React.Suspense fallback={<PageLoading />}><DueloView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "provas") return <React.Suspense fallback={<PageLoading />}><ProvasView data={userData} user={user} update={update} /></React.Suspense>;
@@ -12158,7 +12163,7 @@ function buildAssistantContext(data: ReturnType<typeof useMemoUserData>, user: U
     "Quando o usuário pedir para analisar, resumir, explicar ou corrigir 'o conteúdo', 'os anexos' ou 'o que enviei', use o texto dos conteúdos listados acima como fonte principal da resposta.",
     "Tarefas:",
     taskLines.join("\n") || "- nenhuma",
-    "Rotas disponíveis: home, agenda, atividades, provas, redacao, leitura, laboratorio, duelo, progress, mine, games, cubo, search, plan, comments, suggestions, about e settings.",
+    "Rotas disponíveis: home, agenda, atividades, provas, redacao, leitura, laboratorio, duelo, progress, mine, games, cubo, sala, search, plan, comments, suggestions, about e settings.",
   ].join("\n");
 }
 
@@ -13430,7 +13435,7 @@ function applyAssistantActions(data: AppData, userId: string, actions: Assistant
     }
 
     if (action.type === "navigate") {
-      const allowed: View[] = ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "duelo", "progress", "ranking", "mine", "games", "cubo", "atelie", "idiomas", "search", "plan", "comments", "suggestions", "about", "perfil"];
+      const allowed: View[] = ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "duelo", "progress", "ranking", "mine", "games", "cubo", "sala", "atelie", "idiomas", "search", "plan", "comments", "suggestions", "about", "perfil"];
       if (action.view === "subject") {
         const subject = findSubject(next.subjects.filter((item) => item.userId === userId), action);
         if (subject) route = { view: "subject", id: subject.id };
