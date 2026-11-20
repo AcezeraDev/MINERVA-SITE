@@ -827,3 +827,55 @@
     opacity: 0.6;
   }
 }
+
+/* Glossário (nov/2026): termo difícil sublinhado a lápis, explicação num bilhete */
+.mrt-gloss {
+  position: relative;
+  border-bottom: 2px dotted rgb(var(--pen) / 0.75);
+  cursor: help;
+  outline: none;
+}
+.mrt-gloss:focus-visible {
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px rgb(var(--pen) / 0.45);
+}
+.mrt-gloss__tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 30;
+  display: grid;
+  gap: 0.15rem;
+  width: max-content;
+  max-width: min(17rem, 78vw);
+  padding: 0.55rem 0.7rem;
+  border: 1.5px solid rgb(var(--theme-text) / 0.75);
+  border-radius: 0.7rem;
+  background: rgb(var(--sheet));
+  color: rgb(var(--theme-text));
+  font-family: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 3px 0 rgb(var(--theme-text) / 0.2), 0 12px 28px rgb(0 0 0 / 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+.mrt-gloss__tip strong {
+  color: rgb(var(--pen));
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mrt-gloss:is(:hover, :focus) .mrt-gloss__tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mrt-gloss__tip { transition: none; }
+}

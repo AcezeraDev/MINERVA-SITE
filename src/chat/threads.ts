@@ -13,6 +13,8 @@ type ThreadMessage = {
   createdAt: number;
   /** Título escrito pela IA depois da primeira resposta (out/2026). */
   threadTitle?: string;
+  /** Conversa fixada no topo da lista (nov/2026); fica na primeira mensagem. */
+  threadPinned?: boolean;
 };
 
 export type ChatThread = {
@@ -22,6 +24,7 @@ export type ChatThread = {
   title: string;
   updatedAt: number;
   count: number;
+  pinned: boolean;
 };
 
 export function inSubject(message: { subjectId?: string }, subjectId?: string) {
@@ -61,7 +64,22 @@ export function threadsOf<T extends ThreadMessage>(chats: T[], subjectId: string
         title: messages.find((message) => message.threadTitle)?.threadTitle || titleFrom(firstQuestion?.text || messages[0]?.text || ""),
         updatedAt: Math.max(...messages.map((message) => message.createdAt)),
         count: messages.length,
+        pinned: messages.some((message) => message.threadPinned),
       };
     })
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+    // Fixadas primeiro; dentro de cada grupo, a mais recente em cima.
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+}
+
+/** Liga/desliga o alfinete: a marca mora na primeira mensagem da conversa. */
+export function togglePinned<T extends ThreadMessage & { id: string }>(chats: T[], subjectId: string | undefined, threadId: string | undefined): T[] {
+  const inside = chats.filter((message) => inThread(message, subjectId, threadId));
+  if (!inside.length) return chats;
+  const pinned = inside.some((message) => message.threadPinned);
+  const first = inside.reduce((oldest, message) => (message.createdAt < oldest.createdAt ? message : oldest));
+  return chats.map((message) => {
+    if (!inThread(message, subjectId, threadId)) return message;
+    if (pinned) return message.threadPinned ? { ...message, threadPinned: undefined } : message;
+    return message.id === first.id ? { ...message, threadPinned: true } : message;
+  });
 }

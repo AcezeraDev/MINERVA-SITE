@@ -237,3 +237,29 @@ html:not(.theme-light) .mine-gen-card.is-drawing::after {
     stroke-dashoffset: 0;
   }
 }
+
+/* nov/2026: formatos deitado e em pé, e a contagem de imagens do dia */
+.mine-gen-card.is-paisagem {
+  aspect-ratio: 3 / 2;
+}
+.mine-gen-figure.is-paisagem,
+.mine-gen-card.is-paisagem {
+  width: min(34rem, 100%);
+}
+.mine-gen-card.is-retrato {
+  aspect-ratio: 2 / 3;
+}
+.mine-gen-figure.is-retrato,
+.mine-gen-card.is-retrato {
+  width: min(19rem, 100%);
+}
+.mine-gen-caption {
+  display: grid;
+  min-width: 0;
+}
+.mine-gen-caption small {
+  font-family: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgb(var(--theme-muted) / 0.85);
+}

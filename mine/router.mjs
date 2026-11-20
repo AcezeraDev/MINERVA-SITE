@@ -1,9 +1,9 @@
-import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_SITE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
+import { MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
-import { pickCodeSkills } from "./minecode-skills.mjs";
-import { buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
-import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, extractSuggestions, imageStyleFrom, previousGalleryStyle, withImageStyle } from "../shared/chat-media.mjs";
-import { repairMineCode, replyQualityIssue } from "./quality.mjs";
+import { buildFileInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
+import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, editsAttachedImage, extractSuggestions, imageFormatFrom, imageStyleFrom, previousGalleryStyle, withImageRequest, withImageStyle } from "../shared/chat-media.mjs";
+import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
+import { replyQualityIssue } from "./quality.mjs";
 import { buildSearchQuery, cleanQueries, freshenQueries, matchesSearchTopic, matchesSourceScope, planSearchQueries, resultLimit, searchMany, searchSourcePolicy, searchWeb, WEB_SEARCH_TOOL, webSearchEnabled, webSearchFailedInstruction, webSearchInstruction, webSearchMode } from "./web.mjs";
 import { openPage, readTopPages } from "./page-reader.mjs";
 import { readYoutubeVideo, urlsInText, videoInstruction, youtubeId } from "./video.mjs";
@@ -123,18 +123,6 @@ function gameAttemptMs() {
 // ineditismo no cliente.
 
 /**
- * Cadeia do MineCode. Sites (skill de front-end) vao para o modelo forte
- * (MINE_SITE_MODEL, GPT-6.1 Sol) com o principal (hoje o Claude Haiku 5.5; era o gpt-6-luna) de reserva. Medido em
- * 17/out/2026 com o mesmo pedido de hero 3D: o GLM em "low" entregava pagina
- * generica e em "high" estourou 150 s; o luna fez um site bonito em 57-70 s.
- * Python/JS seguem no GLM, mais barato e rapido para codigo curto.
- */
-function codeChainFor({ prompt, context, history }) {
-  const site = pickCodeSkills({ prompt, context, history }).includes("frontend");
-  return site ? [MINE_SITE_MODEL, MINE_TASK_MODEL] : [MINE_CODE_MODEL, MINE_TASK_MODEL];
-}
-
-/**
  * Uma tentativa contra um modelo ja resolvido.
  * Com `onDelta` a resposta vem em streaming; sem ele, de uma vez so.
  */
@@ -176,24 +164,10 @@ async function attemptModel({ model, task, prompt, context, history, attachments
       return { toolQueries: cleanQueries(search.arguments?.consultas ?? search.arguments?.consulta), reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs };
     }
 
-    let reply = cleanReply(result.content, { prompt });
-    let qualityIssue = replyQualityIssue({ task, reply, prompt, finishReason: result.finishReason });
-    // MineCode com palavra perdida no codigo: se tirar as linhas da palavra
-    // deixa o arquivo limpo, o conserto sai daqui mesmo, sem outra chamada.
-    if (qualityIssue && task === "minecode" && result.finishReason !== "length") {
-      const repaired = repairMineCode(reply);
-      if (repaired) {
-        console.log(`[mine] minecode=consertado model=${model.providerModel} ${qualityIssue.replace(/"[^"]*"/g, "\"…\"")}`);
-        reply = repaired;
-        qualityIssue = "";
-      }
-    }
+    const reply = cleanReply(result.content, { prompt });
+    const qualityIssue = replyQualityIssue({ task, reply, prompt, finishReason: result.finishReason });
     if (qualityIssue) {
-      const error = new MineError(`Resposta rejeitada pelo controle de qualidade: ${qualityIssue}.`, { code: "empty", retryable: true });
-      // O codigo com defeito ainda serve de ultimo recurso: e melhor que nada
-      // se nenhum outro modelo conseguir refazer a tempo.
-      if (task === "minecode" && result.finishReason !== "length") Object.assign(error, { badCode: { reply, issue: qualityIssue, reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs } });
-      throw error;
+      throw new MineError(`Resposta rejeitada pelo controle de qualidade: ${qualityIssue}.`, { code: "empty", retryable: true });
     }
 
     return { reply, reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs };
@@ -382,15 +356,13 @@ export async function runMineRequest({
   const deadline = Date.now() + (gameTask ? gameBudgetMs() : resolveBudgetMs());
   // Tarefas estruturadas sao curtas e sem streaming: 60 s por tentativa basta
   // e deixa a reserva entrar a tempo se o principal travar.
-  // o MineCode escreve arquivos inteiros em streaming (um site 3D passa de 1
-  // minuto): fica com o teto do chat, nao com os 60 s das tarefas curtas
   // A atividade (7 questoes em JSON) e a correcao da redacao (5 competencias
   // e os grifos) passam de 60 s com raciocinio: ficam com 120 s.
   const perAttemptMs = gameTask
     ? gameAttemptMs()
     : LONG_TASKS.has(cleanTask)
       ? Math.min(120_000, resolveTimeoutMs())
-      : cleanTask && cleanTask !== "minecode"
+      : cleanTask
         ? Math.min(60_000, resolveTimeoutMs())
         : resolveTimeoutMs();
   const minAttemptMs = gameTask ? 3_500 : MIN_ATTEMPT_MS;
@@ -398,9 +370,7 @@ export async function runMineRequest({
   const principal = cleanTask ? MINE_TASK_MODEL : MINE_MODEL;
   const candidates = gameTask
     ? [MINE_FAST_MODEL, MINE_TASK_MODEL]
-    : cleanTask === "minecode"
-      ? codeChainFor({ prompt, context, history })
-      : [principal, MINE_FAST_MODEL];
+    : [principal, MINE_FAST_MODEL];
   const seen = new Set();
   const chain = candidates.filter((model) => {
     const key = `${model.provider}:${model.providerModel}:${model.providerParams?.reasoning_effort || ""}`;
@@ -435,18 +405,32 @@ export async function runMineRequest({
   // Criar imagem ("cria um gato astronauta") ou ajustar a que acabou de ser
   // criada ("deixa o fundo azul") vence a busca de fotos: o verbo de criação
   // diz que a imagem ainda não existe.
-  const previousGenerated = cleanTask ? "" : continuesGeneration(prompt, history);
-  const wantsGeneration = !cleanTask && (asksToGenerateImage(prompt) || Boolean(previousGenerated));
+  // Arquivo para baixar (PDF, Word, Excel, HTML) e folha de revisão da
+  // conversa: a Mine escreve o conteúdo num bloco ```arquivo.
+  const studySheet = !cleanTask && asksForStudySheet(prompt);
+  const fileKind = cleanTask || studySheet ? "" : asksForFile(prompt);
+  const wantsFile = studySheet || Boolean(fileKind);
+  // Foto anexada + "transforma em anime": edição da foto do estudante.
+  const hasImageAttachment = (attachments || []).some((item) => /^image\//i.test(String(item?.type || item?.mimeType || "")) || /^data:image\//i.test(String(item?.dataUrl || "")));
+  const editAttached = !cleanTask && !wantsFile && hasImageAttachment && editsAttachedImage(prompt);
+  const previousGenerated = cleanTask || editAttached ? "" : continuesGeneration(prompt, history);
+  const wantsGeneration = !cleanTask && !wantsFile && (editAttached || asksToGenerateImage(prompt) || Boolean(previousGenerated));
+  // Mesmo sem o pedido ser reconhecido como criação, se a Mine desenhar, o
+  // formato pedido ("papel de parede do celular") entra no marcador.
+  const imageFormat = cleanTask || wantsFile ? "" : imageFormatFrom(prompt);
   const previousGallery = cleanTask || wantsGeneration ? "" : continuesGallery(prompt, history);
   // "Icons da Ellie": o estilo pedido vai para o marcador. Vale tambem para
   // "manda mais" depois de uma galeria de icones.
-  const wantsImage = !cleanTask && !wantsGeneration && (photos || asksForImage(prompt) || Boolean(previousGallery));
+  const wantsImage = !cleanTask && !wantsGeneration && !wantsFile && (photos || asksForImage(prompt) || Boolean(previousGallery));
   const imageStyle = wantsImage ? imageStyleFrom(prompt) || (previousGallery ? previousGalleryStyle(history) : "") : "";
   const baseSystem = [
-    ...(wantsGeneration ? [buildImageGenerationInstruction({ previousPrompt: previousGenerated })] : []),
+    ...(wantsGeneration ? [buildImageGenerationInstruction({ previousPrompt: previousGenerated, formato: imageFormat, anexo: editAttached })] : []),
+    ...(studySheet ? [buildStudySheetInstruction()] : fileKind ? [buildFileInstruction(fileKind)] : []),
+    // Glossário só no chat livre e fora dos arquivos (o arquivo tem o próprio texto).
+    ...(cleanTask || wantsFile ? [] : [buildGlossaryInstruction()]),
     // Modo fotos e do chat livre: uma task (simulado, mapa, jogo) tem formato
     // proprio, e um marcador de imagem no meio dela quebraria o parser.
-    ...(cleanTask || wantsGeneration ? [] : photos ? [buildPhotoModeInstruction()] : asksForImage(prompt) || previousGallery ? [buildImageRequestInstruction()] : []),
+    ...(cleanTask || wantsGeneration || wantsFile ? [] : photos ? [buildPhotoModeInstruction()] : asksForImage(prompt) || previousGallery ? [buildImageRequestInstruction()] : []),
     // "Manda mais" depois de uma galeria: o mesmo termo devolveria as mesmas
     // fotos (a galeria fica em cache por termo), então a Mine varia o termo.
     ...(cleanTask || !previousGallery ? [] : [buildMorePhotosInstruction(previousGallery)]),
@@ -460,14 +444,6 @@ export async function runMineRequest({
   let lastError = null;
   let committed = false;
   let reasoning = "";
-  // MineCode com codigo quebrado (palavra perdida, erro de sintaxe) que o
-  // conserto local nao resolveu. O editor ja recebeu o texto ao vivo, mas o
-  // evento final ("done") substitui tudo no cliente: entao o proximo modelo
-  // da cadeia refaz o arquivo SEM streaming, e a versao dele vai no "done".
-  // Se nenhum conseguir, a primeira versao e entregue como antes.
-  let badCode = null;
-  let streamOff = false;
-  let fixNote = [];
 
   const deliver = (result) => {
     // O marcador de sugestoes sai do texto e vira lista a parte; nas tarefas
@@ -475,7 +451,9 @@ export async function runMineRequest({
     const { text: extracted, suggestions } = cleanTask ? { text: result.reply, suggestions: [] } : extractSuggestions(result.reply);
     // O modelo as vezes esquece o terceiro campo; a versao final (que vale
     // mais que o streaming) sai com o estilo que o estudante pediu.
-    const reply = imageStyle ? withImageStyle(extracted, imageStyle) : extracted;
+    const styled = imageStyle ? withImageStyle(extracted, imageStyle) : extracted;
+    // Formato pedido ("papel de parede do celular") e foto anexada também.
+    const reply = imageFormat || editAttached ? withImageRequest(styled, { formato: imageFormat, anexo: editAttached }) : styled;
     return {
       ...result,
       reply: reply || result.reply,
@@ -510,20 +488,18 @@ export async function runMineRequest({
         history,
         attachments,
         maxTokens,
-        // Refazer o arquivo inteiro sem streaming demora mais que uma
-        // tentativa comum de tarefa: usa o que sobra do orcamento.
-        timeoutMs: Math.min(badCode ? resolveTimeoutMs() : perAttemptMs, remaining),
+        timeoutMs: Math.min(perAttemptMs, remaining),
         signal,
         fallback: index > 0 && !gameTask,
-        extraSystem: [...web.extraSystem, ...baseSystem, ...fixNote],
+        extraSystem: [...web.extraSystem, ...baseSystem],
         tools,
-        onDelta: onDelta && !streamOff
+        onDelta: onDelta
           ? (text) => {
               committed = true;
               onDelta(text);
             }
           : undefined,
-        onReasoning: onReasoning && !streamOff
+        onReasoning: onReasoning
           ? (text) => {
               reasoning += text;
               onReasoning(text);
@@ -541,12 +517,7 @@ export async function runMineRequest({
       return deliver(result);
     } catch (error) {
       lastError = error;
-      if (error?.badCode) {
-        badCode ||= error.badCode;
-        fixNote = [`Atencao: uma versao anterior deste arquivo saiu com defeito (${error.badCode.issue}). Escreva o arquivo inteiro de novo, revisando que nenhuma palavra solta fique no meio do CSS ou do JavaScript e que a sintaxe esteja valida.`];
-        // Ja foi para a tela: as proximas tentativas vem inteiras, sem streaming.
-        if (committed) streamOff = true;
-      } else if (committed) {
+      if (committed) {
         // Texto ja entregue ao navegador: nao da para recomecar com outro modelo.
         throw error;
       }
@@ -565,15 +536,10 @@ export async function runMineRequest({
         continue;
       }
       if (!error?.retryable) {
-        if (badCode && error?.code !== "aborted") break;
         throw error;
       }
     }
   }
 
-  if (badCode && !signal?.aborted) {
-    console.log("[mine] minecode=entregue_com_defeito nenhum modelo refez o arquivo a tempo");
-    return deliver(badCode);
-  }
   throw lastError || new MineError("Nenhum modelo conseguiu responder.", { code: "unavailable" });
 }

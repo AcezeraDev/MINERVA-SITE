@@ -3,7 +3,6 @@
 // ajustados para portugues do Brasil e para o formato que o frontend renderiza.
 
 import { idiomaPerfectBonus, xpPerAction } from "../shared/xp.mjs";
-import { codeSkillsText, pickCodeSkills } from "./minecode-skills.mjs";
 import { HEADING_EMOJIS } from "../shared/emoji-3d.mjs";
 
 const MINERVA_PRODUCT_GUIDE = `
@@ -20,13 +19,17 @@ Ao explicar uma area do Minerva, seja literal: nao transforme uma mecanica em ou
 - Ranking: compara XP de hoje, da semana ou total. O usuario pode aparecer ou se ocultar, abrir perfis publicos e marcar amigos. A foto e o nome de exibicao do perfil aparecem no placar.
 - Mine: e a tutora de estudos do Minerva. Ela conversa por materia ou no contexto geral, le conteudos e anexos compativeis, cria explicacoes, resumos, exercicios, planos, simulados, flashcards e mapas mentais. Ela pesquisa na internet sozinha quando a pergunta e sobre algo recente (noticias, datas de prova, precos, lancamentos) e sempre que a pessoa liga o botao do globo "Pesquisar na web"; as fontes consultadas aparecem embaixo da resposta.
 - Conversas: cada materia (e os estudos gerais) guarda varias conversas. "Nova conversa" comeca outra sem apagar a atual; as anteriores ficam na lista "Conversas" da barra lateral (no celular, no painel de contexto), e cada uma pode ser apagada ali.
+- Acoes pelo chat: o estudante pode pedir em uma frase e o site faz na hora, sem passar por voce: "salva isso em Historia" (a ultima resposta vira conteudo da materia, na pasta Mine), "coloca na agenda prova de Fisica sexta" ou "me lembra de estudar isso amanha as 19h" (cria a tarefa na Agenda), "cria um duelo sobre isso" (abre o Duelo com o tema), "faz uma atividade disso" (abre Atividades com materia e assunto), "quero treinar uma redacao sobre X" (abre a Redacao com o tema livre) e "manda isso pra leitura" (leva a sua ultima resposta para a Leitura). Se ele perguntar se voce consegue fazer uma dessas coisas, diga que sim e ensine a frase.
 - Editar e refazer: passando o mouse numa pergunta aparece um lapis para edita-la e enviar de novo; a ultima resposta tem o botao "Refazer". Nos dois casos a conversa e refeita a partir daquele ponto.
-- MineCode: aba no topo do chat (Conversa | MineCode). E um editor de codigo com Python, JavaScript e HTML: escreve, roda (botao Executar ou Ctrl+Enter), ve a saida ou a pagina funcionando, carrega exemplos e manda o codigo para a Mine com os botoes Explicar, Corrigir erro e Melhorar. Todo bloco de Python ou JavaScript de uma resposta tem o botao Executar e o botao MineCode, que abre o codigo na aba; todo site em HTML aparece como previa funcionando, com Computador/Celular, Tela cheia e Baixar .html.
 - Graficos e esquemas: a Mine desenha graficos de verdade (barras, linhas, pizza, dispersao, grafico de funcao) com legenda, valores ao passar o mouse, botao Tabela, Copiar dados e baixar em PNG; e esquemas/diagramas (figuras de geometria, circuitos, ciclos, celulas) que podem ser baixados em SVG. Basta pedir "faz um grafico de..." ou "desenha um esquema de...".
 - Modo tutor: botao "Tutor" na barra de escrever. Ligado, a Mine guia com dicas e perguntas em vez de entregar a resposta pronta, e so mostra a resolucao quando o estudante pede.
 - Proximas perguntas: depois de cada resposta aparecem ate tres sugestoes em "Continuar com"; tocar numa envia a pergunta.
 - Modo fotos: botao "Fotos" na barra de escrever, ao lado do clipe de anexo. Ligado, a Mine ilustra as respostas com fotos reais buscadas na Wikipedia e, quando ela nao tem, na internet (pessoas, lugares, objetos, seres vivos, obras de arte, jogos, figuras de ciencia e matematica), em galerias de varias fotos (tocar numa foto abre em tela cheia, com setas, link da fonte e botao Baixar). Comeca desligado, fica do jeito que a pessoa deixou e vale para o aparelho em que foi ligado. Mesmo desligado, perguntas sobre uma pessoa, lugar, animal ou obra especifica ja abrem com uma galeria, e pedir "manda uma foto de..." sempre funciona.
-- Criar imagem: pedindo "cria/gera/desenha uma imagem de...", a Mine cria uma imagem nova com inteligencia artificial, que aparece na conversa com botoes de ampliar, baixar e pedir alteracao. Para ajustar, basta pedir em seguida ("deixa o fundo azul", "agora em estilo anime"). Cada conta tem um limite diario de imagens criadas; as imagens ficam guardadas no aparelho em que foram criadas.
+- Criar imagem: pedindo "cria/gera/desenha uma imagem de...", a Mine cria uma imagem nova com inteligencia artificial, que aparece na conversa com botoes de ampliar, baixar, ajustar e criar outra versao. Para ajustar, basta pedir em seguida ("deixa o fundo azul", "agora em estilo anime"). Sai quadrada, ou deitada/em pe quando o pedido for banner, capa de video, story ou papel de parede do celular ou do computador. Mandando uma foto pelo clipe e pedindo "transforma em anime" ou "coloca um chapeu", a Mine edita a propria foto. Cada conta tem um limite diario de imagens criadas (o cartao mostra quantas restam); as imagens ficam guardadas no aparelho em que foram criadas.
+- Arquivos: pedindo "cria um PDF/Word/planilha do Excel/pagina HTML sobre...", a Mine monta o arquivo de verdade e mostra um cartao com previa e botoes para baixar em PDF, Word (.docx), HTML ou Excel (.xlsx) e CSV. Planilhas viram abas com formulas que funcionam no Excel.
+- Resumo de prova: no botao "+" da conversa (ou pedindo "transforma essa conversa num resumo de prova"), a Mine faz uma folha de revisao em PDF com o essencial, conceitos, formulas, erros comuns, perguntas que podem cair e checklist da vespera.
+- Glossario: termos dificeis da resposta ficam sublinhados; passando o mouse (ou tocando) aparece a explicacao.
+- Busca e alfinete: na barra lateral do chat ha a busca em todas as conversas (de todas as materias) e um alfinete para fixar conversas no topo.
 - Games com a Mine: o usuario primeiro escolhe uma materia e depois um dos seis jogos. A Mine cria uma rodada nova a partir do nome e dos conteudos cadastrados nessa materia; sem conteudo cadastrado, usa conhecimento geral da materia. Itens recentes sao enviados como lista de bloqueio para reduzir repeticoes. Enquanto a rodada e criada, a tela mostra as regras; o botao Comecar e liberado assim que ha um lote valido.
   1. A Jornada da Mine: verdadeiro ou falso com relogio de 60 segundos. Acertar devolve 3 segundos, errar tira 5 segundos e acertos seguidos aumentam o multiplicador. A historia avanca por quatro capitulos ate o farol; o relogio pausa durante as cenas.
   2. Arquivo Perdido: jogo da memoria com cartas. O jogador vira duas cartas para combinar um termo com sua definicao; pares errados viram para baixo novamente. Cada par recupera um fragmento da biblioteca.
@@ -476,11 +479,13 @@ ${IMAGE_QUERY_RULES}
  * Com `previousPrompt`, a pessoa esta ajustando a imagem que a Mine acabou de
  * fazer: o marcador vai com "editar" e o prompt completo revisado.
  */
-export function buildImageGenerationInstruction({ previousPrompt = "" } = {}) {
-  const editing = String(previousPrompt || "").slice(0, 600);
+export function buildImageGenerationInstruction({ previousPrompt = "", formato = "", anexo = false } = {}) {
+  const editing = anexo ? "" : String(previousPrompt || "").slice(0, 600);
+  const extras = [anexo ? "anexo" : editing ? "editar" : "", formato].filter(Boolean).map((item) => ` | ${item}`).join("");
   return `CRIAR IMAGEM
-O estudante quer que voce CRIE uma imagem nova (nao buscar uma foto que ja existe). Voce consegue: escreva, numa linha propria, o marcador abaixo e o Minerva desenha a imagem com um modelo de IA e mostra ali, com botoes de baixar e ampliar.
-[[gerar_imagem: prompt detalhado em ingles | legenda curta em portugues${editing ? " | editar" : ""}]]
+O estudante quer que voce CRIE uma imagem nova (nao buscar uma foto que ja existe). Voce consegue: escreva, numa linha propria, o marcador abaixo e o Minerva desenha a imagem com um modelo de IA e mostra ali, com botoes de baixar, ampliar, ajustar e criar outra versao.
+[[gerar_imagem: prompt detalhado em ingles | legenda curta em portugues${extras}]]
+${anexo ? `- FOTO ANEXADA: o estudante mandou uma foto e quer que voce a altere (estilo, fundo, objetos). O Minerva manda a foto junto para o modelo de edicao; o campo "anexo" no marcador e obrigatorio. Escreva o prompt como uma instrucao de edicao em ingles que diz o que mudar e o que manter (ex.: "Turn this photo into a Studio Ghibli style illustration, keep the person's pose, face and clothes, soft pastel colors"). Se for foto de uma pessoa, mantenha a identidade e nunca a coloque em situacao constrangedora.\n` : ""}${formato ? `- FORMATO: ele pediu imagem ${formato === "retrato" ? "em pe (retrato, 2:3)" : "deitada (paisagem, 3:2)"}; mantenha o campo "${formato}" no marcador e componha o prompt para esse enquadramento (${formato === "retrato" ? "vertical composition" : "wide horizontal composition"}).\n` : ""}- Formatos possiveis no ultimo campo do marcador: "paisagem" (banner, capa de video, papel de parede do computador) ou "retrato" (story, poster, papel de parede do celular). Sem o campo, a imagem sai quadrada.
 
 Como escrever o prompt (e o que decide a qualidade):
 - Em ingles, de 30 a 90 palavras, numa frase corrida: assunto principal, acao, cenario, estilo (ex.: watercolor illustration, 3D render, flat vector, photorealistic, pencil sketch, anime), cores, luz e enquadramento.
@@ -492,6 +497,83 @@ Como escrever o prompt (e o que decide a qualidade):
 ${editing ? `- ALTERACAO: a ultima imagem foi criada com o prompt "${editing}". O estudante quer ajusta-la. Reescreva esse prompt inteiro ja com a mudanca pedida (mantendo o resto igual) e use o terceiro campo "editar".\n` : ""}- Antes do marcador, uma frase curta e animada dizendo o que vai criar (ex.: "Claro! Vou criar um gato astronauta flutuando entre os planetas."). Depois do marcador, no maximo uma frase oferecendo ajuste (ex.: "Quer que eu mude as cores ou o estilo?"). Nao descreva a imagem em detalhes: voce ainda nao a viu.
 - O MARCADOR E OBRIGATORIO: sem ele nenhuma imagem aparece e a frase "vou criar" vira uma promessa vazia. Se voce disser que vai criar, o marcador tem de vir logo na linha seguinte.
 - Um marcador por resposta. Nunca use ![](url), nunca invente endereco e nunca diga que nao consegue criar imagens.`;
+}
+
+/**
+ * Arquivo para baixar (nov/2026): PDF, Word, Excel ou pagina HTML. A Mine
+ * escreve o conteudo num bloco ```arquivo e o navegador monta o arquivo de
+ * verdade (src/chat/MineFile.tsx), com previa e botoes de baixar.
+ */
+const FILE_NAMES = { pdf: "PDF", word: "documento do Word (.docx)", excel: "planilha do Excel (.xlsx)", html: "pagina HTML" };
+
+export function buildFileInstruction(tipo = "pdf") {
+  const kind = FILE_NAMES[tipo] ? tipo : "pdf";
+  const planilha = kind === "excel";
+  return `CRIAR ARQUIVO
+O estudante pediu um ${FILE_NAMES[kind]}. Voce consegue: escreva o conteudo num bloco de codigo com a etiqueta arquivo, como abaixo, e o Minerva monta o arquivo de verdade, com previa e botoes para baixar em ${planilha ? "Excel (.xlsx) e CSV" : "PDF, Word (.docx) e HTML"}. Nunca diga que nao consegue criar arquivos e nunca mande o estudante copiar e colar num editor.
+
+\`\`\`arquivo
+tipo: ${kind}
+titulo: Titulo curto do arquivo
+---
+${planilha ? `## Nome da aba
+| Coluna A | Coluna B | Total |
+| --- | --- | --- |
+| Item | 10 | =B2*2 |` : `## Primeira secao
+Paragrafos, listas, tabelas em markdown, **negrito** e ==destaque==.`}
+\`\`\`
+
+Regras:
+- Uma frase curta antes do bloco dizendo o que o arquivo traz. Depois do bloco, no maximo uma frase oferecendo ajuste. Nao repita o conteudo do arquivo fora do bloco.
+${planilha
+    ? `- Planilha: so tabelas em markdown dentro do bloco, cada uma com um titulo "## Nome da aba" antes (vira uma aba do Excel, ate 31 letras). Primeira linha = cabecalho. Numeros sem unidade na celula (a unidade vai no cabecalho, ex.: "Preco (R$)"), com virgula decimal brasileira. Formulas do Excel podem comecar com = e usam a posicao da celula (linha 1 e o cabecalho, a primeira linha de dados e a 2), ex.: =SOMA(B2:B6), =B2*C2. Antes de cada tabela pode haver uma linha de texto explicando a aba.`
+    : `- Documento organizado de verdade: comece com 1 ou 2 frases de apresentacao, depois secoes com "## titulo" (sem emoji no titulo), subsecoes "###", listas, tabelas markdown quando houver comparacao, e caixas de destaque "> [!DICA]", "> [!IMPORTANTE]", "> [!ATENCAO]", "> [!DEFINICAO]", "> [!EXEMPLO]", "> [!ERRO COMUM]" e "> [!RESUMO]" (o rotulo na primeira linha do bloco ">", o texto nas linhas ">" seguintes). Formulas em texto simples (ex.: v = d / t) porque o arquivo nao renderiza LaTeX.
+- Tamanho: o que o pedido precisar, de meia pagina a umas 4 paginas. Conteudo correto, completo e pronto para imprimir ou entregar.`}
+- O titulo do arquivo vira o nome do arquivo baixado: curto, sem data e sem a palavra "arquivo".`;
+}
+
+/**
+ * "Transforma essa conversa num resumo de prova": folha de revisao em PDF com
+ * o que foi estudado nesta conversa (o historico vai junto do pedido).
+ */
+export function buildStudySheetInstruction() {
+  return `RESUMO DE PROVA
+O estudante quer transformar ESTA conversa numa folha de revisao para estudar antes da prova. Use so o que foi conversado aqui (e o material da materia no contexto, se houver), corrigindo qualquer erro que tenha aparecido. Entregue num bloco \`\`\`arquivo do tipo pdf, assim:
+
+\`\`\`arquivo
+tipo: pdf
+titulo: Resumo de prova — <tema>
+---
+(conteudo)
+\`\`\`
+
+O conteudo segue estas secoes, nesta ordem (escreva os titulos em portugues correto, com acento: "Fórmulas, datas e números", "Checklist da véspera"):
+## O essencial
+3 a 6 frases que respondem "o que eu preciso saber disso?".
+## Conceitos-chave
+Lista "**termo**: definicao curta", de 5 a 10 itens.
+## Formulas, datas e numeros
+So se houver; tabela markdown com o que decorar e para que serve.
+## Erros comuns
+2 a 4 itens, cada um numa caixa "> [!ERRO COMUM]" (rotulo na primeira linha, texto na linha ">" seguinte), com a confusao e o jeito certo.
+## Perguntas que podem cair
+4 a 6 perguntas no estilo de prova, cada uma com a resposta curta logo abaixo em "Resposta:".
+## Checklist da vespera
+Lista curta de "[ ]" com o que revisar.
+
+Antes do bloco, uma frase curta dizendo que a folha esta pronta para baixar em PDF. Se a conversa ainda nao tem conteudo de estudo (so saudacao ou conversa solta), nao crie o arquivo: diga que precisa de um assunto e sugira um.`;
+}
+
+/**
+ * Glossario (nov/2026): palavras dificeis da resposta ganham uma explicacao ao
+ * passar o mouse. A Mine lista os termos num marcador no fim; a tela grifa.
+ */
+export function buildGlossaryInstruction() {
+  return `GLOSSARIO
+Se a resposta usar termos tecnicos que um estudante do ensino fundamental ou medio talvez nao conheca (ex.: "estomatos", "mitocondria", "absolutismo", "derivada"), liste ate 5 deles no fim, ANTES do marcador de sugestoes, numa linha propria:
+[[glossario: termo exatamente como aparece no texto = explicacao de ate 14 palavras ; outro termo = explicacao]]
+- So termos que aparecem no seu texto, escritos igual (mesmo numero e acento). Nada de palavras comuns, nomes de pessoas ou o proprio tema da pergunta quando ele ja foi explicado.
+- Explicacao simples, sem repetir o termo. Em resposta curta, de conversa ou sem termo dificil, nao escreva o marcador.`;
 }
 
 // Titulo da conversa na barra lateral, como nos chats grandes: escrito pelo
@@ -555,39 +637,6 @@ Sem markdown, sem asteriscos, sem emojis.
 
 Contexto:
 ${context || "Conversa livre em ingles basico."}`;
-}
-
-/**
- * Chat do MineCode: a Mine programa junto com o estudante e o codigo dela vai
- * direto para o editor. O cliente le o ULTIMO bloco de codigo da resposta
- * (readCodeReply em shared/code-run.mjs) e troca o arquivo inteiro por ele.
- */
-export function buildMineCodeInstruction(context, { prompt = "", history = [] } = {}) {
-  const skills = codeSkillsText(pickCodeSkills({ prompt, context, history }));
-  return `Voce e a Mine no MineCode, o editor de codigo do Minerva, programando junto com um estudante brasileiro de escola (ensino fundamental ou medio). O contexto abaixo traz a linguagem aberta, o arquivo atual do editor e a ultima saida do programa.
-
-O que voce faz:
-- Quando ele pedir para criar, mudar, corrigir ou melhorar algo, ESCREVA O CODIGO voce mesma. Seu codigo substitui o arquivo inteiro do editor, entao entregue SEMPRE o ARQUIVO COMPLETO e funcionando num unico bloco de codigo — nunca um trecho solto, nunca "o resto continua igual", nunca reticencias no lugar de codigo.
-- Use a linguagem aberta no editor, a nao ser que ele peca outra (ex.: "faz um site" com Python aberto -> html). Etiqueta do bloco: \`\`\`python, \`\`\`javascript ou \`\`\`html.
-- Ao mudar um codigo que ja existe, mantenha o que ele fez e mude so o necessario.
-- Se for so uma duvida ("o que e uma lista?", "por que deu erro?"), explique em portugues simples; mande codigo so se ajudar, e entao tambem completo.
-
-Formato da resposta, nesta ordem:
-1. Uma ou duas frases curtas em portugues do Brasil dizendo o que voce fez (ex.: "Pronto! Fiz uma calculadora que pergunta dois numeros e a operacao.").
-2. O bloco de codigo completo.
-3. Ate tres bullets curtos: o que mudou ou as partes principais, e como testar (ex.: "Escreva as respostas em Entradas, uma por linha").
-
-Regras do codigo:
-- Python roda no navegador (Pyodide): use so a biblioteca padrao (random, math, datetime...) e numpy; nada de tkinter, turtle, pygame, requests ou arquivos. Mostre resultados com print(). input() funciona: as respostas vem do campo "Entradas", uma por linha.
-- JavaScript roda sem pagina (sem DOM, sem document): use console.log para mostrar resultados.
-- HTML: arquivo completo com <!doctype html>, <meta charset>, <meta name="viewport">, <title>, CSS em <style> e JS em <script>, sem imagens por URL de fora (use as fotos geradas pelo marcador da skill, SVG inline ou CSS). De fora so entram Google Fonts e as bibliotecas que as skills abaixo liberam (Tailwind, Lucide, three.js e GSAP, nas versoes indicadas); nada de React, Vue ou jQuery. Capriche no design: moderno, responsivo, cores harmonicas, botoes com hover, textos de verdade em portugues.
-- Nomes de variaveis claros (em portugues tudo bem) e comentarios curtos em portugues nas partes importantes. Codigo no nivel de um estudante: claro antes de esperto.
-- Se a ultima saida mostra um erro, explique a causa em uma frase e corrija.
-
-Sem tabelas e sem titulos com #. Seja animada e direta, como uma colega que manja de programacao.
-${skills ? `\n${skills}\n` : ""}
-Contexto:
-${context || "Editor vazio."}`;
 }
 
 /** Explicacao de um erro na aba Idiomas, pedida pelo botao "Por que?". */
@@ -752,7 +801,6 @@ const TASK_PROMPTS = {
   "atividade-correcao": buildActivityGradeInstruction,
   "idioma-conversa": buildLanguageChatInstruction,
   "idioma-dica": buildLanguageTipInstruction,
-  minecode: buildMineCodeInstruction,
   title: buildTitleInstruction,
   quiz: buildQuizInstruction,
   "duelo-conferir": buildDuelCheckInstruction,

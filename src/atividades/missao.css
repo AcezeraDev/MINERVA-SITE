@@ -1,0 +1,493 @@
+/* Modo missão das Atividades (nov/2026): uma questão por vez, conferida na hora. Prefixo msn-. */
+
+.msn-page {
+  --msn-certa: 34 197 94;
+  --msn-parcial: 234 179 8;
+  --msn-errada: 239 68 68;
+  max-width: 980px;
+  margin: 0 auto;
+  padding-bottom: 9rem;
+}
+
+/* HUD: sair, trilha das questões e placar */
+.msn-hud {
+  position: sticky;
+  top: 4.6rem;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  margin: 0.4rem 0 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 999px;
+  background: rgb(var(--panel) / 0.92);
+  box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.7);
+  backdrop-filter: saturate(1.2);
+}
+.msn-sair {
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--theme-muted));
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.msn-sair:hover {
+  background: rgb(var(--theme-text) / 0.06);
+  color: rgb(var(--theme-text));
+}
+.msn-trilha {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.msn-no {
+  position: relative;
+  display: grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px dashed rgb(var(--line));
+  color: rgb(var(--theme-muted));
+  font-size: 0.82rem;
+  font-weight: 900;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.msn-no:hover {
+  transform: translateY(-2px);
+}
+.msn-no.is-certa,
+.msn-no.is-parcial,
+.msn-no.is-errada {
+  border-style: solid;
+  border-color: transparent;
+  color: #fff;
+}
+.msn-no.is-certa {
+  background: rgb(var(--msn-certa));
+}
+.msn-no.is-parcial {
+  background: rgb(var(--msn-parcial));
+  color: #3b2f00;
+}
+.msn-no.is-errada {
+  background: rgb(var(--msn-errada));
+}
+.msn-no.is-atual:not(.is-certa):not(.is-parcial):not(.is-errada) {
+  border-style: solid;
+  border-color: rgb(var(--pen));
+  color: rgb(var(--pen));
+}
+.msn-no-anel {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2.5px solid rgb(var(--pen));
+  box-shadow: 0 0 0 4px rgb(var(--pen) / 0.15);
+}
+.msn-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.msn-combo,
+.msn-xp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.msn-combo {
+  background: linear-gradient(135deg, #ff9a3d, #ff4d6d);
+  color: #fff;
+  box-shadow: 0 6px 18px -8px #ff4d6d;
+}
+.msn-xp {
+  background: rgb(var(--hl-yellow));
+  color: #3b2f00;
+}
+.msn-progresso {
+  height: 6px;
+  margin: 0 1.2rem 1.2rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(var(--line) / 0.6);
+}
+.msn-progresso span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(var(--pen)), rgb(var(--msn-certa)));
+  transform-origin: left;
+}
+
+/* palco e carta da questão */
+.msn-palco {
+  perspective: 1200px;
+}
+.msn-carta {
+  position: relative;
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.4rem 1.5rem 1.6rem;
+  border-radius: 1.4rem;
+  background: rgb(var(--panel));
+  box-shadow: var(--card-shadow), 0 30px 60px -40px rgb(var(--pen) / 0.45), inset 0 0 0 1.5px rgb(var(--line) / 0.8);
+  transition: box-shadow 260ms ease;
+}
+.msn-carta.is-certa {
+  box-shadow: var(--card-shadow), 0 30px 60px -36px rgb(var(--msn-certa) / 0.7), inset 0 0 0 2.5px rgb(var(--msn-certa));
+}
+.msn-carta.is-parcial {
+  box-shadow: var(--card-shadow), 0 30px 60px -36px rgb(var(--msn-parcial) / 0.7), inset 0 0 0 2.5px rgb(var(--msn-parcial));
+}
+.msn-carta.is-errada {
+  box-shadow: var(--card-shadow), 0 30px 60px -36px rgb(var(--msn-errada) / 0.6), inset 0 0 0 2.5px rgb(var(--msn-errada));
+}
+.msn-carta-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.msn-secao {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgb(var(--hl-lilac) / 0.55);
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.msn-contagem {
+  color: rgb(var(--theme-muted));
+  font-size: 0.9rem;
+}
+.msn-enunciado {
+  margin: 0;
+  font-family: "Anybody Variable", "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+}
+
+/* barra de baixo: muda de cor conforme a resposta */
+.msn-barra {
+  position: fixed;
+  right: max(1rem, calc((100vw - var(--sidebar-w, 0px) - 980px) / 2));
+  bottom: 1rem;
+  left: max(1rem, calc(var(--sidebar-w, 0px) + (100vw - var(--sidebar-w, 0px) - 980px) / 2));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0.9rem 0.8rem 1rem;
+  border-radius: 1.2rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 18px 50px -20px rgb(0 0 0 / 0.35), inset 0 0 0 1.5px rgb(var(--line));
+}
+@media (min-width: 1024px) {
+  .msn-barra {
+    left: max(17rem, calc(16rem + (100vw - 16rem - 980px) / 2));
+  }
+}
+/* Durante a missão o botão flutuante da Mine sai do canto: ele cobria o "Conferir". */
+body:has(.msn-barra) .caderno-buddy {
+  display: none;
+}
+
+/* abaixo de 1024px o site tem a navegação fixa embaixo: a barra fica logo acima dela */
+@media (max-width: 1023px) {
+  .msn-barra {
+    right: 0.75rem;
+    bottom: calc(4.9rem + env(safe-area-inset-bottom, 0px));
+    left: 0.75rem;
+    z-index: 41;
+  }
+  .msn-page {
+    padding-bottom: 14rem;
+  }
+}
+.msn-barra.is-certa {
+  background: rgb(var(--msn-certa) / 0.14);
+  box-shadow: 0 18px 50px -20px rgb(var(--msn-certa) / 0.6), inset 0 0 0 2px rgb(var(--msn-certa));
+  backdrop-filter: blur(8px);
+}
+.msn-barra.is-parcial {
+  background: rgb(var(--msn-parcial) / 0.16);
+  box-shadow: 0 18px 50px -20px rgb(var(--msn-parcial) / 0.6), inset 0 0 0 2px rgb(var(--msn-parcial));
+  backdrop-filter: blur(8px);
+}
+.msn-barra.is-errada {
+  background: rgb(var(--msn-errada) / 0.12);
+  box-shadow: 0 18px 50px -20px rgb(var(--msn-errada) / 0.55), inset 0 0 0 2px rgb(var(--msn-errada));
+  backdrop-filter: blur(8px);
+}
+.msn-barra-texto {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+.msn-barra-texto b {
+  display: block;
+  font-size: 0.98rem;
+}
+.msn-barra-texto small {
+  color: rgb(var(--theme-muted));
+  font-size: 0.82rem;
+}
+.msn-barra-icone {
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(var(--theme-text) / 0.07);
+  color: rgb(var(--pen));
+}
+.is-certa .msn-barra-icone {
+  background: rgb(var(--msn-certa));
+  color: #fff;
+}
+.is-parcial .msn-barra-icone {
+  background: rgb(var(--msn-parcial));
+  color: #3b2f00;
+}
+.is-errada .msn-barra-icone {
+  background: rgb(var(--msn-errada));
+  color: #fff;
+}
+.msn-botao {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 3rem;
+  padding: 0 1.4rem;
+  border-radius: 0.95rem;
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink, 255 255 255));
+  font-size: 1rem;
+  font-weight: 900;
+  box-shadow: 0 4px 0 rgb(var(--pen) / 0.45);
+  transition: transform 120ms ease, filter 120ms ease, opacity 120ms ease;
+}
+.msn-botao:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.msn-botao:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.is-certa .msn-botao {
+  background: rgb(var(--msn-certa));
+  box-shadow: 0 4px 0 rgb(21 128 61);
+  color: #fff;
+}
+.is-errada .msn-botao {
+  background: rgb(var(--msn-errada));
+  box-shadow: 0 4px 0 rgb(185 28 28);
+  color: #fff;
+}
+.is-parcial .msn-botao {
+  background: rgb(var(--msn-parcial));
+  box-shadow: 0 4px 0 rgb(161 98 7);
+  color: #3b2f00;
+}
+@media (max-width: 640px) {
+  .msn-hud {
+    top: 4rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    border-radius: 1.2rem;
+  }
+  .msn-stats {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+  .msn-carta {
+    padding: 1.1rem 1rem 1.2rem;
+  }
+  .msn-barra {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+    padding: 0.7rem;
+  }
+  .msn-barra-texto small {
+    display: none;
+  }
+  .msn-barra-icone {
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+  .msn-botao {
+    justify-content: center;
+  }
+}
+
+/* fim da missão */
+.msn-fim {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+  padding: 2.2rem 1.5rem;
+  border-radius: 1.6rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(var(--hl-yellow) / 0.55), transparent 55%),
+    rgb(var(--panel));
+  box-shadow: var(--card-shadow), inset 0 0 0 1.5px rgb(var(--line));
+  text-align: center;
+}
+.msn-fim-titulo {
+  margin: 0;
+  font-family: "Anybody Variable", system-ui, sans-serif;
+  font-size: clamp(1.4rem, 3vw, 2.1rem);
+  font-weight: 850;
+  line-height: 1.15;
+}
+.msn-estrelas {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  margin: 0.6rem 0 0.2rem;
+}
+.msn-estrela svg {
+  width: 4rem;
+  height: 4rem;
+  fill: rgb(var(--line));
+  stroke: rgb(var(--line));
+}
+.msn-estrela.is-on svg {
+  fill: #ffc531;
+  stroke: #e09b00;
+  filter: drop-shadow(0 8px 14px rgb(255 170 0 / 0.45));
+}
+.msn-fim-frase {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.msn-fim-numeros {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  width: min(100%, 40rem);
+  margin: 0.4rem 0;
+}
+.msn-fim-numeros span {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.8rem 0.4rem;
+  border-radius: 1rem;
+  background: rgb(var(--theme-text) / 0.04);
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.7);
+}
+.msn-fim-numeros b {
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+.msn-fim-numeros small {
+  color: rgb(var(--theme-muted));
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+@media (max-width: 560px) {
+  .msn-fim-numeros {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.msn-fim-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+/* Dentro da missão as peças ganham cara de jogo (a folha de correção continua igual à da escola) */
+.msn-carta .atv-resposta {
+  overflow: visible;
+  border-radius: 1.1rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 calc(2.6rem - 1.5px), rgb(var(--rule, 200 210 230) / 0.7) calc(2.6rem - 1.5px) 2.6rem),
+    rgb(var(--sheet));
+  box-shadow: inset 0 0 0 2px rgb(var(--line));
+  outline: 2.5px dashed rgb(var(--pen) / 0.35);
+  outline-offset: -8px;
+}
+.msn-carta .atv-resposta.is-certa {
+  outline-color: rgb(var(--msn-certa));
+  box-shadow: inset 0 0 0 2px rgb(var(--msn-certa) / 0.6);
+}
+.msn-carta .atv-resposta.is-errada {
+  outline-color: rgb(var(--msn-errada));
+  box-shadow: inset 0 0 0 2px rgb(var(--msn-errada) / 0.6);
+}
+.msn-carta .atv-resposta-label {
+  display: none;
+}
+.msn-carta .atv-resposta .atv-palavras {
+  min-height: 5.2rem;
+  justify-content: center;
+  padding: 1rem;
+}
+.msn-carta .atv-placeholder {
+  color: rgb(var(--theme-muted));
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+}
+.msn-carta .atv-banco {
+  margin-top: 1.2rem;
+  gap: 0.6rem;
+}
+.msn-carta .atv-palavra {
+  padding: 0.6rem 1.05rem;
+  border-radius: 0.8rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 2px rgb(var(--pen) / 0.55), 0 4px 0 rgb(var(--pen) / 0.4);
+  transition: transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 140ms ease;
+}
+.msn-carta .atv-palavra:not(.is-vaga):not(:disabled):hover {
+  transform: translateY(-3px);
+  box-shadow: inset 0 0 0 2px rgb(var(--pen)), 0 7px 0 rgb(var(--pen) / 0.45);
+}
+.msn-carta .atv-palavra:not(.is-vaga):not(:disabled):active {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 2px rgb(var(--pen)), 0 1px 0 rgb(var(--pen) / 0.45);
+}
+.msn-carta .atv-palavra.is-escolhida {
+  box-shadow: 0 4px 0 rgb(0 0 0 / 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msn-carta .atv-palavra,
+  .msn-no,
+  .msn-botao,
+  .msn-carta {
+    transition: none;
+  }
+}

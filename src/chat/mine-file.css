@@ -1,0 +1,328 @@
+/* Arquivo criado pela Mine (MineFile.tsx): folha em miniatura + faixa de download. */
+.mfile {
+  --mfile-tone: #e5533d;
+  display: grid;
+  width: min(34rem, 100%);
+  margin: 0.9rem 0;
+  overflow: hidden;
+  border: 1.5px solid rgb(var(--theme-text) / 0.7);
+  border-radius: 1.1rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 2px 0 rgb(var(--theme-text) / 0.18);
+}
+
+.mfile.is-building {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.mfile__spin {
+  width: 1.2rem;
+  height: 1.2rem;
+  animation: mfile-spin 900ms linear infinite;
+}
+
+@keyframes mfile-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mfile__spin { animation: none; }
+}
+
+/* a folha: miniatura da página ou da planilha */
+.mfile__sheet {
+  position: relative;
+  display: block;
+  height: 11.5rem;
+  overflow: hidden;
+  border-bottom: 1.5px solid rgb(var(--theme-text) / 0.18);
+  background:
+    radial-gradient(circle at 20% 0%, rgb(var(--pen) / 0.08), transparent 60%),
+    rgb(var(--theme-text) / 0.04);
+  cursor: zoom-in;
+}
+
+.mfile__page {
+  position: absolute;
+  top: 0.9rem;
+  left: 50%;
+  width: 794px;
+  height: 1123px;
+  transform: translateX(-50%) scale(0.36);
+  transform-origin: top center;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18), 0 1px 0 rgb(0 0 0 / 0.1);
+  pointer-events: none;
+}
+
+.mfile__page iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.mfile__grid {
+  position: absolute;
+  inset: 0.9rem 0.9rem auto;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid #cfdad3;
+  border-radius: 6px;
+  background: #fff;
+  color: #1d2320;
+  font: 600 0.72rem/1 "Segoe UI", Arial, sans-serif;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  pointer-events: none;
+}
+
+.mfile__grid > span {
+  overflow: hidden;
+  padding: 0.42rem 0.45rem;
+  border-right: 1px solid #e3e9e5;
+  border-bottom: 1px solid #e3e9e5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mfile__grid .is-col,
+.mfile__grid .is-row,
+.mfile__grid .is-corner {
+  background: #f1f4f2;
+  color: #6b756f;
+  font-weight: 700;
+  text-align: center;
+}
+
+.mfile__grid .is-head {
+  background: #e3f5eb;
+  color: #14513a;
+  font-weight: 800;
+}
+
+.mfile__grid .is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mfile__peek {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgb(var(--theme-text) / 0.82);
+  color: rgb(var(--sheet));
+  font-size: 0.75rem;
+  font-weight: 800;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 160ms, transform 160ms;
+}
+
+.mfile__peek svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.mfile__sheet:is(:hover, :focus-visible) .mfile__peek {
+  opacity: 1;
+  transform: none;
+}
+
+@media (hover: none) {
+  .mfile__peek { opacity: 1; transform: none; }
+}
+
+/* faixa de baixo: ícone, nome e botões */
+.mfile__info {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+  padding: 0.8rem 0.9rem 0.9rem;
+}
+
+.mfile__icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--mfile-tone) 14%, transparent);
+  color: var(--mfile-tone);
+}
+
+.mfile__icon svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.mfile__body {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.mfile__body strong {
+  overflow: hidden;
+  color: rgb(var(--theme-text));
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mfile__body small {
+  color: rgb(var(--theme-muted));
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.mfile__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.mfile__primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 0.75rem;
+  background: var(--mfile-tone);
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 800;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--mfile-tone) 60%, #000);
+  transition: transform 120ms, filter 120ms;
+}
+
+.mfile__primary svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.mfile__primary:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.mfile__primary:active {
+  transform: translateY(1px);
+}
+
+.mfile__more {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.mfile__more button {
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1.5px solid rgb(var(--theme-text) / 0.18);
+  border-radius: 0.75rem;
+  color: rgb(var(--theme-text) / 0.82);
+  font-size: 0.8rem;
+  font-weight: 800;
+  transition: background-color 140ms, border-color 140ms, color 140ms;
+}
+
+.mfile__more button:is(:hover, :focus-visible) {
+  border-color: var(--mfile-tone);
+  color: var(--mfile-tone);
+}
+
+.mfile__hint {
+  grid-column: 1 / -1;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.65rem;
+  background: rgb(var(--pen) / 0.1);
+  color: rgb(var(--theme-text));
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* prévia em tela cheia */
+.mfile-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(8 12 10 / 0.72);
+}
+
+.mfile-dialog__panel {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: min(900px, 100%);
+  height: min(92vh, 1200px);
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #eef1ee;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.45);
+}
+
+.mfile-dialog__panel header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.75rem 0.65rem 1rem;
+  background: #fff;
+  color: #1d2320;
+  border-bottom: 1px solid #dfe6e1;
+}
+
+.mfile-dialog__panel header strong {
+  flex: 1;
+  overflow: hidden;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mfile-dialog__panel header button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0 0.85rem;
+  border-radius: 0.65rem;
+  background: #1d2320;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.mfile-dialog__panel header button.is-close {
+  width: 2.5rem;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: #1d2320;
+}
+
+.mfile-dialog__panel header svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.mfile-dialog__panel iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #eef1ee;
+}

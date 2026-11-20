@@ -5,15 +5,14 @@ import "./mine-code-blocks.css";
 
 /*
  * Terminal de saída do código: o botão Executar, as "Entradas" para input()
- * e o que o programa imprimiu. Usado embaixo dos blocos de código do chat e
- * na aba MineCode.
+ * e o que o programa imprimiu. Usado embaixo dos blocos de código do chat.
  */
 
-export function usesInput(language: RunLanguage, code: string) {
+function usesInput(language: RunLanguage, code: string) {
   return language === "python" ? /\binput\s*\(/.test(code) : /\bprompt\s*\(/.test(code);
 }
 
-export function useRunner() {
+function useRunner() {
   const [lines, setLines] = useState<RunLine[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "running">("idle");
   const [elapsed, setElapsed] = useState<number | null>(null);
@@ -51,7 +50,7 @@ export function useRunner() {
   };
 }
 
-export function RunOutput({ lines, status, elapsed, onClear }: { lines: RunLine[]; status: "idle" | "loading" | "running"; elapsed: number | null; onClear?: () => void }) {
+function RunOutput({ lines, status, elapsed, onClear }: { lines: RunLine[]; status: "idle" | "loading" | "running"; elapsed: number | null; onClear?: () => void }) {
   if (status === "idle" && elapsed === null && !lines.length) return null;
   const failed = lines.some((line) => line.kind === "error");
   return (

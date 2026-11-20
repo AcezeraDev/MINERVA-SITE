@@ -22,8 +22,10 @@ import { SitePreview, isSitePage } from "./SitePreview";
 import { InlineRunner } from "./CodeRunner";
 import { MineChart, MineSvgFigure } from "./MineChart";
 import { emoji3dPath, splitLeadingEmoji } from "../../shared/emoji-3d.mjs";
-import { openInMineCode, runnableLanguage } from "./runner";
+import { runnableLanguage } from "./runner";
 import { CALLOUT_TITLES, labelOf, parseBlocks, parseInline, type Block, type CalloutKind, type InlineToken, type ListBlock } from "../../shared/chat-markdown.mjs";
+import { GLOSS_OPEN, definitionOf, splitMarked, type GlossaryTerm } from "../../shared/chat-glossary.mjs";
+import { MineFileCard } from "./MineFile";
 
 /*
  * Corpo escrito de uma resposta da Mine, com a cara de um caderno de estudo:
@@ -99,9 +101,9 @@ function renderTokens(tokens: InlineToken[], keyPrefix = "t"): React.ReactNode[]
         return <MineCitation key={key} indexes={indexes} />;
       }
       case "text":
-        return <React.Fragment key={key}>{token.text}</React.Fragment>;
+        return token.text.includes(GLOSS_OPEN) ? <GlossText key={key} text={token.text} /> : <React.Fragment key={key}>{token.text}</React.Fragment>;
       case "code":
-        return <code key={key} className="mrt-code-inline">{token.text}</code>;
+        return <code key={key} className="mrt-code-inline">{token.text.replace(GLOSS_MARKS, "")}</code>;
       case "math":
         return <InlineMath key={key} tex={token.tex} />;
       case "strong":
@@ -128,6 +130,36 @@ function renderTokens(tokens: InlineToken[], keyPrefix = "t"): React.ReactNode[]
 function Inline({ text }: { text: string }) {
   const tokens = useMemo(() => parseInline(text), [text]);
   return <>{renderTokens(tokens)}</>;
+}
+
+// ---------------------------------------------------------------------------
+// Glossário: termo sublinhado com a explicação ao passar o mouse ou tocar.
+// As marcas vêm de markGlossary (MineMessageText); aqui só se lê.
+
+const GlossaryContext = React.createContext<GlossaryTerm[]>([]);
+export const MineGlossaryProvider = GlossaryContext.Provider;
+const GLOSS_MARKS = /[]/g;
+
+function GlossText({ text }: { text: string }) {
+  const terms = React.useContext(GlossaryContext);
+  return (
+    <>
+      {splitMarked(text).map((part, index) => {
+        if (part.type === "text") return <React.Fragment key={index}>{part.text}</React.Fragment>;
+        const def = definitionOf(part.text, terms);
+        if (!def) return <React.Fragment key={index}>{part.text}</React.Fragment>;
+        return (
+          <span key={index} className="mrt-gloss" tabIndex={0} aria-label={`${part.text}: ${def}`}>
+            {part.text}
+            <span className="mrt-gloss__tip" role="tooltip" aria-hidden>
+              <strong>{part.text}</strong>
+              {def}
+            </span>
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 const InlineMath = memo(function InlineMath({ tex }: { tex: string }) {
@@ -259,9 +291,13 @@ const CHART_LANGS = new Set(["grafico", "gráfico", "chart"]);
 /**
  * Bloco de código. ```grafico vira gráfico e ```svg vira esquema (MineChart);
  * página HTML completa vira prévia do site funcionando;
- * Python e JavaScript ganham o botão Executar e "Abrir no MineCode".
+ * Python e JavaScript ganham o botão Executar.
  */
-const CodeBlock = memo(function CodeBlock({ code, lang, open }: { code: string; lang: string; open: boolean }) {
+const CodeBlock = memo(function CodeBlock({ code: raw, lang, open }: { code: string; lang: string; open: boolean }) {
+  // Termo do glossário nunca é marcado em código; se escapar, sai aqui.
+  const code = raw.replace(GLOSS_MARKS, "");
+  // Arquivo para baixar (PDF, Word, Excel, HTML): cartão próprio, inclusive enquanto chega.
+  if (lang === "arquivo") return <MineFileCard code={code} open={open} />;
   // Gráfico e esquema só se desenham com a cerca fechada; chegando, aparecem como código.
   if (!open && CHART_LANGS.has(lang)) return <MineChart source={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
   if (!open && (lang === "svg" || (lang === "xml" && /^\s*<svg[\s>]/i.test(code)))) return <MineSvgFigure source={code} fallback={<CodeBox code={code} lang="xml" open={false} />} />;
@@ -270,13 +306,13 @@ const CodeBlock = memo(function CodeBlock({ code, lang, open }: { code: string; 
   if (!runnable) return <CodeBox code={code} lang={lang} open={open} />;
   return (
     <div className="mrt-runnable">
-      <CodeBox code={code} lang={lang} open={false} onMineCode={() => openInMineCode(code, lang)} />
+      <CodeBox code={code} lang={lang} open={false} />
       <InlineRunner language={runnable} code={code} />
     </div>
   );
 });
 
-const CodeBox = memo(function CodeBox({ code, lang, open, onMineCode }: { code: string; lang: string; open: boolean; onMineCode?: () => void }) {
+const CodeBox = memo(function CodeBox({ code, lang, open }: { code: string; lang: string; open: boolean }) {
   // Enquanto o bloco ainda está chegando, realçar a cada token só gastaria
   // CPU: a cor entra de uma vez quando a cerca fecha.
   const highlight = useHighlighter(Boolean(lang) && !open);
@@ -296,12 +332,6 @@ const CodeBox = memo(function CodeBox({ code, lang, open, onMineCode }: { code: 
           {name}
         </span>
         <span className="mrt-codebox__meta">{lines} {lines === 1 ? "linha" : "linhas"}</span>
-        {onMineCode ? (
-          <button type="button" className="mrt-copy mrt-copy--minecode" onClick={onMineCode} aria-label={`Abrir este código ${name} no MineCode`}>
-            <Code2 aria-hidden />
-            <span>MineCode</span>
-          </button>
-        ) : null}
         {!open ? <CopyChip text={code} label={`Copiar código ${name}`} /> : null}
       </figcaption>
       <div className="mrt-codebox__scroll">
@@ -334,7 +364,7 @@ function TableBlock({ block }: { block: Extract<Block, { type: "table" }> }) {
     return cells.length > 0 && cells.every((cell) => NUMERIC_CELL.test(cell.replace(/\*\*/g, "")));
   });
   // Copiar com tabulação: cola célula por célula no Excel e no Planilhas.
-  const plain = (cell: string) => cell.replace(/\*\*|==|`/g, "").replace(/\$([^$]+)\$/g, "$1");
+  const plain = (cell: string) => cell.replace(GLOSS_MARKS, "").replace(/\*\*|==|`/g, "").replace(/\$([^$]+)\$/g, "$1");
   const tsv = [block.header, ...block.rows].map((row) => row.map(plain).join("\t")).join("\n");
   return (
     <figure className="mrt-tablecard" style={{ "--mrt-cols": block.header.length } as React.CSSProperties}>

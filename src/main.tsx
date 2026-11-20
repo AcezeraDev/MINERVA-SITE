@@ -108,6 +108,9 @@ import {
   MicOff,
   Repeat,
   Clock,
+  PenLine,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import "./fonts";
 import "./index.css";
@@ -157,7 +160,12 @@ import {
 } from "../shared/chat-intent.mjs";
 import { parseFlashcards, parseQuiz, type QuizQuestion } from "../shared/study-parsers.mjs";
 import { describeImageMarkers, extractSuggestions, splitMessageMedia, stripImageMarkers } from "../shared/chat-media.mjs";
-import { MineRichText } from "./chat/MineRichText";
+import { MineGlossaryProvider, MineRichText } from "./chat/MineRichText";
+import { extractGlossary, markGlossary } from "../shared/chat-glossary.mjs";
+import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
+import { searchConversations } from "../shared/chat-search.mjs";
+import { chatActionFromPrompt, planejarAcao, type ChatAction } from "./chat/acoes";
+import { deixarPreset } from "./chat/presets";
 import { MineSourcesButton, MineSourcesProvider, MineThought, MineWorking, type MineSearchStatus } from "./chat/MineSources";
 import { cleanVisits, MineControlePanel, MineControleVisits, type MineVisit } from "./chat/MineControle";
 import { MineAnswerActions, VersionSwitch } from "./chat/MineAnswerActions";
@@ -165,12 +173,11 @@ import { branchSlice, switchBranch, versionInfo } from "./chat/branches";
 import { MineImageGallery } from "./chat/MineImageGallery";
 import { MineGeneratedImage } from "./chat/MineGeneratedImage";
 import "./chat/mine-gallery.css";
-import { inThread, threadsOf, type ChatThread } from "./chat/threads";
+import { inThread, threadsOf, togglePinned, type ChatThread } from "./chat/threads";
 import "./chat/mine-rich-text.css";
 import "./chat/mine-chat.css";
 // Caderno vivo por último: é a identidade que vence as camadas anteriores.
 import "./caderno.css";
-import { MineCodeDesktopButton, MineCodeDesktopPanel, MineCodeNews } from "./chat/MineCodeDesktop";
 import {
   Doodle,
   InkCheck,
@@ -259,7 +266,6 @@ const AgendaView = React.lazy(() => import("./agenda/AgendaView").then((m) => ({
 const TaskEditor = React.lazy(() => import("./agenda/TaskEditor").then((m) => ({ default: m.TaskEditor })));
 
 const ComoUsarView = React.lazy(() => import("./guia/ComoUsarView").then((m) => ({ default: m.ComoUsarView })));
-const MineCode = React.lazy(() => import("./chat/MineCode").then((m) => ({ default: m.MineCode })));
 const Pets = React.lazy(() => import("./pets/Pets"));
 const MindmapModal = React.lazy(() => import("./mindmap/MindmapPanel").then((m) => ({ default: m.MindmapModal })));
 
@@ -609,6 +615,10 @@ export type ChatMessage = {
   branches?: ChatMessage[][];
   /** Título da conversa escrito pela IA; fica na primeira pergunta. */
   threadTitle?: string;
+  /** Ação feita pelo chat ("salva isso em História", "cria um duelo"): o cartão reabre o resultado. */
+  action?: ChatAction;
+  /** Conversa fixada no topo da lista; fica na primeira mensagem dela. */
+  threadPinned?: boolean;
   createdAt: number;
 };
 
@@ -744,6 +754,8 @@ export type Session = {
   /** Aba Redação: tema e as notas das 5 competências (0 a 200 cada). */
   tema?: string;
   notas?: number[];
+  /** Proposta pronta de redação (shared/redacao-propostas.mjs): a primeira entrega vale mais XP. */
+  propostaId?: string;
   /** Aba Atividades: componente e pontos da tarefa. */
   materia?: string;
   pontos?: number;
@@ -2079,6 +2091,22 @@ function App() {
           }}
           openMaterial={(materialId) => setModal({ type: "materialView", materialId })}
           addMaterial={(subjectId) => setModal({ type: "material", subjectId })}
+          openThread={(subjectId, threadId) => {
+            if (mineLoading) return;
+            setMineSuggestions([]);
+            if ((subjectId || undefined) === (selectedSubjectId || undefined)) {
+              setMineThreadId(threadId);
+              return;
+            }
+            // Outra matéria: o efeito que troca de matéria lê a conversa guardada aqui.
+            try {
+              sessionStorage.setItem(mineOpenStorageKey, JSON.stringify({ userId: user.id, subjectId, threadId }));
+            } catch {}
+            setSelectedSubjectId(subjectId);
+          }}
+          togglePin={(subjectId, threadId) => {
+            update((draft) => ({ ...draft, chats: togglePinned(draft.chats, subjectId, threadId) }));
+          }}
           openMindmap={(message) => {
             if (!message.mindmap) return;
             setModal({
@@ -2224,12 +2252,21 @@ function App() {
             // em vez de perguntar "sobre o que você quer a prova?".
             const inlineMaterial = inlineMaterialFromPrompt(prompt);
             const hasOwnSource = Boolean(inlineMaterial || attachments.length);
-            const mindMapRequest = isMindMapRequest(prompt);
+            // "salva isso em História", "cria um duelo sobre isso": pedido para
+            // FAZER algo no site. Sai na hora, sem IA (src/chat/acoes.ts).
+            // Mapa mental ganha da ação, e anexo é conversa sobre o arquivo.
+            // Arquivo ("cria um PDF com 10 questões") e resumo de prova vão para a
+            // Mine, que escreve o bloco ```arquivo: vencem ação, mapa e prova.
+            const fileRequest = Boolean(asksForFile(prompt)) || asksForStudySheet(prompt);
+            const chatAction = !fileRequest && !attachments.length && !isMindMapRequest(prompt) ? chatActionFromPrompt(prompt) : null;
+            const mindMapRequest = !fileRequest && !chatAction && isMindMapRequest(prompt);
             const quizRequest = !mindMapRequest
+              && !fileRequest
+              && !chatAction
               && isQuizRequest(prompt)
               && !wantsGuidedQuiz(prompt)
               && !(hasOwnSource && !quizTopicFromPrompt(prompt));
-            const flashcardRequest = !mindMapRequest && !isQuizRequest(prompt) && isFlashcardRequest(prompt);
+            const flashcardRequest = !fileRequest && !chatAction && !mindMapRequest && !isQuizRequest(prompt) && isFlashcardRequest(prompt);
             const artefatoTopic = mindMapRequest
               ? mindMapTopicFromPrompt(prompt)
               : quizRequest
@@ -2318,6 +2355,37 @@ function App() {
             }
             if (subject && savedMaterials.length) {
               notify(savedMaterials.length === 1 ? `Anexo salvo como conteúdo em ${subject.name}.` : `${savedMaterials.length} anexos salvos como conteúdo em ${subject.name}.`);
+            }
+            if (chatAction) {
+              const plano = planejarAcao(chatAction, {
+                userId: user.id,
+                subjects: userData.subjects,
+                materials: userData.materials,
+                subjectId: resolvedSubjectId,
+                conversa: threadMessages,
+                uid,
+              });
+              update((draft) => {
+                const comMensagem: AppData = {
+                  ...draft,
+                  chats: [...draft.chats, {
+                    id: uid("chat"),
+                    userId: user.id,
+                    subjectId: resolvedSubjectId, threadId: threadForMessages,
+                    role: "mine",
+                    text: plano.texto,
+                    action: plano.acao,
+                    createdAt: Date.now() + 1,
+                  }],
+                };
+                return plano.mudar ? plano.mudar(comMensagem) : comMensagem;
+              });
+              setMineSuggestions(plano.sugestoes || []);
+              if (plano.abrir) {
+                deixarPreset(plano.abrir.view, plano.abrir.preset);
+                go(plano.abrir.view);
+              }
+              return;
             }
             if (mindMapRequest) {
               const mapTopic = subject?.name || standaloneMindMapTopic;
@@ -6500,6 +6568,44 @@ function QuizChatPreview({ quiz, onOpen }: { quiz: ChatQuiz; onOpen: () => void 
   );
 }
 
+const actionLooks: Record<ChatAction["kind"], { icon: typeof BookOpen; color: string }> = {
+  salvar: { icon: FileText, color: "#34D399" },
+  agenda: { icon: CalendarDays, color: "#F472B6" },
+  duelo: { icon: Swords, color: "#F87171" },
+  atividade: { icon: ClipboardList, color: "#FBBF24" },
+  redacao: { icon: PenLine, color: "#A78BFA" },
+  leitura: { icon: BookOpen, color: "#38BDF8" },
+};
+
+/** Ação feita pelo chat. O toque leva ao resultado (e preenche a aba de novo). */
+function ActionChatPreview({ action }: { action: ChatAction }) {
+  const look = actionLooks[action.kind] || actionLooks.salvar;
+  const Icon = look.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (action.rota !== "subject" && action.rota !== "agenda") deixarPreset(action.rota, action.preset || {});
+        go(action.rota, action.id);
+      }}
+      className="mine-artifact-card"
+      aria-label={`${action.cta}: ${action.titulo}`}
+    >
+      <span className="mine-artifact-card__icon" style={{ "--artifact-color": look.color } as React.CSSProperties}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="mine-artifact-card__body">
+        <strong>{action.titulo}</strong>
+        <small>{action.detalhe}</small>
+      </span>
+      <span className="mine-artifact-card__cta">
+        {action.cta}
+        <ChevronRight className="h-4 w-4" />
+      </span>
+    </button>
+  );
+}
+
 /** Baralho pronto na conversa. Abre a revisão espaçada da matéria. */
 function DeckChatPreview({ deck, onOpen }: { deck: ChatDeck; onOpen: () => void }) {
   return (
@@ -6720,7 +6826,7 @@ const MineMessageList = React.memo(function MineMessageList({
               <>
                 <MineThought reasoning={message.reasoning} seconds={message.reasoning ? message.thoughtSeconds : undefined} />
                 <MineSourcesProvider sources={message.sources}>
-                  <MineMessageText text={message.text} />
+                  <MineMessageText text={message.text} attachment={questionBefore.get(message.id)?.attachments?.find((item) => item.kind === "image" && item.dataUrl)?.dataUrl} />
                 </MineSourcesProvider>
               </>
             )}
@@ -6734,6 +6840,7 @@ const MineMessageList = React.memo(function MineMessageList({
             ) : null}
             {message.role === "mine" && message.quiz ? <QuizChatPreview quiz={message.quiz} onOpen={() => onOpenQuiz(message)} /> : null}
             {message.role === "mine" && message.deck ? <DeckChatPreview deck={message.deck} onOpen={() => onOpenDeck(message)} /> : null}
+            {message.role === "mine" && message.action ? <ActionChatPreview action={message.action} /> : null}
             <ChatAttachments attachments={message.attachments} tone={message.role === "user" ? "user" : "dark"} />
             {message.role !== "user" && message.visits?.length ? <MineControleVisits visits={message.visits} /> : null}
             {message.role !== "user" ? <MineSourcesButton sources={message.sources} queries={message.queries} /> : null}
@@ -6786,6 +6893,11 @@ function MineThreadList({
   onSelect,
   onDelete,
   disabled,
+  chats,
+  subjects,
+  subjectId,
+  onOpenThread,
+  onTogglePin,
 }: {
   threads: ChatThread[];
   activeId?: string;
@@ -6793,77 +6905,167 @@ function MineThreadList({
   onSelect: (threadId: string | undefined) => void;
   onDelete: (threadId: string | undefined) => void;
   disabled: boolean;
+  /** Busca em todas as conversas (nov/2026): todas as mensagens e matérias. */
+  chats: ChatMessage[];
+  subjects: Subject[];
+  subjectId?: string;
+  onOpenThread: (subjectId: string | undefined, threadId: string | undefined) => void;
+  onTogglePin: (threadId: string | undefined) => void;
 }) {
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   useEffect(() => {
     if (!confirmKey) return;
     const timer = window.setTimeout(() => setConfirmKey(null), 4000);
     return () => window.clearTimeout(timer);
   }, [confirmKey]);
+  const searching = query.trim().length >= 2;
+  const hits = useMemo(() => (searching ? searchConversations(chats, query) : []), [chats, query, searching]);
+  const subjectName = (id?: string) => subjects.find((item) => item.id === id)?.name || "Estudos gerais";
+
+  const search = (
+    <label className="mine-thread-search">
+      <Search className="h-3.5 w-3.5" aria-hidden />
+      <input
+        type="search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setQuery("");
+        }}
+        placeholder="Buscar em todas as conversas"
+        aria-label="Buscar em todas as conversas"
+      />
+    </label>
+  );
+
+  if (searching) {
+    return (
+      <div className="mine-thread-panel">
+        {search}
+        {hits.length ? (
+          <ul className="mine-threads minerva-scroll" aria-label={`${hits.length} conversas encontradas`}>
+            {hits.map((hit) => {
+              const active = (hit.subjectId || undefined) === (subjectId || undefined) && (hit.threadId || undefined) === (activeId || undefined) && !activeIsNew;
+              return (
+                <li key={`${hit.subjectId || ""}::${hit.threadId || ""}`} className="mine-thread-row">
+                  <button
+                    type="button"
+                    className={`mine-thread is-hit ${active ? "is-active" : ""}`}
+                    disabled={disabled && !active}
+                    onClick={() => {
+                      onOpenThread(hit.subjectId, hit.threadId);
+                      setQuery("");
+                    }}
+                  >
+                    <span className="mine-thread__icon">{hit.pinned ? <Pin className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}</span>
+                    <span className="mine-thread__text">
+                      <span className="mine-thread__title">
+                        <InkMark text={hit.title} query={query.trim().split(/\s+/)[0]} />
+                      </span>
+                      {hit.snippet ? (
+                        <span className="mine-thread__snippet">
+                          <InkMark text={hit.snippet} query={query.trim().split(/\s+/)[0]} />
+                        </span>
+                      ) : null}
+                      <span className="mine-thread__meta">
+                        {subjectName(hit.subjectId)} · {activityAge(hit.updatedAt)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="mine-thread-empty">Nada encontrado para “{query.trim()}” nas suas conversas.</p>
+        )}
+      </div>
+    );
+  }
 
   if (!threads.length && !activeIsNew) {
-    return <p className="mine-thread-empty">As conversas desta matéria vão aparecer aqui.</p>;
+    return (
+      <div className="mine-thread-panel">
+        {chats.length ? search : null}
+        <p className="mine-thread-empty">As conversas desta matéria vão aparecer aqui.</p>
+      </div>
+    );
   }
 
   return (
-    <ul className="mine-threads minerva-scroll" aria-label="Conversas">
-      {activeIsNew ? (
-        <li>
-          <span className="mine-thread is-active is-new" aria-current="true">
-            <span className="mine-thread__icon">
-              <Plus className="h-3.5 w-3.5" />
-            </span>
-            <span className="mine-thread__text">
-              <span className="mine-thread__title">Nova conversa</span>
-              <span className="mine-thread__meta">Comece a escrever</span>
-            </span>
-          </span>
-        </li>
-      ) : null}
-      {threads.map((thread) => {
-        const key = thread.id || "__principal__";
-        const active = !activeIsNew && (thread.id || undefined) === (activeId || undefined);
-        const confirming = confirmKey === key;
-        return (
-          <li key={key} className="mine-thread-row">
-            <button
-              type="button"
-              className={`mine-thread ${active ? "is-active" : ""}`}
-              aria-current={active ? "true" : undefined}
-              disabled={disabled && !active}
-              onClick={() => onSelect(thread.id)}
-            >
+    <div className="mine-thread-panel">
+      {search}
+      <ul className="mine-threads minerva-scroll" aria-label="Conversas">
+        {activeIsNew ? (
+          <li>
+            <span className="mine-thread is-active is-new" aria-current="true">
               <span className="mine-thread__icon">
-                <MessageCircle className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5" />
               </span>
               <span className="mine-thread__text">
-                <span className="mine-thread__title">{thread.title}</span>
-                <span className="mine-thread__meta">
-                  {activityAge(thread.updatedAt)} · {thread.count} {thread.count === 1 ? "mensagem" : "mensagens"}
-                </span>
+                <span className="mine-thread__title">Nova conversa</span>
+                <span className="mine-thread__meta">Comece a escrever</span>
               </span>
-            </button>
-            <button
-              type="button"
-              className={`mine-thread__delete ${confirming ? "is-confirming" : ""}`}
-              disabled={disabled}
-              onClick={() => {
-                if (!confirming) {
-                  setConfirmKey(key);
-                  return;
-                }
-                setConfirmKey(null);
-                onDelete(thread.id);
-              }}
-              aria-label={confirming ? `Confirmar: apagar a conversa "${thread.title}"` : `Apagar a conversa "${thread.title}"`}
-              title={confirming ? "Clique de novo para apagar" : "Apagar conversa"}
-            >
-              {confirming ? <span>Apagar?</span> : <Trash2 className="h-3.5 w-3.5" />}
-            </button>
+            </span>
           </li>
-        );
-      })}
-    </ul>
+        ) : null}
+        {threads.map((thread) => {
+          const key = thread.id || "__principal__";
+          const active = !activeIsNew && (thread.id || undefined) === (activeId || undefined);
+          const confirming = confirmKey === key;
+          return (
+            <li key={key} className={`mine-thread-row ${thread.pinned ? "is-pinned" : ""}`}>
+              <button
+                type="button"
+                className={`mine-thread ${active ? "is-active" : ""}`}
+                aria-current={active ? "true" : undefined}
+                disabled={disabled && !active}
+                onClick={() => onSelect(thread.id)}
+              >
+                <span className="mine-thread__icon">{thread.pinned ? <Pin className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}</span>
+                <span className="mine-thread__text">
+                  <span className="mine-thread__title">{thread.title}</span>
+                  <span className="mine-thread__meta">
+                    {thread.pinned ? "Fixada · " : ""}
+                    {activityAge(thread.updatedAt)} · {thread.count} {thread.count === 1 ? "mensagem" : "mensagens"}
+                  </span>
+                </span>
+              </button>
+              <span className="mine-thread__tools">
+                <button
+                  type="button"
+                  className={`mine-thread__pin ${thread.pinned ? "is-on" : ""}`}
+                  onClick={() => onTogglePin(thread.id)}
+                  aria-pressed={thread.pinned}
+                  aria-label={thread.pinned ? `Desafixar a conversa "${thread.title}"` : `Fixar a conversa "${thread.title}" no topo`}
+                  title={thread.pinned ? "Desafixar" : "Fixar no topo"}
+                >
+                  {thread.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  className={`mine-thread__delete ${confirming ? "is-confirming" : ""}`}
+                  disabled={disabled}
+                  onClick={() => {
+                    if (!confirming) {
+                      setConfirmKey(key);
+                      return;
+                    }
+                    setConfirmKey(null);
+                    onDelete(thread.id);
+                  }}
+                  aria-label={confirming ? `Confirmar: apagar a conversa "${thread.title}"` : `Apagar a conversa "${thread.title}"`}
+                  title={confirming ? "Clique de novo para apagar" : "Apagar conversa"}
+                >
+                  {confirming ? <span>Apagar?</span> : <Trash2 className="h-3.5 w-3.5" />}
+                </button>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -7208,6 +7410,8 @@ function MineView({
   send,
   openMaterial,
   addMaterial,
+  openThread,
+  togglePin,
   openMindmap,
   createQuiz,
   openQuiz,
@@ -7250,6 +7454,9 @@ function MineView({
   send: (text: string, subjectId?: string, attachments?: ChatAttachment[], options?: { replaceFromId?: string }) => void | Promise<void>;
   openMaterial: (materialId: string) => void;
   addMaterial: (subjectId: string) => void;
+  /** Abre uma conversa de qualquer matéria (resultado da busca). */
+  openThread: (subjectId: string | undefined, threadId: string | undefined) => void;
+  togglePin: (subjectId: string | undefined, threadId: string | undefined) => void;
   openMindmap: (message: ChatMessage) => void;
   createQuiz: (message: ChatMessage, escolha: { count: number; difficulty: QuizDifficulty; mode: QuizMode }) => void;
   openQuiz: (message: ChatMessage) => void;
@@ -7264,20 +7471,22 @@ function MineView({
   const contextTriggerRef = useRef<HTMLButtonElement | null>(null);
   const contextDrawerRef = useRef<HTMLElement | null>(null);
   const sendRef = useRef(send);
-  // Aba MineCode: editor de código do chat. Abre pelas abas do cabeçalho ou
-  // pelo botão "MineCode" de um bloco de código de uma resposta.
-  const [codeTab, setCodeTab] = useState(() => window.location.hash === "#/mine/code");
-  const [codeIncoming, setCodeIncoming] = useState<{ code: string; lang: string; at: number } | null>(null);
+  // "Ajustar" na imagem criada (e outros atalhos) escrevem na caixa do chat.
   useEffect(() => {
-    const onOpen = (event: Event) => {
-      const detail = (event as CustomEvent<{ code: string; lang: string }>).detail;
-      if (!detail?.code) return;
-      setCodeIncoming({ code: detail.code, lang: detail.lang, at: Date.now() });
-      setCodeTab(true);
+    const onWrite = (event: Event) => {
+      const text = (event as CustomEvent<string>).detail;
+      if (typeof text !== "string") return;
+      setInput(text);
+      window.requestAnimationFrame(() => {
+        const box = textareaRef.current;
+        if (!box) return;
+        box.focus();
+        box.setSelectionRange(text.length, text.length);
+      });
     };
-    window.addEventListener("minecode:open", onOpen);
-    return () => window.removeEventListener("minecode:open", onOpen);
-  }, []);
+    window.addEventListener("mine:escrever", onWrite);
+    return () => window.removeEventListener("mine:escrever", onWrite);
+  }, [setInput]);
   const saveResponseRef = useRef(saveResponse);
   const feedbackRef = useRef(setFeedback);
   const versionRef = useRef(showVersion);
@@ -7637,6 +7846,11 @@ function MineView({
             <span className="text-[10px] font-bold tabular text-white/25">{threads.length}</span>
           </div>
           <MineThreadList
+            chats={data.chats}
+            subjects={data.subjects}
+            subjectId={selectedSubjectId}
+            onOpenThread={openThread}
+            onTogglePin={(id) => togglePin(selectedSubjectId, id)}
             threads={threads}
             activeId={threadId}
             activeIsNew={!activeThread}
@@ -7648,7 +7862,7 @@ function MineView({
       </aside>
 
       <div className="mine-main relative flex h-full min-h-0 min-w-0 flex-col bg-[#111310]">
-        <header data-focus-avoid className="caderno-minecode-chat-header mine-header relative flex min-h-[3.75rem] shrink-0 items-center justify-between gap-2 px-3 py-2 sm:gap-3 md:px-5">
+        <header data-focus-avoid className="mine-header relative flex min-h-[3.75rem] shrink-0 items-center justify-between gap-2 px-3 py-2 sm:gap-3 md:px-5">
           <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
             <button
               type="button"
@@ -7668,19 +7882,6 @@ function MineView({
                 {activeThread ? activeThread.title : "Nova conversa"}
               </p>
             </div>
-          </div>
-          <div className="caderno-minecode-chat-tools">
-          <div className="mine-tabs" role="tablist" aria-label="Modo do chat">
-            <button type="button" role="tab" aria-selected={!codeTab} className={!codeTab ? "is-on" : ""} onClick={() => setCodeTab(false)}>
-              <MessageCircle className="h-4 w-4" aria-hidden />
-              <span>Conversa</span>
-            </button>
-            <button type="button" role="tab" aria-selected={codeTab} className={codeTab ? "is-on" : ""} onClick={() => setCodeTab(true)}>
-              <Code2 className="h-4 w-4" aria-hidden />
-              <span>MineCode</span>
-            </button>
-          </div>
-          <MineCodeDesktopButton />
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <FocusQuickStart userId={userId} subjectId={selectedSubject?.id} subjectName={selectedSubject?.name} />
@@ -7718,25 +7919,6 @@ function MineView({
             </button>
           </div>
         </header>
-
-        {/* o MineCode cobre a tela inteira, como um editor (portal no body:
-            nenhum ancestral com transform prende o position: fixed) */}
-        {codeTab ? createPortal(
-          <div className="mine-minecode-layer">
-            <React.Suspense fallback={<PageLoading />}>
-              <MineCode
-                incoming={codeIncoming}
-                busy={loading}
-                onExit={() => setCodeTab(false)}
-                onAsk={(text) => {
-                  setCodeTab(false);
-                  void sendRef.current(text, selectedSubjectId);
-                }}
-              />
-            </React.Suspense>
-          </div>,
-          document.body,
-        ) : null}
 
         <div className="relative min-h-0 flex-1">
           <div
@@ -8056,6 +8238,23 @@ function MineView({
                       <FileText className="h-4 w-4" />
                       Resumir conteúdo
                     </button>
+                    {/* Folha de revisão em PDF com o que foi conversado aqui. */}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="mine-menu__item"
+                      disabled={!messages.length}
+                      onClick={() => {
+                        setToolsMenuOpen(false);
+                        followUp("Transforma essa conversa em um resumo de prova");
+                      }}
+                    >
+                      <ClipboardCheck className="h-4 w-4" />
+                      <span>
+                        Resumo de prova (PDF)
+                        <span className="mine-menu__detail">{messages.length ? "Folha de revisão desta conversa" : "Converse sobre um assunto primeiro"}</span>
+                      </span>
+                    </button>
                     <button
                       type="button"
                       role="menuitem"
@@ -8235,6 +8434,11 @@ function MineView({
                 </div>
                 <div className="flex max-h-48 min-h-0 flex-col">
                   <MineThreadList
+                    chats={data.chats}
+                    subjects={data.subjects}
+                    subjectId={selectedSubjectId}
+                    onOpenThread={openThread}
+                    onTogglePin={(id) => togglePin(selectedSubjectId, id)}
                     threads={threads}
                     activeId={threadId}
                     activeIsNew={!activeThread}
@@ -8491,22 +8695,39 @@ export function ChatAttachments({ attachments, tone = "dark" }: { attachments?: 
  * um marcador pela metade (`[[imagem: Nik`) apareceria cru na tela por alguns
  * instantes. Ver shared/chat-media.mjs.
  */
-function MineMessageText({ text, streaming = false }: { text: string; streaming?: boolean }) {
-  const segments = useMemo(() => splitMessageMedia(text, { streaming }), [text, streaming]);
+function MineMessageText({ text, streaming = false, attachment }: { text: string; streaming?: boolean; attachment?: string }) {
+  // Glossário: o marcador sai do texto e a primeira vez de cada termo ganha a
+  // marca invisível que o MineRichText transforma em sublinhado com explicação.
+  // Durante o streaming o marcador ainda nem chegou: nada é grifado.
+  const { body, terms } = useMemo(() => {
+    const glossary = extractGlossary(text);
+    return { body: streaming ? glossary.text : markGlossary(glossary.text, glossary.terms), terms: glossary.terms };
+  }, [text, streaming]);
+  const segments = useMemo(() => splitMessageMedia(body, { streaming }), [body, streaming]);
   if (!segments.length) return null;
 
   return (
-    <div className="mine-answer">
-      {segments.map((segment, index) =>
-        segment.type === "generate" ? (
-          <MineGeneratedImage key={`gen-${segment.edit ? "e" : "n"}-${segment.prompt}`} prompt={segment.prompt} caption={segment.caption} edit={segment.edit} streaming={streaming} />
-        ) : segment.type === "image" ? (
-          <MineImageGallery key={`image-${index}-${segment.style || ""}-${segment.query}`} query={segment.query} caption={segment.caption} style={segment.style} />
-        ) : (
-          <MineRichText key={`text-${index}`} text={segment.text} streaming={streaming} />
-        ),
-      )}
-    </div>
+    <MineGlossaryProvider value={terms}>
+      <div className="mine-answer">
+        {segments.map((segment, index) =>
+          segment.type === "generate" ? (
+            <MineGeneratedImage
+              key={`gen-${segment.edit ? "e" : "n"}-${segment.formato || ""}-${segment.prompt}`}
+              prompt={segment.prompt}
+              caption={segment.caption}
+              edit={segment.edit}
+              formato={segment.formato}
+              attachment={segment.fromAttachment ? attachment : undefined}
+              streaming={streaming}
+            />
+          ) : segment.type === "image" ? (
+            <MineImageGallery key={`image-${index}-${segment.style || ""}-${segment.query}`} query={segment.query} caption={segment.caption} style={segment.style} />
+          ) : (
+            <MineRichText key={`text-${index}`} text={segment.text} streaming={streaming} />
+          ),
+        )}
+      </div>
+    </MineGlossaryProvider>
   );
 }
 
@@ -13322,6 +13543,5 @@ rootHost.__minervaRoot = appRoot;
 appRoot.render(
   <React.StrictMode>
     <App />
-    <MineCodeDesktopPanel />
   </React.StrictMode>,
 );

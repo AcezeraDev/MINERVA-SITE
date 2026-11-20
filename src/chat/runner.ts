@@ -1,5 +1,5 @@
 /*
- * Executa o código das respostas da Mine e do MineCode.
+ * Executa o código das respostas da Mine.
  *
  * - Python: Pyodide num Web Worker (python.worker.ts). Um worker só, reaproveitado
  *   entre execuções (o Pyodide demora para carregar); passou do tempo, o worker
@@ -74,14 +74,14 @@ function runPython(code: string, stdin: string[], handlers: RunHandlers) {
 
 const JS_HOST = `<!doctype html><meta charset="utf-8"><script>
 (function(){
-  var send=function(kind,args){var text=Array.prototype.map.call(args,function(v){try{if(typeof v==="string")return v;if(v instanceof Error)return v.name+": "+v.message;return JSON.stringify(v,null,1)}catch(e){return String(v)}}).join(" ");parent.postMessage({minecode:true,kind:kind,text:text},"*")};
+  var send=function(kind,args){var text=Array.prototype.map.call(args,function(v){try{if(typeof v==="string")return v;if(v instanceof Error)return v.name+": "+v.message;return JSON.stringify(v,null,1)}catch(e){return String(v)}}).join(" ");parent.postMessage({mineRun:true,kind:kind,text:text},"*")};
   console.log=function(){send("stdout",arguments)};console.info=console.log;console.debug=console.log;
   console.warn=function(){send("stderr",arguments)};console.error=function(){send("stderr",arguments)};
   window.onerror=function(m){send("error",[m]);};
   window.addEventListener("unhandledrejection",function(e){send("error",[e.reason&&e.reason.message?e.reason.message:String(e.reason)])});
   window.alert=function(m){send("info",["alert: "+m])};
-  window.addEventListener("message",function(e){if(!e.data||e.data.minecodeRun!==true)return;try{var r=(0,eval)(e.data.code);var finish=function(v){if(v!==undefined)send("result",[v]);parent.postMessage({minecode:true,kind:"done"},"*")};if(r&&typeof r.then==="function"){r.then(finish,function(err){send("error",[err&&err.message?err.message:String(err)]);parent.postMessage({minecode:true,kind:"done"},"*")})}else setTimeout(function(){finish(r)},30)}catch(err){send("error",[err&&err.name?err.name+": "+err.message:String(err)]);parent.postMessage({minecode:true,kind:"done"},"*")}});
-  parent.postMessage({minecode:true,kind:"ready"},"*");
+  window.addEventListener("message",function(e){if(!e.data||e.data.mineRun!==true)return;try{var r=(0,eval)(e.data.code);var finish=function(v){if(v!==undefined)send("result",[v]);parent.postMessage({mineRun:true,kind:"done"},"*")};if(r&&typeof r.then==="function"){r.then(finish,function(err){send("error",[err&&err.message?err.message:String(err)]);parent.postMessage({mineRun:true,kind:"done"},"*")})}else setTimeout(function(){finish(r)},30)}catch(err){send("error",[err&&err.name?err.name+": "+err.message:String(err)]);parent.postMessage({mineRun:true,kind:"done"},"*")}});
+  parent.postMessage({mineRun:true,kind:"ready"},"*");
 })();
 <\/script>`;
 
@@ -99,11 +99,11 @@ function runJavaScript(code: string, handlers: RunHandlers) {
       resolve();
     };
     const onMessage = (event: MessageEvent) => {
-      if (event.source !== frame.contentWindow || !event.data?.minecode) return;
+      if (event.source !== frame.contentWindow || !event.data?.mineRun) return;
       const { kind, text } = event.data as { kind: string; text: string };
       if (kind === "ready") {
         handlers.onStatus?.("running");
-        frame.contentWindow?.postMessage({ minecodeRun: true, code }, "*");
+        frame.contentWindow?.postMessage({ mineRun: true, code }, "*");
       } else if (kind === "done") finish();
       else handlers.onLine({ kind: kind as RunLine["kind"], text });
     };
@@ -124,7 +124,3 @@ export async function runCode(language: RunLanguage, code: string, handlers: Run
   return Math.round(performance.now() - started);
 }
 
-/** Abre o código na aba MineCode do chat (MineView escuta o evento). */
-export function openInMineCode(code: string, lang: string) {
-  window.dispatchEvent(new CustomEvent("minecode:open", { detail: { code, lang } }));
-}

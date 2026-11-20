@@ -22,7 +22,11 @@ export const MINE_IMAGE_MODEL = String(process.env.MINE_IMAGE_MODEL || "blackfor
 export const MINE_IMAGE_EDIT_MODEL = String(process.env.MINE_IMAGE_EDIT_MODEL || "blackforestlabs/flux-3/klein/edit-image").trim();
 export const MINE_IMAGE_FALLBACK_MODEL = String(process.env.MINE_IMAGE_FALLBACK_MODEL || "qwen-image-2.1/text-to-image").trim();
 export const MINE_IMAGE_FALLBACK_EDIT_MODEL = String(process.env.MINE_IMAGE_FALLBACK_EDIT_MODEL || "qwen-image-2.1/edit").trim();
-export const MINE_IMAGE_DAILY_LIMIT = Math.max(0, Number(process.env.MINE_IMAGE_DAILY_LIMIT) || 8);
+// O FLUX.3 Klein só faz imagem quadrada. Deitada (banner, capa) e em pé
+// (story, papel de parede do celular) vão para o FLUX.2 Klein 9B, que aceita
+// 1536x1024 e 1024x1536 pelo mesmo preço (testado em 20/nov/2026).
+export const MINE_IMAGE_WIDE_MODEL = String(process.env.MINE_IMAGE_WIDE_MODEL || "flux-2-klein-9b").trim();
+export const MINE_IMAGE_DAILY_LIMIT =Math.max(0, Number(process.env.MINE_IMAGE_DAILY_LIMIT) || 8);
 // Imagem que precisa de letra legível (título num cartaz, rótulos num esquema)
 // vai para o modelo que escreve bem. O FLUX Klein desenha o "jeito" de letra e
 // devolve texto embaralhado — foi o que estragou a planilha de 17/out/2026.
@@ -78,15 +82,23 @@ function cleanReference(value) {
  * Corpo do pedido para cada família de modelo. A NanoGPT aceita o formato da
  * OpenAI (`size`), mas o Qwen mede em "1k" + proporção.
  */
-export function requestBody({ model, prompt, reference }) {
+export function requestBody({ model, prompt, reference, formato = "" }) {
   const body = { model, prompt, n: 1, response_format: "b64_json" };
-  if (/^qwen-image/.test(model)) Object.assign(body, { resolution: "1k", aspect_ratio: reference ? "auto" : "1:1" });
-  else body.size = "1024x1024";
+  const ratio = formato === "paisagem" ? "3:2" : formato === "retrato" ? "2:3" : "1:1";
+  if (/^qwen-image/.test(model)) Object.assign(body, { resolution: "1k", aspect_ratio: reference ? "auto" : ratio });
+  else body.size = formato === "paisagem" ? "1536x1024" : formato === "retrato" ? "1024x1536" : "1024x1024";
   if (reference) body.imageDataUrl = reference;
   return body;
 }
 
-async function askModel({ model, prompt, reference, signal }) {
+/** Formato real da imagem pelos primeiros bytes (a NanoGPT devolve JPEG também). */
+function mimeOf(b64) {
+  if (b64.startsWith("/9j/")) return "image/jpeg";
+  if (b64.startsWith("UklGR")) return "image/webp";
+  return "image/png";
+}
+
+async function askModel({ model, prompt, reference, formato, signal }) {
   const key = nanogptKeys()[0];
   if (!key) throw new MineImageError(503, "A criação de imagens não está configurada no servidor.");
   const started = Date.now();
@@ -94,7 +106,7 @@ async function askModel({ model, prompt, reference, signal }) {
   const response = await fetch(`${nanogptBaseUrl()}/images/generations`, {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-    body: JSON.stringify(requestBody({ model, prompt, reference })),
+    body: JSON.stringify(requestBody({ model, prompt, reference, formato })),
     signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
   });
   const text = await response.text();
@@ -113,7 +125,7 @@ async function askModel({ model, prompt, reference, signal }) {
   const item = payload?.data?.[0] || {};
   let image = "";
   if (item.b64_json) {
-    image = `data:image/png;base64,${item.b64_json}`;
+    image = `data:${mimeOf(item.b64_json)};base64,${item.b64_json}`;
   } else if (item.url) {
     const file = await fetch(item.url, { signal: timeout });
     if (!file.ok) throw new MineImageError(502, "A imagem foi criada, mas não chegou.");
@@ -128,16 +140,19 @@ async function askModel({ model, prompt, reference, signal }) {
  * Cria (ou edita, com `reference`) uma imagem. Tenta o modelo principal e,
  * se ele falhar por algo que não seja recusa de conteúdo, a reserva.
  */
-export async function generateMineImage({ prompt, reference, signal }) {
+export async function generateMineImage({ prompt, reference, formato, signal }) {
   const cleanText = cleanPrompt(prompt);
   const cleanRef = cleanReference(reference);
-  const primary = cleanRef ? MINE_IMAGE_EDIT_MODEL : needsLegibleText(cleanText) && MINE_IMAGE_TEXT_MODEL ? MINE_IMAGE_TEXT_MODEL : MINE_IMAGE_MODEL;
+  // Edição mantém a proporção da imagem de referência; o formato vale para criar do zero.
+  const shape = !cleanRef && (formato === "paisagem" || formato === "retrato") ? formato : "";
+  const textModel = needsLegibleText(cleanText) && MINE_IMAGE_TEXT_MODEL ? MINE_IMAGE_TEXT_MODEL : "";
+  const primary = cleanRef ? MINE_IMAGE_EDIT_MODEL : textModel || (shape ? MINE_IMAGE_WIDE_MODEL : MINE_IMAGE_MODEL);
   const fallback = cleanRef ? MINE_IMAGE_FALLBACK_EDIT_MODEL : MINE_IMAGE_FALLBACK_MODEL;
   try {
-    return await askModel({ model: primary, prompt: cleanText, reference: cleanRef, signal });
+    return await askModel({ model: primary, prompt: cleanText, reference: cleanRef, formato: shape, signal });
   } catch (error) {
     const refused = error instanceof MineImageError && (error.status === 422 || error.status === 503);
     if (refused || !fallback || fallback === primary || signal?.aborted) throw error;
-    return askModel({ model: fallback, prompt: cleanText, reference: cleanRef, signal });
+    return askModel({ model: fallback, prompt: cleanText, reference: cleanRef, formato: shape, signal });
   }
 }

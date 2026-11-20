@@ -11,6 +11,7 @@ export type XpStatKey =
   | "idiomaXp"
   | "redacoes"
   | "redacaoXp"
+  | "propostas"
   | "atividades"
   | "atividadeXp"
   | "labs"
@@ -58,6 +59,8 @@ export const redacoesPorDia: number;
 export const atividadeXpMax: number;
 export const atividadesPorDia: number;
 export function redacaoXp(total: number): number;
+export const redacaoPropostaXpMax: number;
+export function redacaoPropostaXp(total: number): number;
 export const labXpMax: number;
 export const labPorDia: number;
 export const leituraXpMax: number;

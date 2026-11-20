@@ -60,43 +60,6 @@ export const MINE_TASK_MODEL = {
   },
 };
 
-/**
- * Out/2026: o MineCode tem modelo proprio, feito para programar. GLM-5.3 Flash
- * custa US$ 0,10/0,30 por milhao (entrada/saida), abaixo do principal na
- * saida, que e quase todo o custo de gerar codigo. Ele so aceita raciocinio
- * low/high/max. Se falhar, o principal assume.
- */
-export const MINE_CODE_MODEL = {
-  alias: "mine",
-  displayName: "Mine",
-  provider: "nanogpt",
-  get providerModel() {
-    return envModel("NANOGPT_CODE_MODEL", "z-ai/glm-5.3-flash");
-  },
-  get providerParams() {
-    return { reasoning_effort: envEffort("MINE_CODE_REASONING_EFFORT", "low") };
-  },
-  capabilities: CAPABILITIES,
-};
-
-/**
- * Out/2026: sites do MineCode (pedidos com a skill de front-end) e a revisao
- * visual vao para um modelo forte. GPT-6.1 Sol custa US$ 2/10 por milhao, uns
- * 12 centavos de dolar por site; le imagem, entao tambem revisa a foto da
- * pagina. NANOGPT_SITE_MODEL / MINE_SITE_REASONING_EFFORT trocam.
- */
-export const MINE_SITE_MODEL = {
-  alias: "mine",
-  displayName: "Mine",
-  provider: "nanogpt",
-  get providerModel() {
-    return envModel("NANOGPT_SITE_MODEL", "openai/gpt-6.1-sol");
-  },
-  get providerParams() {
-    return { reasoning_effort: envEffort("MINE_SITE_REASONING_EFFORT", "low") };
-  },
-  capabilities: CAPABILITIES,
-};
 
 /**
  * Reserva interna, nunca escolhivel: entra quando o principal falha e abre os

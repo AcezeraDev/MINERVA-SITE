@@ -41,36 +41,19 @@ function fileName(code: string) {
   return `${base || "meu-site"}.html`;
 }
 
-// Foto da página para a revisão visual do MineCode. Roda DENTRO do iframe
-// (origem opaca): o editor manda {type:"mc-capture", id}, a página se desenha
-// com html-to-image (até 3 telas de altura) e devolve um JPEG pelo postMessage.
-// O html2canvas não serve aqui: ele clona a página num iframe interno, que o
-// sandbox sem allow-same-origin bloqueia. <img> sem src (lightbox vazio) é
-// pulado: senão a biblioteca baixa a própria página como "imagem" e falha.
-// O editor só aceita a resposta vinda desse iframe.
-const CAPTURE = `<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script><script>addEventListener("message",function(e){var d=e.data||{};if(d.type!=="mc-capture")return;var reply=function(img,err){parent.postMessage({type:"mc-capture-result",id:d.id,image:img||"",error:err||""},"*")};try{scrollTo(0,0);var b=document.body,h=Math.min(Math.max(b.scrollHeight,document.documentElement.scrollHeight),innerHeight*3),bg=getComputedStyle(b).backgroundColor;if(!bg||bg==="rgba(0, 0, 0, 0)")bg=getComputedStyle(document.documentElement).backgroundColor||"#ffffff";htmlToImage.toCanvas(b,{width:innerWidth,height:h,pixelRatio:1,backgroundColor:bg,cacheBust:false,imagePlaceholder:"data:image/gif;base64,R0lGODlhAQABAAAAACw=",filter:function(n){var t=n.tagName;return!((t==="IMG"&&!(n.getAttribute("src")||"").trim())||t==="IFRAME"||t==="VIDEO")}}).then(function(c){var w=Math.min(1100,c.width),k=w/c.width,o=document.createElement("canvas");o.width=w;o.height=Math.round(c.height*k);var g=o.getContext("2d");g.fillStyle=bg;g.fillRect(0,0,o.width,o.height);g.drawImage(c,0,0,o.width,o.height);reply(o.toDataURL("image/jpeg",0.72))}).catch(function(x){reply("",String(x&&x.message||x))})}catch(x){reply("",String(x))}});</script>`;
-
-export function SiteFrame({
+function SiteFrame({
   code,
   title,
   device,
-  capture = false,
-  frameRef,
 }: {
   code: string;
   title: string;
   device: "desktop" | "mobile";
-  /** Inclui o script que fotografa a página (revisão visual do MineCode). */
-  capture?: boolean;
-  frameRef?: React.Ref<HTMLIFrameElement>;
 }) {
-  const srcDoc = useMemo(() => {
-    const guarded = withGuard(code);
-    return capture ? (/<\/body>/i.test(guarded) ? guarded.replace(/<\/body>/i, `${CAPTURE}</body>`) : `${guarded}${CAPTURE}`) : guarded;
-  }, [code, capture]);
+  const srcDoc = useMemo(() => withGuard(code), [code]);
   return (
     <div className={`msp-stage is-${device}`}>
-      <iframe ref={frameRef} className="msp-frame" title={`Prévia: ${title}`} srcDoc={srcDoc} sandbox="allow-scripts allow-forms" referrerPolicy="no-referrer" loading="lazy" />
+      <iframe className="msp-frame" title={`Prévia: ${title}`} srcDoc={srcDoc} sandbox="allow-scripts allow-forms" referrerPolicy="no-referrer" loading="lazy" />
     </div>
   );
 }

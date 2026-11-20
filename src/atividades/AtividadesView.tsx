@@ -1,11 +1,12 @@
 // Carregado sob demanda (React.lazy): a aba Atividades, tarefas no formato da rede estadual geradas pela Mine.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion, Reorder, useDragControls } from "framer-motion";
-import { ArrowDown, ArrowUp, BookMarked, Check, ChevronDown, ClipboardList, Eraser, GripVertical, Loader2, Save, Send, Sparkles, Wand2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, BookMarked, Check, ChevronDown, ChevronRight, ClipboardList, Eraser, Flame, GripVertical, Loader2, Save, Send, Sparkles, Star, Target, Wand2, X } from "lucide-react";
 import { PageHeader, uid, type Session, type User, type useMemoUserData, type AppData } from "../main";
 import { useSoftMotion } from "../motion";
 import { celebrateFrom, floatXp, mineSays } from "../caderno";
 import { CenaPrancheta } from "../cena3d/Cena3D";
+import { usePreset } from "../chat/presets";
 import {
   assuntosSugeridos,
   atividadesExemplo,
@@ -38,6 +39,7 @@ import { atividadeXp } from "../../shared/xp.mjs";
 import { askMineTask } from "../mineTask";
 import "../cena3d/cena3d.css";
 import "./atividades.css";
+import "./missao.css";
 
 /** O que o aluno fez em cada questão; o formato de cada tipo está em shared/atividades.mjs. */
 type Resposta = unknown;
@@ -52,6 +54,24 @@ type EmAndamento = {
   tentativas: Record<number, number>;
   semente: number;
   finalizada?: { pontos: number; maximo: number; acertos: number; xp: number };
+  /** Modo missão (nov/2026): questão aberta, questões já conferidas e sequência de acertos. */
+  atual?: number;
+  conferidas?: number[];
+  combo?: number;
+  melhorCombo?: number;
+};
+
+/** O que fazer em cada tipo, dito em uma linha na barra de baixo. */
+const instrucoes: Record<string, string> = {
+  ordenar: "Toque nas palavras na ordem certa para montar a frase.",
+  lacunas: "Escolha a palavra que completa cada lacuna.",
+  vf: "Marque verdadeiro ou falso em cada carta.",
+  multipla: "Escolha uma alternativa.",
+  ligar: "Ligue cada item da esquerda ao par da direita.",
+  categorias: "Leve cada item para a caixa certa.",
+  sequencia: "Coloque as etapas na ordem certa.",
+  numerica: "Faça a conta e digite o resultado.",
+  dissertativa: "Escreva sua resposta; a Mine lê e dá a nota.",
 };
 
 /** Mola padrão das peças: passa um pouco do ponto e assenta. */
@@ -106,9 +126,11 @@ export function AtividadesView({ data, user, update }: { data: ReturnType<typeof
   const chave = `minerva:atividade:${user.id}`;
   const [atual, setAtual] = useState<EmAndamento | null>(() => lerLocal<EmAndamento | null>(chave, null));
   const [aberta, setAberta] = useState(false);
-  const [materia, setMateria] = useState(materias[0]);
+  // Pedido feito no chat da Mine ("faz uma atividade disso") já vem preenchido.
+  const preset = usePreset("atividades");
+  const [materia, setMateria] = useState(() => materias.find((item) => item === preset?.materia) || materias[0]);
   const [serie, setSerie] = useState("1ª série EM");
-  const [assunto, setAssunto] = useState("");
+  const [assunto, setAssunto] = useState(() => (preset?.assunto || "").slice(0, 120));
   const [carregando, setCarregando] = useState(false);
   const [passo, setPasso] = useState(0);
   const [erro, setErro] = useState("");
@@ -173,7 +195,7 @@ export function AtividadesView({ data, user, update }: { data: ReturnType<typeof
 
   if (atual && aberta) {
     return (
-      <Folha
+      <Missao
         key={atual.id}
         inicial={atual}
         user={user}
@@ -201,7 +223,7 @@ export function AtividadesView({ data, user, update }: { data: ReturnType<typeof
       <PageHeader
         eyebrow="Atividades · tarefa"
         title="Atividades da Mine"
-        subtitle="Tarefas no formato que você já conhece da escola, só que de mexer: arrastar, ligar, virar cartas e montar frases. A Mine cria a atividade do assunto que você escolher e corrige na hora."
+        subtitle="Cada tarefa vira uma missão: uma questão por vez, de mexer (arrastar, ligar, virar cartas, montar frases), conferida na hora, com sequência de acertos, XP subindo e estrelas no final."
       />
 
       <section className="atv-hero">
@@ -347,6 +369,380 @@ export function AtividadesView({ data, user, update }: { data: ReturnType<typeof
           </motion.div>
         ) : null}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Modo missão (nov/2026): uma questão por vez, conferida na hora.
+//
+// A folha longa com as 7 questões e a correção só no fim virou um palco: a
+// questão entra deslizando, o aluno responde e toca em "Conferir"; a carta
+// mostra o gabarito (os componentes já tinham o modo corrigido), a barra de
+// baixo fica verde ou rosa, o XP sobe e a sequência de acertos vira combo.
+// No fim, estrelas pela nota. A folha completa continua como "ver correção".
+
+type MissaoProps = {
+  inicial: EmAndamento;
+  user: User;
+  onSalvar: (estado: EmAndamento) => void;
+  onVoltar: () => void;
+  onFinalizar: (estado: EmAndamento, session: Session) => void;
+  onDescartar: () => void;
+};
+
+function fracaoDaQuestao(estado: EmAndamento, indice: number) {
+  const questao = estado.atividade.questoes[indice];
+  if (questao.tipo === "dissertativa") return (estado.correcoes[indice]?.nota || 0) / 10;
+  return corrigirObjetiva(questao, paraCorrecao(questao, estado.respostas[indice]));
+}
+
+function Missao(props: MissaoProps) {
+  const { inicial, user, onSalvar, onVoltar, onFinalizar, onDescartar } = props;
+  const reduced = useSoftMotion();
+  const [estado, setEstado] = useState(inicial);
+  const [revisar, setRevisar] = useState(false);
+  const [conferindo, setConferindo] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const [tremor, setTremor] = useState(0);
+  const palcoRef = useRef<HTMLDivElement>(null);
+  const hudRef = useRef<HTMLDivElement>(null);
+  const { atividade } = estado;
+  const total = atividade.questoes.length;
+  const conferidas = estado.conferidas || [];
+  const atual = Math.max(0, Math.min(total - 1, estado.atual ?? 0));
+  const questao = atividade.questoes[atual];
+  const conferida = conferidas.includes(atual);
+  const pronta = respondida(questao, paraCorrecao(questao, estado.respostas[atual]));
+  const fracao = conferida ? fracaoDaQuestao(estado, atual) : null;
+  const acertos = conferidas.filter((indice) => fracaoDaQuestao(estado, indice) >= 0.99).length;
+  const combo = estado.combo || 0;
+  const secao = secoes.find((item) => item.id === questao.secao);
+
+  // rascunho automático, como na folha
+  useEffect(() => {
+    const timer = window.setTimeout(() => onSalvar(estado), 400);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado]);
+
+  const responder = (valor: Resposta) => {
+    if (conferida) return;
+    setAviso("");
+    setEstado((anterior) => {
+      const respostas = [...anterior.respostas];
+      respostas[atual] = valor;
+      const correcoes = { ...anterior.correcoes };
+      if (anterior.atividade.questoes[atual].tipo === "dissertativa") delete correcoes[atual];
+      return { ...anterior, respostas, correcoes };
+    });
+  };
+
+  const corrigirDissertativa = async () => {
+    const pergunta = questao as QuestaoDissertativa;
+    const texto = String(estado.respostas[atual] || "").trim();
+    const resposta = await askMineTask(
+      {
+        task: "atividade-correcao",
+        prompt: texto,
+        context: [`Componente: ${estado.materia} (${estado.serie})`, `Pergunta: ${pergunta.enunciado}`, pergunta.textoBase ? `Texto-base: ${pergunta.textoBase}` : "", `Uma boa resposta precisa: ${pergunta.esperado}`].filter(Boolean).join("\n"),
+        outputTokens: 700,
+      },
+      { timeoutMs: 90_000 },
+    );
+    const correcao = lerCorrecaoDissertativa(resposta);
+    if (!correcao) throw new Error("A correção veio incompleta. Tente conferir de novo.");
+    return correcao;
+  };
+
+  const conferir = async () => {
+    if (!pronta || conferida || conferindo) return;
+    let correcaoNova: CorrecaoDissertativa | undefined;
+    if (questao.tipo === "dissertativa" && !estado.correcoes[atual]) {
+      setConferindo(true);
+      try {
+        correcaoNova = await corrigirDissertativa();
+      } catch (error) {
+        setAviso(error instanceof Error ? error.message : "A Mine não conseguiu ler agora. Tente de novo.");
+        setConferindo(false);
+        return;
+      }
+      setConferindo(false);
+    }
+    const proximo: EmAndamento = {
+      ...estado,
+      correcoes: correcaoNova ? { ...estado.correcoes, [atual]: correcaoNova } : estado.correcoes,
+      conferidas: [...conferidas, atual],
+    };
+    const nota = fracaoDaQuestao(proximo, atual);
+    const certa = nota >= 0.99;
+    const novoCombo = certa ? combo + 1 : 0;
+    setEstado({ ...proximo, combo: novoCombo, melhorCombo: Math.max(estado.melhorCombo || 0, novoCombo) });
+    if (certa) {
+      floatXp("+5 XP", hudRef.current);
+      if (!reduced) celebrateFrom(palcoRef.current, { count: novoCombo >= 3 ? 26 : 14, spread: 0.5 });
+      if (novoCombo === 3) mineSays("3 seguidas! Tá voando!", "wow");
+      else if (novoCombo === 5) mineSays("5 em sequência!!", "wow");
+    } else {
+      setTremor((valor) => valor + 1);
+      if (nota > 0) mineSays("Quase! Olha o que faltou.", "happy");
+    }
+  };
+
+  const finalizar = (base: EmAndamento) => {
+    const respostas = base.atividade.questoes.map((item, indice) => paraCorrecao(item, base.respostas[indice]));
+    const nota = pontuar(base.atividade.questoes, respostas, base.correcoes);
+    const xp = atividadeXp(nota.acertos);
+    const fim: EmAndamento = { ...base, finalizada: { ...nota, xp } };
+    setEstado(fim);
+    const session: Session = {
+      id: base.id,
+      userId: user.id,
+      subjectId: "atividades",
+      title: `${base.materia}: ${base.atividade.titulo}`.slice(0, 140),
+      kind: "Atividade",
+      createdAt: Date.now(),
+      xpEarned: xp,
+      correctAnswers: nota.acertos,
+      questionsAnswered: total,
+      accuracy: Math.round((nota.acertos / total) * 100),
+      materia: base.materia,
+      pontos: nota.pontos,
+      pontosMax: nota.maximo,
+    };
+    onFinalizar(fim, session);
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  };
+
+  const irPara = (indice: number) => {
+    setAviso("");
+    setEstado((anterior) => ({ ...anterior, atual: indice }));
+    window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  };
+
+  const continuar = () => {
+    const ordem = [...Array(total).keys()];
+    const depois = ordem.slice(atual + 1).concat(ordem.slice(0, atual + 1));
+    const proxima = depois.find((indice) => !conferidas.includes(indice));
+    if (proxima === undefined) finalizar(estado);
+    else irPara(proxima);
+  };
+
+  // Enter confere e depois avança (fora de caixas de texto)
+  const atalho = useRef<() => void>(() => undefined);
+  atalho.current = () => (conferida ? continuar() : void conferir());
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      const alvo = event.target as HTMLElement | null;
+      if (alvo && (alvo.tagName === "TEXTAREA" || alvo.tagName === "INPUT" || alvo.tagName === "SELECT" || alvo.tagName === "BUTTON")) return;
+      event.preventDefault();
+      atalho.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  if (estado.finalizada && revisar) {
+    return <Folha {...props} inicial={estado} onVoltar={() => setRevisar(false)} />;
+  }
+  if (estado.finalizada) {
+    return <FimDaMissao estado={estado} onRevisar={() => setRevisar(true)} onNova={onDescartar} onVoltar={onVoltar} />;
+  }
+
+  const resultado = fracao === null ? "neutro" : fracao >= 0.99 ? "certa" : fracao > 0 ? "parcial" : "errada";
+  const ultima = conferidas.length + (conferida ? 0 : 1) >= total;
+
+  return (
+    <div className="atv-page msn-page">
+      <header className="msn-hud" ref={hudRef}>
+        <button type="button" className="msn-sair" onClick={onVoltar} aria-label="Sair da missão (o progresso fica salvo)">
+          <X className="h-5 w-5" />
+        </button>
+        <div className="msn-trilha" role="list" aria-label="Questões da missão">
+          {atividade.questoes.map((item, indice) => {
+            const feita = conferidas.includes(indice);
+            const nota = feita ? fracaoDaQuestao(estado, indice) : null;
+            const tom = nota === null ? "" : nota >= 0.99 ? "is-certa" : nota > 0 ? "is-parcial" : "is-errada";
+            return (
+              <button
+                key={indice}
+                type="button"
+                role="listitem"
+                className={`msn-no ${tom} ${indice === atual ? "is-atual" : ""}`}
+                onClick={() => irPara(indice)}
+                aria-label={`Questão ${indice + 1}${feita ? (nota! >= 0.99 ? ", certa" : nota! > 0 ? ", parcial" : ", errada") : ""}`}
+                aria-current={indice === atual ? "step" : undefined}
+              >
+                {indice === atual ? <motion.span layoutId="msn-no-atual" className="msn-no-anel" transition={molaSolta} /> : null}
+                <span className="relative">{feita ? (nota! >= 0.99 ? <Check className="h-3.5 w-3.5" /> : nota! > 0 ? "½" : <X className="h-3.5 w-3.5" />) : indice + 1}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="msn-stats">
+          <AnimatePresence>
+            {combo >= 2 ? (
+              <motion.span key="combo" className="msn-combo" initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.4, opacity: 0 }} transition={molaSolta}>
+                <Flame className="h-4 w-4" aria-hidden /> x{combo}
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
+          <motion.span key={acertos} className="msn-xp" initial={reduced ? false : { scale: 1.35 }} animate={{ scale: 1 }} transition={molaSolta}>
+            <Sparkles className="h-4 w-4" aria-hidden /> {acertos * 5} XP
+          </motion.span>
+        </div>
+      </header>
+
+      <div className="msn-progresso" aria-hidden>
+        <motion.span animate={{ scaleX: conferidas.length / total }} transition={molaPeca} />
+      </div>
+
+      <section className="msn-palco" ref={palcoRef}>
+        <motion.div key={`tremor-${tremor}`} animate={tremor && !reduced ? { x: [0, -12, 12, -8, 8, -3, 0] } : undefined} transition={{ duration: 0.45 }}>
+          <motion.article
+            key={atual}
+            className={`msn-carta is-${resultado}`}
+            initial={reduced ? false : { opacity: 0, x: 70, rotate: 2.5, scale: 0.97 }}
+            animate={{ opacity: 1, x: 0, rotate: 0, scale: 1 }}
+            transition={molaSolta}
+          >
+            <div className="msn-carta-topo">
+              <span className="msn-secao">
+                <span aria-hidden>{secao?.emoji}</span> {secao?.titulo}
+              </span>
+              <span className="msn-contagem">
+                Questão <b>{dois(atual + 1)}</b> de {dois(total)}
+              </span>
+            </div>
+            {questao.textoBase ? (
+              <>
+                <blockquote className="atv-texto-base">{questao.textoBase}</blockquote>
+                {questao.fonte ? <p className="atv-fonte">Fonte: {questao.fonte}</p> : null}
+              </>
+            ) : null}
+            <p className="msn-enunciado">{questao.enunciado}</p>
+            <Questao
+              id={`${estado.id}-${atual}`}
+              questao={questao}
+              resposta={estado.respostas[atual]}
+              semente={estado.semente + atual * 7919}
+              fechada={conferida}
+              onChange={responder}
+              dissertativa={{ correcao: estado.correcoes[atual], tentativas: -1, corrigindo: conferindo, onAssistente: () => undefined }}
+            />
+          </motion.article>
+        </motion.div>
+      </section>
+
+      <motion.footer className={`msn-barra is-${resultado}`} layout transition={molaPeca} aria-live="polite">
+        <div className="msn-barra-texto">
+          {resultado === "neutro" ? (
+            <>
+              <span className="msn-barra-icone">
+                <Target className="h-5 w-5" aria-hidden />
+              </span>
+              <span>
+                <b>{aviso || instrucoes[questao.tipo] || "Responda e confira."}</b>
+                <small>{pronta ? "Pronto? Toque em Conferir (ou Enter)." : "Responda para liberar o Conferir."}</small>
+              </span>
+            </>
+          ) : (
+            <>
+              <motion.span className="msn-barra-icone" initial={reduced ? false : { scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} transition={molaSolta}>
+                {resultado === "certa" ? <Check className="h-5 w-5" /> : resultado === "parcial" ? <Star className="h-5 w-5" /> : <X className="h-5 w-5" />}
+              </motion.span>
+              <span>
+                <b>{resultado === "certa" ? (combo >= 3 ? `Mandou bem! ${combo} seguidas 🔥` : "Mandou bem! +5 XP") : resultado === "parcial" ? "Quase! Parte certa." : "Não foi dessa vez."}</b>
+                <small>{resultado === "certa" ? "A explicação está na carta, se quiser revisar." : "Veja na carta a resposta certa e a explicação."}</small>
+              </span>
+            </>
+          )}
+        </div>
+        {conferida ? (
+          <motion.button type="button" className="msn-botao" onClick={continuar} whileTap={{ scale: 0.95 }} transition={molaPeca} autoFocus>
+            {ultima && conferidas.length >= total ? "Ver resultado" : "Continuar"} <ChevronRight className="h-4 w-4" />
+          </motion.button>
+        ) : (
+          <motion.button type="button" className="msn-botao" onClick={() => void conferir()} disabled={!pronta || conferindo} whileTap={{ scale: 0.95 }} transition={molaPeca}>
+            {conferindo ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {conferindo ? "A Mine está lendo…" : "Conferir"}
+          </motion.button>
+        )}
+      </motion.footer>
+    </div>
+  );
+}
+
+function FimDaMissao({ estado, onRevisar, onNova, onVoltar }: { estado: EmAndamento; onRevisar: () => void; onNova: () => void; onVoltar: () => void }) {
+  const reduced = useSoftMotion();
+  const placarRef = useRef<HTMLDivElement>(null);
+  const fim = estado.finalizada!;
+  const total = estado.atividade.questoes.length;
+  const porcentagem = fim.maximo ? fim.pontos / fim.maximo : 0;
+  const estrelas = porcentagem >= 0.95 ? 3 : porcentagem >= 0.75 ? 2 : porcentagem >= 0.45 ? 1 : 0;
+  const frase = ["Bora treinar mais um pouco!", "Boa! Dá pra subir mais.", "Muito bem!", "Gabaritou! Perfeito!"][estrelas];
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      floatXp(`+${fim.xp} XP`, placarRef.current);
+      if (estrelas >= 2) celebrateFrom(placarRef.current, { count: estrelas === 3 ? 50 : 32 });
+      mineSays(frase, estrelas >= 2 ? "wow" : "happy");
+    }, reduced ? 50 : 1100);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="atv-page msn-page">
+      <section className="msn-fim" ref={placarRef}>
+        <p className="caderno-note">missão cumprida · {estado.materia}</p>
+        <h2 className="msn-fim-titulo">{estado.atividade.titulo}</h2>
+        <div className="msn-estrelas" aria-label={`${estrelas} de 3 estrelas`}>
+          {[0, 1, 2].map((indice) => (
+            <motion.span
+              key={indice}
+              className={`msn-estrela ${indice < estrelas ? "is-on" : ""}`}
+              initial={reduced ? false : { scale: 0, rotate: -120, y: 30 }}
+              animate={{ scale: indice === 1 ? 1.25 : 1, rotate: 0, y: indice === 1 ? -10 : 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 14, mass: 1, delay: 0.3 + indice * 0.22 }}
+            >
+              <Star />
+            </motion.span>
+          ))}
+        </div>
+        <p className="msn-fim-frase">{frase}</p>
+        <div className="msn-fim-numeros">
+          <span>
+            <b>{String(fim.pontos).replace(".", ",")}</b>
+            <small>de {fim.maximo} pontos</small>
+          </span>
+          <span>
+            <b>
+              {fim.acertos}/{total}
+            </b>
+            <small>questões certas</small>
+          </span>
+          <span>
+            <b>x{estado.melhorCombo || 0}</b>
+            <small>maior sequência</small>
+          </span>
+          <span>
+            <b>+{fim.xp}</b>
+            <small>XP ganho</small>
+          </span>
+        </div>
+        <div className="msn-fim-acoes">
+          <button type="button" className="atv-btn caderno-btn-pen" onClick={onNova}>
+            <Sparkles className="h-4 w-4" /> Nova missão
+          </button>
+          <button type="button" className="atv-btn atv-btn-ghost" onClick={onRevisar}>
+            <ClipboardList className="h-4 w-4" /> Ver correção completa
+          </button>
+          <button type="button" className="atv-btn atv-btn-ghost" onClick={onVoltar}>
+            Voltar
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -1286,7 +1682,7 @@ function Dissertativa({
         <span>N° mínimo de caracteres: {questao.minimo}</span>
         <span className={curta ? "" : "is-ok"}>{valor.trim().length} {valor.trim().length === 1 ? "caractere" : "caracteres"}</span>
       </div>
-      {!fechada ? (
+      {!fechada && tentativas >= 0 ? (
         <div className="atv-assistente">
           <button type="button" className="atv-btn atv-btn-ghost" onClick={onAssistente} disabled={curta || tentativas <= 0 || corrigindo || Boolean(correcao)}>
             {corrigindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Assistente de correção

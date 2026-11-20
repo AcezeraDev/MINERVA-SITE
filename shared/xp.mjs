@@ -35,6 +35,12 @@ export const xpPerAction = {
  */
 export const redacaoXpMax = 40;
 export const redacoesPorDia = 3;
+/**
+ * Proposta pronta (nov/2026): coletânea completa no estilo da prova, com textos
+ * motivadores. Vale mais que um tema livre, mas só na PRIMEIRA entrega de cada
+ * proposta; reescrever a mesma volta ao teto comum.
+ */
+export const redacaoPropostaXpMax = 70;
 export const atividadeXpMax = 40;
 export const atividadesPorDia = 5;
 
@@ -71,6 +77,24 @@ export function redacaoXp(total) {
   return Math.min(redacaoXpMax, 10 + Math.round((nota / 1000) * 30));
 }
 
+/** Proposta pronta: 20 XP por entregar e até 50 pela nota. */
+export function redacaoPropostaXp(total) {
+  const nota = Math.max(0, Math.min(1000, Number(total) || 0));
+  return Math.min(redacaoPropostaXpMax, 20 + Math.round((nota / 1000) * 50));
+}
+
+/** Teto de cada redação: proposta pronta só vale mais na primeira entrega. */
+function redacaoMax(sessions) {
+  const primeiras = new Set();
+  const vistas = new Set();
+  for (const item of [...sessions].filter((entry) => entry?.kind === "Redação").sort((a, b) => (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0))) {
+    if (!item.propostaId || vistas.has(item.propostaId)) continue;
+    vistas.add(item.propostaId);
+    primeiras.add(item);
+  }
+  return (item) => (primeiras.has(item) ? redacaoPropostaXpMax : redacaoXpMax);
+}
+
 /** 10 XP por finalizar a atividade e 5 por questão certa, até o teto. */
 export function atividadeXp(acertos) {
   return Math.min(atividadeXpMax, 10 + Math.max(0, Math.floor(Number(acertos) || 0)) * 5);
@@ -101,6 +125,7 @@ export const xpActions = [
   ["Fechar uma lição de idioma sem errar (bônus)", idiomaPerfectBonus],
   [`Guardar um desenho pintado no Ateliê (até ${drawingsPerDay} por dia)`, xpPerAction.drawing],
   [`Entregar uma redação corrigida (pela nota, até ${redacoesPorDia} por dia)`, redacaoXpMax],
+  ["Entregar uma proposta pronta de redação pela primeira vez (pela nota)", redacaoPropostaXpMax],
   [`Finalizar uma atividade (pelos acertos, até ${atividadesPorDia} por dia)`, atividadeXpMax],
   [`Cumprir um desafio do Laboratório (até ${labPorDia} por dia)`, labXpMax],
   [`Terminar uma leitura e responder as perguntas (até ${leiturasPorDia} por dia)`, leituraXpMax],
@@ -151,6 +176,8 @@ export const achievementList = [
   { id: "arte-1", title: "Primeira obra", text: "Guarde seu primeiro desenho pintado no Ateliê.", xp: 20, target: 1, stat: "drawings" },
   { id: "redacao-1", title: "Primeira redação", text: "Entregue sua primeira redação para a Mine corrigir.", xp: 20, target: 1, stat: "redacoes" },
   { id: "redacao-10", title: "Caneta afiada", text: "Entregue 10 redações.", xp: 80, target: 10, stat: "redacoes" },
+  { id: "proposta-3", title: "Coletânea lida", text: "Entregue 3 propostas prontas de redação.", xp: 50, target: 3, stat: "propostas" },
+  { id: "proposta-all", title: "Mural completo", text: "Entregue todas as propostas prontas de redação.", xp: 150, target: 10, stat: "propostas" },
   { id: "atividade-1", title: "Tarefa entregue", text: "Finalize sua primeira atividade.", xp: 20, target: 1, stat: "atividades" },
   { id: "atividade-15", title: "Aluno exemplar", text: "Finalize 15 atividades.", xp: 80, target: 15, stat: "atividades" },
   { id: "lab-1", title: "Cientista de jaleco", text: "Cumpra um desafio do Laboratório.", xp: 20, target: 1, stat: "labs" },
@@ -204,7 +231,8 @@ function cappedKindXp(sessions, kind, maxEach, perDay, since = 0) {
     if (item?.kind !== kind || !(Number(item.createdAt) >= since)) continue;
     const day = startOfDay(item.createdAt);
     const list = byDay.get(day) || [];
-    list.push(Math.max(0, Math.min(maxEach, Math.floor(Number(item.xpEarned) || 0))));
+    const max = typeof maxEach === "function" ? maxEach(item) : maxEach;
+    list.push(Math.max(0, Math.min(max, Math.floor(Number(item.xpEarned) || 0))));
     byDay.set(day, list);
   }
   let total = 0;
@@ -237,7 +265,8 @@ export function gamificationStats(scope, now = Date.now()) {
       .filter((item) => item.kind === "Idiomas")
       .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0),
     redacoes: sessions.filter((item) => item.kind === "Redação").length,
-    redacaoXp: cappedKindXp(sessions, "Redação", redacaoXpMax, redacoesPorDia),
+    redacaoXp: cappedKindXp(sessions, "Redação", redacaoMax(sessions), redacoesPorDia),
+    propostas: new Set(sessions.filter((item) => item.kind === "Redação" && item.propostaId).map((item) => item.propostaId)).size,
     atividades: sessions.filter((item) => item.kind === "Atividade").length,
     atividadeXp: cappedKindXp(sessions, "Atividade", atividadeXpMax, atividadesPorDia),
     labs: sessions.filter((item) => item.kind === "Laboratório").length,
@@ -319,7 +348,7 @@ export function xpSince(scope, since) {
     sessions
       .filter((item) => item.kind === "Idiomas" && after(item.createdAt))
       .reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.xpEarned) || 0)), 0) +
-    cappedKindXp(sessions, "Redação", redacaoXpMax, redacoesPorDia, from) +
+    cappedKindXp(sessions, "Redação", redacaoMax(sessions), redacoesPorDia, from) +
     cappedKindXp(sessions, "Atividade", atividadeXpMax, atividadesPorDia, from) +
     cappedKindXp(sessions, "Laboratório", labXpMax, labPorDia, from) +
     cappedKindXp(sessions, "Leitura", leituraXpMax, leiturasPorDia, from) +

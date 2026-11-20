@@ -7,6 +7,7 @@ import { PageHeader, uid, type Session, type User, type useMemoUserData, type Ap
 import { useSoftMotion } from "../motion";
 import { celebrateFrom, floatXp, mineConversa, mineSays } from "../caderno";
 import { askMineTask } from "../mineTask";
+import { usePreset } from "../chat/presets";
 import { leituraXp, leiturasPorDia } from "../../shared/xp.mjs";
 import {
   contarPalavrasLeitura,
@@ -70,7 +71,11 @@ export function LeituraView({ user, update }: { data: ReturnType<typeof useMemoU
   const reduced = useSoftMotion();
   const chaveRascunho = `minerva:leitura:${user.id}`;
   const chaveGuardadas = `minerva:leituras:${user.id}`;
-  const [rascunho, setRascunho] = useState(() => lerLocal(chaveRascunho, { titulo: "", texto: "" }));
+  // "manda esse texto pra leitura" no chat: a resposta da Mine vira o texto colado
+  const preset = usePreset("leitura");
+  const [rascunho, setRascunho] = useState(() =>
+    preset?.texto ? { titulo: preset.titulo || "", texto: preset.texto } : lerLocal(chaveRascunho, { titulo: "", texto: "" }),
+  );
   const [fase, setFase] = useState<"colar" | "lendo" | "resultado">("colar");
   const [atual, setAtual] = useState<Guardada | null>(null);
   const [erro, setErro] = useState("");

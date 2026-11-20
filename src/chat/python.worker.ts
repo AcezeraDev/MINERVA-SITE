@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 /*
- * Python do MineCode, rodando no navegador (Pyodide) dentro de um Web Worker:
+ * Python das respostas da Mine, rodando no navegador (Pyodide) dentro de um Web Worker:
  * o código do aluno não trava a tela, e um laço infinito é resolvido
  * encerrando o worker (runner.ts faz isso no tempo limite).
  *

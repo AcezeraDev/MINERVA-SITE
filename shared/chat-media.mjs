@@ -114,7 +114,10 @@ export function withImageStyle(text, style) {
  * Exige o prefixo de "imagem"/"foto" para nao engolir um `[[` legitimo.
  */
 const PENDING_MARKER =
-  /\[\[\s*(?:i|im|ima|imag|image|imagem|imagens|f|fo|fot|foto|fotos|s|su|sug|suge|sugest|sugesto|sugestõ|sugestoe|sugestõe|sugestoes|sugestões|g|ge|ger|gera|gerar|gerar[_ ][a-z]{0,6}|c|cr|cri|cria|criar|criar[_ ][a-z]{0,6})?\s*(?::[^\]]*\]?)?$/i;
+  /\[\[\s*(?:i|im|ima|imag|image|imagem|imagens|f|fo|fot|foto|fotos|s|su|sug|suge|sugest|sugesto|sugestõ|sugestoe|sugestõe|sugestoes|sugestões|g|ge|ger|gera|gerar|gerar[_ ][a-z]{0,6}|gl[a-záo]{0,7}|c|cr|cri|cria|criar|criar[_ ][a-z]{0,6})?\s*(?::[^\]]*\]?)?$/i;
+
+/** Glossário (shared/chat-glossary.mjs): some do texto mostrado, copiado e do histórico. */
+const GLOSSARY_ANY = /\[\[\s*gloss[aá]rio\s*:[^\]]*\]\]/gi;
 
 /**
  * Proximas perguntas sugeridas: `[[sugestoes: pergunta 1 | pergunta 2]]` no
@@ -199,7 +202,7 @@ function tidy(text) {
 export function stripImageMarkers(text) {
   // O marcador costuma ficar sozinho numa linha; tirar so ele deixaria tres
   // quebras seguidas e um buraco no meio do texto, dai o `tidy`.
-  return tidy(String(text || "").replace(IMAGE_MARKER, "").replace(GENERATE_MARKER, "").replace(SUGGESTION_MARKER, ""));
+  return tidy(String(text || "").replace(IMAGE_MARKER, "").replace(GENERATE_MARKER, "").replace(SUGGESTION_MARKER, "").replace(GLOSSARY_ANY, ""));
 }
 
 /** Corta um marcador que ainda esta sendo escrito, para ele nao piscar na tela. */
@@ -220,7 +223,7 @@ export function stripPendingMarker(text) {
  * em diante e um modelo empolgado, e a conversa viraria um album.
  */
 export function splitMessageMedia(text, { limit = 2, streaming = false } = {}) {
-  const withoutSuggestions = String(text || "").replace(SUGGESTION_MARKER, "");
+  const withoutSuggestions = String(text || "").replace(SUGGESTION_MARKER, "").replace(GLOSSARY_ANY, "");
   const source = streaming ? stripPendingMarker(withoutSuggestions) : withoutSuggestions;
   const segments = [];
   let buffer = "";
@@ -243,8 +246,19 @@ export function splitMessageMedia(text, { limit = 2, streaming = false } = {}) {
       const prompt = generated < 1 ? cleanField(match[3], MAX_PROMPT_CHARS) : "";
       if (prompt.length < 3) continue;
       flushText();
-      const [caption, mode] = String(match[4] || "").split("|");
-      segments.push({ type: "generate", prompt, caption: cleanField(caption, MAX_CAPTION_CHARS), edit: /^\s*edit/i.test(mode || "") });
+      // Depois da legenda vêm, em qualquer ordem: "editar" (ajusta a última
+      // imagem), "anexo" (ajusta a foto que o estudante mandou) e o formato.
+      const [caption, ...modes] = String(match[4] || "").split("|");
+      const flags = modes.map((mode) => normalizeIntentFlag(mode));
+      const formato = flags.find((flag) => flag === "paisagem" || flag === "retrato");
+      segments.push({
+        type: "generate",
+        prompt,
+        caption: cleanField(caption, MAX_CAPTION_CHARS),
+        edit: flags.includes("editar") || flags.includes("anexo"),
+        ...(flags.includes("anexo") ? { fromAttachment: true } : {}),
+        ...(formato ? { formato } : {}),
+      });
       generated += 1;
       continue;
     }
@@ -304,7 +318,8 @@ export function describeImageMarkers(text) {
       // A Mine precisa lembrar o que desenhou para "deixa o fundo azul" virar
       // uma edição da mesma imagem, e não um desenho novo do zero.
       .replace(GENERATE_MARKER, (_, prompt) => `(imagem criada pela Mine: ${cleanField(prompt, MAX_PROMPT_CHARS)})`)
-      .replace(SUGGESTION_MARKER, ""),
+      .replace(SUGGESTION_MARKER, "")
+      .replace(GLOSSARY_ANY, ""),
   );
 }
 
@@ -341,7 +356,7 @@ export function continuesGallery(text, history = []) {
 // fazer, desenhar, ilustrar, pintar, montar, imaginar. Sem verbo de criação,
 // continua sendo busca, como sempre foi.
 const CREATE_VERB = String.raw`(?:ger[ae]\w*|cri[ae]\w*|fa[zç]\w*|fazer|desenh\w*|ilustr\w*|pint[ae]\w*|mont[ae]\w*|imagin[ae]\w*|produz\w*|elabor\w*|design\w*)`;
-const CREATE_NOUN = String.raw`(?:imagens?|imagem|fotos?|desenhos?|ilustra[cç](?:ão|ao|ões|oes)|artes?|pinturas?|logos?|logotipos?|wallpapers?|pap[eé]is?\s+de\s+parede|p[oô]sters?|cartaz(?:es)?|capas?|banners?|figurinhas?|stickers?|avatar(?:es|s)?|ícones?|icones?|icons?|mascotes?|personagens?|cen[aá]rios?|quadrinhos?|tirinhas?|infogr[aá]ficos?)`;
+const CREATE_NOUN = String.raw`(?:imagens?|imagem|fotos?|desenhos?|ilustra[cç](?:ão|ao|ões|oes)|artes?|pinturas?|logos?|logotipos?|wallpapers?|pap[eé](?:l|is)\s+de\s+parede|fundos?\s+de\s+tela|p[oô]sters?|cartaz(?:es)?|capas?|banners?|figurinhas?|stickers?|avatar(?:es|s)?|ícones?|icones?|icons?|mascotes?|personagens?|cen[aá]rios?|quadrinhos?|tirinhas?|infogr[aá]ficos?)`;
 const CREATE_REQUEST = new RegExp(String.raw`(?:^|[^\p{L}])${CREATE_VERB}(?![\p{L}])[^.?!\n]{0,30}?(?:^|[^\p{L}])${CREATE_NOUN}(?![\p{L}])`, "iu");
 // "Desenhe" sozinho ("desenha um gato pra mim") também é pedido de imagem.
 const DRAW_ALONE = /(?:^|[^\p{L}])(?:desenh[ae]|desenhar|ilustr[ae]|ilustrar|pint[ae])(?![\p{L}])\s+(?:uma?|o|a|meu|minha|pra|para|me)\b/iu;
@@ -350,6 +365,61 @@ const DRAW_ALONE = /(?:^|[^\p{L}])(?:desenh[ae]|desenhar|ilustr[ae]|ilustrar|pin
 // Nov/2026: gráfico, esquema e diagrama também ficam aqui — a Mine desenha
 // esses em código (```grafico / ```svg), com número e rótulo legíveis.
 const TEXT_FIRST = /(?:^|[^\p{L}])(?:resumo|lista|texto|reda[cç][aã]o|exerc[ií]cios?|quest(?:ão|ao|ões|oes)|prova|plano|tabela|mapa\s+mental|flashcards?|gr[aá]ficos?|esquemas?|diagramas?|fluxogramas?|organogramas?|linha\s+do\s+tempo)(?![\p{L}])/iu;
+
+/** Campo extra do marcador de criação, já normalizado. */
+function normalizeIntentFlag(value) {
+  const flag = String(value || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (/^edit/.test(flag)) return "editar";
+  if (/^(?:anexo|foto\s+anexada|anexad[ao])$/.test(flag)) return "anexo";
+  if (/^(?:paisagem|horizontal|landscape|wide|16:9|3:2)$/.test(flag)) return "paisagem";
+  if (/^(?:retrato|vertical|portrait|9:16|2:3)$/.test(flag)) return "retrato";
+  if (/^(?:quadrad[ao]|square|1:1)$/.test(flag)) return "quadrado";
+  return "";
+}
+
+/**
+ * O modelo às vezes esquece o campo de formato ou o "anexo" no marcador de
+ * criação (escreve "vertical composition" no prompt, mas a imagem sai
+ * quadrada). O servidor sabe o que foi pedido e completa o marcador.
+ */
+export function withImageRequest(text, { formato = "", anexo = false } = {}) {
+  if (!formato && !anexo) return String(text || "");
+  return String(text || "").replace(GENERATE_MARKER, (marker, prompt, rest) => {
+    const [caption = "", ...modes] = String(rest || "").split("|").map((part) => part.trim());
+    const flags = modes.map(normalizeIntentFlag);
+    const extra = modes.filter((mode, index) => flags[index] && flags[index] !== "editar");
+    const keep = flags.includes("editar") && !anexo ? ["editar"] : [];
+    const want = [...keep, ...(anexo ? ["anexo"] : extra.filter((mode) => normalizeIntentFlag(mode) === "anexo")), formato || extra.find((mode) => /^(?:paisagem|retrato)$/.test(normalizeIntentFlag(mode))) || ""].filter(Boolean);
+    const prefix = marker.match(/^\[\[\s*([^:]+?)\s*:/)?.[1] || "gerar_imagem";
+    return `[[${prefix}: ${String(prompt).trim()} | ${caption}${want.map((item) => ` | ${normalizeIntentFlag(item) || item}`).join("")}]]`;
+  });
+}
+
+/**
+ * Formato que a pessoa pediu para a imagem criada. Papel de parede de celular,
+ * story e pôster são em pé; banner, capa de vídeo e papel de parede do
+ * computador são deitados. Sem pista, quadrado ("").
+ */
+export function imageFormatFrom(text) {
+  const value = String(text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (/\b(?:retrato|vertical|em\s+pe|stor(?:y|ies)|reels?|tiktok|p[oô]ster|cartaz|(?:wallpaper|papel\s+de\s+parede|fundo\s+de\s+tela)\s+(?:d[oe]|pr[ao]|pra\s+o|para\s+o?)\s*(?:meu\s+)?(?:celular|telefone|iphone|android))\b/.test(value)) return "retrato";
+  if (/\b(?:paisagem|horizontal|deitad[ao]|widescreen|banner|capa\s+(?:de|do|pra|pro|para)\s+(?:o\s+|meu\s+)?(?:video|youtube|canal|slide|apresentacao)|thumbnail|thumb|(?:wallpaper|papel\s+de\s+parede|fundo\s+de\s+tela)\s+(?:d[oe]|pr[ao]|pra\s+o|para\s+o?)\s*(?:meu\s+)?(?:pc|computador|notebook|desktop|monitor))\b/.test(value)) return "paisagem";
+  return "";
+}
+
+/**
+ * "Transforma essa foto em anime", "deixa minha foto estilo Pixar", "coloca um
+ * chapéu nele": com uma foto anexada, é pedido para EDITAR a foto. Pergunta
+ * sobre a foto ("o que tem nessa imagem?") continua sendo leitura do anexo.
+ */
+export function editsAttachedImage(text) {
+  const value = String(text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (!value.trim() || value.length > 300) return false;
+  if (/^\s*(?:o\s+que|qual|quais|quem|onde|como|por\s*que|explica|descrev|analis|identific|le\b|leia|resolv)/.test(value)) return false;
+  const verb = /\b(?:transform\w*|deix[ae]\w*|coloc\w*|mud[ae]\w*|troc[ae]\w*|edit\w*|vir[ae]\w*|convert\w*|refa[zc]\w*|redesenh\w*|recri\w*|tir[ae]\w*|remov\w*|adicion\w*|bot[ae]\w*|poe|ponha|faz|faca|fazer|desenh\w*|pint[ae]\w*)\b/;
+  const change = /\b(?:estilo|anime|mang[aá]|cartoon|desenho|pixar|disney|ghibli|aquarela|pintura|oleo|realista|fundo|cor(?:es)?|chap[eé]u|oculos|roupa|cabelo|preto\s+e\s+branco|sketch|lapis|3d|pixel|minecraft|lego|quadrinhos?|hq|vintage|neon|cyberpunk|figurinha|sticker|avatar|caricatura|super-?heroi|astronauta)\b/;
+  return verb.test(value) && change.test(value);
+}
 
 /** A pessoa pediu para a Mine CRIAR uma imagem (e não buscar uma foto)? */
 export function asksToGenerateImage(text) {

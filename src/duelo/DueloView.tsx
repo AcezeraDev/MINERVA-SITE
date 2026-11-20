@@ -10,6 +10,7 @@ import { useSoftMotion } from "../motion";
 import { celebrateFrom, floatXp, mineSays } from "../caderno";
 import { dueloXp, duelosPorDia } from "../../shared/xp.mjs";
 import type { VistaDuelo } from "../../shared/duelo.mjs";
+import { usePreset } from "../chat/presets";
 import "./duelo.css";
 
 type Sala = { codigo: string; tema: string; dono: string; criadoEm: number; minha: boolean };
@@ -50,7 +51,9 @@ export function DueloView({ user, update }: { data: ReturnType<typeof useMemoUse
   const reduced = useSoftMotion();
   const [duelo, setDuelo] = useState<VistaDuelo | null>(null);
   const [desvio, setDesvio] = useState(0);
-  const [tema, setTema] = useState("");
+  // "cria um duelo sobre isso" no chat chega aqui com o tema já escrito
+  const preset = usePreset("duelo");
+  const [tema, setTema] = useState(() => (preset?.tema || "").slice(0, 120));
   const [codigo, setCodigo] = useState("");
   const [salas, setSalas] = useState<Sala[]>([]);
   const [ocupado, setOcupado] = useState<"" | "colega" | "mine" | "entrar">("");

@@ -130,7 +130,9 @@ function splitRow(line) {
       continue;
     }
     if (char === "`") inCode = !inCode;
-    if (char === "$") inMath = !inMath;
+    // "R$" e "US$" são dinheiro, não abrem fórmula: "Preço (R$) | Total (R$)"
+    // juntava as duas colunas numa só.
+    if (char === "$" && (inMath || !/[A-Za-z]/.test(trimmed[index - 1] || ""))) inMath = !inMath;
     // Barra dentro de codigo ou formula (|x|, a || b) nao separa coluna.
     if (char === "|" && !inCode && !inMath) {
       cells.push(current.trim());
@@ -413,7 +415,7 @@ export function parseBlocks(text, { streaming = false } = {}) {
 // Ordem importa: codigo antes de tudo (nada dentro dele e formatado), formula
 // antes de enfase (x_1 * y_2 nao e italico).
 const INLINE =
-  /(`+)([^`]+?)\1|\$\$([^$]+?)\$\$|\\\((.+?)\\\)|\$(?!\s)([^$\n]+?)(?<![\s\\])\$(?!\d)|\*\*(.+?)\*\*|__(.+?)__|==(.+?)==|~~(.+?)~~|(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])|(?<![\w])_(?!\s)(.+?)(?<!\s)_(?![\w])|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(?<![\w\]])((?:\[\d{1,2}\])+)(?![(\w])/g;
+  /(`+)([^`]+?)\1|\$\$([^$]+?)\$\$|\\\((.+?)\\\)|(?<![A-Za-z])\$(?!\s)([^$\n]+?)(?<![\s\\])\$(?!\d)|\*\*(.+?)\*\*|__(.+?)__|==(.+?)==|~~(.+?)~~|(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])|(?<![\w])_(?!\s)(.+?)(?<!\s)_(?![\w])|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(?<![\w\]])((?:\[\d{1,2}\])+)(?![(\w])/g;
 
 /**
  * Quebra uma linha em pedacos: text, code, math, strong, em, mark, del, link.

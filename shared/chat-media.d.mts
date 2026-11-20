@@ -1,7 +1,12 @@
 export type MessageSegment =
   | { type: "text"; text: string }
   | { type: "image"; query: string; caption: string; style?: ImageStyle }
-  | { type: "generate"; prompt: string; caption: string; edit: boolean };
+  | { type: "generate"; prompt: string; caption: string; edit: boolean; fromAttachment?: boolean; formato?: "paisagem" | "retrato" };
+
+export type ImageFormat = "paisagem" | "retrato" | "";
+export function imageFormatFrom(text: string): ImageFormat;
+export function editsAttachedImage(text: string): boolean;
+export function withImageRequest(text: string, options?: { formato?: string; anexo?: boolean }): string;
 
 export type ImageStyle = "icone" | "wallpaper" | "desenho" | "logo";
 export const IMAGE_STYLES: ImageStyle[];

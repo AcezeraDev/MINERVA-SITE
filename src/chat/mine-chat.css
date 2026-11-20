@@ -422,3 +422,123 @@
     transform: none;
   }
 }
+
+/* ------------------------------------------------- busca e alfinete (nov/2026) */
+
+.mine-thread-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.mine-thread-search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 2px 0.1rem 0;
+  padding: 0 0.6rem;
+  border: 1px solid rgb(var(--theme-text) / 0.1);
+  border-radius: 0.7rem;
+  background: rgb(var(--theme-text) / 0.035);
+  color: rgb(var(--theme-text) / 0.4);
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.mine-thread-search:focus-within {
+  border-color: rgb(var(--mint) / 0.55);
+  background: rgb(var(--theme-text) / 0.06);
+  color: rgb(var(--mint));
+}
+
+.mine-thread-search input {
+  min-width: 0;
+  flex: 1;
+  height: 2.1rem;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--theme-text) / 0.92);
+  font-size: 12px;
+  font-weight: 700;
+  outline: none;
+}
+
+.mine-thread-search input::placeholder {
+  color: rgb(var(--theme-text) / 0.34);
+}
+
+.mine-thread.is-hit {
+  align-items: flex-start;
+  padding-right: 0.6rem;
+}
+
+.mine-thread__snippet {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 1px 0 2px;
+  color: rgb(var(--theme-text) / 0.55);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mine-thread__snippet mark,
+.mine-thread__title mark {
+  border-radius: 2px;
+  background: rgb(var(--marker, 250 222 90) / 0.55);
+  color: inherit;
+}
+
+/* alfinete + lixeira: aparecem juntos no canto da linha */
+.mine-thread__tools {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  display: flex;
+  gap: 1px;
+  transform: translateY(-50%);
+}
+
+.mine-thread__tools .mine-thread__delete {
+  position: static;
+  transform: none;
+}
+
+.mine-thread-row .mine-thread {
+  padding-right: 4.3rem;
+}
+
+.mine-thread__pin {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
+  border-radius: 0.6rem;
+  color: rgb(var(--theme-text) / 0.4);
+  opacity: 0;
+  transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.mine-thread-row:hover .mine-thread__pin,
+.mine-thread__pin:focus-visible {
+  opacity: 1;
+}
+
+.mine-thread__pin:hover,
+.mine-thread__pin:focus-visible {
+  background: rgb(var(--mint) / 0.12);
+  color: rgb(var(--mint));
+}
+
+.mine-thread-row.is-pinned .mine-thread__icon {
+  color: rgb(var(--mint));
+}
+
+@media (hover: none) {
+  .mine-thread__pin {
+    opacity: 0.55;
+  }
+}
