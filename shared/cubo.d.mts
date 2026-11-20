@@ -1,0 +1,35 @@
+export type Eixo = "x" | "y" | "z";
+export type Vetor = [number, number, number];
+export type Giro = { eixo: Eixo; camada: number | "todas"; q: number };
+export type Adesivo = { n: Vetor; cor: number; local: Vetor };
+export type Peca = { id: number; pos: Vetor; base: [Vetor, Vetor, Vetor]; adesivos: Adesivo[] };
+export type Cubo = { n: number; pecas: Peca[] };
+export type Face = "U" | "D" | "F" | "B" | "R" | "L";
+export type Planificacao = Record<Face, number[][]>;
+export type Solve = { id: string; n: number; ms: number; giros: number; em: number; modo: "tela" | "real"; embaralhamento: string; mais2?: boolean; dnf?: boolean };
+
+export const corNomes: string[];
+export const coresHex: string[];
+export const ordemFaces: Face[];
+export const tamanhoDoEmbaralhamento: Record<number, number>;
+
+export function girarVetor(v: Vetor, eixo: Eixo, q: number): Vetor;
+export function criarCubo(n?: number): Cubo;
+export function clonarCubo(cubo: Cubo): Cubo;
+export function pecaNoGiro(peca: Peca, giro: Giro): boolean;
+export function aplicarGiro(cubo: Cubo, giro: Giro): Cubo;
+export function aplicarGiros(cubo: Cubo, giros: Giro[]): Cubo;
+export function estaResolvido(cubo: Cubo): boolean;
+export function inverso(giro: Giro): Giro;
+export function simplificar(giros: Giro[]): Giro[];
+export function caminhoDeVolta(historico: Giro[]): Giro[];
+export function giroDaNotacao(texto: string, n?: number): Giro | null;
+export function notacao(giro: Giro, n?: number): string;
+export function textoDosGiros(giros: Giro[], n?: number): string;
+export function gerarEmbaralhamento(n?: number, aleatorio?: () => number, tamanho?: number): Giro[];
+export function planificar(cubo: Cubo): Planificacao;
+export function formatarTempo(ms: number | null | undefined): string;
+export function mediaDe(tempos: Array<number | null>, quantos: number): number | null;
+export function resumoTempos(solves: Solve[]): { total: number; melhor: number | null; media: number | null; ao5: number | null; ao12: number | null };
+export const etapasDoMetodo: string[];
+export function etapaDoMetodo(cubo: Cubo): { indice: number; nome: string; feitas: number; total: number } | null;
