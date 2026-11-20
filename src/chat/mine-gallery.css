@@ -175,6 +175,44 @@
   font-weight: 700;
 }
 
+/* "Baixar todas (.zip)": discreto, na linha da legenda */
+.mine-gallery__zip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  margin-left: auto;
+  padding: 0 0.7rem;
+  border: 1px solid rgb(var(--theme-text) / 0.14);
+  border-radius: 0.6rem;
+  color: rgb(var(--theme-text) / 0.78);
+  font-size: 12px;
+  font-weight: 750;
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.mine-gallery__zip svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.mine-gallery__zip:hover:not(:disabled) {
+  border-color: rgb(var(--mint));
+  color: rgb(var(--theme-text));
+  transform: translateY(-1px);
+}
+.mine-gallery__zip:focus-visible {
+  outline: 2px solid rgb(var(--mint));
+  outline-offset: 2px;
+}
+.mine-gallery__zip:disabled {
+  cursor: progress;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mine-gallery__zip {
+    transition: none;
+  }
+}
+
 .mine-gallery__skeleton {
   display: block;
   border-radius: 1rem;

@@ -12,6 +12,7 @@ import { chatActionFromPrompt, plainTextFromReply, type ChatActionKind, type Cha
 import { parseQuickTask, startOfDay } from "../../shared/agenda.mjs";
 import { materias } from "../../shared/atividades.mjs";
 import { normalizeIntentText } from "../../shared/chat-intent.mjs";
+import { splitMessageMedia } from "../../shared/chat-media.mjs";
 import type { AppData, ChatMessage, Material, Subject } from "../main";
 import type { PresetView } from "./presets";
 
@@ -38,6 +39,8 @@ export type PlanoAcao = {
   mudar?: (draft: AppData) => AppData;
   /** Abre a aba logo depois de responder. */
   abrir?: { view: PresetView; preset: Record<string, string> };
+  /** Fotos das galerias da conversa para baixar num .zip (src/chat/galleryZip.ts). */
+  baixarFotos?: { nome: string; grupos: { query: string; style?: string }[] };
 };
 
 type Contexto = {
@@ -178,6 +181,31 @@ function abrirAba(view: PresetView, kind: ChatActionKind, preset: Record<string,
   return { texto, acao: { kind, titulo, detalhe, rota: view, preset, cta }, abrir: { view, preset } };
 }
 
+/**
+ * "Coloca essas fotos num zip": as galerias da última resposta da Mine que
+ * tinha fotos. O download em si roda em main.tsx (precisa da rede).
+ */
+function fotosZip(ctx: Contexto): PlanoAcao {
+  for (let index = ctx.conversa.length - 1; index >= 0; index -= 1) {
+    const message = ctx.conversa[index];
+    if (message.role === "user") continue;
+    const grupos = splitMessageMedia(message.text || "")
+      .filter((segment) => segment.type === "image")
+      .map((segment) => ({ query: segment.query, ...(segment.style ? { style: segment.style } : {}) }));
+    if (!grupos.length) continue;
+    const nome = grupos.length === 1 ? grupos[0].query : "fotos da Mine";
+    const sobre = grupos.map((grupo) => `“${grupo.query}”`).join(" e ");
+    return {
+      texto: `Estou juntando as fotos de ${sobre} num .zip. O download começa em instantes. Se o navegador bloquear, use o botão "Baixar todas (.zip)" embaixo da galeria.`,
+      baixarFotos: { nome, grupos },
+    };
+  }
+  return {
+    texto: 'Ainda não tem fotos nesta conversa para juntar. Peça as fotos primeiro (por exemplo, "manda fotos da Segunda Guerra") e depois diga "coloca num zip".',
+    sugestoes: ["Manda fotos sobre o assunto que estamos estudando"],
+  };
+}
+
 /** Decide o que fazer com o pedido. Não muda nada: quem chama aplica `mudar` e abre a aba. */
 export function planejarAcao(pedido: ChatActionRequest, ctx: Contexto): PlanoAcao {
   const aberta = ctx.subjects.find((item) => item.id === ctx.subjectId);
@@ -185,6 +213,7 @@ export function planejarAcao(pedido: ChatActionRequest, ctx: Contexto): PlanoAca
 
   if (pedido.kind === "salvar") return salvar(pedido, ctx);
   if (pedido.kind === "agenda") return agenda(pedido, ctx);
+  if (pedido.kind === "fotos-zip") return fotosZip(ctx);
 
   if (pedido.kind === "duelo") {
     return tema

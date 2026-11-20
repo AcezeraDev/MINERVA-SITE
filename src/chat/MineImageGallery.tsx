@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Download, ExternalLink, Images, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FolderArchive, Images, Loader2, X } from "lucide-react";
+import { downloadPhotosZip } from "./galleryZip";
 
 /*
  * Galeria de fotos da Mine, no formato que o ChatGPT popularizou: até três
@@ -239,6 +240,8 @@ export function MineImageGallery({ query, caption, style = "" }: { query: string
   // Foto que não carrega sai da galeria em vez de deixar um buraco.
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
   const [openAt, setOpenAt] = useState<number | null>(null);
+  // "Baixar todas (.zip)": progresso e resultado ficam no próprio botão.
+  const [zip, setZip] = useState<{ done: number; total: number } | "pronto" | "falhou" | null>(null);
 
   useEffect(() => {
     const cachedImages = galleryCache.get(key);
@@ -325,10 +328,34 @@ export function MineImageGallery({ query, caption, style = "" }: { query: string
           );
         })}
       </div>
-      {caption || sources.length ? (
+      {caption || sources.length || visible.length > 1 ? (
         <figcaption className="mine-gallery__caption">
           {caption ? <span>{caption}</span> : null}
           {sources.length ? <span className="mine-gallery__sources">{sources.join(" · ")}</span> : null}
+          {visible.length > 1 ? (
+            <button
+              type="button"
+              className="mine-gallery__zip"
+              disabled={zip !== null && typeof zip === "object"}
+              onClick={async () => {
+                setZip({ done: 0, total: visible.length });
+                const result = await downloadPhotosZip([{ query, style, images: visible }], caption || query, (done, total) => setZip({ done, total }));
+                setZip(result.saved ? "pronto" : "falhou");
+                window.setTimeout(() => setZip(null), 4000);
+              }}
+            >
+              {zip !== null && typeof zip === "object" ? <Loader2 className="animate-spin" aria-hidden /> : <FolderArchive aria-hidden />}
+              <span aria-live="polite">
+                {zip === null
+                  ? `Baixar todas (.zip)`
+                  : zip === "pronto"
+                    ? "Zip baixado"
+                    : zip === "falhou"
+                      ? "Não deu para baixar"
+                      : `Juntando ${zip.done} de ${zip.total}…`}
+              </span>
+            </button>
+          ) : null}
         </figcaption>
       ) : null}
       <AnimatePresence>

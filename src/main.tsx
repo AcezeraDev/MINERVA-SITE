@@ -172,6 +172,7 @@ import { cleanVisits, MineControlePanel, MineControleVisits, type MineVisit } fr
 import { MineAnswerActions, VersionSwitch } from "./chat/MineAnswerActions";
 import { branchSlice, switchBranch, versionInfo } from "./chat/branches";
 import { MineImageGallery } from "./chat/MineImageGallery";
+import { downloadPhotosZip } from "./chat/galleryZip";
 import { MineGeneratedImage } from "./chat/MineGeneratedImage";
 import "./chat/mine-gallery.css";
 import { inThread, threadsOf, togglePinned, type ChatThread } from "./chat/threads";
@@ -2385,6 +2386,18 @@ function App() {
               if (plano.abrir) {
                 deixarPreset(plano.abrir.view, plano.abrir.preset);
                 go(plano.abrir.view);
+              }
+              if (plano.baixarFotos) {
+                const { nome, grupos } = plano.baixarFotos;
+                void downloadPhotosZip(grupos, nome)
+                  .then(({ saved, failed }) =>
+                    notify(
+                      saved
+                        ? `Zip com ${saved} ${saved === 1 ? "foto" : "fotos"} baixado${failed ? ` (${failed} não ${failed === 1 ? "abriu" : "abriram"} no site de origem)` : ""}.`
+                        : "Não consegui baixar as fotos agora. Tente o botão “Baixar todas (.zip)” da galeria.",
+                    ),
+                  )
+                  .catch(() => notify("Não consegui montar o zip agora. Tente de novo em instantes."));
               }
               return;
             }
@@ -6576,6 +6589,7 @@ const actionLooks: Record<ChatAction["kind"], { icon: typeof BookOpen; color: st
   atividade: { icon: ClipboardList, color: "#FBBF24" },
   redacao: { icon: PenLine, color: "#A78BFA" },
   leitura: { icon: BookOpen, color: "#38BDF8" },
+  "fotos-zip": { icon: Download, color: "#2FD483" },
 };
 
 /** Ação feita pelo chat. O toque leva ao resultado (e preenche a aba de novo). */

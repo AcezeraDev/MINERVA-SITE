@@ -72,6 +72,16 @@ export function chatActionFromPrompt(value) {
   const grupo = (match, index) => (match.indices?.[index] ? firstLine.slice(match.indices[index][0], match.indices[index][1]) : "");
   const re = (source) => new RegExp(source, "d");
 
+  // ── fotos num .zip: "coloca essas fotos num zip", "baixa todas as fotos" ───
+  // Pergunta sobre zip ("o que é um arquivo zip?") segue como conversa.
+  const pergunta = /^(?:o\s+que|oq|que\s+e|como\s+(?:eu\s+)?(?:abro|faco|crio|uso|descompact)|qual|quais|pra\s+que|para\s+que)\b/.test(text);
+  const fotos = /\b(?:fotos?|fotinhas?|imagens?|figuras?|wallpapers?|icones?)\b/;
+  const pacote = /(?:\.zip\b|\bzip\b|\bzipad\w*|\bzipa\w*|\bcompact(?:a|e|ar|ad\w*)\b|\bnum\s+pacote\b|\bem\s+um\s+pacote\b)/;
+  const todas = /\bbaix\w*\b[^.?!]{0,24}\btod[ao]s\s+(?:as\s+|os\s+|ess[ae]s\s+)?(?:fotos|imagens|figuras|icones|wallpapers)\b/;
+  if (!pergunta && ((pacote.test(text) && (fotos.test(text) || /\b(?:essas|elas|todas)\b/.test(text))) || todas.test(text))) {
+    return { kind: "fotos-zip", topic: "", refersBack: true };
+  }
+
   // ── agenda: "coloca na agenda ...", "me lembra de ... amanhã" ─────────────
   const agenda = re(`${LEAD}${AGENDA_VERB}\\b(.*?)\\b(?:n[ao]|em|pr[ao]|para\\s+[ao])\\s+(?:minha\\s+)?agenda\\b(.*)$`).exec(text);
   if (agenda) {
@@ -89,7 +99,7 @@ export function chatActionFromPrompt(value) {
   // ── salvar nos conteúdos da matéria ────────────────────────────────────────
   const salvar = re(`${LEAD}${SAVE_VERB}\\s+(?:(${SAVE_OBJECT})\\b\\s*)?(?:(?:n[ao]s?|em|pr[ao]s?|para\\s+[ao]s?)\\s+(.+))?$`).exec(text);
   // "salva isso em PDF" é pedido de arquivo para a Mine (shared/chat-files.mjs).
-  if (salvar && (salvar[1] || salvar[2]) && !/\b(?:pdf|word|docx|excel|planilhas?|xlsx|html|csv|arquivo)\b/.test(text)) {
+  if (salvar && (salvar[1] || salvar[2]) && !/\b(?:pdf|word|docx|excel|planilhas?|xlsx|html|csv|arquivo|zip)\b/.test(text)) {
     const destino = grupo(salvar, 2)
       .replace(/[?!.]+$/, "")
       .replace(/^(?:minhas?|meus?|a|o|as|os)\s+/i, "")
