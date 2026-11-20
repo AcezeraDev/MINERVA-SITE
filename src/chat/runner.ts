@@ -12,8 +12,15 @@
 
 export type RunLanguage = "python" | "javascript";
 /** `raw`: pedaço cru do Python (já traz as próprias quebras de linha). */
-export type RunLine = { kind: "stdout" | "stderr" | "error" | "result" | "info"; text: string; raw?: boolean };
-export type RunHandlers = { onLine: (line: RunLine) => void; onStatus?: (status: "loading" | "running") => void };
+/** `image`: gráfico do matplotlib em PNG (base64). */
+export type RunLine = { kind: "stdout" | "stderr" | "error" | "result" | "info" | "image"; text: string; raw?: boolean };
+export type RunHandlers = {
+  onLine: (line: RunLine) => void;
+  onStatus?: (status: "loading" | "running") => void;
+  /** O programa chamou input() e as respostas acabaram: perguntar ao estudante. */
+  onNeedInput?: () => void;
+};
+export type RunExtras = { files?: { path: string; content: string }[]; seed?: number };
 
 const PYTHON_TIMEOUT_MS = 20_000;
 const JS_TIMEOUT_MS = 6_000;
@@ -28,7 +35,7 @@ function worker() {
   return pythonWorker;
 }
 
-function runPython(code: string, stdin: string[], handlers: RunHandlers) {
+function runPython(code: string, stdin: string[], handlers: RunHandlers, extras: RunExtras = {}) {
   return new Promise<void>((resolve) => {
     const id = ++pythonId;
     const target = worker();
@@ -55,6 +62,7 @@ function runPython(code: string, stdin: string[], handlers: RunHandlers) {
           }, PYTHON_TIMEOUT_MS);
         }
       } else if (message.type === "done") finish();
+      else if (message.type === "input") handlers.onNeedInput?.();
       else if (message.type === "raw") handlers.onLine({ kind: "stdout", text: message.text, raw: true });
       else handlers.onLine({ kind: message.type as RunLine["kind"], text: message.text });
     };
@@ -68,7 +76,7 @@ function runPython(code: string, stdin: string[], handlers: RunHandlers) {
       },
       { once: true },
     );
-    target.postMessage({ id, code, stdin });
+    target.postMessage({ id, code, stdin, files: extras.files || [], seed: extras.seed });
   });
 }
 
@@ -117,9 +125,9 @@ function runJavaScript(code: string, handlers: RunHandlers) {
   });
 }
 
-export async function runCode(language: RunLanguage, code: string, handlers: RunHandlers, stdin: string[] = []) {
+export async function runCode(language: RunLanguage, code: string, handlers: RunHandlers, stdin: string[] = [], extras: RunExtras = {}) {
   const started = performance.now();
-  if (language === "python") await runPython(code, stdin, handlers);
+  if (language === "python") await runPython(code, stdin, handlers, extras);
   else await runJavaScript(code, handlers);
   return Math.round(performance.now() - started);
 }

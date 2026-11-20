@@ -102,6 +102,10 @@ function calloutFromLine(line) {
 
 // \p{L}: "```gráfico" também abre bloco (sem ele, o acento quebrava a cerca).
 const FENCE = /^\s{0,3}(`{3,}|~{3,})\s*([\p{L}\w#+.-]*)\s*$/u;
+// "````projeto: Nome do projeto": o modelo de código às vezes põe o nome na
+// cerca. Vira o mesmo bloco projeto, com o nome na primeira linha.
+const PROJECT_FENCE = /^\s{0,3}(`{3,}|~{3,})\s*projeto\s*[:\-–—]\s*(.+?)\s*$/iu;
+const isFence = (line) => FENCE.test(line) || PROJECT_FENCE.test(line);
 const HEADING = /^\s{0,3}(#{1,4})\s+(.+?)\s*#*\s*$/;
 const RULE = /^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/;
 const QUOTE = /^\s{0,3}>\s?(.*)$/;
@@ -156,7 +160,7 @@ function alignmentOf(cell) {
 
 function startsBlock(line, next) {
   return (
-    FENCE.test(line) ||
+    isFence(line) ||
     HEADING.test(line) ||
     RULE.test(line) ||
     QUOTE.test(line) ||
@@ -196,8 +200,9 @@ function readMath(lines, start) {
 }
 
 function readFence(lines, start) {
-  const [, marker, lang] = lines[start].match(FENCE);
-  const body = [];
+  const named = lines[start].match(PROJECT_FENCE);
+  const [, marker, lang] = named ? [null, named[1], "projeto"] : lines[start].match(FENCE);
+  const body = named ? [`=== projeto: ${named[2]} ===`] : [];
   for (let index = start + 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (line.trim().startsWith(marker[0].repeat(marker.length)) && line.trim().replace(/[`~]/g, "") === "") {
@@ -329,7 +334,7 @@ export function parseBlocks(text, { streaming = false } = {}) {
       continue;
     }
 
-    if (FENCE.test(line)) {
+    if (isFence(line)) {
       const result = readFence(lines, index);
       blocks.push(result.block);
       index = result.next;

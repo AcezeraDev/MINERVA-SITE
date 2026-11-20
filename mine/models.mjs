@@ -18,6 +18,8 @@ function envEffort(name, fallback) {
 // "none" e "minimal" (validos na OpenAI) viram "low" em vez de erro 400.
 function effortFor(modelId, effort) {
   if (/^anthropic\//i.test(modelId) && (effort === "none" || effort === "minimal")) return "low";
+  // GLM na NanoGPT: so low/high/max.
+  if (/^z-ai\/glm/i.test(modelId)) return ["high", "xhigh"].includes(effort) ? "high" : effort === "max" ? "max" : "low";
   return effort;
 }
 
@@ -43,6 +45,29 @@ export const MINE_MODEL = {
     return { reasoning_effort: effortFor(this.providerModel, envEffort("MINE_REASONING_EFFORT", "medium")) };
   },
   capabilities: CAPABILITIES,
+};
+
+/**
+ * Modelo de codigo: sites, jogos, programas e ajustes no codigo que a Mine
+ * acabou de mandar (deteccao em shared/code-intent.mjs).
+ *
+ * Nov/2026: GLM-5.3 Flash (z-ai/glm-5.3-flash) na NanoGPT, US$ 0,10/0,30 por
+ * milhao, feito para codigo, le imagem (print de um site) e tem 1M de
+ * contexto. Mais barato que o Haiku do chat. Nao le PDF: com PDF anexado o
+ * texto extraido continua indo como texto. Se ele falhar antes de escrever,
+ * a resposta cai para o modelo principal.
+ */
+export const MINE_CODE_MODEL = {
+  alias: "mine",
+  displayName: "Mine",
+  provider: "nanogpt",
+  get providerModel() {
+    return envModel("NANOGPT_CODE_MODEL", "z-ai/glm-5.3-flash");
+  },
+  get providerParams() {
+    return { reasoning_effort: effortFor(this.providerModel, envEffort("MINE_CODE_REASONING_EFFORT", "low")) };
+  },
+  capabilities: { ...CAPABILITIES, pdf: false },
 };
 
 /**

@@ -161,6 +161,7 @@ import {
 import { parseFlashcards, parseQuiz, type QuizQuestion } from "../shared/study-parsers.mjs";
 import { describeImageMarkers, extractSuggestions, splitMessageMedia, stripImageMarkers } from "../shared/chat-media.mjs";
 import { MineGlossaryProvider, MineRichText } from "./chat/MineRichText";
+import { MineMonitor, useMonitorOpen } from "./chat/monitor/MineMonitor";
 import { extractGlossary, markGlossary } from "../shared/chat-glossary.mjs";
 import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
 import { searchConversations } from "../shared/chat-search.mjs";
@@ -7699,6 +7700,8 @@ function MineView({
     el.style.height = `${Math.min(el.scrollHeight, 192)}px`;
   }
 
+  // Monitor de código aberto: o chat abre uma terceira coluna para ele.
+  const monitorOpen = useMonitorOpen();
   function submit(event: FormEvent) {
     event.preventDefault();
     if ((!input.trim() && !attachments.length) || loading) return;
@@ -7737,7 +7740,7 @@ function MineView({
   }
   return (
     <section
-      className="mine-chat-shell mine-chatgpt-shell relative grid h-full min-h-0 grid-rows-1 overflow-hidden bg-[#111310] lg:grid-cols-[260px_minmax(0,1fr)]"
+      className={`mine-chat-shell mine-chatgpt-shell relative grid h-full min-h-0 grid-rows-1 overflow-hidden bg-[#111310] lg:grid-cols-[260px_minmax(0,1fr)] ${monitorOpen ? "has-monitor" : ""}`}
       // Arrastar arquivo para qualquer ponto do chat anexa, como nos chats grandes.
       onDragEnter={(event) => {
         if (loading || !Array.from(event.dataTransfer.types).includes("Files")) return;
@@ -8378,6 +8381,8 @@ function MineView({
           </form>
         </div>
       </div>
+
+      <MineMonitor />
 
       <AnimatePresence>
         {contextPanelOpen ? (

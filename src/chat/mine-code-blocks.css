@@ -289,3 +289,54 @@
     height: 26rem;
   }
 }
+
+/* ───────────── input() interativo e gráficos ───────────── */
+.mcr-out.is-standalone {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.9rem;
+  overflow: hidden;
+}
+.mcr-out__status.is-waiting {
+  color: #2fd483;
+}
+.mcr-out__img {
+  display: block;
+  max-width: 100%;
+  margin: 0.5rem 0;
+  border-radius: 0.6rem;
+  background: #fff;
+}
+.mcr-ask {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+.mcr-ask input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(47, 212, 131, 0.45);
+  border-radius: 0.5rem;
+  background: rgba(47, 212, 131, 0.06);
+  color: #e9f5ee;
+  font: inherit;
+  outline: none;
+}
+.mcr-ask input:focus-visible {
+  border-color: #2fd483;
+  box-shadow: 0 0 0 3px rgba(47, 212, 131, 0.2);
+}
+.mcr-ask button {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: #2fd483;
+  color: #0b100e;
+}
+.mcr-ask button svg {
+  width: 1rem;
+  height: 1rem;
+}

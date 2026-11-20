@@ -12,6 +12,7 @@ import { checkRateLimit, resolveIdentity, validateChatPayload } from "./mine/lim
 import { runMineRequest } from "./mine/router.mjs";
 import { webSearchEnabled } from "./mine/web.mjs";
 import { asksForFile, asksForStudySheet } from "./shared/chat-files.mjs";
+import { asksForCode } from "./shared/code-intent.mjs";
 
 export { loadLocalEnv };
 
@@ -173,10 +174,15 @@ export async function handleGeminiRequest(req, res) {
     // próprio. Com o teto geral de produção o documento era cortado no meio e
     // o cartão ficava em "Montando o PDF…" para sempre.
     const fileRequest = !task && (Boolean(asksForFile(payload.prompt)) || asksForStudySheet(payload.prompt));
-    const serverTokenCap = fileRequest
-      ? clampNumber(process.env.MINE_FILE_MAX_OUTPUT_TOKENS, 2000, 16000, 14000)
-      : clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
-    const requestedTokens = fileRequest ? serverTokenCap : clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
+    // Nov/2026: projeto de codigo (site com 3 arquivos, jogo) tambem precisa
+    // terminar inteiro, senao o monitor fica com o arquivo pela metade.
+    const codeRequest = !task && !payload.controle && Boolean(asksForCode(payload.prompt, payload.history));
+    const serverTokenCap = codeRequest
+      ? clampNumber(process.env.MINE_CODE_MAX_OUTPUT_TOKENS, 2000, 32000, 20000)
+      : fileRequest
+        ? clampNumber(process.env.MINE_FILE_MAX_OUTPUT_TOKENS, 2000, 16000, 14000)
+        : clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
+    const requestedTokens = fileRequest || codeRequest ? serverTokenCap : clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
     const maxTokens = Math.min(requestedTokens, serverTokenCap);
     const wantsStream = payload.stream === true;
 

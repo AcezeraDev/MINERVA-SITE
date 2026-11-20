@@ -1,0 +1,666 @@
+/*
+  Monitor da Mine (MineMonitor.tsx) e cartão do projeto no chat (ProjectCard.tsx).
+  Mesma família visual do chat: grafite #111310, menta #2fd483.
+*/
+
+.mmo,
+.mpc {
+  --mmo-bg: #0c0e0d;
+  --mmo-surface: #151916;
+  --mmo-raise: #1b201c;
+  --mmo-line: rgba(255, 255, 255, 0.08);
+  --mmo-text: #e8efe9;
+  --mmo-muted: rgba(232, 239, 233, 0.58);
+  --mmo-accent: #2fd483;
+  --mmo-accent-ink: #0b100e;
+  --mmo-danger: #ff8a8f;
+}
+.theme-light .mmo,
+.theme-light .mpc {
+  --mmo-bg: #f4f2ec;
+  --mmo-surface: #ffffff;
+  --mmo-raise: #efede6;
+  --mmo-line: rgba(17, 21, 30, 0.1);
+  --mmo-text: #161a16;
+  --mmo-muted: rgba(22, 26, 22, 0.6);
+  --mmo-accent: #149a5c;
+  --mmo-accent-ink: #ffffff;
+  --mmo-danger: #c2363d;
+}
+
+/* ───────────── espaço na grade do chat ───────────── */
+@media (min-width: 1024px) {
+  .mine-chat-shell.has-monitor {
+    grid-template-columns: 260px minmax(0, 1fr) auto;
+  }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  /* tela média: a barra de conversas sai para o chat e o monitor caberem */
+  .mine-chat-shell.has-monitor {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .mine-chat-shell.has-monitor > .mine-context-sidebar {
+    display: none;
+  }
+}
+
+/* ───────────── painel ───────────── */
+.mmo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--mmo-w, clamp(420px, 44vw, 780px));
+  max-width: calc(100vw - 480px);
+  min-height: 0;
+  height: 100%;
+  border-left: 1px solid var(--mmo-line);
+  background: var(--mmo-bg);
+  color: var(--mmo-text);
+  animation: mmo-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes mmo-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@media (max-width: 1023px) {
+  .mmo {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    width: auto;
+    max-width: none;
+    border-left: 0;
+  }
+  .mmo-resize {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mmo {
+    animation: none;
+  }
+}
+
+.mmo-resize {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.mmo-resize:hover,
+.mmo-resize:active {
+  background: linear-gradient(90deg, transparent 3px, var(--mmo-accent) 3px, var(--mmo-accent) 5px, transparent 5px);
+}
+
+.mmo button {
+  font: inherit;
+  color: inherit;
+}
+.mmo button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mmo :is(button, select, input):focus-visible {
+  outline: 2px solid var(--mmo-accent);
+  outline-offset: 2px;
+}
+.mmo svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.mmo-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.8rem 0.6rem 1rem;
+}
+.mmo-title {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+}
+.mmo-title strong {
+  overflow: hidden;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mmo-title small {
+  color: var(--mmo-muted);
+  font-weight: 700;
+}
+.mmo-version select {
+  max-width: 13rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--mmo-line);
+  border-radius: 0.5rem;
+  background: var(--mmo-surface);
+  color: var(--mmo-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.mmo-head__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.mmo-zip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 0.65rem;
+  background: var(--mmo-accent);
+  color: var(--mmo-accent-ink) !important;
+  font-size: 0.82rem;
+  font-weight: 850;
+  transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mmo-zip:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.mmo-icon {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.6rem;
+  color: var(--mmo-muted) !important;
+}
+.mmo-icon:hover {
+  background: var(--mmo-raise);
+  color: var(--mmo-text) !important;
+}
+
+.mmo-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0 0.8rem;
+  border-bottom: 1px solid var(--mmo-line);
+}
+.mmo-tabs > button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem 0.65rem;
+  color: var(--mmo-muted) !important;
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+.mmo-tabs > button:hover {
+  color: var(--mmo-text) !important;
+}
+.mmo-tabs > button.is-on {
+  color: var(--mmo-text) !important;
+}
+.mmo-tabs > button.is-on::after {
+  content: "";
+  position: absolute;
+  right: 0.6rem;
+  bottom: -1px;
+  left: 0.6rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--mmo-accent);
+}
+.mmo-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--mmo-danger);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+.mmo-writing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--mmo-accent);
+  font-size: 0.76rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.mmo-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.mmo-pane {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.mmo-pane[hidden] {
+  display: none;
+}
+
+/* prévia */
+.mmo-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+}
+.mmo-seg {
+  display: inline-flex;
+  padding: 0.18rem;
+  border-radius: 0.65rem;
+  background: var(--mmo-surface);
+}
+.mmo-seg button,
+.mmo-tools__right button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  color: var(--mmo-muted) !important;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+.mmo-seg button[aria-pressed="true"] {
+  background: var(--mmo-raise);
+  color: var(--mmo-text) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.mmo-tools__right {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+.mmo-tools__right button:hover:not(:disabled) {
+  background: var(--mmo-surface);
+  color: var(--mmo-text) !important;
+}
+.mmo-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  justify-items: center;
+  padding: 0 0.8rem 0.8rem;
+}
+.mmo-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--mmo-line);
+  border-radius: 0.75rem;
+  background: #fff;
+}
+.mmo-stage.is-mobile {
+  align-items: start;
+  overflow: auto;
+  padding-top: 0.4rem;
+}
+.mmo-stage.is-mobile .mmo-frame {
+  width: 375px;
+  max-width: 100%;
+  height: min(720px, 100%);
+  border: 0;
+  border-radius: 1.7rem;
+  box-shadow: 0 0 0 9px #1c1f1c, 0 22px 40px -18px rgba(0, 0, 0, 0.6);
+}
+
+/* código */
+.mmo-codeview {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.mmo-files {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.8rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.mmo-files > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: none;
+  padding: 0.32rem 0.6rem;
+  border-radius: 0.5rem;
+  color: var(--mmo-muted) !important;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+.mmo-files > button:hover {
+  background: var(--mmo-surface);
+}
+.mmo-files > button.is-on {
+  background: var(--mmo-raise);
+  color: var(--mmo-text) !important;
+}
+.mmo-files__tools {
+  display: inline-flex;
+  gap: 0.15rem;
+  margin-left: auto;
+  padding-left: 0.5rem;
+}
+.mmo-files__tools button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.32rem 0.55rem;
+  border-radius: 0.5rem;
+  color: var(--mmo-muted) !important;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.mmo-files__tools button:hover:not(:disabled) {
+  background: var(--mmo-surface);
+  color: var(--mmo-text) !important;
+}
+.mmo .mmo-code.mrt-codebox {
+  flex: 1;
+  min-height: 0;
+  margin: 0 0.8rem 0.8rem;
+  padding: 0.9rem 1rem;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.75rem;
+  background: #0a0d0b;
+  color: #dfe9e2;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  tab-size: 2;
+  white-space: pre;
+}
+
+/* console */
+.mmo-run {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex: 1;
+  min-height: 0;
+  padding: 0.6rem 0.8rem 0.8rem;
+}
+.mmo-run__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.mmo-hint {
+  color: var(--mmo-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.mmo-run .mcr-out {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mmo-run .mcr-out__pre {
+  flex: 1;
+  max-height: none;
+}
+.mmo-sitelog {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 0.6rem 0.8rem 0.8rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.9rem;
+  background: #070a09;
+  color: #d9e6df;
+}
+.mmo-sitelog__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  color: rgba(217, 230, 223, 0.55);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.mmo-sitelog__bar button {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.mmo-sitelog ol {
+  flex: 1;
+  margin: 0;
+  padding: 0 0.75rem 0.75rem;
+  overflow: auto;
+  list-style: none;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.78rem;
+}
+.mmo-sitelog li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mmo-sitelog li.is-warn {
+  color: #ffd27a;
+}
+.mmo-sitelog li.is-error {
+  color: #ff8a8f;
+}
+.mmo-sitelog .mmo-empty {
+  color: rgba(217, 230, 223, 0.5);
+}
+.mmo-empty {
+  margin: 0;
+  padding: 1rem 0.9rem;
+  color: var(--mmo-muted);
+  font-size: 0.84rem;
+}
+.mmo-wait {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* tela cheia */
+.mmo-full {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  background: #0b0d0c;
+}
+.mmo-full__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.8rem;
+  color: #e8efe9;
+}
+.mmo-full__bar button {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.6rem;
+  color: #e8efe9;
+}
+.mmo-full__bar button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.mmo-full__bar svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.mmo-full .mmo-stage {
+  flex: 1;
+  display: flex;
+  padding: 0;
+}
+.mmo-full .mmo-frame {
+  border: 0;
+  border-radius: 0;
+}
+
+/* ───────────── cartão do projeto no chat ───────────── */
+.mpc {
+  margin: 0.9rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--mmo-line);
+  border-radius: 1rem;
+  background: var(--mmo-surface);
+  color: var(--mmo-text);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.mpc.is-active {
+  border-color: color-mix(in srgb, var(--mmo-accent) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mmo-accent) 12%, transparent);
+}
+.mpc-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.mpc-icon {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: none;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--mmo-accent) 14%, transparent);
+  color: var(--mmo-accent);
+}
+.mpc-icon svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+.mpc-title {
+  display: grid;
+  min-width: 0;
+}
+.mpc-title strong {
+  overflow: hidden;
+  font-size: 0.98rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mpc-title small {
+  color: var(--mmo-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+.mpc-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mpc-files li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.45rem;
+  background: var(--mmo-raise);
+  color: var(--mmo-muted);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+}
+.mpc-files li.is-writing {
+  color: var(--mmo-accent);
+}
+.mpc-files svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.mpc-status {
+  margin: 0.6rem 0 0;
+  color: var(--mmo-accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.mpc-status.is-warn {
+  color: var(--mmo-danger);
+}
+.mpc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+.mpc-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.4rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--mmo-line);
+  border-radius: 0.7rem;
+  color: var(--mmo-text);
+  font-size: 0.84rem;
+  font-weight: 750;
+  transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 150ms ease;
+}
+.mpc-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--mmo-raise);
+}
+.mpc-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mpc-actions button:focus-visible {
+  outline: 2px solid var(--mmo-accent);
+  outline-offset: 2px;
+}
+.mpc-actions .mpc-primary {
+  border-color: transparent;
+  background: var(--mmo-accent);
+  color: var(--mmo-accent-ink);
+}
+.mpc-actions .mpc-primary:hover:not(:disabled) {
+  background: var(--mmo-accent);
+  filter: brightness(1.06);
+}
+.mpc-actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mpc-actions button,
+  .mmo-zip {
+    transition: none;
+  }
+}

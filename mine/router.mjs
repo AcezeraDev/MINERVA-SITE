@@ -1,8 +1,9 @@
-import { MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
+import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
-import { buildFileInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
+import { buildCodeInstruction, buildFileInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
 import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, editsAttachedImage, extractSuggestions, imageFormatFrom, imageStyleFrom, previousGalleryStyle, withImageRequest, withImageStyle } from "../shared/chat-media.mjs";
 import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
+import { asksForCode } from "../shared/code-intent.mjs";
 import { replyQualityIssue } from "./quality.mjs";
 import { buildSearchQuery, cleanQueries, freshenQueries, matchesSearchTopic, matchesSourceScope, planSearchQueries, resultLimit, searchMany, searchSourcePolicy, searchWeb, WEB_SEARCH_TOOL, webSearchEnabled, webSearchFailedInstruction, webSearchInstruction, webSearchMode } from "./web.mjs";
 import { openPage, readTopPages } from "./page-reader.mjs";
@@ -411,10 +412,16 @@ export async function runMineRequest({
         : resolveTimeoutMs();
   const minAttemptMs = gameTask ? 3_500 : MIN_ATTEMPT_MS;
 
-  const principal = cleanTask ? MINE_TASK_MODEL : MINE_MODEL;
+  // Pedido de codigo (site, jogo, programa, ajuste no codigo anterior): modelo
+  // de codigo com o modo designer; se ele falhar antes de escrever, o
+  // principal assume. Controle Mine e tarefas seguem como antes.
+  const codeKind = cleanTask || control ? "" : asksForCode(prompt, history);
+  const principal = cleanTask ? MINE_TASK_MODEL : codeKind ? MINE_CODE_MODEL : MINE_MODEL;
   const candidates = gameTask
     ? [MINE_FAST_MODEL, MINE_TASK_MODEL]
-    : [principal, MINE_FAST_MODEL];
+    : codeKind
+      ? [MINE_CODE_MODEL, MINE_MODEL, MINE_FAST_MODEL]
+      : [principal, MINE_FAST_MODEL];
   const seen = new Set();
   const chain = candidates.filter((model) => {
     const key = `${model.provider}:${model.providerModel}:${model.providerParams?.reasoning_effort || ""}`;
@@ -452,7 +459,11 @@ export async function runMineRequest({
   // Arquivo para baixar (PDF, Word, Excel, HTML) e folha de revisão da
   // conversa: a Mine escreve o conteúdo num bloco ```arquivo.
   const studySheet = !cleanTask && asksForStudySheet(prompt);
-  const fileKind = cleanTask || studySheet ? "" : asksForFile(prompt);
+  // "cria uma pagina html sobre X" e pedido de codigo, nao de arquivo para baixar.
+  const fileKind = cleanTask || studySheet ? "" : (() => {
+    const kind = asksForFile(prompt);
+    return kind === "html" && codeKind ? "" : kind;
+  })();
   const wantsFile = studySheet || Boolean(fileKind);
   // Foto anexada + "transforma em anime": edição da foto do estudante.
   const hasImageAttachment = (attachments || []).some((item) => /^image\//i.test(String(item?.type || item?.mimeType || "")) || /^data:image\//i.test(String(item?.dataUrl || "")));
@@ -470,6 +481,7 @@ export async function runMineRequest({
   const baseSystem = [
     ...(wantsGeneration ? [buildImageGenerationInstruction({ previousPrompt: previousGenerated, formato: imageFormat, anexo: editAttached })] : []),
     ...(studySheet ? [buildStudySheetInstruction()] : fileKind ? [buildFileInstruction(fileKind)] : []),
+    ...(codeKind && !wantsFile && !wantsGeneration ? [buildCodeInstruction(codeKind)] : []),
     // Glossário só no chat livre e fora dos arquivos (o arquivo tem o próprio texto).
     ...(cleanTask || wantsFile ? [] : [buildGlossaryInstruction()]),
     // Modo fotos e do chat livre: uma task (simulado, mapa, jogo) tem formato

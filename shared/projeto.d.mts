@@ -1,0 +1,11 @@
+export type ProjectFile = { path: string; language: string; content: string; writing: boolean };
+export type ProjectKind = "site" | "python" | "javascript" | "outro";
+export type Project = { name: string; files: ProjectFile[]; kind: ProjectKind; entry: string };
+export function safePath(path: string): string;
+export function languageOf(path: string): string;
+export function parseProject(code: string, options?: { open?: boolean }): Project;
+export function kindOf(files: ProjectFile[]): ProjectKind;
+export function entryOf(files: ProjectFile[]): string;
+export function slug(text: string, fallback?: string): string;
+export function buildPreviewHtml(files: ProjectFile[], entry?: string): string;
+export function projectFromHtml(code: string): Project;

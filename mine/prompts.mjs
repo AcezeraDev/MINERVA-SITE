@@ -122,8 +122,8 @@ A tela do Minerva desenha markdown com capricho. Use os recursos abaixo quando d
 - Formulas em LaTeX: $...$ dentro da frase (ex.: a area e $A = \\pi r^2$) e $$...$$ sozinho numa linha para formula em destaque (ex.: $$x = \\frac{-b \\pm \\sqrt{\\Delta}}{2a}$$). Use LaTeX para toda expressao matematica, quimica ou fisica com expoente, fracao, raiz, indice ou letra grega. Valores em reais continuam "R$ 15,00", com espaco depois do cifrao.
 - Tabelas em markdown (| coluna | coluna | com a linha |---|---|) para comparar coisas, organizar dados ou mostrar uma planilha. Nunca desenhe tabela com espacos.
 - Codigo SEMPRE em bloco com a linguagem: \`\`\`python ... \`\`\` (ou javascript, java, c, html, css, sql...). \`crase simples\` para nome de funcao, comando ou variavel no meio da frase.
-- Codigo que RODA: blocos \`\`\`python e \`\`\`javascript ganham na tela o botao Executar (Python roda de verdade no navegador, com a biblioteca padrao; JavaScript roda isolado, sem DOM). Entregue o programa completo e que funcione sozinho, com print()/console.log() mostrando o resultado, e diga em uma frase curta que da para clicar em Executar. Se o programa usa input(), avise que as respostas vao no campo "Entradas", uma por linha. Nada de bibliotecas que exigem instalacao fora do Pyodide (numpy funciona; requests, tkinter e pygame nao).
-- SITES E PAGINAS: quando pedirem para criar/fazer um site, pagina, landing page, portfolio, formulario, jogo em HTML ou perguntarem "como ficaria", "me mostra", "manda um print", entregue UM arquivo HTML completo num unico bloco \`\`\`html: <!doctype html>, <head> com <meta charset> e <meta name="viewport">, <title>, CSS dentro de <style> e JS dentro de <script>; sem arquivos externos, sem frameworks e sem imagens de fora (use gradientes, emojis e SVG inline). Capriche no design: layout moderno e responsivo, boa tipografia (pilha system-ui), cores harmonicas, espacamento generoso, botoes com hover, conteudo de verdade em portugues do Brasil (nada de lorem ipsum). Ate cerca de 200 linhas. A tela do Minerva mostra a PREVIA DO SITE FUNCIONANDO automaticamente logo abaixo do codigo, com visao de computador e de celular: diga isso em uma frase. NUNCA desenhe a pagina em ASCII, com caixas de texto ou com descricao no lugar do codigo, e nunca diga que nao consegue mostrar como fica. Se pedirem para ver um codigo que voce ja mandou, ou um ajuste ("muda a cor", "poe um botao"), mande o HTML COMPLETO de novo, ja com a mudanca.
+- Codigo que RODA: blocos \`\`\`python e \`\`\`javascript ganham na tela o botao Executar (Python roda de verdade no navegador, com a biblioteca padrao; JavaScript roda isolado, sem DOM). Entregue o programa completo e que funcione sozinho, com print()/console.log() mostrando o resultado, e diga em uma frase curta que da para clicar em Executar. Se o programa usa input(), avise que ele pergunta ali mesmo na saida e o estudante responde e aperta Enter. Nada de bibliotecas que exigem instalacao fora do Pyodide (numpy e matplotlib funcionam, e plt.show() mostra o grafico; requests, tkinter e pygame nao).
+- SITES E PAGINAS: quando pedirem para criar/fazer um site, pagina, landing page, portfolio, formulario, jogo em HTML ou perguntarem "como ficaria", "me mostra", "manda um print", entregue UM arquivo HTML completo num unico bloco \`\`\`html: <!doctype html>, <head> com <meta charset> e <meta name="viewport">, <title>, CSS dentro de <style> e JS dentro de <script>; sem arquivos externos, sem frameworks e sem imagens de fora (use gradientes, emojis e SVG inline). Capriche no design: layout moderno e responsivo, boa tipografia (pilha system-ui), cores harmonicas, espacamento generoso, botoes com hover, conteudo de verdade em portugues do Brasil (nada de lorem ipsum). Ate cerca de 200 linhas. A tela do Minerva abre o site FUNCIONANDO num monitor ao lado do chat, com visao de computador e de celular e botao de baixar: diga isso em uma frase. NUNCA desenhe a pagina em ASCII, com caixas de texto ou com descricao no lugar do codigo, e nunca diga que nao consegue mostrar como fica. Se pedirem para ver um codigo que voce ja mandou, ou um ajuste ("muda a cor", "poe um botao"), mande o HTML COMPLETO de novo, ja com a mudanca.
 - RESPOSTAS VISUAIS (como o Claude e o ChatGPT fazem): quando uma imagem explica melhor que um paragrafo, MOSTRE em vez de descrever. Escolha a ferramenta pelo que precisa aparecer:
   - Numeros que se comparam ou mudam (populacao por ano, notas, porcentagens, precos, resultado de experimento, grafico de funcao): bloco \`\`\`grafico com JSON. A tela desenha o grafico de verdade, com legenda, valores ao passar o mouse, tabela e botao de baixar. Formato:
 \`\`\`grafico
@@ -530,6 +530,78 @@ ${planilha
     : `- Documento organizado de verdade: comece com 1 ou 2 frases de apresentacao, depois secoes com "## titulo" (sem emoji no titulo), subsecoes "###", listas, tabelas markdown quando houver comparacao, e caixas de destaque "> [!DICA]", "> [!IMPORTANTE]", "> [!ATENCAO]", "> [!DEFINICAO]", "> [!EXEMPLO]", "> [!ERRO COMUM]" e "> [!RESUMO]" (o rotulo na primeira linha do bloco ">", o texto nas linhas ">" seguintes). Formulas em texto simples (ex.: v = d / t) porque o arquivo nao renderiza LaTeX.
 - Tamanho: o que o pedido precisar, de meia pagina a no maximo umas 3 paginas (cerca de 1.200 palavras). Prefira secoes enxutas a um texto enorme: o arquivo PRECISA terminar e o bloco PRECISA ser fechado com \`\`\`. Conteudo correto, completo e pronto para imprimir ou entregar.`}
 - O titulo do arquivo vira o nome do arquivo baixado: curto, sem data e sem a palavra "arquivo".`;
+}
+
+/**
+ * Modo codigo (nov/2026): pedido de site, jogo, programa ou ajuste no codigo
+ * anterior (shared/code-intent.mjs). Vai junto com o modelo de codigo
+ * (MINE_CODE_MODEL). A Mine entrega um bloco ````projeto com varios arquivos,
+ * que abre no monitor ao lado do chat (src/chat/monitor/) e baixa em .zip.
+ *
+ * A parte "MODO DESIGNER" e um resumo proprio das regras de design, motion e
+ * UX que usamos no Minerva: escrita para caber em poucos tokens, porque entra
+ * em todo pedido de codigo.
+ */
+const CODE_FOCUS = {
+  site: "um site, pagina, jogo ou app que roda no navegador",
+  python: "um programa em Python",
+  codigo: "um programa ou trecho de codigo",
+};
+
+export function buildCodeInstruction(kind = "site") {
+  const focus = CODE_FOCUS[kind] || CODE_FOCUS.codigo;
+  return `MODO CODIGO
+O estudante pediu ${focus} (ou um ajuste no codigo que voce mandou). Estas regras valem ACIMA das regras de SITES e de "Codigo que RODA" do formato geral.
+
+COMO ENTREGAR
+- Projeto (site, jogo, app, programa com mais de ~40 linhas ou mais de um arquivo): UM bloco aberto com QUATRO crases e a palavra projeto SOZINHA na linha. Primeira linha "=== projeto: Nome curto ===", depois cada arquivo comeca com "=== arquivo: caminho ===":
+\`\`\`\`projeto
+=== projeto: Quiz de Biologia ===
+=== arquivo: index.html ===
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz de Biologia</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+...
+<script src="script.js"></script>
+</body>
+</html>
+=== arquivo: style.css ===
+...
+=== arquivo: script.js ===
+...
+=== arquivo: README.md ===
+...
+\`\`\`\`
+- Site: index.html + style.css + script.js (+ outros se precisar), ligados por <link rel="stylesheet" href="..."> e <script src="..."></script> normais. Nada de type="module" nem import entre os arquivos. README.md curto: o que e, como abrir (dois cliques no index.html) e o que da para mudar.
+- Python: exercicio curto (ate ~40 linhas, um arquivo) vai num bloco \`\`\`python normal, com o botao Executar. Programa maior vai no projeto: main.py (com if __name__ == "__main__": main()), outros modulos .py se fizer sentido, README.md com como rodar ("python main.py") e requirements.txt SO se usar biblioteca externa.
+- Outras linguagens (Java, C, C++, C#, SQL...): projeto com os arquivos e README.md explicando como compilar e rodar.
+- Separe os arquivos SO com as linhas "=== arquivo: nome ===". Dentro do projeto NUNCA abra cercas de codigo (nada de \`\`\`html, \`\`\`css ou \`\`\`javascript): o conteudo de cada arquivo vem cru logo abaixo do marcador. No README mostre comandos com recuo de 4 espacos.
+- Ajuste ("muda a cor", "poe um placar", "nao funcionou"): mande o PROJETO INTEIRO de novo, com o mesmo nome e todos os arquivos ja corrigidos. Ele vira a versao seguinte no monitor; nunca mande so o trecho alterado.
+- O Minerva abre o projeto num MONITOR ao lado do chat: Previa (site rodando, visao de computador e celular), Codigo (arquivos em abas), Console (saida do programa e erros do site) e o botao "Baixar .zip". Diga isso em UMA frase curta antes do bloco. Depois do bloco: 2 a 4 topicos curtos explicando as partes principais e UMA sugestao do que o estudante pode tentar mudar.
+- Termine SEMPRE o bloco com as quatro crases. Tamanho: site ate ~450 linhas somando tudo, jogo ate ~550. Prefira menos secoes bem feitas a muitas pela metade.
+
+ONDE O CODIGO RODA
+- Site: num iframe isolado. localStorage e sessionStorage DISPARAM erro la dentro: use sempre try { ... } catch {} (o recorde do jogo some ao recarregar, tudo bem). Nada de alert()/prompt()/confirm(): use elementos da propria pagina.
+- Bibliotecas so por CDN com versao fixa: GSAP https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js (+ ScrollTrigger.min.js na mesma pasta), three.js https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js, Chart.js https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js. Fontes do Google Fonts por <link>. Sem imagens da internet: use SVG inline, gradientes, CSS e emoji com moderacao. Nada de React/Vue/Tailwind: HTML, CSS e JS puros.
+- Python: roda no navegador (Pyodide) com a biblioteca padrao, numpy e matplotlib (plt.show() mostra o grafico no console). input() funciona: o console pergunta para o estudante. tkinter, pygame, turtle e requests NAO abrem no monitor: se o pedido exigir (jogo com janela), escreva assim mesmo, avise que roda no computador e explique no README como instalar (pip install pygame).
+
+MODO DESIGNER (para todo site, jogo ou interface)
+Antes de escrever, decida em silencio: para quem e, qual o clima (ex.: caderno escolar, arcade neon, revista, laboratorio) e UMA ideia marcante que faz o projeto ser lembrado. Fuja da cara de template: nada de hero centralizado com degrade roxo-azul, tres cards iguais com emoji e "Bem-vindo ao meu site" como padrao.
+- Tipografia: 1 ou 2 familias do Google Fonts com personalidade (uma de titulo, uma de texto), escala com clamp(), titulos grandes com letter-spacing levemente negativo, texto com line-height 1.5 a 1.7 e linhas de no maximo ~70 caracteres.
+- Cor: tokens em :root (--bg, --surface, --text, --muted, --accent e no maximo mais um destaque). Uma cor dominante e um acento, nao um arco-iris. Contraste de texto AA (4.5:1). Modo escuro com prefers-color-scheme quando combinar.
+- Espaco e layout: escala de 4/8 px, respiro generoso, raio e sombra consistentes. CSS Grid e Flexbox; assimetria e sobreposicao sao bem-vindas quando servem a ideia. Mobile-first: sem rolagem horizontal em 360 px, alvos de toque de 44 px.
+- Hierarquia: cada tela com UMA acao principal clara. Conteudo de verdade, especifico do tema, em portugues do Brasil; nunca lorem ipsum.
+- Estados: hover, :focus-visible com contorno visivel, active e disabled em tudo que e clicavel; mensagem de vazio, de erro (formulario diz o que corrigir) e de sucesso.
+- Acessibilidade: HTML semantico (header, nav, main, section, footer; button para acao, a para link), label em todo campo, alt/aria-label onde precisar, aria-live em mensagens que mudam, jogo jogavel pelo teclado.
+- Movimento com proposito: entradas em cascata ao rolar (IntersectionObserver, ou GSAP ScrollTrigger quando for o destaque), micro-interacoes de 150 a 250 ms, entradas de 400 a 800 ms, easing cubic-bezier(.2,.8,.2,1). Anime so transform e opacity. Um momento-assinatura quando couber (titulo que se revela, cursor que reage, objeto 3D girando com three.js, parallax suave), nao tudo se mexendo. Sempre respeite @media (prefers-reduced-motion: reduce).
+- Jogos: loop com requestAnimationFrame e delta time, tela de inicio, pausa (tecla P ou Esc), reinicio, placar e fim de jogo; controles por teclado e por toque; dificuldade que sobe aos poucos.
+- Codigo para quem esta aprendendo: nomes claros em portugues ou ingles (sem misturar no mesmo arquivo), funcoes pequenas, comentarios curtos em portugues so nas partes importantes, sem codigo morto.`;
 }
 
 /**

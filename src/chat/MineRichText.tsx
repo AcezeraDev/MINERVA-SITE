@@ -18,7 +18,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { MineCitation } from "./MineSources";
-import { SitePreview, isSitePage } from "./SitePreview";
+import { isSitePage } from "./SitePreview";
+import { ProjectCard } from "./monitor/ProjectCard";
 import { InlineRunner } from "./CodeRunner";
 import { MineChart, MineSvgFigure } from "./MineChart";
 import { emoji3dPath, splitLeadingEmoji } from "../../shared/emoji-3d.mjs";
@@ -303,8 +304,11 @@ const CodeBlock = memo(function CodeBlock({ code: raw, lang, open, streaming = f
   // Gráfico e esquema só se desenham com a cerca fechada; chegando, aparecem como código.
   if (!open && CHART_LANGS.has(lang)) return <MineChart source={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
   if (!open && (lang === "svg" || (lang === "xml" && /^\s*<svg[\s>]/i.test(code)))) return <MineSvgFigure source={code} fallback={<CodeBox code={code} lang="xml" open={false} />} />;
+  // Projeto (````projeto) e página HTML inteira abrem no monitor ao lado do chat,
+  // inclusive enquanto chegam (o monitor mostra o código sendo escrito).
+  if (lang === "projeto") return <ProjectCard code={code} source="projeto" open={open} streaming={streaming} />;
+  if (isSitePage(code, lang)) return <ProjectCard code={code} source="html" open={open} streaming={streaming} />;
   const runnable = !open ? runnableLanguage(lang) : null;
-  if (!open && isSitePage(code, lang)) return <SitePreview code={code} codeView={<CodeBox code={code} lang={lang} open={false} />} />;
   if (!runnable) return <CodeBox code={code} lang={lang} open={open} />;
   return (
     <div className="mrt-runnable">
