@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Code2, Copy, Download, Eye, Loader2, Maximize2, Monitor, Play, RotateCw, Smartphone, SquareTerminal, X } from "lucide-react";
-import { buildPreviewHtml, type Project } from "../../../shared/projeto.mjs";
+import { Check, Code2, Copy, Download, Eye, Loader2, Lock, Maximize2, Monitor, Play, RotateCw, Smartphone, SquareTerminal, X } from "lucide-react";
+import { buildPreviewHtml, slug, type Project } from "../../../shared/projeto.mjs";
 import { closeMonitor, selectVersion, useMonitor, versionOf, type MonitorEntry } from "./store";
 import { downloadFile, downloadZip } from "./download";
 import { RunOutput, useRunner } from "../CodeRunner";
@@ -9,9 +9,9 @@ import "./mine-monitor.css";
 
 /*
  * Monitor da Mine: painel ao lado do chat (tela cheia no celular) com o
- * projeto que ela escreveu. Abas Prévia (site rodando), Console (saída do
- * Python/JS ou erros do site) e Código (arquivos em abas), versões da
- * conversa e "Baixar .zip".
+ * projeto que ela escreveu. Abas Prévia (site rodando numa janela de
+ * navegador), Console (saída do Python/JS ou erros do site) e Código
+ * (arquivos em abas, com número de linha), versões da conversa e .zip.
  *
  * Segurança: o site roda num iframe `sandbox="allow-scripts allow-forms"`
  * SEM `allow-same-origin` — origem opaca, sem acesso à sessão do Minerva.
@@ -38,11 +38,50 @@ function withBridge(html: string) {
   return `${SITE_BRIDGE}${html}`;
 }
 
+const LANG_LABEL: Record<string, string> = { html: "HTML", css: "CSS", javascript: "JS", python: "PY", markdown: "MD", json: "JSON", text: "TXT" };
+
+function FileDot({ language }: { language: string }) {
+  return <i className={`mmo-dot is-${language}`} aria-hidden />;
+}
+
 function SiteFrame({ html, device, reloadKey, frameRef, title }: { html: string; device: "desktop" | "mobile"; reloadKey: number; frameRef?: React.RefObject<HTMLIFrameElement>; title: string }) {
   const srcDoc = useMemo(() => withBridge(html), [html]);
+  return <iframe key={`${reloadKey}-${device}`} ref={frameRef} className="mmo-frame" title={`Prévia: ${title}`} srcDoc={srcDoc} sandbox="allow-scripts allow-forms" referrerPolicy="no-referrer" />;
+}
+
+/** Janela de navegador (computador) ou celular em volta da prévia. */
+function Device({ project, device, children, onReload, onFull, ready }: { project: Project; device: "desktop" | "mobile"; children: React.ReactNode; onReload: () => void; onFull: () => void; ready: boolean }) {
+  const address = `${slug(project.name)}.minerva/${project.entry || "index.html"}`;
+  if (device === "mobile") {
+    return (
+      <div className="mmo-phone">
+        <span className="mmo-phone__island" aria-hidden />
+        <div className="mmo-phone__screen">{children}</div>
+      </div>
+    );
+  }
   return (
-    <div className={`mmo-stage is-${device}`}>
-      <iframe key={reloadKey} ref={frameRef} className="mmo-frame" title={`Prévia: ${title}`} srcDoc={srcDoc} sandbox="allow-scripts allow-forms" referrerPolicy="no-referrer" />
+    <div className="mmo-browser">
+      <div className="mmo-browser__bar">
+        <span className="mmo-browser__dots" aria-hidden>
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="mmo-browser__address" title={address}>
+          <Lock aria-hidden />
+          <span>{address}</span>
+        </span>
+        <span className="mmo-browser__tools">
+          <button type="button" onClick={onReload} aria-label="Recarregar prévia" title="Recarregar" disabled={!ready}>
+            <RotateCw aria-hidden />
+          </button>
+          <button type="button" onClick={onFull} aria-label="Abrir em tela cheia" title="Tela cheia" disabled={!ready}>
+            <Maximize2 aria-hidden />
+          </button>
+        </span>
+      </div>
+      <div className="mmo-browser__view">{children}</div>
     </div>
   );
 }
@@ -73,7 +112,9 @@ function CodeView({ project, writingPath }: { project: Project; writingPath?: st
     const lang = HL_LANG[file.language] ?? file.language;
     return lang ? highlight(file.content, lang) : null;
   }, [file, highlight]);
-  const scroller = useRef<HTMLPreElement>(null);
+  const lineCount = file ? file.content.split("\n").length : 0;
+  const gutter = useMemo(() => Array.from({ length: lineCount }, (_, index) => index + 1).join("\n"), [lineCount]);
+  const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (file?.writing && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [file?.content, file?.writing]);
@@ -86,25 +127,39 @@ function CodeView({ project, writingPath }: { project: Project; writingPath?: st
   };
   return (
     <div className="mmo-codeview">
-      <div className="mmo-files" role="tablist" aria-label="Arquivos">
+      <div className="mmo-files" role="tablist" aria-label="Arquivos do projeto">
         {project.files.map((item) => (
           <button key={item.path} type="button" role="tab" aria-selected={item.path === file.path} className={item.path === file.path ? "is-on" : ""} onClick={() => setChosen(item.path)}>
-            {item.writing ? <Loader2 className="animate-spin" aria-hidden /> : null}
+            {item.writing ? <Loader2 className="animate-spin" aria-hidden /> : <FileDot language={item.language} />}
             {item.path}
           </button>
         ))}
-        <span className="mmo-files__tools">
-          <button type="button" onClick={copy} disabled={file.writing} title="Copiar arquivo">
-            {copied ? <Check aria-hidden /> : <Copy aria-hidden />} <span>{copied ? "Copiado" : "Copiar"}</span>
-          </button>
-          <button type="button" onClick={() => downloadFile(file.path, file.content)} disabled={file.writing} title="Baixar só este arquivo">
-            <Download aria-hidden />
-          </button>
-        </span>
       </div>
-      <pre ref={scroller} className="mmo-code mrt-codebox">
-        {html ? <code dangerouslySetInnerHTML={{ __html: html }} /> : <code>{file.content}</code>}
-      </pre>
+      <div className="mmo-sheet">
+        <div className="mmo-sheet__bar">
+          <span className="mmo-sheet__meta">
+            <span className="mmo-lang">{LANG_LABEL[file.language] || file.language.toUpperCase()}</span>
+            {lineCount} {lineCount === 1 ? "linha" : "linhas"}
+          </span>
+          <span className="mmo-sheet__tools">
+            <button type="button" onClick={copy} disabled={file.writing}>
+              {copied ? <Check aria-hidden /> : <Copy aria-hidden />} {copied ? "Copiado" : "Copiar"}
+            </button>
+            <button type="button" onClick={() => downloadFile(file.path, file.content)} disabled={file.writing} aria-label={`Baixar ${file.path}`} title={`Baixar só ${file.path}`}>
+              <Download aria-hidden />
+            </button>
+          </span>
+        </div>
+        <div ref={scroller} className="mmo-code mrt-codebox" tabIndex={0} aria-label={`Código de ${file.path}`}>
+          <pre className="mmo-gutter" aria-hidden>
+            {gutter}
+          </pre>
+          <pre className="mmo-source">
+            {html ? <code dangerouslySetInnerHTML={{ __html: html }} /> : <code>{file.content}</code>}
+            {file.writing ? <span className="mmo-caret" aria-hidden /> : null}
+          </pre>
+        </div>
+      </div>
     </div>
   );
 }
@@ -128,7 +183,7 @@ function RunPanel({ project }: { project: Project }) {
           {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />}
           {busy ? "Rodando…" : `Executar ${project.entry}`}
         </button>
-        <span className="mmo-hint">{language === "python" ? "Python roda aqui mesmo, no navegador. input() pergunta na saída." : "JavaScript roda isolado, sem página."}</span>
+        <span className="mmo-hint">{language === "python" ? "Roda aqui no navegador. Se o programa perguntar algo, responda na saída." : "Roda isolado, sem página."}</span>
       </div>
       <RunOutput runner={runner} onClear={runner.clear} standalone />
     </div>
@@ -155,8 +210,30 @@ function SiteConsole({ logs, onClear }: { logs: SiteLog[]; onClear: () => void }
           ))}
         </ol>
       ) : (
-        <p className="mmo-empty">Nada por aqui. O que o site escrever com console.log() e os erros dele aparecem nesta aba.</p>
+        <p className="mmo-empty">Tudo limpo. O que o site escrever com console.log() e os erros dele aparecem aqui.</p>
       )}
+    </div>
+  );
+}
+
+/** Enquanto a Mine escreve: a janela vazia mostra o progresso arquivo por arquivo. */
+function Writing({ project }: { project: Project }) {
+  const done = project.files.filter((file) => !file.writing).length;
+  const current = project.files.find((file) => file.writing)?.path;
+  return (
+    <div className="mmo-writingstate">
+      <ol className="mmo-writingstate__files">
+        {project.files.map((file) => (
+          <li key={file.path} className={file.writing ? "is-now" : "is-done"}>
+            {file.writing ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />}
+            {file.path}
+          </li>
+        ))}
+      </ol>
+      <p>
+        A Mine está escrevendo {current || "o projeto"}. A prévia liga quando ela terminar
+        {project.files.length > 1 ? ` (${done} de ${project.files.length} prontos)` : ""}.
+      </p>
     </div>
   );
 }
@@ -173,7 +250,6 @@ function MonitorBody({ entry, entries }: { entry: MonitorEntry; entries: Monitor
   const [logs, setLogs] = useState<SiteLog[]>([]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const fullRef = useRef<HTMLIFrameElement>(null);
-  const version = versionOf(entries, entry);
 
   // Escrevendo: mostra o código chegando. Terminou: vai para a prévia/console.
   useEffect(() => {
@@ -202,90 +278,96 @@ function MonitorBody({ entry, entries }: { entry: MonitorEntry; entries: Monitor
   }, [full]);
 
   const errors = logs.filter((log) => log.kind === "error").length;
+  // Versões do MESMO projeto viram chips; outros projetos da conversa, um seletor.
+  const name = project.name.toLowerCase();
+  const versions = entries.filter((item) => item.project.name.toLowerCase() === name);
+  // Um item por projeto da conversa (a versão mais nova de cada).
+  const latestByName = new Map(entries.map((item) => [item.project.name.toLowerCase(), item]));
+  const others = [...latestByName.values()];
+  const kindLabel = isSite ? "Site" : project.kind === "python" ? "Python" : project.kind === "javascript" ? "JavaScript" : "Código";
 
   return (
     <>
       <header className="mmo-head">
         <div className="mmo-title">
-          <strong title={project.name}>{project.name}</strong>
-          {entries.length > 1 ? (
-            <label className="mmo-version">
-              <span className="sr-only">Versão</span>
-              <select value={entry.key} onChange={(event) => selectVersion(event.target.value)}>
-                {entries.map((item) => {
-                  const v = versionOf(entries, item);
-                  return (
-                    <option key={item.key} value={item.key}>
-                      {item.project.name.slice(0, 28)} · v{v.number}
-                    </option>
-                  );
-                })}
+          {others.length > 1 ? (
+            <label className="mmo-switch">
+              <span className="sr-only">Projeto da conversa</span>
+              <select value={others.find((item) => item.project.name.toLowerCase() === name)?.key} onChange={(event) => selectVersion(event.target.value)}>
+                {others.map((item) => (
+                  <option key={item.key} value={item.key}>
+                    {item.project.name}
+                  </option>
+                ))}
               </select>
             </label>
-          ) : version.total > 1 ? (
-            <small>v{version.number}</small>
-          ) : null}
+          ) : (
+            <strong title={project.name}>{project.name}</strong>
+          )}
+          <span className="mmo-kind">
+            {kindLabel} · {project.files.length} {project.files.length === 1 ? "arquivo" : "arquivos"}
+          </span>
         </div>
         <div className="mmo-head__actions">
           <button type="button" className="mmo-zip" onClick={() => downloadZip(project)} disabled={streaming}>
             <Download aria-hidden /> <span>Baixar .zip</span>
           </button>
-          <button type="button" className="mmo-icon" onClick={closeMonitor} aria-label="Fechar monitor" title="Fechar monitor">
+          <button type="button" className="mmo-icon" onClick={closeMonitor} aria-label="Fechar monitor" title="Fechar (Esc)">
             <X aria-hidden />
           </button>
         </div>
       </header>
 
-      <nav className="mmo-tabs" role="tablist" aria-label="Ver projeto">
-        {isSite ? (
-          <button type="button" role="tab" aria-selected={tab === "preview"} className={tab === "preview" ? "is-on" : ""} onClick={() => setTab("preview")}>
-            <Eye aria-hidden /> Prévia
+      <nav className="mmo-tabs" aria-label="Ver projeto">
+        <span role="tablist" className="mmo-tabs__list">
+          {isSite ? (
+            <button type="button" role="tab" aria-selected={tab === "preview"} className={tab === "preview" ? "is-on" : ""} onClick={() => setTab("preview")}>
+              <Eye aria-hidden /> Prévia
+            </button>
+          ) : null}
+          {isSite || runnable ? (
+            <button type="button" role="tab" aria-selected={tab === "console"} className={tab === "console" ? "is-on" : ""} onClick={() => setTab("console")}>
+              <SquareTerminal aria-hidden /> Console
+              {errors ? <span className="mmo-badge" aria-label={`${errors} ${errors === 1 ? "erro" : "erros"}`}>{errors}</span> : null}
+            </button>
+          ) : null}
+          <button type="button" role="tab" aria-selected={tab === "code"} className={tab === "code" ? "is-on" : ""} onClick={() => setTab("code")}>
+            <Code2 aria-hidden /> Código
           </button>
+        </span>
+        {versions.length > 1 ? (
+          <span className="mmo-versions" role="group" aria-label="Versões">
+            {versions.map((item, index) => (
+              <button key={item.key} type="button" aria-pressed={item.key === entry.key} onClick={() => selectVersion(item.key)} title={`Versão ${index + 1}`}>
+                v{index + 1}
+              </button>
+            ))}
+          </span>
         ) : null}
-        {isSite || runnable ? (
-          <button type="button" role="tab" aria-selected={tab === "console"} className={tab === "console" ? "is-on" : ""} onClick={() => setTab("console")}>
-            <SquareTerminal aria-hidden /> Console
-            {errors ? <span className="mmo-badge" aria-label={`${errors} erros`}>{errors}</span> : null}
-          </button>
-        ) : null}
-        <button type="button" role="tab" aria-selected={tab === "code"} className={tab === "code" ? "is-on" : ""} onClick={() => setTab("code")}>
-          <Code2 aria-hidden /> Código
-        </button>
-        {streaming ? (
-          <span className="mmo-writing">
-            <Loader2 className="animate-spin" aria-hidden /> escrevendo {writingPath || ""}…
+        {isSite && tab === "preview" && !streaming ? (
+          <span className="mmo-seg" role="group" aria-label="Tamanho da tela">
+            <button type="button" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")} aria-label="Computador" title="Computador">
+              <Monitor aria-hidden />
+            </button>
+            <button type="button" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")} aria-label="Celular" title="Celular">
+              <Smartphone aria-hidden />
+            </button>
           </span>
         ) : null}
       </nav>
 
       <div className="mmo-body">
         {isSite ? (
-          <div className="mmo-pane" hidden={tab !== "preview"}>
-            <div className="mmo-tools">
-              <span className="mmo-seg" role="group" aria-label="Tamanho da tela">
-                <button type="button" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")} title="Computador">
-                  <Monitor aria-hidden /> <span>Computador</span>
-                </button>
-                <button type="button" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")} title="Celular">
-                  <Smartphone aria-hidden /> <span>Celular</span>
-                </button>
-              </span>
-              <span className="mmo-tools__right">
-                <button type="button" onClick={() => setReloadKey((value) => value + 1)} title="Recarregar" aria-label="Recarregar prévia" disabled={!html}>
-                  <RotateCw aria-hidden />
-                </button>
-                <button type="button" onClick={() => setFull(true)} title="Tela cheia" aria-label="Tela cheia" disabled={!html}>
-                  <Maximize2 aria-hidden />
-                </button>
-              </span>
-            </div>
-            {html ? (
-              <SiteFrame html={html} device={device} reloadKey={reloadKey} frameRef={frameRef} title={project.name} />
-            ) : (
-              <p className="mmo-empty mmo-wait">
-                <Loader2 className="animate-spin" aria-hidden /> A prévia aparece quando a Mine terminar de escrever.
-              </p>
-            )}
+          <div className="mmo-pane mmo-desk" hidden={tab !== "preview"}>
+            <Device project={project} device={device} onReload={() => setReloadKey((value) => value + 1)} onFull={() => setFull(true)} ready={Boolean(html)}>
+              {html ? (
+                <div className="mmo-boot" key={`${html.length}-${reloadKey}`}>
+                  <SiteFrame html={html} device={device} reloadKey={reloadKey} frameRef={frameRef} title={project.name} />
+                </div>
+              ) : (
+                <Writing project={project} />
+              )}
+            </Device>
           </div>
         ) : null}
         {isSite ? (
@@ -307,6 +389,7 @@ function MonitorBody({ entry, entries }: { entry: MonitorEntry; entries: Monitor
             <div className="mmo-full" role="dialog" aria-modal="true" aria-label={`Site em tela cheia: ${project.name}`}>
               <div className="mmo-full__bar">
                 <strong>{project.name}</strong>
+                <span>Esc para sair</span>
                 <button type="button" onClick={() => setFull(false)} aria-label="Fechar tela cheia">
                   <X aria-hidden />
                 </button>

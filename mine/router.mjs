@@ -544,7 +544,9 @@ export async function runMineRequest({
         history,
         attachments,
         maxTokens,
-        timeoutMs: Math.min(perAttemptMs, remaining),
+        // Projeto de codigo leva ~40 a 120 s no GLM: a tentativa pode ir ate 240 s
+        // (a funcao da Vercel corta em 300 s).
+        timeoutMs: Math.min(codeKind && index === 0 ? Math.max(perAttemptMs, 240_000) : perAttemptMs, remaining),
         signal,
         fallback: index > 0 && !gameTask,
         extraSystem: [...web.extraSystem, ...baseSystem],
