@@ -7784,6 +7784,13 @@ function MineView({
                   onShowVersion={openVersion}
                 />
               )}
+              {/* Um painel só, fora dos dois ramos (trabalhando / escrevendo): assim a
+                  página aberta e o vídeo não recomeçam quando o texto começa a chegar. */}
+              {loading && controleLive && !artifactLoading ? (
+                <div className="mb-3 pl-[2.75rem] sm:pl-[3.25rem]">
+                  <MineControlePanel status={searchStatus} visits={liveVisits} answering={Boolean(streamText)} answerText={streamText} />
+                </div>
+              ) : null}
               {loading && artifactLoading ? (
                 artifactLoading.kind === "mindmap" ? (
                   <MindmapBuildPreview topic={artifactLoading.topic} reduceMotion={Boolean(reduceMotion)} />
@@ -7803,7 +7810,6 @@ function MineView({
                     aria-live="polite"
                   >
                     <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.14em] text-white/38"><span>Mine</span></div>
-                    {controleLive ? <div className="mb-3"><MineControlePanel status={searchStatus} visits={liveVisits} answering /></div> : null}
                     {reasoning ? <MineThought reasoning={reasoning} /> : null}
                     {/* A ponta da caneta no fim do texto vem do CSS (.mine-streaming). */}
                     <MineSourcesProvider sources={searchStatus?.sources}>
@@ -7820,7 +7826,6 @@ function MineView({
                 >
                   <span className="mt-1"><MineAvatar size="sm" thinking /></span>
                   <div className="min-w-0 flex-1 pt-0.5">
-                    {controleLive ? <div className="mb-2"><MineControlePanel status={searchStatus} visits={liveVisits} answering={false} /></div> : null}
                     <MineWorking status={searchStatus} reasoning={reasoning} />
                   </div>
                 </motion.article>

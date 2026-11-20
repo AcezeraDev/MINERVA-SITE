@@ -147,12 +147,10 @@ export async function readPage(rawUrl, query, options = {}) {
 }
 
 /**
- * Abre uma pagina e devolve `{ text, title, url }` (url final, depois dos
- * redirecionamentos). Usado pelo Controle Mine, que mostra o titulo do que
- * abriu. Em falha, `text` vem vazio.
+ * Baixa uma pagina publica (https, DNS checado a cada redirecionamento).
+ * Devolve `{ raw, type, url }` ou null.
  */
-export async function openPage(rawUrl, query, { signal, timeoutMs = PAGE_TIMEOUT_MS, limit = PAGE_TEXT_CHARS } = {}) {
-  const empty = { text: "", title: "", url: String(rawUrl || "") };
+async function fetchPublicPage(rawUrl, { signal, timeoutMs = PAGE_TIMEOUT_MS } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const onAbort = () => controller.abort();
@@ -174,21 +172,96 @@ export async function openPage(rawUrl, query, { signal, timeoutMs = PAGE_TIMEOUT
         current = location ? await publicHttps(new URL(location, current).toString()) : null;
         continue;
       }
-      if (!response.ok) return empty;
+      if (!response.ok) return null;
       const type = String(response.headers.get("content-type") || "").toLowerCase();
-      if (!type.includes("html") && !type.startsWith("text/plain")) return empty;
-      const raw = await readBody(response);
-      const paragraphs = type.startsWith("text/plain") ? raw.split(/\n{2,}/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean) : htmlToParagraphs(raw);
-      const title = decodeEntities(raw.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").replace(/\s+/g, " ").trim().slice(0, 160);
-      return { text: relevantText(paragraphs, query, limit), title, url: current.toString() };
+      if (!type.includes("html") && !type.startsWith("text/plain")) return null;
+      return { raw: await readBody(response), type, url: current.toString() };
     }
-    return empty;
+    return null;
   } catch {
-    return empty;
+    return null;
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);
   }
+}
+
+function pageTitle(raw) {
+  return decodeEntities(raw.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").replace(/\s+/g, " ").trim().slice(0, 160);
+}
+
+/**
+ * Os `count` paragrafos que mais falam da pergunta, na ordem da pagina, cortados
+ * em ~160 caracteres. E o que o Controle Mine grifa na pagina ao vivo; sem
+ * palavra em comum, os primeiros paragrafos.
+ */
+export function pageHighlights(paragraphs, query, count = 3) {
+  const asked = new Set(words(query));
+  const scored = paragraphs
+    .map((text, index) => {
+      const own = words(text);
+      return { text, index, score: own.filter((word) => asked.has(word)).length / Math.sqrt(own.length + 4) };
+    })
+    .filter((item) => item.text.length >= 60);
+  const anyHit = scored.some((item) => item.score > 0);
+  const picked = anyHit ? [...scored].filter((item) => item.score > 0).sort((a, b) => b.score - a.score || a.index - b.index).slice(0, count) : scored.slice(0, Math.min(2, count));
+  return picked.sort((a, b) => a.index - b.index).map((item) => item.text.slice(0, 160));
+}
+
+/**
+ * Abre uma pagina e devolve `{ text, title, url, highlights }` (url final,
+ * depois dos redirecionamentos). Em falha, `text` vem vazio.
+ */
+export async function openPage(rawUrl, query, { signal, timeoutMs = PAGE_TIMEOUT_MS, limit = PAGE_TEXT_CHARS } = {}) {
+  const empty = { text: "", title: "", url: String(rawUrl || ""), highlights: [] };
+  const page = await fetchPublicPage(rawUrl, { signal, timeoutMs });
+  if (!page) return empty;
+  const paragraphs = page.type.startsWith("text/plain")
+    ? page.raw.split(/\n{2,}/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean)
+    : htmlToParagraphs(page.raw);
+  return { text: relevantText(paragraphs, query, limit), title: pageTitle(page.raw), url: page.url, highlights: pageHighlights(paragraphs, query) };
+}
+
+const PANEL_HTML_BYTES = 900_000;
+
+/**
+ * HTML de terceiros pronto para o painel do Controle Mine. A barreira de
+ * seguranca e o iframe com `sandbox` sem `allow-scripts` (nada roda la
+ * dentro); a limpeza daqui e a segunda camada e deixa a pagina leve: sem
+ * scripts, frames, eventos inline nem redirecionamento, com <base> apontando
+ * para o site (CSS e imagens relativos funcionam) e links abrindo fora.
+ */
+export function sanitizePageHtml(raw, baseUrl) {
+  let html = String(raw || "")
+    .replace(/<script\b[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<script\b[^>]*>/gi, "")
+    .replace(/<(iframe|frame|frameset|object|embed|applet|portal)\b[\s\S]*?<\/\1\s*>/gi, "")
+    .replace(/<(iframe|frame|object|embed|applet|portal|base)\b[^>]*>/gi, "")
+    .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?(refresh|content-security-policy|set-cookie)[^>]*>/gi, "")
+    .replace(/<link\b[^>]*rel\s*=\s*["']?(preload|prefetch|modulepreload|manifest|serviceworker)[^>]*>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src|action|formaction)\s*=\s*(["']?)\s*javascript:[^"'\s>]*/gi, '$1=$2#')
+    // Imagem "preguiçosa" que dependia de script para aparecer.
+    .replace(/<img\b[^>]*>/gi, (tag) => {
+      const lazy = tag.match(/\sdata-(?:src|lazy-src|original)\s*=\s*("[^"]*"|'[^']*')/i)?.[1];
+      if (!lazy) return tag;
+      const hasRealSrc = /\ssrc\s*=\s*["'](?!data:)[^"']+["']/i.test(tag);
+      return hasRealSrc ? tag : tag.replace(/\ssrc\s*=\s*("[^"]*"|'[^']*')/i, "").replace(/<img\b/i, `<img src=${lazy}`);
+    });
+  const safeBase = String(baseUrl || "").replace(/"/g, "%22");
+  const head = `<meta charset="utf-8"><base href="${safeBase}" target="_blank"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'"><style>html{scroll-behavior:smooth;scrollbar-width:none}html::-webkit-scrollbar{display:none}.mine-grifo{background:linear-gradient(transparent 12%,rgba(57,245,154,.55) 12%,rgba(57,245,154,.55) 88%,transparent 88%) no-repeat 0 0/0% 100%;transition:background-size 1.1s ease-out;border-radius:2px}.mine-grifo.is-on{background-size:100% 100%}</style>`;
+  html = /<head\b[^>]*>/i.test(html) ? html.replace(/<head\b[^>]*>/i, (tag) => `${tag}${head}`) : `${head}${html}`;
+  return html.length > PANEL_HTML_BYTES ? html.slice(0, PANEL_HTML_BYTES) : html;
+}
+
+/** Pagina limpa para o painel: `{ html, title, url }` ou null. */
+export async function pageForPanel(rawUrl, { signal, timeoutMs = 7_000 } = {}) {
+  const page = await fetchPublicPage(rawUrl, { signal, timeoutMs });
+  if (!page) return null;
+  const html = page.type.startsWith("text/plain")
+    ? `<pre style="white-space:pre-wrap;font:15px/1.6 system-ui;padding:16px">${page.raw.slice(0, 200_000).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>`
+    : page.raw;
+  return { html: sanitizePageHtml(html, page.url), title: pageTitle(page.raw), url: page.url };
 }
 
 /**
@@ -198,6 +271,10 @@ export async function openPage(rawUrl, query, { signal, timeoutMs = PAGE_TIMEOUT
  */
 export async function readTopPages(results, query, { count = 3, signal, timeoutMs = PAGE_TIMEOUT_MS } = {}) {
   const head = results.slice(0, count);
-  const texts = await Promise.all(head.map((item) => readPage(item.url, `${query} ${item.title}`, { signal, timeoutMs })));
-  return results.map((item, index) => (index < count && texts[index] && texts[index].length > (item.snippet || "").length ? { ...item, content: texts[index] } : item));
+  const pages = await Promise.all(head.map((item) => openPage(item.url, `${query} ${item.title}`, { signal, timeoutMs })));
+  return results.map((item, index) => {
+    const page = index < count ? pages[index] : null;
+    // `highlights`: os trechos que o Controle Mine grifa na pagina ao vivo.
+    return page?.text && page.text.length > (item.snippet || "").length ? { ...item, content: page.text, highlights: page.highlights } : item;
+  });
 }

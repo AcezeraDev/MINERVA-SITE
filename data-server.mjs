@@ -28,6 +28,7 @@ import {
 } from "./shared/duelo.mjs";
 import { perguntasDaReserva } from "./shared/duelo-reserva.mjs";
 import { runMineRequest } from "./mine/router.mjs";
+import { pageForPanel } from "./mine/page-reader.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
 import { MINE_IMAGE_DAILY_LIMIT, MineImageError, generateMineImage } from "./mine/image-gen.mjs";
 import { MINE_VOICE_DAILY_LIMIT, MineVoiceError, synthesizeVoice } from "./mine/voice.mjs";
@@ -1216,6 +1217,18 @@ export async function handleDataRequest(req, res) {
 
     if (url.pathname === "/api/mine-imagem" && (req.method === "POST" || req.method === "GET")) {
       await handleMineImage(req, res);
+      return true;
+    }
+
+    // Controle Mine: a página de verdade, limpa (sem scripts), para o painel
+    // mostrar ao vivo num iframe sandbox. Só https público (page-reader.mjs).
+    if (url.pathname === "/api/mine-pagina" && req.method === "POST") {
+      const session = await requireSession(req, res);
+      if (!session) return true;
+      const body = await readJson(req);
+      const page = typeof body.url === "string" && body.url.length < 2048 ? await pageForPanel(body.url) : null;
+      if (!page) sendError(req, res, 422, "Não deu para abrir esta página.");
+      else sendJson(req, res, 200, page);
       return true;
     }
 

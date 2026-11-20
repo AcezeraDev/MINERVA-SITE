@@ -282,7 +282,7 @@ async function prepareWebContext({ prompt, history, signal, deadline, queries: g
       queries,
       notice: "",
       // Paginas que foram de fato abertas (o Controle Mine mostra cada uma).
-      opened: results.filter((item) => item.content).map(({ url, title, domain }) => ({ url, title, domain })),
+      opened: results.filter((item) => item.content).map(({ url, title, domain, highlights }) => ({ url, title, domain, highlights: highlights || [] })),
     };
   } catch (error) {
     if (error?.code === "aborted" || signal?.aborted) throw new MineError("Geração cancelada.", { code: "aborted" });
@@ -321,14 +321,14 @@ async function openControlLinks({ prompt, signal, onStatus }) {
         const video = await readYoutubeVideo(url, { signal });
         videos.push(video);
         // Mesma url do "visiting": a tela troca o item pendente por este.
-        const visit = { ...pending, title: video.title, ok: video.ok, note: video.ok ? `Legenda ${video.language}` : video.reason };
+        const visit = { ...pending, title: video.title, ok: video.ok, note: video.ok ? `Legenda ${video.language}` : video.reason, seconds: video.seconds || 0 };
         visits.push(visit);
         onStatus?.({ stage: "visited", visit });
         return;
       }
       const page = await openPage(url, prompt, { signal, timeoutMs: 6_000, limit: 6_000 });
       pages.push({ ...page, requested: url });
-      const visit = { ...pending, title: page.title, ok: Boolean(page.text), note: page.text ? "" : "não abriu" };
+      const visit = { ...pending, title: page.title, ok: Boolean(page.text), note: page.text ? "" : "não abriu", highlights: page.highlights || [] };
       visits.push(visit);
       onStatus?.({ stage: "visited", visit });
     }),

@@ -11,9 +11,10 @@ import "./mine-controle.css";
  * (mine/router.mjs, openControlLinks); aqui é a janela que mostra isso, com o
  * cursor da Mine indo até cada link e clicando.
  *
- * O print vem do mShots (serviço público do WordPress que fotografa uma URL):
- * só endereços públicos que a própria Mine abriu vão para ele, nunca dado do
- * estudante.
+ * As páginas aparecem de verdade (/api/mine-pagina devolve o HTML sem
+ * scripts e ele abre num iframe sandbox): a Mine rola até os trechos que leu e
+ * grifa. Vídeo abre no player do YouTube e pula para os minutos que ela cita.
+ * O print (thum.io/Microlink) ficou para o cartão e para quando a página não abre.
  */
 
 export type MineVisit = {
@@ -23,6 +24,10 @@ export type MineVisit = {
   kind: "page" | "video";
   ok: boolean;
   note?: string;
+  /** Trechos que a Mine leu; o painel rola até eles e grifa. */
+  highlights?: string[];
+  /** Duração do vídeo, para o cursor achar o ponto na barra. */
+  seconds?: number;
 };
 
 export function cleanVisits(value: unknown): MineVisit[] {
@@ -36,6 +41,8 @@ export function cleanVisits(value: unknown): MineVisit[] {
       kind: item.kind === "video" ? "video" : "page",
       ok: item.ok === true,
       note: typeof item.note === "string" ? item.note.slice(0, 80) : undefined,
+      highlights: Array.isArray(item.highlights) ? item.highlights.filter((text): text is string => typeof text === "string").slice(0, 3).map((text) => text.slice(0, 200)) : undefined,
+      seconds: typeof item.seconds === "number" && item.seconds > 0 ? item.seconds : undefined,
     }))
     .slice(0, 8);
 }
@@ -43,6 +50,15 @@ export function cleanVisits(value: unknown): MineVisit[] {
 function hostOf(url: string) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+/** Endereço como a pessoa leria (Fotoss%C3%ADntese → Fotossíntese). */
+function readableUrl(url: string) {
+  try {
+    return decodeURI(url);
   } catch {
     return url;
   }
@@ -134,44 +150,360 @@ function MineCursor({ x, y, clicking }: { x: number; y: number; clicking: boolea
   );
 }
 
+type Point = { x: number; y: number };
+type PanelPage = { html: string; title?: string; url?: string };
+
+/**
+ * Página de verdade para o painel, buscada pelo servidor (/api/mine-pagina,
+ * já sem scripts). Fica em cache por endereço: o painel começa a buscar
+ * assim que a visita chega, antes de a cena dela aparecer.
+ */
+const pageCache = new Map<string, Promise<PanelPage | null>>();
+
+function sessionToken() {
+  try {
+    return (JSON.parse(localStorage.getItem("minerva-session-v1") || "{}") as { token?: string }).token || "";
+  } catch {
+    return "";
+  }
+}
+
+function loadPanelPage(url: string) {
+  const cached = pageCache.get(url);
+  if (cached) return cached;
+  const job = fetch("/api/mine-pagina", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${sessionToken()}` },
+    body: JSON.stringify({ url }),
+  })
+    .then((response) => (response.ok ? (response.json() as Promise<PanelPage>) : null))
+    .then((page) => (page && typeof page.html === "string" && page.html.length > 200 ? page : null))
+    .catch(() => null);
+  pageCache.set(url, job);
+  if (pageCache.size > 24) pageCache.delete(pageCache.keys().next().value as string);
+  return job;
+}
+
+/** Largura "de computador" em que a página é desenhada antes de encolher. */
+const PAGE_WIDTH = 960;
+const squash = (text: string) => text.replace(/\s+/g, "").toLocaleLowerCase("pt-BR");
+
+/** O bloco da página que contém o trecho (o menor que contém). */
+function findPassage(doc: Document, passage: string) {
+  const needle = squash(passage).slice(0, 48);
+  if (needle.length < 16) return null;
+  const pick = (selector: string) => {
+    let best: HTMLElement | null = null;
+    let bestLength = Infinity;
+    const nodes = Array.from(doc.body?.querySelectorAll<HTMLElement>(selector) || []).slice(0, 5000);
+    for (const node of nodes) {
+      const text = node.textContent || "";
+      if (text.length >= bestLength || text.length < needle.length) continue;
+      if (squash(text).includes(needle)) {
+        best = node;
+        bestLength = text.length;
+      }
+    }
+    return best;
+  };
+  return pick("p,li,h1,h2,h3,h4,h5,h6,td,th,blockquote,dd,dt,pre,figcaption") || pick("div,section,article,span");
+}
+
+/** Marca-texto: o conteúdo do bloco vai para um span que pinta linha a linha. */
+function markPassage(doc: Document, element: HTMLElement, instant: boolean) {
+  if (element.querySelector(".mine-grifo")) return;
+  const mark = doc.createElement("span");
+  mark.className = "mine-grifo";
+  while (element.firstChild) mark.appendChild(element.firstChild);
+  element.appendChild(mark);
+  // Força o layout antes de ligar: a transição do grifo roda mesmo sem rAF
+  // (aba em segundo plano).
+  if (!instant) void mark.offsetWidth;
+  mark.classList.add("is-on");
+}
+
+/**
+ * A página aberta de verdade, dentro de um iframe `sandbox` sem scripts. A
+ * Mine rola até cada trecho que leu, aponta com o cursor e grifa. Sem a
+ * página (site bloqueou, login), cai no print.
+ */
+function LivePage({
+  visit,
+  reduce,
+  onCursor,
+  onDone,
+}: {
+  visit: MineVisit;
+  reduce: boolean;
+  onCursor: (point: Point, clicking?: boolean) => void;
+  onDone: () => void;
+}) {
+  const [page, setPage] = useState<PanelPage | null | "loading">("loading");
+  const [scale, setScale] = useState(0.5);
+  const [loaded, setLoaded] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const callbacks = useRef({ onCursor, onDone });
+  callbacks.current = { onCursor, onDone };
+  // A lista de visitas é refeita a cada evento; a chave evita recomeçar a leitura.
+  const highlightKey = (visit.highlights || []).join("\n");
+
+  useEffect(() => {
+    let alive = true;
+    // Ainda abrindo no servidor: espera. Falhou: print.
+    if (!visit.ok) {
+      setPage(visit.note ? null : "loading");
+      return;
+    }
+    loadPanelPage(visit.url).then((value) => alive && setPage(value));
+    return () => {
+      alive = false;
+    };
+  }, [visit.url, visit.ok]);
+
+  // A página é desenhada a 960 px e encolhida para caber na janela.
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const update = () => setScale(Math.max(0.25, box.clientWidth / PAGE_WIDTH));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
+
+  // Sem página: o print fica ~2,6 s e a cena acaba.
+  useEffect(() => {
+    if (page !== null) return;
+    callbacks.current.onCursor({ x: 78, y: 72 });
+    const id = window.setTimeout(() => callbacks.current.onDone(), reduce ? 300 : 2600);
+    return () => window.clearTimeout(id);
+  }, [page, reduce]);
+
+  // Página carregada: rola até cada trecho, aponta e grifa, um por vez.
+  useEffect(() => {
+    if (!loaded) return;
+    const frame = frameRef.current;
+    const doc = frame?.contentDocument;
+    const win = frame?.contentWindow;
+    if (!frame || !doc || !win) {
+      callbacks.current.onDone();
+      return;
+    }
+    const timers: number[] = [];
+    const later = (ms: number, run: () => void) => timers.push(window.setTimeout(run, reduce ? 0 : ms));
+    const passages = (highlightKey ? highlightKey.split("\n") : []).map((text) => findPassage(doc, text)).filter((node): node is HTMLElement => Boolean(node));
+    const viewHeight = () => win.innerHeight || frame.clientHeight / scale;
+    const pointAt = (element: HTMLElement): Point => {
+      const rect = element.getBoundingClientRect();
+      return {
+        x: Math.min(92, Math.max(4, ((rect.left + Math.min(rect.width * 0.12, 48)) / PAGE_WIDTH) * 100)),
+        y: Math.min(90, Math.max(6, ((rect.top + Math.min(rect.height / 2, 16)) / viewHeight()) * 100)),
+      };
+    };
+    let at = 500;
+    if (!passages.length) {
+      // Nada achado: a Mine desce lendo a página.
+      later(at, () => {
+        win.scrollTo({ top: viewHeight() * 0.9, behavior: (reduce ? "instant" : "smooth") as ScrollBehavior });
+        callbacks.current.onCursor({ x: 70, y: 62 });
+      });
+      later(at + 2200, () => callbacks.current.onDone());
+    } else {
+      passages.forEach((element) => {
+        later(at, () => {
+          const top = element.getBoundingClientRect().top + win.scrollY - viewHeight() * 0.3;
+          win.scrollTo({ top: Math.max(0, top), behavior: (reduce ? "instant" : "smooth") as ScrollBehavior });
+        });
+        later(at + 750, () => callbacks.current.onCursor(pointAt(element)));
+        later(at + 1250, () => {
+          callbacks.current.onCursor(pointAt(element), true);
+          markPassage(doc, element, reduce);
+        });
+        at += 2300;
+      });
+      later(at, () => callbacks.current.onDone());
+    }
+    return () => timers.forEach((id) => window.clearTimeout(id));
+    // `scale` só muda o tamanho visual; não reinicia a leitura.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, highlightKey, reduce]);
+
+  if (page === null) return <SitePrint visit={visit} className="mine-controle__shot is-reading" />;
+  return (
+    <div ref={boxRef} className="mine-controle__live">
+      {page !== "loading" ? (
+        <iframe
+          ref={frameRef}
+          title={`Página aberta pela Mine: ${visit.title || visit.domain || hostOf(visit.url)}`}
+          className="mine-controle__frame"
+          sandbox="allow-same-origin"
+          referrerPolicy="no-referrer"
+          srcDoc={page.html}
+          tabIndex={-1}
+          onLoad={() => setLoaded(true)}
+          style={{ width: PAGE_WIDTH, height: `${100 / scale}%`, transform: `scale(${scale})` }}
+        />
+      ) : null}
+      {!loaded ? <span className="mine-print__wait">abrindo a página…</span> : null}
+    </div>
+  );
+}
+
+/** Marca de tempo mais recente no texto que a Mine está escrevendo ([03:20]). */
+export function lastTimestamp(text: string) {
+  let seconds = -1;
+  for (const match of String(text || "").matchAll(/[[(](?:(\d{1,2}):)?(\d{1,2}):(\d{2})[\])]/g)) {
+    seconds = Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+  }
+  return seconds;
+}
+
+/**
+ * O vídeo de verdade (player do YouTube, mudo). Enquanto a Mine escreve o
+ * resumo, cada marca de tempo nova faz o player pular para aquele ponto e o
+ * cursor clica na barra de progresso.
+ */
+function LiveVideo({
+  visit,
+  seek,
+  reduce,
+  onCursor,
+  onDone,
+}: {
+  visit: MineVisit;
+  seek: number;
+  reduce: boolean;
+  onCursor: (point: Point, clicking?: boolean) => void;
+  onDone: () => void;
+}) {
+  const id = youtubeIdOf(visit.url);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const [ready, setReady] = useState(false);
+  const callbacks = useRef({ onCursor, onDone });
+  callbacks.current = { onCursor, onDone };
+
+  useEffect(() => {
+    callbacks.current.onCursor({ x: 50, y: 50 });
+    const play = window.setTimeout(() => callbacks.current.onCursor({ x: 50, y: 50 }, true), reduce ? 0 : 900);
+    const done = window.setTimeout(() => callbacks.current.onDone(), reduce ? 300 : 3400);
+    return () => {
+      window.clearTimeout(play);
+      window.clearTimeout(done);
+    };
+  }, [visit.url, reduce]);
+
+  useEffect(() => {
+    if (!ready || seek < 0) return;
+    const send = (func: string, args: unknown[] = []) =>
+      frameRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "https://www.youtube-nocookie.com");
+    send("seekTo", [seek, true]);
+    send("playVideo");
+    const total = visit.seconds && visit.seconds > 0 ? visit.seconds : 0;
+    const x = total ? 4 + Math.min(1, seek / total) * 92 : 50;
+    callbacks.current.onCursor({ x, y: 90 }, true);
+  }, [seek, ready, visit.seconds]);
+
+  // O player avisa por mensagem quando o vídeo não pode tocar fora do
+  // YouTube (dono bloqueou, restrição de idade): aí fica a capa.
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => {
+    if (!ready) return;
+    const frame = frameRef.current?.contentWindow;
+    frame?.postMessage(JSON.stringify({ event: "listening", id: "mine", channel: "widget" }), "https://www.youtube-nocookie.com");
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== "https://www.youtube-nocookie.com" || event.source !== frame) return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        if (data?.event === "onError") setBlocked(true);
+      } catch {
+        /* mensagem que não é do player */
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [ready]);
+
+  if (!id || blocked) {
+    return (
+      <>
+        <SitePrint visit={visit} className="mine-controle__shot" />
+        <span className="mine-controle__caption">{blocked ? "Esse vídeo só toca no YouTube · a Mine leu a legenda" : "Lendo a legenda do vídeo…"}</span>
+      </>
+    );
+  }
+  return (
+    <div className="mine-controle__live">
+      <iframe
+        ref={frameRef}
+        className="mine-controle__video"
+        title={`Vídeo aberto pela Mine: ${visit.title || "YouTube"}`}
+        src={`https://www.youtube-nocookie.com/embed/${id}?enablejsapi=1&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1`}
+        allow="autoplay; encrypted-media; picture-in-picture"
+        referrerPolicy="strict-origin-when-cross-origin"
+        onLoad={() => setReady(true)}
+      />
+      {seek < 0 ? <span className="mine-controle__caption">Lendo a legenda do vídeo…</span> : null}
+    </div>
+  );
+}
+
 type Scene =
-  | { kind: "search"; queries: string[]; results: MineSource[]; target: number }
-  | { kind: "visit"; visit: MineVisit; done: boolean };
+  | { kind: "search"; queries: string[]; results: MineSource[] }
+  | { kind: "visit"; visit: MineVisit };
 
 /**
  * Janela ao vivo. As visitas chegam em rajada (o servidor abre as páginas em
- * paralelo), então cada uma fica na tela pelo menos ~2,6 s, na ordem em que
- * chegou — dá tempo de ver o cursor clicar e o print aparecer.
+ * paralelo); cada uma ganha a sua cena, na ordem em que chegou, e a próxima
+ * só entra quando a Mine termina de ler (grifar) a atual.
  */
 export function MineControlePanel({
   status,
   visits,
   answering,
+  answerText = "",
 }: {
   status: MineSearchStatus | null;
   visits: MineVisit[];
   answering: boolean;
+  answerText?: string;
 }) {
   const [shown, setShown] = useState(0);
+  const [sceneDone, setSceneDone] = useState(true);
   const [phase, setPhase] = useState<"move" | "click" | "open">("move");
-  const reduce = useReducedMotion();
+  const [pointer, setPointer] = useState<{ point: Point; clicking: boolean } | null>(null);
+  const reduce = Boolean(useReducedMotion());
 
-  // Avança uma visita por vez.
+  // As páginas começam a carregar assim que a visita chega.
+  useEffect(() => {
+    visits.filter((visit) => visit.kind === "page" && visit.ok).forEach((visit) => void loadPanelPage(visit.url));
+  }, [visits]);
+
+  // Próxima cena quando a atual terminou (com teto, para nunca travar).
   useEffect(() => {
     if (shown >= visits.length) return;
-    const wait = shown === 0 ? 400 : 2600;
-    const id = window.setTimeout(() => setShown((value) => value + 1), reduce ? 200 : wait);
+    const advance = () => {
+      setShown((value) => value + 1);
+      setSceneDone(false);
+      setPointer(null);
+    };
+    if (shown === 0 || sceneDone) {
+      const id = window.setTimeout(advance, reduce ? 150 : shown === 0 ? 400 : 500);
+      return () => window.clearTimeout(id);
+    }
+    const id = window.setTimeout(advance, 14_000);
     return () => window.clearTimeout(id);
-  }, [shown, visits.length, reduce]);
+  }, [shown, visits.length, sceneDone, reduce]);
 
-  const current = shown > 0 ? visits[shown - 1] : undefined;
+  // Enquanto escreve o resumo de um vídeo, a cena volta para ele.
+  const seek = lastTimestamp(answerText);
+  const videoVisit = [...visits].reverse().find((visit) => visit.kind === "video" && visit.ok);
+  const current = seek >= 0 && videoVisit && shown >= visits.length ? videoVisit : shown > 0 ? visits[shown - 1] : undefined;
   const results = status?.sources || [];
-  const scene: Scene = current
-    ? { kind: "visit", visit: current, done: current.ok || Boolean(current.note) }
-    : { kind: "search", queries: status?.queries || [], results, target: 0 };
+  const scene: Scene = current ? { kind: "visit", visit: current } : { kind: "search", queries: status?.queries || [], results };
 
-  // Ciclo do cursor em cada cena: vai até o alvo, clica, a página abre.
-  const sceneKey = scene.kind === "visit" ? `v-${shown}` : `s-${results.length}`;
+  // Ciclo do cursor: vai até o alvo, clica, a página abre.
+  const sceneKey = scene.kind === "visit" ? `v-${scene.visit.url}` : `s-${results.length}`;
   useEffect(() => {
     setPhase("move");
     const click = window.setTimeout(() => setPhase("click"), reduce ? 0 : 900);
@@ -182,12 +514,10 @@ export function MineControlePanel({
     };
   }, [sceneKey, reduce]);
 
-  // Onde o cursor está: no resultado que vai abrir, no play do vídeo, ou
-  // "lendo" a página (desce devagar).
   const nextResult = Math.max(0, visits[shown]?.url ? results.findIndex((item) => item.url === visits[shown].url) : 0);
   // O alvo na busca é medido na tela: o título do resultado que vai abrir.
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [hit, setHit] = useState<{ x: number; y: number } | null>(null);
+  const [hit, setHit] = useState<Point | null>(null);
   useEffect(() => {
     const box = viewportRef.current;
     const row = box?.querySelector<HTMLElement>(`[data-mc-result="${nextResult}"] .mine-controle__result-title`);
@@ -202,38 +532,37 @@ export function MineControlePanel({
       y: ((inner.top - outer.top + inner.height * 0.6) / outer.height) * 100,
     });
   }, [nextResult, results.length, scene.kind]);
-  const cursor =
-    scene.kind === "search"
-      ? hit || { x: 62, y: 20 }
-      : scene.visit.kind === "video"
-        ? phase === "open" ? { x: 70, y: 78 } : { x: 50, y: 50 }
-        : phase === "open" ? { x: 78, y: 72 } : { x: 46, y: 9 };
 
-  const address = scene.kind === "visit"
-    ? scene.visit.url
-    : scene.queries[0]
-      ? `busca: ${scene.queries[0]}`
-      : "minerva://controle-mine";
+  const onCursor = (point: Point, clicking = false) => setPointer({ point, clicking });
+  const onDone = () => setSceneDone(true);
+  const cursor = scene.kind === "search" ? hit || { x: 62, y: 20 } : pointer?.point || (scene.visit.kind === "video" ? { x: 50, y: 50 } : { x: 46, y: 9 });
+  const clicking = scene.kind === "search" ? phase === "click" : Boolean(pointer?.clicking);
+
+  const address = scene.kind === "visit" ? readableUrl(scene.visit.url) :scene.queries[0] ? `busca: ${scene.queries[0]}` : "minerva://controle-mine";
 
   const log = useMemo(() => {
     const lines: Array<{ text: string; state: "ok" | "fail" | "now" }> = [];
     if (status?.queries?.length) lines.push({ text: `Pesquisou “${status.queries[0]}”`, state: "ok" });
     visits.slice(0, shown).forEach((visit, index) => {
       const nome = visit.title || visit.domain || hostOf(visit.url);
-      const now = index === shown - 1 && !visit.ok && !visit.note;
+      const reading = index === shown - 1 && !sceneDone;
+      const host = visit.domain || hostOf(visit.url);
       lines.push({
         text: visit.kind === "video"
-          ? visit.ok ? `Assistiu “${nome}” (${visit.note || "legenda"})` : now ? `Abrindo o vídeo ${nome}` : `Vídeo sem legenda: ${nome}`
-          : visit.ok ? `Abriu ${visit.domain || hostOf(visit.url)} e tirou print` : now ? `Abrindo ${visit.domain || hostOf(visit.url)}` : `Não conseguiu abrir ${visit.domain || hostOf(visit.url)}`,
-        state: now ? "now" : visit.ok ? "ok" : "fail",
+          ? visit.ok ? `${reading ? "Assistindo" : "Assistiu"} “${nome}” (${visit.note || "legenda"})` : !visit.note ? `Abrindo o vídeo ${nome}` : `Vídeo sem legenda: ${nome}`
+          : visit.ok ? reading ? `Lendo ${host} e grifando` : `Leu ${host}` : !visit.note ? `Abrindo ${host}` : `Não conseguiu abrir ${host}`,
+        state: reading ? "now" : visit.ok ? "ok" : visit.note ? "fail" : "now",
       });
     });
-    if (answering && shown >= visits.length) lines.push({ text: "Escrevendo a resposta", state: "now" });
+    if (seek >= 0 && videoVisit) {
+      const m = Math.floor(seek / 60);
+      lines.push({ text: `Voltou o vídeo em ${m}:${String(seek % 60).padStart(2, "0")}`, state: "now" });
+    } else if (answering && shown >= visits.length) lines.push({ text: "Escrevendo a resposta", state: "now" });
     return lines.slice(-4);
-  }, [status?.queries, visits, shown, answering]);
+  }, [status?.queries, visits, shown, sceneDone, answering, seek, videoVisit]);
 
   return (
-    <div className="mine-controle" aria-live="polite">
+    <div className="mine-controle">
       <div className="mine-controle__chrome">
         <span className="mine-controle__dots" aria-hidden><i /><i /><i /></span>
         <span className="mine-controle__address">
@@ -274,20 +603,17 @@ export function MineControlePanel({
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.35 }}
           >
-            <SitePrint visit={scene.visit} className={`mine-controle__shot ${phase === "open" && scene.visit.kind === "page" ? "is-reading" : ""}`} />
-            {scene.visit.kind === "video" && phase === "open" ? <span className="mine-controle__caption">Lendo a legenda do vídeo…</span> : null}
+            {scene.visit.kind === "video" ? (
+              <LiveVideo visit={scene.visit} seek={seek} reduce={reduce} onCursor={onCursor} onDone={onDone} />
+            ) : (
+              <LivePage visit={scene.visit} reduce={reduce} onCursor={onCursor} onDone={onDone} />
+            )}
           </motion.div>
         )}
-        <MineCursor x={cursor.x} y={cursor.y} clicking={phase === "click"} />
-        {/* Os prints das próximas páginas já vão sendo tirados. */}
-        <span className="mine-controle__preload" aria-hidden>
-          {visits.slice(shown).filter((visit) => visit.kind === "page").map((visit) => (
-            <img key={visit.url} src={shotUrls(visit.url)[0]} alt="" referrerPolicy="no-referrer" />
-          ))}
-        </span>
+        <MineCursor x={cursor.x} y={cursor.y} clicking={clicking} />
       </div>
 
-      <ol className="mine-controle__log">
+      <ol className="mine-controle__log" aria-live="polite">
         {log.map((line, index) => (
           <li key={`${line.text}-${index}`} className={`is-${line.state}`}>
             <span className="mine-controle__mark" aria-hidden>
