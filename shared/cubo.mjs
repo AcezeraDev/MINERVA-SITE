@@ -314,25 +314,38 @@ export function etapaDoMetodo(cubo) {
   };
   const amareloPraCima = (p) => p.adesivos.some((a) => a.cor === amarelo && a.n.join(",") === centroDe.get(amarelo));
 
-  const passos = [
-    arestas.filter((p) => tem(p, branco)),
-    cantos.filter((p) => tem(p, branco)),
-    arestas.filter((p) => !tem(p, branco) && !tem(p, amarelo)),
-  ];
-  for (let i = 0; i < passos.length; i += 1) {
-    const feitas = passos[i].filter(certa).length;
-    if (feitas < passos[i].length) return { indice: i, nome: etapasDoMetodo[i], feitas, total: passos[i].length };
-  }
   const arestasAmarelas = arestas.filter((p) => tem(p, amarelo));
   const cantosAmarelos = cantos.filter((p) => tem(p, amarelo));
-  const checagens = [
-    arestasAmarelas.filter(amareloPraCima).length,
-    arestasAmarelas.filter(certa).length,
-    cantosAmarelos.filter(casaCerta).length,
-    cantosAmarelos.filter(certa).length,
+  // cada etapa: as peças dela e o que é "estar pronta" naquela etapa
+  const etapas = [
+    [arestas.filter((p) => tem(p, branco)), certa],
+    [cantos.filter((p) => tem(p, branco)), certa],
+    [arestas.filter((p) => !tem(p, branco) && !tem(p, amarelo)), certa],
+    [arestasAmarelas, amareloPraCima],
+    [arestasAmarelas, certa],
+    [cantosAmarelos, casaCerta],
+    [cantosAmarelos, certa],
   ];
-  for (let i = 0; i < checagens.length; i += 1) {
-    if (checagens[i] < 4) return { indice: 3 + i, nome: etapasDoMetodo[3 + i], feitas: checagens[i], total: 4 };
+  const direcao = (i, sinal) => {
+    const n = [0, 0, 0];
+    n[i] = sinal;
+    return n;
+  };
+  // onde a peça está e para onde vai, em normais (a tela traduz para "de cima", "da frente"…)
+  const descrever = (p) => ({
+    id: p.id,
+    cores: p.adesivos.map((a) => a.cor),
+    // faces do cubo que a peça toca agora
+    onde: [0, 1, 2].filter((i) => p.pos[i] !== 0).map((i) => direcao(i, Math.sign(p.pos[i]))),
+    // cada cor da peça e para qual lado ela está virada
+    viradas: p.adesivos.map((a) => ({ cor: a.cor, n: [...a.n] })),
+    // as faces do lugar certo: as dos centros com as cores da peça
+    destino: p.adesivos.map((a) => centroDe.get(a.cor).split(",").map(Number)),
+  });
+  for (let i = 0; i < etapas.length; i += 1) {
+    const [pecas, pronta] = etapas[i];
+    const faltam = pecas.filter((p) => !pronta(p));
+    if (faltam.length) return { indice: i, nome: etapasDoMetodo[i], feitas: pecas.length - faltam.length, total: pecas.length, pendentes: faltam.map(descrever) };
   }
-  return { indice: 7, nome: "montado", feitas: 1, total: 1 };
+  return { indice: 7, nome: "montado", feitas: 1, total: 1, pendentes: [] };
 }

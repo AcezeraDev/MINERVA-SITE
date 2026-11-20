@@ -114,3 +114,12 @@ test("etapa do método reconhece o progresso", () => {
   // virar o cubo inteiro não muda nada
   assert.equal(etapaDoMetodo(aplicarGiros(criarCubo(3), seq("x2 y"))).indice, 7);
 });
+
+test("etapa aponta as peças que faltam e para onde vão", () => {
+  const e = etapaDoMetodo(aplicarGiros(criarCubo(3), seq("F2")));
+  assert.equal(e.pendentes.length, 1);
+  const aresta = e.pendentes[0];
+  assert.deepEqual([...aresta.cores].sort(), [0, 2]); // branco e verde
+  assert.deepEqual(aresta.onde.map((n) => n.join(",")).sort(), ["0,-1,0", "0,0,1"]); // embaixo, na frente
+  assert.deepEqual(aresta.destino.map((n) => n.join(",")).sort(), ["0,0,1", "0,1,0"]); // em cima, na frente
+});

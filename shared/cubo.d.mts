@@ -32,4 +32,5 @@ export function formatarTempo(ms: number | null | undefined): string;
 export function mediaDe(tempos: Array<number | null>, quantos: number): number | null;
 export function resumoTempos(solves: Solve[]): { total: number; melhor: number | null; media: number | null; ao5: number | null; ao12: number | null };
 export const etapasDoMetodo: string[];
-export function etapaDoMetodo(cubo: Cubo): { indice: number; nome: string; feitas: number; total: number } | null;
+export type PecaPendente = { id: number; cores: number[]; onde: Vetor[]; viradas: Array<{ cor: number; n: Vetor }>; destino: Vetor[] };
+export function etapaDoMetodo(cubo: Cubo): { indice: number; nome: string; feitas: number; total: number; pendentes: PecaPendente[] } | null;

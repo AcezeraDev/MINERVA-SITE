@@ -114,6 +114,9 @@ export function CuboView({ user }: { user: User }) {
 
   const [pensando, setPensando] = useState(false);
   const [aoVivo, setAoVivo] = useState(false);
+  const aoVivoLigado = useRef(false);
+  const olharEtapaRef = useRef<() => unknown>(() => null);
+  aoVivoLigado.current = aoVivo;
   const [pergunta, setPergunta] = useState("");
   const [ultimaPergunta, setUltimaPergunta] = useState("");
   const iaSeq = useRef(0);
@@ -488,7 +491,19 @@ export function CuboView({ user }: { user: User }) {
     if (cena && v.prefs.n === 3) {
       const estado = cena.estado();
       const etapa = etapaDoMetodo(estado);
-      if (etapa) linhas.push(`Pelo estado do cubo, a proxima etapa do metodo de camadas e: ${etapa.nome} (${etapa.feitas} de ${etapa.total} pecas dessa etapa ja certas).`);
+      if (etapa) {
+        linhas.push(`Pelo estado do cubo, a proxima etapa do metodo de camadas e: ${etapa.nome} (${etapa.feitas} de ${etapa.total} pecas dessa etapa ja certas).`);
+        if (!a && etapa.pendentes.length) {
+          const lado = (n: number[]) => cena.ladoNaTela(n as [number, number, number]);
+          const faces = (ns: number[][]) => ns.map((n) => `face ${lado(n)}`).join(" e ");
+          linhas.push("Pecas que ainda faltam nessa etapa (estao BRILHANDO em lilas no cubo; lados como o aluno ve na tela agora):");
+          etapa.pendentes.slice(0, 4).forEach((p) => {
+            const nome = `${p.cores.length === 2 ? "aresta" : "canto"} ${p.cores.map((c) => corNomes[c]).join("-")}`;
+            const viradas = p.viradas.map((v) => `${corNomes[v.cor]} virado para a face ${lado(v.n)}`).join(", ");
+            linhas.push(`- ${nome}: esta entre a ${faces(p.onde)} (${viradas}); o lugar certo dela e entre a ${faces(p.destino)}, com cada cor virada para o centro da mesma cor.`);
+          });
+        }
+      }
       linhas.push(`Estado (face: linhas de cima para baixo, iniciais das cores; centro da face U = cor de cima): ${resumoEstado(planificar(estado))}`);
     }
     return linhas.join("\n");
@@ -497,6 +512,22 @@ export function CuboView({ user }: { user: User }) {
   // Montagem livre com a Mine ao vivo: depois de uma pausa nos giros ela
   // comenta se a etapa do método avançou ou voltou; parado muito tempo, dá dica.
   const etapaVista = useRef<number | null>(null);
+  const [etapaInfo, setEtapaInfo] = useState<{ nome: string; feitas: number; total: number; indice: number } | null>(null);
+
+  /** Peças que faltam na etapa: brilham no cubo e viram texto para a Mine. */
+  const olharEtapa = useCallback(() => {
+    const cena = cenaRef.current;
+    if (!cena || vivo.current.prefs.n !== 3) {
+      setEtapaInfo(null);
+      return null;
+    }
+    const etapa = etapaDoMetodo(cena.estado());
+    if (!etapa) return null;
+    setEtapaInfo({ nome: etapa.nome, feitas: etapa.feitas, total: etapa.total, indice: etapa.indice });
+    if (!aula.current) cena.destacarPecas(etapa.pendentes.map((p) => p.id));
+    return etapa;
+  }, []);
+  olharEtapaRef.current = olharEtapa;
   const pausaGiros = useRef<number | undefined>(undefined);
   const aoVivoRef = useRef<() => void>(() => {});
   aoVivoRef.current = () => {
@@ -505,7 +536,7 @@ export function CuboView({ user }: { user: User }) {
     pausaGiros.current = window.setTimeout(() => {
       const cena = cenaRef.current;
       if (!cena || aula.current) return;
-      const etapa = etapaDoMetodo(cena.estado());
+      const etapa = olharEtapa();
       if (!etapa || etapa.indice === etapaVista.current) return;
       const antes = etapaVista.current;
       etapaVista.current = etapa.indice;
@@ -518,8 +549,7 @@ export function CuboView({ user }: { user: User }) {
   };
   useEffect(() => {
     if (!aoVivo) return;
-    const cena = cenaRef.current;
-    etapaVista.current = cena && vivo.current.prefs.n === 3 ? etapaDoMetodo(cena.estado())?.indice ?? null : null;
+    etapaVista.current = olharEtapa()?.indice ?? null;
     if (!aula.current && !fala)
       falarIA("EVENTO: o aluno ligou a Mine ao vivo para montar o cubo. Diga em que etapa o cubo esta e como comecar.", "Tô aqui! Gira o cubo que eu vou acompanhando. Pode me perguntar qualquer coisa aqui embaixo.");
     return () => window.clearTimeout(pausaGiros.current);
@@ -588,6 +618,7 @@ export function CuboView({ user }: { user: User }) {
   const sairDaAula = useCallback(() => {
     aula.current = null;
     cenaRef.current?.destacar(null);
+    setEtapaInfo(null);
     calarIA();
     setFala(null);
     setAoVivo(false);
@@ -636,6 +667,7 @@ export function CuboView({ user }: { user: User }) {
     if (relogioRef.current) relogioRef.current.textContent = v.prefs.inspecao && v.prefs.modo === "tela" ? "15" : "0.00";
     seq.forEach((g) => cena.girar(g, "embaralhar", true));
     etapaVista.current = etapaDoMetodo(cena.estado())?.indice ?? null;
+    if (aoVivoLigado.current) olharEtapaRef.current();
     setPlanif(planificar(aplicarGiros(criarCubo(n), seq)));
   }, [mudarFase]);
 
@@ -681,6 +713,7 @@ export function CuboView({ user }: { user: User }) {
     setUltimo(null);
     setPlanif(planificar(criarCubo(v.prefs.n)));
     etapaVista.current = v.prefs.n === 3 ? 7 : null;
+    if (aoVivoLigado.current) olharEtapaRef.current();
     if (relogioRef.current) relogioRef.current.textContent = "0.00";
     mudarFase("livre");
   }, [mudarFase]);
@@ -931,6 +964,14 @@ export function CuboView({ user }: { user: User }) {
                   {aulaViva?.tipo === "treino" && ficha >= 0 && ficha < aulaViva.passo.algoritmo.length ? (
                     <p className="cubo-faixa-proximo">
                       <span>Próximo giro</span> {instrucao(aulaViva.passo.algoritmo[ficha])}
+                    </p>
+                  ) : null}
+                  {!aulaViva && etapaInfo ? (
+                    <p className="cubo-faixa-proximo">
+                      <span>Etapa agora</span>
+                      {etapaInfo.indice >= 7
+                        ? "cubo montado!"
+                        : `${etapaInfo.nome}: ${etapaInfo.feitas} de ${etapaInfo.total} peças certas. As peças brilhando em lilás ainda não estão no lugar.`}
                     </p>
                   ) : null}
                   {aulaViva ? <FichasAlgoritmo algoritmo={aulaViva.passo.algoritmo} ativo={ficha} compacto /> : null}

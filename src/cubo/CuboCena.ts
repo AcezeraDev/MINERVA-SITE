@@ -100,6 +100,7 @@ export class CuboCena {
   /** Corpo das peças da camada que a Mine pede para girar (brilha pulsando). */
   private destaqueMat: THREE.MeshStandardMaterial;
   private destaque: Giro | null = null;
+  private destaquePecas = new Set<number>();
   private adesivoMats: THREE.MeshStandardMaterial[];
   /** Trava o gesto de girar camada (modo cubo de verdade, embaralhando…). */
   travado = false;
@@ -250,13 +251,31 @@ export class CuboCena {
   /** Faz brilhar as peças da camada deste giro (null apaga). Vale o estado que a pessoa vai ver. */
   destacar(giro: Giro | null) {
     this.destaque = giro;
+    this.destaquePecas.clear();
     this.aplicarDestaque();
+  }
+
+  /** Faz brilhar peças soltas (as que faltam na etapa do método). */
+  destacarPecas(ids: number[]) {
+    this.destaquePecas = new Set(ids);
+    if (ids.length) this.destaque = null;
+    this.aplicarDestaque();
+  }
+
+  /** Para que lado da tela aponta uma direção do cubo: "de cima", "da frente"… */
+  ladoNaTela(n: [number, number, number]) {
+    const v = new THREE.Vector3(...n).applyQuaternion(this.alvoRaiz);
+    const comp = [Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)];
+    const i = comp.indexOf(Math.max(...comp));
+    const positivo = [v.x, v.y, v.z][i] > 0;
+    return i === 0 ? (positivo ? "da direita" : "da esquerda") : i === 1 ? (positivo ? "de cima" : "de baixo") : positivo ? "da frente" : "de trás";
   }
 
   private aplicarDestaque() {
     for (const peca of this.alvo.pecas) {
       const corpo = this.grupos[peca.id]?.userData.corpo as THREE.Mesh | undefined;
-      if (corpo) corpo.material = this.destaque && pecaNoGiro(peca, this.destaque) ? this.destaqueMat : this.corpoMat;
+      const brilha = this.destaque ? pecaNoGiro(peca, this.destaque) : this.destaquePecas.has(peca.id);
+      if (corpo) corpo.material = brilha ? this.destaqueMat : this.corpoMat;
     }
   }
 
@@ -341,7 +360,7 @@ export class CuboCena {
       this.flutua.rotation.x += (alvoX - this.flutua.rotation.x) * Math.min(1, delta * 5);
       this.flutua.rotation.y += (alvoY - this.flutua.rotation.y) * Math.min(1, delta * 5);
     }
-    if (this.destaque) this.destaqueMat.emissiveIntensity = this.opcoes.reduzido ? 0.6 : 0.45 + Math.sin(tempo * 5) * 0.25;
+    if (this.destaque || this.destaquePecas.size) this.destaqueMat.emissiveIntensity = this.opcoes.reduzido ? 0.6 : 0.45 + Math.sin(tempo * 5) * 0.25;
     this.flutua.position.y = (this.opcoes.reduzido ? 0 : Math.sin(tempo * 1.2) * 0.06) + hop;
     const sm = this.sombra.material as THREE.MeshBasicMaterial;
     sm.opacity = 1 - hop * 0.9;
