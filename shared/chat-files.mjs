@@ -25,7 +25,7 @@ function fold(text) {
   return String(text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-const FILE_VERB = String.raw`(?:cri[ae]|criar|faz|faca|fazer|ger[ae]|gerar|mont[ae]|montar|export[ae]|exportar|transform[ae]|transformar|convert[ae]|converter|pass[ae]|passar|coloc[ae]|colocar|salv[ae]|salvar|me\s+d[aeê]|mand[ae]|mandar|quero|queria|preciso(?:\s+de)?|baix[ae]|baixar|gostaria\s+de|elabor[ae]|prepar[ae]|organiz[ae]|organizar|escrev[ae]|escrever)`;
+const FILE_VERB = String.raw`(?:continu[ae]|continuar|termin[ae]|terminar|refa[cz]\w*|complet[ae]|completar|cri[ae]|criar|faz|faca|fazer|ger[ae]|gerar|mont[ae]|montar|export[ae]|exportar|transform[ae]|transformar|convert[ae]|converter|pass[ae]|passar|coloc[ae]|colocar|salv[ae]|salvar|me\s+d[aeê]|mand[ae]|mandar|quero|queria|preciso(?:\s+de)?|baix[ae]|baixar|gostaria\s+de|elabor[ae]|prepar[ae]|organiz[ae]|organizar|escrev[ae]|escrever)`;
 
 /**
  * A pessoa pediu um arquivo? Devolve o tipo ("pdf", "word", "excel", "html")
@@ -41,6 +41,8 @@ export function asksForFile(text) {
   if (near(String.raw`(?:word|docx|doc|documento\s+(?:do|de)\s+word)`)) return "word";
   if (near(String.raw`(?:html|pagina\s+(?:web|html))`)) return "html";
   if (near(String.raw`(?:pdf|pdfs|apostila|arquivo\s+para\s+imprimir|folha\s+para\s+imprimir)`)) return "pdf";
+  // "continua o arquivo" / "refaça o arquivo completo": retomada de um arquivo cortado
+  if (/\b(?:continu[ae]|continuar|termin[ae]|terminar|refa[cz]\w*|complet[ae]|completar)\b[^.?!\n]{0,40}?\barquivo\b/.test(value)) return "pdf";
   return "";
 }
 

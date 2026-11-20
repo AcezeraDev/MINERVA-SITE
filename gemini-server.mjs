@@ -11,6 +11,7 @@ import { loadLocalEnv, redactSecrets } from "./mine/env.mjs";
 import { checkRateLimit, resolveIdentity, validateChatPayload } from "./mine/limits.mjs";
 import { runMineRequest } from "./mine/router.mjs";
 import { webSearchEnabled } from "./mine/web.mjs";
+import { asksForFile, asksForStudySheet } from "./shared/chat-files.mjs";
 
 export { loadLocalEnv };
 
@@ -168,8 +169,14 @@ export async function handleGeminiRequest(req, res) {
     // Out/2026: o teto subiu de 2600 para 8000. Com raciocinio "medium" o
     // modelo gastava boa parte dos 1500 pedidos pelo chat so pensando, e
     // explicacoes longas saiam cortadas ou encurtadas.
-    const serverTokenCap = clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
-    const requestedTokens = clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
+    // Nov/2026: arquivo (PDF, Word, Excel, HTML) e resumo de prova têm teto
+    // próprio. Com o teto geral de produção o documento era cortado no meio e
+    // o cartão ficava em "Montando o PDF…" para sempre.
+    const fileRequest = !task && (Boolean(asksForFile(payload.prompt)) || asksForStudySheet(payload.prompt));
+    const serverTokenCap = fileRequest
+      ? clampNumber(process.env.MINE_FILE_MAX_OUTPUT_TOKENS, 2000, 16000, 14000)
+      : clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
+    const requestedTokens = fileRequest ? serverTokenCap : clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
     const maxTokens = Math.min(requestedTokens, serverTokenCap);
     const wantsStream = payload.stream === true;
 

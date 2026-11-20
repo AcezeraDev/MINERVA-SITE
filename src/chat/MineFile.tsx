@@ -10,7 +10,7 @@
 */
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, Eye, FileCode2, FileSpreadsheet, FileText, Loader2, Printer, X } from "lucide-react";
+import { Download, Eye, FileCode2, FileSpreadsheet, FileText, Loader2, Printer, RotateCcw, X } from "lucide-react";
 import {
   buildDocx,
   buildXlsx,
@@ -61,7 +61,7 @@ function printAsPdf(html: string) {
   document.body.appendChild(frame);
 }
 
-export const MineFileCard = memo(function MineFileCard({ code, open }: { code: string; open: boolean }) {
+export const MineFileCard = memo(function MineFileCard({ code, open, cortado = false }: { code: string; open: boolean; cortado?: boolean }) {
   const file = useMemo(() => parseFileBlock(code), [code]);
   const [preview, setPreview] = useState(false);
   const [hint, setHint] = useState("");
@@ -95,7 +95,7 @@ export const MineFileCard = memo(function MineFileCard({ code, open }: { code: s
     file.tipo === "excel"
       ? `${sheets.length || 1} ${sheets.length === 1 ? "aba" : "abas"} · ${sheets.reduce((sum, sheet) => sum + sheet.rows.length - 1, 0)} linhas`
       : (() => {
-          const secoes = (file.corpo.match(/^#{2,3}\s/gm) || []).length || 1;
+          const secoes = (file.corpo.match(/^##\s/gm) || []).length || 1;
           return `${secoes} ${secoes === 1 ? "seção" : "seções"} · ${Math.max(1, Math.round(file.corpo.split(/\s+/).length / 380))} pág. aprox.`;
         })();
 
@@ -151,6 +151,17 @@ export const MineFileCard = memo(function MineFileCard({ code, open }: { code: s
             ))}
           </span>
         </span>
+        {cortado ? (
+          <span className="mfile__hint is-cortado" role="status">
+            <span>Este arquivo chegou incompleto: dá para baixar o que veio, ou pedir de novo.</span>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("mine:escrever", { detail: `Refaça o arquivo "${file.titulo}" completo, um pouco mais curto.` }))}
+            >
+              <RotateCcw aria-hidden /> Pedir o arquivo completo
+            </button>
+          </span>
+        ) : null}
         {hint ? (
           <span className="mfile__hint" role="status">
             {hint}

@@ -254,6 +254,33 @@
   font-weight: 700;
 }
 
+.mfile__hint.is-cortado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: rgb(var(--hl-yellow, 250 222 90) / 0.45);
+}
+
+.mfile__hint.is-cortado button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.2rem;
+  padding: 0 0.75rem;
+  border-radius: 0.6rem;
+  background: rgb(var(--theme-text) / 0.85);
+  color: rgb(var(--sheet));
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.mfile__hint.is-cortado svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
 /* prévia em tela cheia */
 .mfile-dialog {
   position: fixed;

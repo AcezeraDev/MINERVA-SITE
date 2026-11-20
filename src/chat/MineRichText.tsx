@@ -293,11 +293,13 @@ const CHART_LANGS = new Set(["grafico", "gráfico", "chart"]);
  * página HTML completa vira prévia do site funcionando;
  * Python e JavaScript ganham o botão Executar.
  */
-const CodeBlock = memo(function CodeBlock({ code: raw, lang, open }: { code: string; lang: string; open: boolean }) {
+const CodeBlock = memo(function CodeBlock({ code: raw, lang, open, streaming = false }: { code: string; lang: string; open: boolean; streaming?: boolean }) {
   // Termo do glossário nunca é marcado em código; se escapar, sai aqui.
   const code = raw.replace(GLOSS_MARKS, "");
   // Arquivo para baixar (PDF, Word, Excel, HTML): cartão próprio, inclusive enquanto chega.
-  if (lang === "arquivo") return <MineFileCard code={code} open={open} />;
+  // Bloco aberto numa resposta que JÁ terminou = arquivo cortado: o cartão
+  // mostra o que chegou em vez de girar "Montando…" para sempre.
+  if (lang === "arquivo") return <MineFileCard code={code} open={open && streaming} cortado={open && !streaming} />;
   // Gráfico e esquema só se desenham com a cerca fechada; chegando, aparecem como código.
   if (!open && CHART_LANGS.has(lang)) return <MineChart source={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
   if (!open && (lang === "svg" || (lang === "xml" && /^\s*<svg[\s>]/i.test(code)))) return <MineSvgFigure source={code} fallback={<CodeBox code={code} lang="xml" open={false} />} />;
@@ -530,7 +532,7 @@ function Blocks({ blocks, streaming }: { blocks: Block[]; streaming: boolean }) 
           case "rule":
             return <hr key={key} className="mrt-rule" />;
           case "code":
-            return <CodeBlock key={key} code={block.code} lang={block.lang} open={block.open} />;
+            return <CodeBlock key={key} code={block.code} lang={block.lang} open={block.open} streaming={streaming} />;
           case "math":
             return <MathBlock key={key} tex={block.tex} open={block.open} />;
           case "table":

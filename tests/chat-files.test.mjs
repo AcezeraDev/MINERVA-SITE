@@ -29,9 +29,18 @@ test("pedido de arquivo: formato certo, dúvida continua conversa", () => {
   assert.equal(asksForFile("monta uma apostila de frações"), "pdf");
   assert.equal(asksForFile("exporta essa tabela pra excel"), "excel");
   assert.equal(asksForFile("quero uma página html do meu trabalho"), "html");
+  assert.equal(asksForFile("continua o arquivo"), "pdf");
+  assert.equal(asksForFile('Refaça o arquivo "País de Gales" completo, um pouco mais curto.'), "pdf");
   assert.equal(asksForFile("como faço uma planilha no excel?"), "");
   assert.equal(asksForFile("o que é um pdf?"), "");
   assert.equal(asksForFile("o professor mandou o pdf da aula"), "");
+});
+
+test("detecta bloco de arquivo que ficou aberto (resposta cortada)", async () => {
+  const { fileBlockOpen } = await import("../mine/router.mjs");
+  assert.equal(fileBlockOpen("Montei.\n\n```arquivo\ntipo: pdf\ntitulo: X\n---\n## A\ntexto cort"), true);
+  assert.equal(fileBlockOpen("Montei.\n\n```arquivo\ntipo: pdf\n---\n## A\ntexto\n```\n\nQuer ajuste?"), false);
+  assert.equal(fileBlockOpen("Sem arquivo nenhum."), false);
 });
 
 test("resumo de prova a partir da conversa", () => {

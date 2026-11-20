@@ -122,6 +122,14 @@ function gameAttemptMs() {
 // recusam o parametro. A variacao das partidas vem do prompt e do filtro de
 // ineditismo no cliente.
 
+/** Há um bloco ```arquivo aberto (sem a cerca de fechamento) no fim do texto? */
+export function fileBlockOpen(text) {
+  const source = String(text || "");
+  const start = source.lastIndexOf("```arquivo");
+  if (start < 0) return false;
+  return !/\n[ \t]*```[ \t]*(?:\n|$)/.test(source.slice(start + "```arquivo".length));
+}
+
 /**
  * Uma tentativa contra um modelo ja resolvido.
  * Com `onDelta` a resposta vem em streaming; sem ele, de uma vez so.
@@ -164,8 +172,44 @@ async function attemptModel({ model, task, prompt, context, history, attachments
       return { toolQueries: cleanQueries(search.arguments?.consultas ?? search.arguments?.consulta), reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs };
     }
 
-    const reply = cleanReply(result.content, { prompt });
-    const qualityIssue = replyQualityIssue({ task, reply, prompt, finishReason: result.finishReason });
+    // Arquivo (```arquivo) cortado pelo limite de saída: em vez de entregar
+    // meio documento, pede ao modelo para continuar de onde parou. Em
+    // streaming a continuação chega na tela emendada no mesmo balão.
+    let content = String(result.content || "");
+    let finishReason = result.finishReason;
+    for (let rodada = 0; rodada < 2 && finishReason === "length" && fileBlockOpen(content); rodada += 1) {
+      const continuacao = await call({
+        provider: model.provider,
+        providerModel: model.providerModel,
+        messages: [
+          ...messages,
+          { role: "assistant", content },
+          {
+            role: "user",
+            content: "Sua resposta foi cortada pelo limite de tamanho no meio do bloco ```arquivo. Continue EXATAMENTE do ponto onde parou (sem repetir nada do que já escreveu e sem comentar o corte), termine o conteúdo de forma mais enxuta e feche o bloco com ``` numa linha própria. Depois do bloco, no máximo uma frase.",
+          },
+        ],
+        maxTokens,
+        timeoutMs,
+        signal,
+        onDelta,
+        providerParams: model.providerParams,
+      });
+      content += String(continuacao.content || "");
+      finishReason = continuacao.finishReason;
+      console.log(`[mine] arquivo=continuado rodada=${rodada + 1} fim=${finishReason || "ok"}`);
+    }
+    // Ainda aberto (não deu para terminar): fecha o bloco para o arquivo
+    // aparecer com o que chegou, e a resposta não é descartada por isso.
+    if (fileBlockOpen(content)) {
+      const fecho = "\n```\n\n_(O arquivo ficou maior que o limite e saiu resumido. Peça \"continua o arquivo\" para eu completar.)_";
+      content += fecho;
+      onDelta?.(fecho);
+      finishReason = "stop";
+    }
+
+    const reply = cleanReply(content, { prompt });
+    const qualityIssue = replyQualityIssue({ task, reply, prompt, finishReason });
     if (qualityIssue) {
       throw new MineError(`Resposta rejeitada pelo controle de qualidade: ${qualityIssue}.`, { code: "empty", retryable: true });
     }

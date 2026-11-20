@@ -528,7 +528,7 @@ Regras:
 ${planilha
     ? `- Planilha: so tabelas em markdown dentro do bloco, cada uma com um titulo "## Nome da aba" antes (vira uma aba do Excel, ate 31 letras). Primeira linha = cabecalho. Numeros sem unidade na celula (a unidade vai no cabecalho, ex.: "Preco (R$)"), com virgula decimal brasileira. Formulas do Excel podem comecar com = e usam a posicao da celula (linha 1 e o cabecalho, a primeira linha de dados e a 2), ex.: =SOMA(B2:B6), =B2*C2. Antes de cada tabela pode haver uma linha de texto explicando a aba.`
     : `- Documento organizado de verdade: comece com 1 ou 2 frases de apresentacao, depois secoes com "## titulo" (sem emoji no titulo), subsecoes "###", listas, tabelas markdown quando houver comparacao, e caixas de destaque "> [!DICA]", "> [!IMPORTANTE]", "> [!ATENCAO]", "> [!DEFINICAO]", "> [!EXEMPLO]", "> [!ERRO COMUM]" e "> [!RESUMO]" (o rotulo na primeira linha do bloco ">", o texto nas linhas ">" seguintes). Formulas em texto simples (ex.: v = d / t) porque o arquivo nao renderiza LaTeX.
-- Tamanho: o que o pedido precisar, de meia pagina a umas 4 paginas. Conteudo correto, completo e pronto para imprimir ou entregar.`}
+- Tamanho: o que o pedido precisar, de meia pagina a no maximo umas 3 paginas (cerca de 1.200 palavras). Prefira secoes enxutas a um texto enorme: o arquivo PRECISA terminar e o bloco PRECISA ser fechado com \`\`\`. Conteudo correto, completo e pronto para imprimir ou entregar.`}
 - O titulo do arquivo vira o nome do arquivo baixado: curto, sem data e sem a palavra "arquivo".`;
 }
 
