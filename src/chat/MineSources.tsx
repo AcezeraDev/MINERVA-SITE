@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Globe,
   Search,
+  Wrench,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -36,7 +37,10 @@ export type MineSource = {
 };
 
 export type MineSearchStatus = {
-  stage: "searching" | "reading";
+  /** "tool": a Mine está usando uma ferramenta (agenda, contas, ENEM...). */
+  stage: "searching" | "reading" | "tool";
+  /** Rótulo da ferramenta, ex.: "Olhando sua agenda". */
+  label?: string;
   queries?: string[];
   sources?: MineSource[];
 };
@@ -381,16 +385,20 @@ export function MineWorking({
   const seconds = useElapsed(true);
   const [showReasoning, setShowReasoning] = useState(false);
   const label =
-    status?.stage === "reading"
-      ? `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"}`
-      : status?.stage === "searching"
-        ? "Pesquisando na web"
-        : "Pensando";
+    status?.stage === "tool"
+      ? status.label || "Usando uma ferramenta"
+      : status?.stage === "reading"
+        ? `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"}`
+        : status?.stage === "searching"
+          ? "Pesquisando na web"
+          : "Pensando";
   return (
     <div className="mine-working" aria-live="polite">
       <div className="mine-working__row">
         <span className="mine-working__icon" aria-hidden>
-          {status ? (
+          {status?.stage === "tool" ? (
+            <Wrench className="h-3.5 w-3.5" />
+          ) : status ? (
             <Globe className="h-3.5 w-3.5" />
           ) : (
             <Brain className="h-3.5 w-3.5" />

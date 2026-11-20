@@ -1,6 +1,6 @@
 import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
-import { buildCodeInstruction, buildFileInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
+import { buildCodeInstruction, buildFileInstruction, buildToolsInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
 import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, editsAttachedImage, extractSuggestions, imageFormatFrom, imageStyleFrom, previousGalleryStyle, withImageRequest, withImageStyle } from "../shared/chat-media.mjs";
 import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
 import { asksForCode } from "../shared/code-intent.mjs";
@@ -10,6 +10,7 @@ import { openPage, readTopPages } from "./page-reader.mjs";
 import { readYoutubeVideo, urlsInText, videoInstruction, youtubeId } from "./video.mjs";
 import { callProvider, callProviderStream, MineError, providerAvailable, providerConfigured } from "./providers.mjs";
 import { redactSecrets } from "./env.mjs";
+import { KNOWLEDGE_TOOLS, STUDENT_TOOLS, TOOL_LABELS, runTools, sanitizeAluno, toolResultsInstruction } from "./tools.mjs";
 
 // Camada de roteamento da Mine: decide qual modelo atende (principal ou reserva
 // interna), pesquisa na web quando faz sentido e devolve texto limpo. Quem
@@ -168,9 +169,18 @@ async function attemptModel({ model, task, prompt, context, history, attachments
 
     // Pediu uma pesquisa e ainda nao escreveu nada: quem chama pesquisa e
     // pergunta de novo, entao nao ha resposta para avaliar.
-    const search = (result.toolCalls || []).find((call) => call.name === WEB_SEARCH_TOOL.function.name);
-    if (search && !String(result.content || "").trim()) {
-      return { toolQueries: cleanQueries(search.arguments?.consultas ?? search.arguments?.consulta), reasoning: result.reasoning, usage: result.usage, durationMs: result.durationMs };
+    // Pediu ferramentas (pesquisa, agenda, conta...) e ainda nao escreveu:
+    // quem chama executa e pergunta de novo com os resultados.
+    const calls = result.toolCalls || [];
+    if (calls.length && !String(result.content || "").trim()) {
+      const search = calls.find((call) => call.name === WEB_SEARCH_TOOL.function.name);
+      return {
+        toolQueries: search ? cleanQueries(search.arguments?.consultas ?? search.arguments?.consulta) : null,
+        toolCalls: calls.filter((call) => call.name !== WEB_SEARCH_TOOL.function.name),
+        reasoning: result.reasoning,
+        usage: result.usage,
+        durationMs: result.durationMs,
+      };
     }
 
     // Arquivo (```arquivo) cortado pelo limite de saída: em vez de entregar
@@ -393,6 +403,7 @@ export async function runMineRequest({
   photos = false,
   tutor = false,
   controle = false,
+  aluno = null,
 }) {
   const cleanTask = String(task || "").trim();
   // Controle Mine vale só no chat livre: tarefas têm formato próprio.
@@ -447,6 +458,13 @@ export async function runMineRequest({
   const empty = { extraSystem: [], sources: [], queries: [], notice: "", opened: [] };
   let web = mode === "force" ? await prepareWebContext({ prompt, history, signal, deadline, onStatus }) : empty;
   let offerTool = mode === "auto" && toolsSupported();
+  // Ferramentas da Mine (mine/tools.mjs): dados do aluno (quando o navegador
+  // mandou o retrato dele) e contas/dados exatos. Ate 3 rodadas por pedido.
+  const alunoData = cleanTask || control ? null : sanitizeAluno(aluno);
+  let extraTools = cleanTask || control || codeKind || !toolsSupported() ? [] : [...(alunoData ? STUDENT_TOOLS : []), ...KNOWLEDGE_TOOLS];
+  const toolResults = [];
+  const actions = [];
+  let toolRounds = 0;
   if (control) {
     for (const page of web.opened || []) {
       onStatus?.({ stage: "visited", visit: { ...page, kind: "page", ok: true } });
@@ -495,6 +513,7 @@ export async function runMineRequest({
     ...(cleanTask ? [] : tutor ? [buildTutorInstruction()] : []),
     ...(control ? [CONTROL_INSTRUCTION, ...controlLinks.extraSystem] : []),
     ...(cleanTask ? [] : [buildSuggestionsInstruction({ tutor: Boolean(tutor) })]),
+    ...(extraTools.length || (!cleanTask && !codeKind && !control) ? [buildToolsInstruction({ ferramentas: extraTools.length > 0, aluno: Boolean(alunoData) && extraTools.length > 0 })] : []),
   ];
 
   let lastError = null;
@@ -513,6 +532,7 @@ export async function runMineRequest({
     return {
       ...result,
       reply: reply || result.reply,
+      actions,
       reasoning: (reasoning || result.reasoning || "").trim(),
       suggestions,
       alias: MINE_MODEL.alias,
@@ -533,7 +553,8 @@ export async function runMineRequest({
     const remaining = deadline - Date.now();
     if (remaining < minAttemptMs) break;
 
-    const tools = offerTool ? [WEB_SEARCH_TOOL] : undefined;
+    const offered = [...(offerTool ? [WEB_SEARCH_TOOL] : []), ...(toolRounds < 3 ? extraTools : [])];
+    const tools = offered.length ? offered : undefined;
     try {
       committed = false;
       const result = await attemptModel({
@@ -549,7 +570,7 @@ export async function runMineRequest({
         timeoutMs: Math.min(codeKind && index === 0 ? Math.max(perAttemptMs, 240_000) : perAttemptMs, remaining),
         signal,
         fallback: index > 0 && !gameTask,
-        extraSystem: [...web.extraSystem, ...baseSystem],
+        extraSystem: [...web.extraSystem, ...baseSystem, ...(toolResults.length ? [toolResultsInstruction(toolResults)] : [])],
         tools,
         onDelta: onDelta
           ? (text) => {
@@ -564,11 +585,21 @@ export async function runMineRequest({
             }
           : undefined,
       });
-      if (result.toolQueries) {
-        // A Mine pediu para pesquisar: busca com as consultas dela e a mesma
-        // tentativa recomeca, agora sem a ferramenta (uma rodada so).
-        offerTool = false;
-        web = await prepareWebContext({ prompt, history, signal, deadline, queries: result.toolQueries, onStatus });
+      if (result.toolQueries || result.toolCalls?.length) {
+        if (result.toolCalls?.length) {
+          // Agenda, contas, ENEM...: roda e a mesma tentativa recomeca com os resultados.
+          onStatus?.({ stage: "tool", label: TOOL_LABELS[result.toolCalls[0].name] || "Usando uma ferramenta" });
+          const ran = await runTools(result.toolCalls, { aluno: alunoData, actions, signal });
+          toolResults.push(...ran);
+          toolRounds += 1;
+          console.log(`[mine] ferramentas=${ran.map((item) => item.name).join(",")} rodada=${toolRounds}`);
+        }
+        if (result.toolQueries) {
+          // A Mine pediu para pesquisar: busca com as consultas dela e a mesma
+          // tentativa recomeca, agora sem a ferramenta (uma rodada so).
+          offerTool = false;
+          web = await prepareWebContext({ prompt, history, signal, deadline, queries: result.toolQueries, onStatus });
+        }
         index -= 1;
         continue;
       }
@@ -584,6 +615,7 @@ export async function runMineRequest({
       if (tools && !error?.retryable && (error?.status === 400 || error?.status === 422)) {
         markToolsUnsupported();
         offerTool = false;
+        extraTools = [];
         index -= 1;
         continue;
       }

@@ -617,6 +617,52 @@ QUALIDADE DO CODIGO (escreva como um dev senior que vai ser avaliado)
 }
 
 /**
+ * Ferramentas (mine/tools.mjs) e blocos interativos do chat (nov/2026).
+ * `ferramentas`: o modelo recebeu as funcoes; `aluno`: tambem as do aluno.
+ * Os blocos sao desenhados pelo navegador (src/chat/blocos/).
+ */
+export function buildToolsInstruction({ ferramentas = true, aluno = false } = {}) {
+  const tools = ferramentas
+    ? `FERRAMENTAS
+Voce tem ferramentas de verdade. Chame a ferramenta ANTES de escrever a resposta (sem anunciar "vou verificar"), use o resultado e fale com naturalidade, sem citar nome de ferramenta.
+- calcular / resolver_equacao: TODA conta numerica (exercicio, porcentagem, juros, fisica, estatistica) passa por calcular; confira raizes com resolver_equacao. Nunca faca conta de cabeca.
+- quimica: massa molar, balanceamento e dados de elemento.
+- questoes_enem: questoes oficiais do ENEM quando pedirem questao real/de vestibular; mostre o texto, o comando e as alternativas, cite "ENEM ano, questao N" e so revele o gabarito depois que o estudante responder (ou se ele pedir).
+- dados_ibge: populacao oficial (Brasil, estado, municipio); otimo para virar \`\`\`grafico com fonte IBGE.${aluno ? `
+- ver_agenda, buscar_meus_conteudos, meus_erros, meu_progresso: dados do PROPRIO estudante no Minerva. Use quando ele falar da vida dele ("o que eu tenho essa semana", "meu conteudo de X", "no que eu erro", "meu nivel"); com isso, monte planos e revisoes personalizados.
+- criar_tarefa: so quando ele pedir para anotar/lembrar/agendar; confirme em uma frase.` : ""}
+
+`
+    : "";
+  return `${tools}BLOCOS INTERATIVOS (a tela desenha; escreva JSON valido, aspas duplas, sem comentarios)
+Use quando ajudarem a aprender, no maximo um por resposta, com 1 ou 2 frases de texto antes:
+- Quiz para treinar agora (ate 6 perguntas, uma por vez na tela, com correcao):
+\`\`\`quiz
+{"titulo": "Revisao de citologia", "perguntas": [{"pergunta": "Qual organela faz a respiracao celular?", "opcoes": ["Ribossomo", "Mitocondria", "Lisossomo", "Complexo golgiense"], "correta": 1, "explicacao": "A mitocondria produz ATP na respiracao celular."}]}
+\`\`\`
+- Linha do tempo (Historia, ciencia, biografias; 4 a 12 eventos em ordem):
+\`\`\`linha-do-tempo
+{"titulo": "Era Vargas", "eventos": [{"data": "1930", "titulo": "Revolucao de 1930", "texto": "Vargas chega ao poder."}]}
+\`\`\`
+- Mapa com lugares marcados (Geografia, Historia; coordenadas reais em graus decimais):
+\`\`\`mapa
+{"titulo": "Grandes navegacoes", "lugares": [{"nome": "Lisboa", "lat": 38.7223, "lon": -9.1393, "texto": "Partida das expedicoes."}]}
+\`\`\`
+- Grafico de funcao para MEXER (controles deslizantes nos coeficientes; expressao com * e ^):
+\`\`\`funcao
+{"titulo": "Parabola y = ax^2 + bx + c", "expressao": "a*x^2 + b*x + c", "parametros": {"a": {"min": -5, "max": 5, "valor": 1, "passo": 0.5}, "b": {"min": -10, "max": 10, "valor": 0, "passo": 1}, "c": {"min": -10, "max": 10, "valor": 0, "passo": 1}}, "x": [-10, 10]}
+\`\`\`
+- Timer de foco quando ele quiser estudar junto ("estuda comigo 25 minutos"):
+\`\`\`timer
+{"minutos": 25, "tarefa": "Revisar logaritmos", "pausa": 5}
+\`\`\`
+- Ditado de vocabulario (idiomas: a tela fala a palavra e ele escreve; 5 a 12 palavras):
+\`\`\`ditado
+{"idioma": "en-US", "palavras": [{"palavra": "apple", "traducao": "maca"}]}
+\`\`\``;
+}
+
+/**
  * "Transforma essa conversa num resumo de prova": folha de revisao em PDF com
  * o que foi estudado nesta conversa (o historico vai junto do pedido).
  */

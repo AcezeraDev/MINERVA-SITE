@@ -20,6 +20,7 @@ import {
 import { MineCitation } from "./MineSources";
 import { isSitePage } from "./SitePreview";
 import { ProjectCard } from "./monitor/ProjectCard";
+import { BLOCO_LANGS, BlocoInterativo } from "./blocos/Blocos";
 import { InlineRunner } from "./CodeRunner";
 import { MineChart, MineSvgFigure } from "./MineChart";
 import { emoji3dPath, splitLeadingEmoji } from "../../shared/emoji-3d.mjs";
@@ -307,6 +308,8 @@ const CodeBlock = memo(function CodeBlock({ code: raw, lang, open, streaming = f
   // Projeto (````projeto) e página HTML inteira abrem no monitor ao lado do chat,
   // inclusive enquanto chegam (o monitor mostra o código sendo escrito).
   if (lang === "projeto") return <ProjectCard code={code} source="projeto" open={open} streaming={streaming} />;
+  // Quiz, linha do tempo, mapa, gráfico de função, timer e ditado (src/chat/blocos/).
+  if (!open && BLOCO_LANGS.has(lang)) return <BlocoInterativo lang={lang} code={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
   if (isSitePage(code, lang)) return <ProjectCard code={code} source="html" open={open} streaming={streaming} />;
   const runnable = !open ? runnableLanguage(lang) : null;
   if (!runnable) return <CodeBox code={code} lang={lang} open={open} />;

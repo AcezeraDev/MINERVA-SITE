@@ -201,12 +201,13 @@ export async function handleGeminiRequest(req, res) {
       photos: payload.photos === true,
       tutor: payload.tutor === true,
       controle: payload.controle === true,
+      aluno: payload.aluno && typeof payload.aluno === "object" ? payload.aluno : null,
       maxTokens,
     });
 
     writeJson(res, 200, {
       reply: result.reply,
-      actions: [],
+      actions: result.actions || [],
       suggestions: result.suggestions || [],
       model: result.alias,
       modelDisplayName: result.displayName,
@@ -260,6 +261,7 @@ async function streamResponse(req, res, { task, payload, maxTokens }) {
       photos: payload.photos === true,
       tutor: payload.tutor === true,
       controle: payload.controle === true,
+      aluno: payload.aluno && typeof payload.aluno === "object" ? payload.aluno : null,
       maxTokens,
       signal: controller.signal,
       onDelta: deliverDeltas
@@ -292,6 +294,7 @@ async function streamResponse(req, res, { task, payload, maxTokens }) {
     sendEvent(res, {
       type: "done",
       reply: result.reply,
+      actions: result.actions || [],
       model: result.alias,
       modelDisplayName: result.displayName,
       notice: result.notice || "",

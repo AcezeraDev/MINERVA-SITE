@@ -238,7 +238,8 @@ test("no modo automatico a Mine pede a pesquisa pela ferramenta", async () => {
     },
   );
   assert.equal(requests[0].tools[0].function.name, "pesquisar_web");
-  assert.equal(requests[1].tools, undefined);
+  // depois da pesquisa ela nao e oferecida de novo (as outras ferramentas continuam)
+  assert.ok(!(requests[1].tools || []).some((tool) => tool.function.name === "pesquisar_web"));
   assert.match(requests[1].messages.map((message) => message.content).join("\n"), /A final foi em 19 de julho/);
 });
 

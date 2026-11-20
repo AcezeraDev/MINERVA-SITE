@@ -1,0 +1,584 @@
+/*
+  Blocos interativos do chat da Mine (Blocos.tsx): quiz, linha do tempo,
+  mapa, gráfico de função, timer e ditado. Mesma família do cartão de
+  projeto (monitor): grafite e menta no escuro, branco e cinza-folha no claro.
+*/
+
+.mbk {
+  --mbk-surface: #151816;
+  --mbk-raise: #1d211e;
+  --mbk-line: rgba(255, 255, 255, 0.08);
+  --mbk-line-strong: rgba(255, 255, 255, 0.16);
+  --mbk-text: #e9efea;
+  --mbk-muted: rgba(233, 239, 234, 0.62);
+  --mbk-accent: #2fd483;
+  --mbk-accent-text: #5ee3a1;
+  --mbk-accent-ink: #08110c;
+  --mbk-good: #2fd483;
+  --mbk-bad: #ff8a8f;
+  --mbk-good-bg: rgba(47, 212, 131, 0.12);
+  --mbk-bad-bg: rgba(255, 138, 143, 0.12);
+  --mbk-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  display: grid;
+  gap: 0.85rem;
+  margin: 0.9rem 0;
+  padding: 1rem 1.1rem 1.1rem;
+  border: 1px solid var(--mbk-line);
+  border-radius: 1rem;
+  background: var(--mbk-surface);
+  color: var(--mbk-text);
+  font-variant-numeric: tabular-nums;
+}
+.theme-light .mbk {
+  --mbk-surface: #ffffff;
+  --mbk-raise: #f1f3f1;
+  --mbk-line: rgba(20, 49, 38, 0.1);
+  --mbk-line-strong: rgba(20, 49, 38, 0.2);
+  --mbk-text: #141a16;
+  --mbk-muted: rgba(20, 26, 22, 0.62);
+  --mbk-accent: #13955a;
+  --mbk-accent-text: #0e7a49;
+  --mbk-accent-ink: #ffffff;
+  --mbk-good: #13955a;
+  --mbk-bad: #c2363d;
+  --mbk-good-bg: rgba(19, 149, 90, 0.1);
+  --mbk-bad-bg: rgba(194, 54, 61, 0.08);
+}
+.mbk svg:not([class]) {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+.mbk button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.mbk button:disabled {
+  cursor: default;
+}
+.mbk :is(button, input, iframe):focus-visible {
+  outline: 2px solid var(--mbk-accent);
+  outline-offset: 2px;
+}
+
+.mbk-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.mbk-head strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.mbk-meta {
+  color: var(--mbk-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.mbk-muted {
+  margin: 0;
+  color: var(--mbk-muted);
+}
+.mbk-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.mbk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 0.75rem;
+  background: var(--mbk-accent);
+  color: var(--mbk-accent-ink) !important;
+  font-size: 0.88rem;
+  font-weight: 800;
+  transition: transform 160ms var(--mbk-ease), filter 160ms ease;
+}
+.mbk-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+.mbk-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.mbk-btn.is-ghost {
+  border: 1px solid var(--mbk-line-strong);
+  background: transparent;
+  color: var(--mbk-text) !important;
+}
+.mbk-icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--mbk-line);
+  border-radius: 0.65rem;
+}
+.mbk-icon:hover:not(:disabled) {
+  background: var(--mbk-raise);
+}
+.mbk-icon:disabled {
+  opacity: 0.35;
+}
+.mbk-link {
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.4rem;
+  color: var(--mbk-accent-text) !important;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+.mbk-link:hover {
+  background: var(--mbk-raise);
+}
+.mbk-progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--mbk-raise);
+}
+.mbk-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mbk-accent);
+  transition: width 420ms var(--mbk-ease);
+}
+
+/* ── quiz ── */
+.mbk-quiz__pergunta {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.mbk-quiz__opcoes {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mbk-quiz__opcoes button {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--mbk-line-strong);
+  border-radius: 0.8rem;
+  text-align: left;
+  line-height: 1.4;
+  transition: border-color 160ms ease, background-color 160ms ease, opacity 200ms ease;
+}
+.mbk-quiz__opcoes button:hover:not(:disabled) {
+  border-color: var(--mbk-accent);
+  background: var(--mbk-raise);
+}
+.mbk-letra {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background: var(--mbk-raise);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.mbk-letra svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.mbk-quiz__opcoes button.is-certa {
+  border-color: var(--mbk-good);
+  background: var(--mbk-good-bg);
+}
+.mbk-quiz__opcoes button.is-certa .mbk-letra {
+  background: var(--mbk-good);
+  color: var(--mbk-accent-ink);
+}
+.mbk-quiz__opcoes button.is-errada {
+  border-color: var(--mbk-bad);
+  background: var(--mbk-bad-bg);
+}
+.mbk-quiz__opcoes button.is-errada .mbk-letra {
+  background: var(--mbk-bad);
+  color: #fff;
+}
+.mbk-quiz__opcoes button.is-apagada {
+  opacity: 0.5;
+}
+.mbk-quiz__feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.8rem;
+  line-height: 1.5;
+  animation: mbk-surge 320ms var(--mbk-ease) both;
+}
+.mbk-quiz__feedback.is-certa {
+  background: var(--mbk-good-bg);
+}
+.mbk-quiz__feedback.is-certa strong {
+  color: var(--mbk-good);
+}
+.mbk-quiz__feedback.is-errada {
+  background: var(--mbk-bad-bg);
+}
+.mbk-quiz__feedback.is-errada strong {
+  color: var(--mbk-bad);
+}
+.mbk-quiz__feedback .mbk-btn {
+  margin-left: auto;
+}
+.mbk-quiz__fim {
+  display: grid;
+  justify-items: start;
+  gap: 0.6rem;
+}
+.mbk-quiz__nota {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+@keyframes mbk-surge {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ── linha do tempo ── */
+.mbk-linha__trilho {
+  position: relative;
+  display: flex;
+  gap: 0;
+  margin: 0;
+  padding: 0.2rem 0 0.4rem;
+  overflow-x: auto;
+  list-style: none;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.mbk-linha__trilho li {
+  position: relative;
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+}
+.mbk-linha__trilho li + li::before {
+  content: "";
+  position: absolute;
+  top: 2.05rem;
+  right: 50%;
+  left: -50%;
+  height: 2px;
+  background: var(--mbk-line-strong);
+}
+.mbk-linha__trilho button {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  width: 7.5rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 0.6rem;
+}
+.mbk-linha__data {
+  color: var(--mbk-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.mbk-linha__ponto {
+  position: relative;
+  z-index: 1;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid var(--mbk-line-strong);
+  border-radius: 50%;
+  background: var(--mbk-surface);
+  transition: transform 200ms var(--mbk-ease), background-color 200ms ease, border-color 200ms ease;
+}
+.mbk-linha__nome {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--mbk-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.mbk-linha__trilho button.is-passado .mbk-linha__ponto {
+  border-color: var(--mbk-accent);
+}
+.mbk-linha__trilho button.is-on .mbk-linha__ponto {
+  border-color: var(--mbk-accent);
+  background: var(--mbk-accent);
+  transform: scale(1.35);
+}
+.mbk-linha__trilho button.is-on :is(.mbk-linha__data, .mbk-linha__nome) {
+  color: var(--mbk-text);
+}
+.mbk-linha__card {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.85rem;
+  background: var(--mbk-raise);
+}
+.mbk-linha__quando {
+  color: var(--mbk-accent-text);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.mbk-linha__card strong {
+  font-size: 1.02rem;
+}
+.mbk-linha__card p {
+  margin: 0;
+  line-height: 1.55;
+}
+.mbk-linha__nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+/* ── mapa ── */
+.mbk-mapa__view {
+  overflow: hidden;
+  border: 1px solid var(--mbk-line);
+  border-radius: 0.85rem;
+  aspect-ratio: 16 / 10;
+  background: var(--mbk-raise);
+}
+.mbk-mapa__view iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.mbk-mapa__lugares {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mbk-mapa__lugares button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.1rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--mbk-line-strong);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.mbk-mapa__lugares button svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  color: var(--mbk-accent-text);
+}
+.mbk-mapa__lugares button[aria-pressed="true"] {
+  border-color: var(--mbk-accent);
+  background: var(--mbk-good-bg);
+}
+.mbk-mapa__texto {
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* ── gráfico de função ── */
+.mbk-funcao__svg {
+  width: 100%;
+  height: auto;
+  border-radius: 0.8rem;
+  background: var(--mbk-raise);
+  touch-action: none;
+}
+.mbk-grid {
+  stroke: var(--mbk-line);
+  stroke-width: 1;
+}
+.mbk-eixo {
+  stroke: var(--mbk-muted);
+  stroke-width: 1.4;
+}
+.mbk-tick {
+  fill: var(--mbk-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.mbk-curva {
+  fill: none;
+  stroke: var(--mbk-accent);
+  stroke-width: 2.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.mbk-ponto {
+  fill: var(--mbk-surface);
+  stroke: var(--mbk-accent);
+  stroke-width: 2.5;
+}
+.mbk-hover {
+  fill: var(--mbk-text);
+  font-size: 12px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--mbk-raise);
+  stroke-width: 4px;
+}
+.mbk-funcao__formula {
+  margin: 0;
+  overflow-x: auto;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+.mbk-funcao__formula span {
+  color: var(--mbk-accent-text);
+}
+.mbk-funcao__controles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.6rem 1rem;
+}
+.mbk-funcao__controles label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+}
+.mbk-funcao__controles b {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+.mbk-funcao__controles input[type="range"] {
+  width: 100%;
+  accent-color: var(--mbk-accent);
+}
+
+/* ── timer ── */
+.mbk-timer {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1.1rem;
+}
+.mbk-timer__ring {
+  position: relative;
+  width: 7.5rem;
+  height: 7.5rem;
+}
+.mbk-timer__ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.mbk-timer__trilho {
+  fill: none;
+  stroke: var(--mbk-line-strong);
+  stroke-width: 9;
+}
+.mbk-timer__arco {
+  fill: none;
+  stroke: var(--mbk-accent);
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 260ms linear;
+}
+.mbk-timer.is-pausa .mbk-timer__arco {
+  stroke: #e9c46a;
+}
+.mbk-timer__tempo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+.mbk-timer__tempo span {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.mbk-timer__tempo small {
+  color: var(--mbk-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.mbk-timer__info {
+  display: grid;
+  gap: 0.45rem;
+}
+.mbk-timer__info strong {
+  font-size: 1.02rem;
+}
+@media (max-width: 420px) {
+  .mbk-timer {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .mbk-timer .mbk-row {
+    justify-content: center;
+  }
+}
+
+/* ── ditado ── */
+.mbk-ditado__form {
+  display: flex;
+  gap: 0.5rem;
+}
+.mbk-ditado__form input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.6rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--mbk-line-strong);
+  border-radius: 0.75rem;
+  background: var(--mbk-raise);
+  color: var(--mbk-text);
+  font: inherit;
+  font-size: 1rem;
+}
+.mbk-ditado__form input:focus-visible {
+  outline: 2px solid var(--mbk-accent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mbk-progress i,
+  .mbk-btn,
+  .mbk-linha__ponto,
+  .mbk-quiz__opcoes button,
+  .mbk-timer__arco {
+    transition: none;
+  }
+  .mbk-quiz__feedback {
+    animation: none;
+  }
+}

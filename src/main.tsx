@@ -173,6 +173,7 @@ import { MineAnswerActions, VersionSwitch } from "./chat/MineAnswerActions";
 import { branchSlice, switchBranch, versionInfo } from "./chat/branches";
 import { MineImageGallery } from "./chat/MineImageGallery";
 import { downloadPhotosZip } from "./chat/galleryZip";
+import { buildAlunoSnapshot } from "./chat/aluno";
 import { MineGeneratedImage } from "./chat/MineGeneratedImage";
 import "./chat/mine-gallery.css";
 import { inThread, threadsOf, togglePinned, type ChatThread } from "./chat/threads";
@@ -2667,6 +2668,7 @@ function App() {
                   photos: minePhotos,
                   tutor: mineTutor,
                   controle: mineControle || undefined,
+                  aluno: buildAlunoSnapshot(userData, user.id),
                   attachments: [...attachments, ...earlierAttachments, ...subjectImages].slice(0, maxChatAttachments),
                   context: [
                     buildAssistantContext(userData, user, resolvedSubjectId),
@@ -12190,7 +12192,7 @@ export async function requestAssistantResponse(payload: {
  * pedaços, e as fontes da web quando houve pesquisa.
  */
 async function streamAssistantResponse(
-  payload: { prompt: string; history: MineHistoryItem[]; context: string; attachments?: ChatAttachment[]; webSearch?: boolean; photos?: boolean; tutor?: boolean; controle?: boolean },
+  payload: { prompt: string; history: MineHistoryItem[]; context: string; attachments?: ChatAttachment[]; webSearch?: boolean; photos?: boolean; tutor?: boolean; controle?: boolean; aluno?: unknown },
   options: {
     onDelta: (text: string) => void;
     signal: AbortSignal;
@@ -12248,6 +12250,8 @@ async function streamAssistantResponse(
         reasoning?: string;
         visit?: unknown;
         visits?: unknown;
+        label?: unknown;
+        actions?: unknown;
       };
       try {
         event = JSON.parse(raw.slice(5).trim());
@@ -12264,6 +12268,8 @@ async function streamAssistantResponse(
       } else if (event.type === "status" && (event.stage === "visiting" || event.stage === "visited")) {
         const [visit] = cleanVisits([event.visit]);
         if (visit) options.onVisit?.(visit);
+      } else if (event.type === "status" && event.stage === "tool") {
+        options.onStatus?.({ stage: "tool", label: typeof event.label === "string" ? event.label.slice(0, 60) : "Usando uma ferramenta" });
       } else if (event.type === "status" && (event.stage === "searching" || event.stage === "reading")) {
         options.onStatus?.({
           stage: event.stage,
@@ -12276,7 +12282,7 @@ async function streamAssistantResponse(
         const fromServer = Array.isArray(event.suggestions) ? event.suggestions.filter((item): item is string => typeof item === "string") : [];
         done = {
           reply: extracted.text || event.reply || streamed,
-          actions: [],
+          actions: Array.isArray(event.actions) ? (event.actions.filter((item: unknown) => item && typeof (item as { type?: unknown }).type === "string").slice(0, 8) as AssistantAction[]) : [],
           suggestions: (fromServer.length ? fromServer : extracted.suggestions).slice(0, 3),
           notice: event.notice || undefined,
           sources: Array.isArray(event.sources)
