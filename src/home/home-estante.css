@@ -30,6 +30,11 @@
   height: 100%;
 }
 
+/* a Mine 3D do topo (MineRetrato3D) se posiciona por cima desta caixa */
+.he-hero-mine {
+  position: relative;
+}
+
 .he-hero-texto {
   min-width: 0;
 }

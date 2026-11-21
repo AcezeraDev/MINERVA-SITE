@@ -429,3 +429,9 @@
 .no-motion .mine-welcome-scene .mine-welcome-sparks {
   display: none;
 }
+
+/* Mine 3D (MineRetrato3D) no lugar do rosto desenhado: sai um pouco do
+   ladrilho, como se estivesse saltando dele */
+.mine-welcome-3d {
+  inset: -16%;
+}

@@ -1,0 +1,21 @@
+/* palco da Mine em retrato 3D: sai um pouco da caixa de quem a usa, para
+   orelhas, antena e pulo não serem cortados */
+.mine-retrato-3d {
+  position: absolute;
+  inset: -18%;
+  cursor: pointer;
+}
+
+.mine-retrato-3d canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.mine-retrato-3d.is-ready canvas {
+  opacity: 1;
+}

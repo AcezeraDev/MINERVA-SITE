@@ -18,6 +18,7 @@ import "./home.css";
 import "./home-estante.css";
 
 const Sistema3D = React.lazy(() => import("./Sistema3D"));
+const MineRetrato3D = React.lazy(() => import("../cena3d/MineRetrato3D"));
 const mola = { type: "spring", stiffness: 300, damping: 30, mass: 1 } as const;
 
 export type ItemFicha = {
@@ -381,7 +382,15 @@ export function HomeEstante({
           animate={{ opacity: 1, scale: 1, rotate: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 16 }}
         >
-          <MineFace track draw={!reduced} />
+          {ligada && !falhou ? (
+            <Guarda onFail={() => setFalhou(true)}>
+              <React.Suspense fallback={<MineFace track draw={!reduced} />}>
+                <MineRetrato3D key={tema} className="he-hero-mine-3d" />
+              </React.Suspense>
+            </Guarda>
+          ) : (
+            <MineFace track draw={!reduced} />
+          )}
         </motion.span>
         <div className="he-hero-texto">
           <motion.p className="he-hero-data" initial={reduced ? false : { opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={mola}>

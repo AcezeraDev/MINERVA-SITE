@@ -718,67 +718,99 @@
   white-space: nowrap;
 }
 
-/* ── cena de matéria nova ── */
+/* ── cena de matéria nova (3,2 s, tudo em keyframes) ──
+   0–20% cai e quica · 20–40% capa e folhas abrem · 34–56% lápis escreve
+   56–62% grifo · 60% carimbo + confete · 72–82% fecha · 81–100% voa para a Mine */
 .nova-materia {
   position: fixed;
   inset: 0;
   z-index: 120;
   display: grid;
   place-items: center;
-  background: rgb(var(--paper, 245 245 240) / 0.6);
-  animation: nm-fundo 2900ms ease both;
+  background: radial-gradient(ellipse at 50% 55%, rgb(var(--paper, 245 245 240) / 0.55), rgb(var(--paper, 245 245 240) / 0.94) 70%);
+  animation: nm-fundo 3200ms ease both;
   cursor: pointer;
 }
 
 @keyframes nm-fundo {
   0% { opacity: 0; }
-  8% { opacity: 1; }
-  82% { opacity: 1; }
+  7% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.nova-materia-sombra {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 150px);
+  width: 260px;
+  height: 34px;
+  margin-left: -130px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(29 36 64 / 0.32), transparent);
+  animation: nm-sombra 3200ms both;
+}
+
+@keyframes nm-sombra {
+  0% { opacity: 0; transform: scale(0.3); }
+  12% { opacity: 1; transform: scale(1.08, 0.9); }
+  20% { opacity: 1; transform: scale(1); }
+  80% { opacity: 1; transform: scale(1); }
+  90% { opacity: 0; transform: scale(0.5); }
   100% { opacity: 0; }
 }
 
 .nova-materia-palco {
   position: relative;
-  width: 240px;
-  height: 300px;
-  perspective: 1100px;
-  animation: nm-voa 2900ms cubic-bezier(0.55, 0, 0.3, 1) both;
+  width: 250px;
+  height: 310px;
+  perspective: 1200px;
+  animation: nm-voa 3200ms both;
 }
 
-/* cai, assenta, e no fim voa para a estante (alto e à direita) */
+/* cai com quique (achata e estica), assenta e no fim voa para dentro da Mine */
 @keyframes nm-voa {
-  0% { transform: translateY(-80vh) rotate(-18deg) scale(0.8); }
-  22% { transform: translateY(14px) rotate(3deg) scale(1.02); }
-  30% { transform: translateY(0) rotate(0deg) scale(1); }
-  80% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
-  100% { transform: translate(34vw, -40vh) rotate(16deg) scale(0.2); opacity: 0; }
+  0% { transform: translateY(-75vh) rotate(-16deg) scale(0.85); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4); }
+  12% { transform: translateY(12px) rotate(2deg) scale(1.05, 0.93); animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1); }
+  16% { transform: translateY(-10px) rotate(-1deg) scale(0.98, 1.03); }
+  20% { transform: none; }
+  80% { transform: none; opacity: 1; animation-timing-function: cubic-bezier(0.6, -0.4, 0.7, 0.4); }
+  100% { transform: translate(var(--alvo-x, 34vw), var(--alvo-y, -40vh)) rotate(14deg) scale(0.14); opacity: 0; }
 }
 
 .nova-materia-caderno {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  transform: rotateX(14deg);
+  transform: rotateX(16deg) rotateY(-8deg);
 }
 
+.nova-materia-contracapa,
 .nova-materia-pagina,
+.nova-materia-folha,
 .nova-materia-capa {
   position: absolute;
   inset: 0;
   border-radius: 0.4rem 1rem 1rem 0.4rem;
 }
 
+/* contracapa: a cor da matéria aparecendo atrás das páginas (dá espessura) */
+.nova-materia-contracapa {
+  background: color-mix(in srgb, var(--cor) 80%, #1d2440);
+  transform: translate3d(6px, 7px, -8px);
+  box-shadow: 0 34px 60px -28px rgb(0 0 0 / 0.5);
+}
+
 .nova-materia-pagina {
   display: grid;
   align-content: center;
   justify-items: start;
-  gap: 0.3rem;
-  padding: 1.4rem 1.2rem 1.4rem 1.8rem;
-  overflow: hidden;
+  gap: 0.35rem;
+  padding: 1.4rem 1.2rem 1.4rem 1.9rem;
   background:
-    linear-gradient(90deg, transparent 1.3rem, rgb(232 89 89 / 0.5) 1.3rem 1.4rem, transparent 1.4rem),
+    linear-gradient(90deg, transparent 1.35rem, rgb(232 89 89 / 0.55) 1.35rem 1.45rem, transparent 1.45rem),
     repeating-linear-gradient(to bottom, #fffdf6 0 27px, #cfd8ee 27px 28px);
-  box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.55);
+  box-shadow: inset 14px 0 18px -14px rgb(0 0 0 / 0.25), 2px 2px 0 #ebe6d6, 4px 4px 0 #e2dcc9;
 }
 
 .nova-materia-pagina small {
@@ -787,28 +819,71 @@
   color: #6b7280;
 }
 
-.nova-materia-nome {
+.nova-materia-linha {
+  position: relative;
+  display: grid;
   max-width: 100%;
+}
+
+.nova-materia-nome {
+  position: relative;
+  z-index: 1;
   font-family: "Kalam", cursive;
-  font-size: 1.75rem;
+  font-size: 1.8rem;
   line-height: 1.2;
   color: #2b3fc4;
   overflow-wrap: anywhere;
   clip-path: inset(0 100% 0 0);
-  animation: nm-escreve 700ms steps(18, end) 1000ms both;
+  animation: nm-escreve 700ms cubic-bezier(0.45, 0.05, 0.55, 0.95) 1090ms both;
 }
 
-@keyframes nm-escreve { to { clip-path: inset(0 0 0 0); } }
+@keyframes nm-escreve { to { clip-path: inset(0 -4% 0 0); } }
+
+/* o lápis anda junto com a escrita, tremendo como mão de verdade */
+.nova-materia-lapis {
+  position: absolute;
+  z-index: 2;
+  bottom: 0.15rem;
+  left: 0;
+  width: 112px;
+  height: 22px;
+  transform-origin: 0 50%;
+  transform: rotate(-38deg);
+  opacity: 0;
+  animation:
+    nm-lapis-anda 700ms cubic-bezier(0.45, 0.05, 0.55, 0.95) 1090ms both,
+    nm-lapis-treme 120ms ease-in-out 1090ms 6 alternate,
+    nm-lapis-sai 3200ms both;
+}
+
+@keyframes nm-lapis-anda {
+  from { left: 0; }
+  to { left: 100%; }
+}
+
+@keyframes nm-lapis-treme {
+  from { translate: 0 -2px; }
+  to { translate: 0 3px; }
+}
+
+@keyframes nm-lapis-sai {
+  0%, 28% { opacity: 0; scale: 1.3; }
+  33% { opacity: 1; scale: 1; }
+  56% { opacity: 1; scale: 1; }
+  62%, 100% { opacity: 0; scale: 1; }
+}
 
 .nova-materia-grifo {
-  width: 70%;
-  height: 0.65rem;
-  margin-top: -0.65rem;
+  position: absolute;
+  left: -0.2rem;
+  right: -0.2rem;
+  bottom: 0.15rem;
+  height: 0.75rem;
   border-radius: 0.3rem;
   background: var(--cor);
-  opacity: 0.55;
+  opacity: 0.5;
   transform-origin: left;
-  animation: nm-grifo 420ms cubic-bezier(0.22, 1, 0.36, 1) 1650ms both;
+  animation: nm-grifo 420ms cubic-bezier(0.22, 1, 0.36, 1) 1800ms both;
 }
 
 @keyframes nm-grifo {
@@ -816,44 +891,119 @@
   to { transform: scaleX(1) skewX(-10deg); }
 }
 
+/* folhas que viram atrás da capa */
+.nova-materia-folha {
+  background: repeating-linear-gradient(to bottom, #fffdf6 0 27px, #dde3f2 27px 28px);
+  border: 1px solid #e7e1cf;
+  transform-origin: left center;
+  translate: 0 0 2px;
+  animation: nm-folha 3200ms both;
+}
+
+.nova-materia-folha.is-2 {
+  animation-name: nm-folha-2;
+}
+
+@keyframes nm-folha {
+  0%, 24% { transform: rotateY(0deg); animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1); }
+  40% { transform: rotateY(-166deg); }
+  72% { transform: rotateY(-166deg); animation-timing-function: cubic-bezier(0.5, 0, 0.6, 1); }
+  80%, 100% { transform: rotateY(0deg); }
+}
+
+@keyframes nm-folha-2 {
+  0%, 28% { transform: rotateY(0deg); animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1); }
+  44% { transform: rotateY(-162deg); }
+  70% { transform: rotateY(-162deg); animation-timing-function: cubic-bezier(0.5, 0, 0.6, 1); }
+  79%, 100% { transform: rotateY(0deg); }
+}
+
+/* capa com duas faces: a frente colorida e o verso de papel cartão (antes o
+   verso era escondido e a capa sumia no meio do giro) */
 .nova-materia-capa {
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  /* acima do plano da página: fechada, ela cobre o nome (sem isso o texto vazava) */
+  translate: 0 0 4px;
+  animation: nm-capa 3200ms both;
+}
+
+.nova-materia-capa-frente,
+.nova-materia-capa-verso {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  backface-visibility: hidden;
+}
+
+.nova-materia-capa-frente {
   display: grid;
   place-items: center;
   background:
+    linear-gradient(115deg, rgb(255 255 255 / 0.22), transparent 38%),
     repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.07) 0 2px, transparent 2px 6px),
     var(--cor);
-  box-shadow: inset 10px 0 0 rgb(0 0 0 / 0.16), 0 30px 60px -30px rgb(0 0 0 / 0.55);
-  transform-origin: left center;
-  backface-visibility: hidden;
-  animation: nm-capa 800ms cubic-bezier(0.34, 1.3, 0.64, 1) 750ms both;
+  box-shadow: inset 12px 0 0 rgb(0 0 0 / 0.14), 0 30px 60px -30px rgb(0 0 0 / 0.55);
+}
+
+.nova-materia-capa-verso {
+  transform: rotateY(180deg);
+  background:
+    linear-gradient(270deg, rgb(0 0 0 / 0.12), transparent 30%),
+    color-mix(in srgb, var(--cor) 22%, #f4efe2);
 }
 
 @keyframes nm-capa {
-  from { transform: rotateY(0deg); }
-  to { transform: rotateY(-158deg); }
+  0%, 20% { transform: rotateY(0deg); animation-timing-function: cubic-bezier(0.3, 0.6, 0.3, 1.25); }
+  38% { transform: rotateY(-170deg); }
+  72% { transform: rotateY(-170deg); animation-timing-function: cubic-bezier(0.5, 0, 0.5, 1.2); }
+  82%, 100% { transform: rotateY(0deg); }
 }
 
 .nova-materia-etiqueta {
   display: grid;
   place-items: center;
-  width: 5rem;
-  height: 3.6rem;
+  width: 5.2rem;
+  height: 3.8rem;
   border-radius: 0.5rem;
   font-family: "Anybody Variable", system-ui, sans-serif;
-  font-size: 2rem;
+  font-size: 2.1rem;
   font-weight: 900;
   color: #1d2440;
-  background: rgb(255 255 255 / 0.92);
+  background: rgb(255 255 255 / 0.94);
+  box-shadow: 0 2px 0 rgb(0 0 0 / 0.12);
+  rotate: -2deg;
 }
 
 .nova-materia-espiral {
   position: absolute;
   top: 0.8rem;
   bottom: 0.8rem;
-  left: -0.45rem;
-  width: 0.9rem;
-  background: repeating-linear-gradient(to bottom, #9aa0ad 0 6px, transparent 6px 14px);
+  left: -0.5rem;
+  width: 1rem;
+  background: repeating-linear-gradient(to bottom, #9aa3b5 0 6px, transparent 6px 14px);
   border-radius: 999px;
+}
+
+/* onda de tinta quando o carimbo bate */
+.nova-materia-onda {
+  position: absolute;
+  right: -3.2rem;
+  bottom: -0.6rem;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 3px solid #16a34a;
+  opacity: 0;
+  pointer-events: none;
+  animation: nm-onda 700ms cubic-bezier(0.2, 0.7, 0.3, 1) 1930ms both;
+}
+
+/* 0% transparente: com fill "both" o primeiro quadro vale durante o atraso */
+@keyframes nm-onda {
+  0% { opacity: 0; transform: scale(0.2); }
+  1% { opacity: 0.7; transform: scale(0.2); }
+  100% { opacity: 0; transform: scale(1.8); }
 }
 
 .nova-materia-carimbo {
@@ -866,26 +1016,38 @@
   font-family: "Gochi Hand", cursive;
   font-size: 1.7rem;
   color: #16a34a;
-  background: rgb(255 255 255 / 0.85);
-  animation: nm-carimbo 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 1400ms both;
+  background: rgb(255 255 255 / 0.88);
+  animation:
+    nm-carimbo 460ms cubic-bezier(0.34, 1.56, 0.64, 1) 1900ms both,
+    nm-carimbo-sai 3200ms both;
+}
+
+/* o carimbo sai antes da capa fechar (usa `scale`, que não briga com o transform) */
+@keyframes nm-carimbo-sai {
+  0%, 70% { scale: 1; }
+  76%, 100% { scale: 0; }
 }
 
 @keyframes nm-carimbo {
-  from { opacity: 0; transform: scale(2.8) rotate(-30deg); }
-  to { opacity: 1; transform: scale(1) rotate(-12deg); }
+  0% { opacity: 0; transform: scale(2.8) rotate(-30deg); }
+  60% { opacity: 1; transform: scale(0.92) rotate(-10deg); }
+  100% { opacity: 1; transform: scale(1) rotate(-12deg); }
 }
 
-/* movimento reduzido: só o cartão aparecendo e sumindo, sem voo nem capa */
+/* movimento reduzido: só o cartão aberto aparecendo e sumindo */
 .nova-materia.is-calma {
   animation-duration: 1400ms;
 }
 
 .nova-materia.is-calma .nova-materia-palco,
-.nova-materia.is-calma .nova-materia-capa {
+.nova-materia.is-calma .nova-materia-sombra {
   animation: none;
 }
 
-.nova-materia.is-calma .nova-materia-capa {
+.nova-materia.is-calma .nova-materia-capa,
+.nova-materia.is-calma .nova-materia-folha,
+.nova-materia.is-calma .nova-materia-lapis,
+.nova-materia.is-calma .nova-materia-onda {
   display: none;
 }
 

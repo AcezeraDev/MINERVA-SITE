@@ -2,6 +2,20 @@ import React, { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Doodle, type DoodleKind } from "./index";
 import { MineFace } from "./MineFace";
+import { useCena3D } from "../cena3d/Cena3D";
+
+const MineRetrato3D = React.lazy(() => import("../cena3d/MineRetrato3D"));
+
+/** Se o WebGL cair no meio, volta para o rosto desenhado. */
+class GuardaMine extends React.Component<{ fallback: React.ReactNode; children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
 
 export type WelcomePrompt = {
   key: string;
@@ -48,6 +62,15 @@ export function MineWelcome({
   reduced: boolean;
 }) {
   const sceneRef = useRef<HTMLDivElement | null>(null);
+  const em3d = useCena3D();
+  // a cena lê as cores do tema ao montar: remonta quando o tema troca
+  const lerTema = () => (document.documentElement.classList.contains("theme-light") ? "claro" : "escuro");
+  const [tema, setTema] = React.useState(lerTema);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setTema(lerTema()));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
 
   // Parallax dos rabiscos: uma escrita de CSS var por quadro, sem React.
   useEffect(() => {
@@ -123,7 +146,15 @@ export function MineWelcome({
             animate={{ scale: 1, rotate: 0, y: 0 }}
             transition={{ type: "spring", stiffness: 260, damping: 14, delay: 0.1 }}
           >
-            <MineFace track draw={!reduced} />
+            {em3d ? (
+              <GuardaMine fallback={<MineFace track draw={!reduced} />}>
+                <React.Suspense fallback={<MineFace track draw={!reduced} />}>
+                  <MineRetrato3D key={tema} className="mine-welcome-3d" />
+                </React.Suspense>
+              </GuardaMine>
+            ) : (
+              <MineFace track draw={!reduced} />
+            )}
             <span className="mine-welcome-sparks" aria-hidden>
               {Array.from({ length: 8 }, (_, index) => (
                 <i key={index} style={{ "--a": `${index * 45}deg` } as React.CSSProperties} />
