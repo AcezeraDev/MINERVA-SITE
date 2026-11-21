@@ -707,3 +707,21 @@ html.no-motion .atelie-cor:hover {
   font-size: 0.75rem;
   color: rgb(var(--theme-muted));
 }
+
+.atelie-pedido-outra {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-self: start;
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.6rem;
+  background: rgb(var(--sheet));
+  border: 1.5px solid rgb(var(--line));
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgb(var(--theme-text));
+  text-align: left;
+}
+.atelie-pedido-outra:hover:not(:disabled) {
+  border-color: rgb(var(--pen));
+}

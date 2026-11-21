@@ -60,6 +60,50 @@ const palette = [
   "#FBCFE8", "#FED7AA", "#FEF3C7", "#D9F99D", "#BAE6FD", "#DDD6FE",
 ];
 
+type Caixa = { x: number; y: number; w: number; h: number };
+
+/**
+ * Onde está o traço numa imagem preto no branco: a caixa em volta dos pixels
+ * escuros, com uma folga. Medida numa cópia pequena (rápido); sem traço
+ * nenhum, devolve a imagem inteira.
+ */
+async function caixaDoTraco(dataUrl: string): Promise<Caixa> {
+  const img = new Image();
+  img.src = dataUrl;
+  await img.decode();
+  const W = img.naturalWidth;
+  const H = img.naturalHeight;
+  const escala = Math.min(1, 400 / Math.max(W, H));
+  const cw = Math.max(1, Math.round(W * escala));
+  const ch = Math.max(1, Math.round(H * escala));
+  const canvas = document.createElement("canvas");
+  canvas.width = cw;
+  canvas.height = ch;
+  const c = canvas.getContext("2d", { willReadFrequently: true });
+  if (!c) return { x: 0, y: 0, w: W, h: H };
+  c.fillStyle = "#ffffff";
+  c.fillRect(0, 0, cw, ch);
+  c.drawImage(img, 0, 0, cw, ch);
+  const d = c.getImageData(0, 0, cw, ch).data;
+  let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      const i = (y * cw + x) * 4;
+      if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 140) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < x0 || y1 < y0) return { x: 0, y: 0, w: W, h: H };
+  const folga = 0.02 * Math.max(cw, ch);
+  const ax = Math.max(0, x0 - folga), ay = Math.max(0, y0 - folga);
+  const bx = Math.min(cw, x1 + 1 + folga), by = Math.min(ch, y1 + 1 + folga);
+  return { x: ax / escala, y: ay / escala, w: (bx - ax) / escala, h: (by - ay) / escala };
+}
+
 /** Quanto da folha precisa ter tinta para o desenho valer XP (rabisco não conta). */
 const MIN_PAINTED = 0.04;
 
@@ -271,11 +315,11 @@ export function AtelieView({ data, user, update }: AtelieProps) {
    * Imagem preto no branco (da IA) vira contorno: tinta onde é escuro,
    * transparente onde é papel, encaixada na folha sem distorcer.
    */
-  const imagemParaContorno = useCallback(async (dataUrl: string) => {
+  const imagemParaContorno = useCallback(async (dataUrl: string, alvo?: { w: number; h: number; recorte: Caixa }) => {
     const img = new Image();
     img.src = dataUrl;
     await img.decode();
-    const { w, h } = sheetRef.current;
+    const { w, h } = alvo || sheetRef.current;
     const tmp = document.createElement("canvas");
     tmp.width = w;
     tmp.height = h;
@@ -284,10 +328,21 @@ export function AtelieView({ data, user, update }: AtelieProps) {
     if (!t || !lines) return false;
     t.fillStyle = "#ffffff";
     t.fillRect(0, 0, w, h);
-    const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
-    const dw = img.naturalWidth * scale;
-    const dh = img.naturalHeight * scale;
-    t.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    if (alvo) {
+      // Desenho da Mine: só a parte com traço, ampliada para ocupar a folha
+      // com uma margem (antes ficava pequeno no meio de muito branco).
+      const r = alvo.recorte;
+      const escala = Math.min((w * 0.9) / r.w, (h * 0.9) / r.h);
+      const dw = r.w * escala;
+      const dh = r.h * escala;
+      t.imageSmoothingQuality = "high";
+      t.drawImage(img, r.x, r.y, r.w, r.h, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    } else {
+      const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      t.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    }
     const pixels = t.getImageData(0, 0, w, h);
     const d = pixels.data;
     // Só o traço escuro vira tinta. O modelo às vezes devolve áreas em
@@ -309,6 +364,7 @@ export function AtelieView({ data, user, update }: AtelieProps) {
   /* ───────────── "Mine, desenha um…": a IA cria a folha de colorir do zero (nov/2026) ───────────── */
 
   const [pedido, setPedido] = useState("");
+  const [ultimoPedido, setUltimoPedido] = useState("");
   const [cotaDesenho, setCotaDesenho] = useState<{ used: number; limit: number } | null>(null);
 
   const pedirDesenho = async (tema: string) => {
@@ -321,23 +377,34 @@ export function AtelieView({ data, user, update }: AtelieProps) {
       const response = await fetch("/api/mine-imagem", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        // Sem "formato": imagem quadrada vai para o FLUX.3 Klein, o melhor
+        // modelo. Pedir em pé mandava para o FLUX.2 Klein 9B, de traço pior
+        // (o carro de 21/nov/2026). A folha se ajusta ao desenho depois.
+        // Em inglês: os modelos de imagem seguem as regras de estilo bem melhor.
         body: JSON.stringify({
-          formato: "retrato",
-          prompt: `Página de livro de colorir para estudante: ${assunto}. Só contorno preto grosso e limpo sobre fundo totalmente branco, sem sombras, sem cinza, sem cor e sem texto. Áreas grandes e fechadas para pintar com balde de tinta, traço de ilustração didática e simpática, o desenho ocupa a página inteira.`,
+          prompt: `Coloring book page for kids. Subject (in Portuguese): "${assunto}". Draw it as one charming, well-proportioned cartoon illustration, centered and fully visible, filling most of the square. Clean bold black outlines with uniform line weight on a pure white background. Simple shapes with a moderate amount of detail and large closed areas that are easy to fill with color. No shading, no gray tones, no hatching, no color fills, no ground shadow, no background scenery, no border, no text.`,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as { image?: string; error?: string; used?: number; limit?: number };
       if (typeof payload.used === "number" && typeof payload.limit === "number") setCotaDesenho({ used: payload.used, limit: payload.limit });
       if (!response.ok || !payload.image) throw new Error(payload.error || "A Mine não conseguiu desenhar agora.");
-      prepare(SHEET_W, SHEET_H);
+      const recorte = await caixaDoTraco(payload.image);
+      // Desenho largo (carro, trem, baleia) ganha folha deitada; o resto, em pé.
+      const deitada = recorte.w / recorte.h > 1.15;
+      const w = deitada ? SHEET_H : SHEET_W;
+      const h = deitada ? SHEET_W : SHEET_H;
+      prepare(w, h);
       photoSrcRef.current = null;
       setHasPhoto(false);
       setGuideOn(false);
       setPageId(null);
       setCurrentId(null);
       setShowLines(true);
-      setSheet({ w: SHEET_W, h: SHEET_H, kind: "mine", title: assunto.charAt(0).toUpperCase() + assunto.slice(1, 40) });
-      if (!(await imagemParaContorno(payload.image))) throw new Error("canvas");
+      const folha = { w, h, kind: "mine" as const, title: assunto.charAt(0).toUpperCase() + assunto.slice(1, 40) };
+      sheetRef.current = folha;
+      setSheet(folha);
+      if (!(await imagemParaContorno(payload.image, { w, h, recorte }))) throw new Error("canvas");
+      setUltimoPedido(assunto);
       setTool("balde");
       setPedido("");
       mineSays("Desenhei pra você! Agora é só pintar.", "wow");
@@ -997,6 +1064,11 @@ export function AtelieView({ data, user, update }: AtelieProps) {
                     </button>
                   ))}
                 </div>
+                {ultimoPedido ? (
+                  <button type="button" className="atelie-pedido-outra" onClick={() => void pedirDesenho(ultimoPedido)} disabled={Boolean(busy) || (cotaDesenho ? cotaDesenho.used >= cotaDesenho.limit : false)}>
+                    <RefreshCw className="h-4 w-4" /> Não gostei, desenhar outra versão de “{ultimoPedido}”
+                  </button>
+                ) : null}
                 <small>
                   A Mine cria a folha de colorir com IA de imagens.
                   {cotaDesenho ? ` Hoje: ${cotaDesenho.used}/${cotaDesenho.limit}.` : ""}
