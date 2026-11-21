@@ -208,6 +208,34 @@
   inset: 0;
 }
 
+/* luz de mesa atrás da órbita: um halo menta + tinta que respira devagar,
+   pintado no CSS (fora do WebGL) e preso à área, sem cobrir o papel todo */
+.he-orbita::before {
+  content: "";
+  position: absolute;
+  inset: 4% 8% 10%;
+  pointer-events: none;
+  background:
+    radial-gradient(closest-side at 50% 52%, rgb(var(--hl-mint) / 0.16), transparent 72%),
+    radial-gradient(closest-side at 62% 40%, rgb(var(--pen) / 0.07), transparent 80%);
+  animation: he-orbita-respira 9s ease-in-out infinite alternate;
+}
+
+@keyframes he-orbita-respira {
+  from { transform: scale(0.96); opacity: 0.8; }
+  to { transform: scale(1.04); opacity: 1; }
+}
+
+/* as estrelas e a órbita de fora se dissolvem no papel em vez de bater na borda */
+.he-orbita .home-sistema-canvas canvas {
+  -webkit-mask-image: radial-gradient(ellipse 62% 64% at 50% 50%, #000 72%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 64% at 50% 50%, #000 72%, transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .he-orbita::before { animation: none; }
+}
+
 .he-orbita-legenda {
   position: absolute;
   left: 0.4rem;

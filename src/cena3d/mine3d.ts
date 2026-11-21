@@ -191,6 +191,8 @@ export function criarMine3D(guardar: Guardar, opcoes: { escuro?: boolean; aura?:
     local.copy(olhar);
     cabeca.worldToLocal(local);
     local.normalize();
+    // escala ~0 (entrada com mola) deixa a matriz singular: NaN travaria as molas dos olhos
+    if (!Number.isFinite(local.x) || !Number.isFinite(local.y)) local.set(0, 0, 1);
     const ox = mola(olhoX, THREE.MathUtils.clamp(local.x * 0.5, -0.07, 0.07), delta, 260, 24);
     const oy = mola(olhoY, THREE.MathUtils.clamp(local.y * 0.4, -0.05, 0.05), delta, 260, 24);
 

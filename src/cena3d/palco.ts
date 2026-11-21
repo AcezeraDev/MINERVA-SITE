@@ -94,7 +94,8 @@ export function criarPalco(host: HTMLElement, tick: (tempo: number, delta: numbe
   const laco = (agora: number) => {
     quadro = 0;
     if (!visivel || !ativo) return;
-    const delta = Math.min(0.05, (agora - anterior) / 1000);
+    // o carimbo do rAF pode vir antes do performance.now() do ligar(): delta negativo
+    const delta = Math.max(0, Math.min(0.05, (agora - anterior) / 1000));
     anterior = agora;
     if (!pointer.dentro) {
       if (agora - medidoMine > 250) { medidoMine = agora; rectMine = host.getBoundingClientRect(); }

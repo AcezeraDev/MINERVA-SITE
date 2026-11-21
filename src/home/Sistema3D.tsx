@@ -9,9 +9,13 @@
  */
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { corDoToken, criarPalco, mola, type Palco } from "../cena3d/palco";
 import { aoCutucar } from "../pets/bus";
 import { criarMine3D } from "../cena3d/mine3d";
+import { criarMaterialAnel, criarPoeira, texturaDaPagina, texturaDeBorda, texturaRadial } from "./sistema3d-pecas";
 
 /** Bilhete colado no caderno: prazo ou pendência da matéria. */
 export type AvisoCaderno = { texto: string; tom: "amarelo" | "rosa" };
@@ -20,7 +24,15 @@ export type MateriaOrbita = { id: string; name: string; color: string; aviso?: A
 type Caderno = {
   id: string;
   grupo: THREE.Group;
-  capa: THREE.Mesh;
+  /** Caixa invisível do raycast (a capa abre e o caderno muda de forma). */
+  alvo: THREE.Mesh;
+  /** Pivô da capa da frente, na lombada: gira para abrir. */
+  tampa: THREE.Group;
+  abre: { v: number; vel: number };
+  fita: THREE.Mesh;
+  sombra: THREE.Mesh;
+  /** Entrou na abertura da cena: não pula a Mine nem solta onda. */
+  silencioso: boolean;
   raio: number;
   angulo: number;
   velocidade: number;
@@ -67,36 +79,86 @@ function texturaDoPostit(aviso: AvisoCaderno) {
 const raios = [2.35, 3.25, 4.15];
 /** Cadernos 1,5× maiores: com o tamanho antigo eles sumiam no palco largo. */
 const ESCALA_CADERNO = 1.5;
-/** O caderno escolhido para ~35° à direita da frente, para não atravessar a Mine. */
-const DESVIO_FRENTE = 0.62;
+/** O caderno escolhido vai ~45° à direita da frente, para não tampar a Mine. */
+const DESVIO_FRENTE = 0.78;
 const tamanhoCapa = new THREE.Vector3(0.62, 0.84, 0.14);
+const ESP_CAPA = 0.028;
+const ESP_MIOLO = 0.084;
+/** Chão invisível onde caem as sombras de contato (abaixo do plano das órbitas). */
+const PISO = -1.05;
+const MENTA = 0x39f59a;
 
-/** Capa desenhada num canvas: cor da matéria, etiqueta branca e a inicial. */
-function texturaDaCapa(nome: string, cor: string) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 160;
-  canvas.height = 216;
+/** Capa desenhada num canvas: cor da matéria, costura, etiqueta e a inicial. */
+function desenharCapa(canvas: HTMLCanvasElement, nome: string, cor: string) {
+  const L = 256;
+  const A = 344;
+  canvas.width = L;
+  canvas.height = A;
   const ctx = canvas.getContext("2d")!;
   ctx.fillStyle = cor;
-  ctx.fillRect(0, 0, 160, 216);
-  // textura de papel cartão: listras bem leves
-  ctx.fillStyle = "rgba(255,255,255,0.07)";
-  for (let y = 0; y < 216; y += 6) ctx.fillRect(0, y, 160, 2);
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.fillRect(0, 0, L, A);
+  // luz de cima para baixo, bem leve (papel cartão plastificado)
+  const luz = ctx.createLinearGradient(0, 0, L, A);
+  luz.addColorStop(0, "rgba(255,255,255,0.22)");
+  luz.addColorStop(0.55, "rgba(255,255,255,0)");
+  luz.addColorStop(1, "rgba(0,0,0,0.12)");
+  ctx.fillStyle = luz;
+  ctx.fillRect(0, 0, L, A);
+  // grão do papel cartão
+  for (let i = 0; i < 900; i += 1) {
+    ctx.fillStyle = Math.random() < 0.5 ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)";
+    ctx.fillRect(Math.random() * L, Math.random() * A, 1.5, 1.5);
+  }
+  // faixa da lombada, onde passa a espiral
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
+  ctx.fillRect(0, 0, 26, A);
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.fillRect(26, 0, 2, A);
+  // costura tracejada contornando a capa
+  ctx.setLineDash([7, 6]);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.45)";
+  ctx.strokeRect(40, 14, L - 54, A - 28);
+  ctx.setLineDash([]);
+  // etiqueta branca com a inicial grande e o nome à mão
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.22)";
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.beginPath();
-  ctx.roundRect(22, 64, 116, 70, 8);
+  ctx.roundRect(58, 102, 170, 118, 14);
   ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "rgba(52,70,201,0.25)";
+  for (let y = 176; y < 214; y += 14) ctx.fillRect(70, y, 146, 1.5);
   ctx.fillStyle = "#1d2440";
-  ctx.font = "800 40px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText((nome.trim()[0] || "?").toUpperCase(), 80, 92);
-  ctx.font = "700 13px system-ui, sans-serif";
-  const curto = nome.length > 14 ? `${nome.slice(0, 13)}…` : nome;
-  ctx.fillText(curto, 80, 120);
+  ctx.font = "800 62px system-ui, sans-serif";
+  ctx.fillText((nome.trim()[0] || "?").toUpperCase(), 143, 146);
+  let tamanho = 26;
+  const fonte = (t: number) => `700 ${t}px "Kalam", "Gochi Hand", "Comic Sans MS", cursive`;
+  ctx.font = fonte(tamanho);
+  while (ctx.measureText(nome).width > 150 && tamanho > 15) {
+    tamanho -= 1;
+    ctx.font = fonte(tamanho);
+  }
+  const curto = ctx.measureText(nome).width > 150 ? `${nome.slice(0, 14)}…` : nome;
+  ctx.fillText(curto, 143, 196);
+}
+
+function texturaDaCapa(nome: string, cor: string) {
+  const canvas = document.createElement("canvas");
+  desenharCapa(canvas, nome, cor);
   const textura = new THREE.CanvasTexture(canvas);
   textura.colorSpace = THREE.SRGBColorSpace;
-  textura.anisotropy = 4;
+  textura.anisotropy = 8;
+  // a letra à mão pode chegar depois do primeiro desenho
+  document.fonts?.ready.then(() => {
+    desenharCapa(canvas, nome, cor);
+    textura.needsUpdate = true;
+  });
   return textura;
 }
 
@@ -141,8 +203,15 @@ export default function Sistema3D({
     const olhar = new THREE.Vector3();
     const pontoCaderno = new THREE.Vector3();
 
+    // abertura da cena: câmera desce em dolly, anéis se desenham, a Mine
+    // aparece com mola e os cadernos saem dela um a um
+    let intro = 0;
+    const escalaMine = { v: 0, vel: 0 };
+
     const tick = (tempo: number, delta: number) => {
       const p = palcoRef.current!;
+      intro = THREE.MathUtils.clamp(intro + delta / 2.4, 0, 1);
+      const ei = 1 - Math.pow(1 - intro, 4);
       // inércia do arrasto, depois volta ao giro lento de sempre
       if (!arrasto.ativo) {
         giro.alvo += arrasto.inercia;
@@ -150,16 +219,29 @@ export default function Sistema3D({
         // com um caderno em destaque o sistema para de girar sozinho
         if (!escolhido) giro.alvo += delta * 0.06;
       }
-      sistema.rotation.y = mola(giro, giro.alvo, delta, 90, 16);
+      sistema.rotation.y = mola(giro, giro.alvo, delta, 90, 16) - (1 - ei) * 1.5;
       // afasta a câmera em palco estreito para a órbita de fora caber inteira
       const meiaLargura = Math.tan(THREE.MathUtils.degToRad(p.camera.fov / 2)) * p.camera.aspect;
       // 8.8 de perto: na Estante em órbita a área é larga e os cadernos sumiam a 11
-      p.camera.position.z = Math.max(8.2, 5.2 / meiaLargura);
-      // parallax suave da câmera pelo ponteiro
-      p.camera.position.x = p.pointer.x * 0.9;
+      p.camera.position.z = Math.max(8.2, 5.2 / meiaLargura) + (1 - ei) * 4.5;
+      // parallax suave da câmera pelo ponteiro + respiração bem lenta
+      p.camera.position.x = p.pointer.x * 0.9 + Math.sin(tempo * 0.23) * 0.12;
       // câmera mais alta: a órbita vira uma elipse mais aberta e enche o palco
-      p.camera.position.y = 4.1 + p.pointer.y * 0.6;
+      p.camera.position.y = 4.1 + p.pointer.y * 0.6 + Math.sin(tempo * 0.31) * 0.08 + (1 - ei) * 3;
       p.camera.lookAt(0, -0.35, 0);
+
+      aneis.forEach((anel, i) => {
+        const u = anel.material.uniforms;
+        u.uProgresso.value = THREE.MathUtils.clamp((intro - 0.05 - i * 0.1) / 0.55, 0, 1) * 1.0001;
+      });
+      poeiraMat.uniforms.uTempo.value = tempo;
+      poeiraMat.uniforms.uOpacidade.value = (escuro ? 0.85 : 0.6) * THREE.MathUtils.smoothstep(intro, 0.15, 0.8);
+      poca.material.opacity = (escuro ? 0.5 : 0.75) * ei;
+      // nunca 0: matriz singular faz o worldToLocal dos olhos devolver NaN
+      mine.grupo.scale.setScalar(1.25 * Math.max(0.002, mola(escalaMine, intro > 0.12 ? 1 : 0, delta, 160, 11)));
+      // o plano do chão está deitado: escala em x/z (y é a normal)
+      sombraMine.scale.set(2.6 - Math.sin(tempo * 1.2) * 0.12, 1, 1.7 - Math.sin(tempo * 1.2) * 0.08);
+      sombraMine.material.opacity = (escuro ? 0.18 : 0.3) * Math.min(1, escalaMine.v);
 
       // a Mine olha para a câmera, puxada pelo ponteiro; com um caderno em
       // hover (ou escolhido) ela vira a cabeça para ele, sem perder o rosto
@@ -174,6 +256,8 @@ export default function Sistema3D({
       for (const ponto of satelites) {
         const a = tempo * ponto.vel + ponto.fase;
         ponto.malha.position.set(Math.cos(a) * ponto.raio, 0, Math.sin(a) * ponto.raio);
+        ponto.malha.visible = intro > 0.7;
+        ponto.anel.uniforms.uCabeca.value = THREE.MathUtils.euclideanModulo(a / (Math.PI * 2), 1);
       }
 
       for (const caderno of cadernos.values()) {
@@ -192,11 +276,14 @@ export default function Sistema3D({
         }
         if (!parado) caderno.angulo += delta * caderno.velocidade;
         const antes = caderno.chegada;
-        caderno.chegada = Math.min(1, caderno.chegada + delta * 0.85);
+        caderno.chegada = Math.min(1, caderno.chegada + delta * (caderno.silencioso ? 1.05 : 0.85));
         // esperando a cena de matéria nova sair da frente: ainda não existe
         caderno.grupo.visible = caderno.chegada > 0;
-        if (antes < 1 && caderno.chegada >= 1) mine.pular(0.7);
-        if (antes <= 0 && caderno.chegada > 0) soltarOnda(caderno.cor);
+        caderno.sombra.visible = caderno.chegada > 0;
+        if (!caderno.silencioso) {
+          if (antes < 1 && caderno.chegada >= 1) mine.pular(0.7);
+          if (antes <= 0 && caderno.chegada > 0) soltarOnda(caderno.cor);
+        } else if (antes < 1 && caderno.chegada >= 1) caderno.silencioso = false;
         const k = Math.max(0, caderno.chegada);
         // sai de cima da Mine num arco e assenta na órbita com mola (overshoot)
         const e = k >= 1 ? 1 : 1 - Math.pow(2, -9 * k) * Math.cos(k * 7.5);
@@ -215,8 +302,26 @@ export default function Sistema3D({
         caderno.grupo.rotation.y = base + falta * lev;
         caderno.grupo.rotation.z = Math.sin(tempo * 0.9 + caderno.fase) * 0.08 * (1 - lev) + (1 - Math.min(1, k)) * 0.5;
         caderno.grupo.rotation.x = -0.18 * lev;
-        const tamanho = eleito ? 1 + lev * 0.6 : coadjuvante ? 0.85 + lev * 0.3 : 1 + lev * 0.3;
-        caderno.grupo.scale.setScalar(ESCALA_CADERNO * tamanho * Math.min(1, k * 2.2));
+        const tamanho = eleito ? 1 + lev * 0.45 : coadjuvante ? 0.85 + lev * 0.3 : 1 + lev * 0.3;
+        const escala = ESCALA_CADERNO * tamanho * Math.min(1, k * 2.2);
+        caderno.grupo.scale.setScalar(escala);
+        // a capa abre um pouco no hover e mais no escolhido (aparece a página pautada)
+        const abre = mola(caderno.abre, eleito ? 0.95 : hover === caderno.id ? 0.5 : 0, delta, 140, 13);
+        caderno.tampa.rotation.y = -Math.max(0, abre);
+        // fitinha de marcador balança com o caderno
+        caderno.fita.rotation.x = Math.sin(tempo * 2.1 + caderno.fase) * 0.22 + caderno.levanta.vel * 0.04;
+        caderno.fita.rotation.z = Math.sin(tempo * 1.4 + caderno.fase) * 0.12;
+        // sombra de contato no chão: cresce e clareia quando o caderno sobe
+        const altura = caderno.grupo.position.y - PISO;
+        const s = caderno.sombra;
+        s.position.set(caderno.grupo.position.x, PISO, caderno.grupo.position.z);
+        const largura = escala * (0.75 + altura * 0.18);
+        s.scale.set(largura, 1, largura * 0.5);
+        s.rotation.y = caderno.grupo.rotation.y;
+        const sm = s.material as THREE.MeshBasicMaterial;
+        sm.opacity = (escuro ? 0.32 : 0.34) * Math.min(1, k * 1.5) * (1 - lev * 0.35) * (eleito ? 1.5 : 1) * (coadjuvante ? 0.7 : 1);
+        // no escuro sombra preta some no fundo: vira um reflexo da cor da capa
+        sm.color.copy(eleito || escuro ? caderno.cor : corSombra);
       }
       fantasmas.forEach((fantasma, indice) => {
         const angulo = tempo * 0.18 + (indice * Math.PI * 2) / 3;
@@ -242,7 +347,7 @@ export default function Sistema3D({
       if (p.pointer.dentro && !arrasto.ativo) {
         ndc.set(p.pointer.alvoX, p.pointer.alvoY);
         raycaster.setFromCamera(ndc, p.camera);
-        const alvos = [...[...cadernos.values()].map((c) => c.capa), ...fantasmas.map((g) => g.children[0]), mine.alvo];
+        const alvos = [...[...cadernos.values()].map((c) => c.alvo), ...fantasmas.map((g) => g.children[0]), mine.alvo];
         const toque = raycaster.intersectObjects(alvos, false)[0];
         const id = (toque?.object.userData.id as string | undefined) ?? null;
         nucleoHover = toque?.object === mine.alvo;
@@ -268,14 +373,41 @@ export default function Sistema3D({
 
     const palco = criarPalco(host, tick, { fov: 36, z: 11 });
     palcoRef.current = palco;
-    const { scene, guardar } = palco;
+    const { scene, guardar, renderer } = palco;
     const tinta = corDoToken("--pen", "#3446c9");
     const texto = corDoToken("--theme-text", "#1d2440");
+    const menta = new THREE.Color(MENTA);
+    // tema escuro = texto claro (a cena remonta a cada troca de tema)
+    const escuro = texto.getHSL({ h: 0, s: 0, l: 0 }).l > 0.5;
+    const corSombra = new THREE.Color(0x1d2440);
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8fa8, 1.3));
-    const sol = new THREE.DirectionalLight(0xffffff, 1.6);
+    // Neutral no lugar do ACES: as capas mantêm a cor da matéria sem precisar
+    // de luz própria (que achatava o volume dos cadernos)
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 1;
+    // reflexo de estúdio (gerado uma vez): dá brilho à espiral e à capa plastificada
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const sala = new RoomEnvironment();
+    const ambiente = guardar(pmrem.fromScene(sala, 0.04).texture);
+    sala.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      }
+    });
+    pmrem.dispose();
+    scene.environment = ambiente;
+    scene.environmentIntensity = escuro ? 0.55 : 0.75;
+
+    scene.add(new THREE.HemisphereLight(0xffffff, escuro ? 0x2a3050 : 0xb9bfd6, escuro ? 0.9 : 1.1));
+    const sol = new THREE.DirectionalLight(0xfff6e8, 2.1);
     sol.position.set(4, 7, 6);
     scene.add(sol);
+    // luz de recorte por trás, em menta: separa o contorno dos cadernos do fundo
+    const recorte = new THREE.DirectionalLight(MENTA, escuro ? 1.6 : 0.9);
+    recorte.position.set(-5, 3, -6);
+    scene.add(recorte);
     const quente = new THREE.PointLight(0xffd89a, 6, 9, 1.6);
     scene.add(quente);
 
@@ -285,44 +417,92 @@ export default function Sistema3D({
 
     // núcleo: a Mine em 3D (cel-shading com contorno de caneta), sempre
     // virando a cabeça para quem está olhando. Fica fora do grupo que gira.
-    // tema escuro = texto claro (a cena remonta a cada troca de tema)
-    const mine = criarMine3D(guardar, { escuro: texto.getHSL({ h: 0, s: 0, l: 0 }).l > 0.5 });
+    const mine = criarMine3D(guardar, { escuro });
     mine.grupo.position.y = 0.35;
-    mine.grupo.scale.setScalar(1.25);
+    mine.grupo.scale.setScalar(0.0001);
     scene.add(mine.grupo);
 
-    // órbitas: as linhas da pauta do caderno viraram anéis de tinta, cada uma
-    // com um pingo de caneta dando a volta
-    const materialAnel = guardar(new THREE.MeshBasicMaterial({ color: tinta, transparent: true, opacity: 0.2, depthWrite: false }));
+    // chão: poça de luz menta embaixo do sistema + sombras de contato macias
+    const texRadial = guardar(texturaRadial(1, 0.4));
+    const texPoca = guardar(texturaRadial(0.5, 0.18));
+    const geoChao = guardar(new THREE.PlaneGeometry(1, 1));
+    geoChao.rotateX(-Math.PI / 2);
+    const poca = new THREE.Mesh(geoChao, guardar(new THREE.MeshBasicMaterial({ map: texPoca, color: escuro ? menta : tinta.clone().lerp(menta, 0.55), transparent: true, opacity: 0, depthWrite: false })));
+    poca.scale.set(11, 1, 8.5);
+    poca.position.y = PISO - 0.01;
+    poca.renderOrder = -2;
+    sistema.add(poca);
+    const sombraMine = new THREE.Mesh(geoChao, guardar(new THREE.MeshBasicMaterial({ map: texRadial, color: escuro ? menta : corSombra, transparent: true, opacity: 0, depthWrite: false })));
+    sombraMine.position.y = PISO;
+    sombraMine.renderOrder = -1;
+    sistema.add(sombraMine);
+
+    // órbitas: as linhas da pauta do caderno viraram anéis de tinta que se
+    // desenham na abertura, com um pingo de caneta deixando rastro de cometa
     const materialPingo = guardar(new THREE.MeshBasicMaterial({ color: tinta }));
-    const geoPingo = guardar(new THREE.SphereGeometry(0.055, 12, 10));
-    const satelites: Array<{ malha: THREE.Mesh; raio: number; vel: number; fase: number }> = [];
+    const geoPingo = guardar(new THREE.SphereGeometry(0.06, 14, 10));
+    const satelites: Array<{ malha: THREE.Mesh; raio: number; vel: number; fase: number; anel: THREE.ShaderMaterial }> = [];
+    const aneis: THREE.Mesh<THREE.TorusGeometry, THREE.ShaderMaterial>[] = [];
     raios.forEach((raio, i) => {
-      const anel = new THREE.Mesh(guardar(new THREE.TorusGeometry(raio, i === 1 ? 0.016 : 0.01, 6, 180)), materialAnel);
+      const vel = (i % 2 ? -0.5 : 0.4) / raio;
+      const material = guardar(
+        criarMaterialAnel({
+          cor: tinta,
+          cabeca: i === 1 ? menta : tinta,
+          opacidade: escuro ? 0.42 : i === 1 ? 0.34 : 0.26,
+          raio,
+          sentido: Math.sign(vel),
+          traco: i === 2 ? 110 : 0,
+        }),
+      );
+      const anel = new THREE.Mesh(guardar(new THREE.TorusGeometry(raio, i === 1 ? 0.018 : 0.012, 6, 220)), material);
       anel.rotation.x = Math.PI / 2;
       sistema.add(anel);
-      const pingo = new THREE.Mesh(geoPingo, i === 1 ? guardar(new THREE.MeshBasicMaterial({ color: 0x39f59a })) : materialPingo);
+      aneis.push(anel);
+      const pingo = new THREE.Mesh(geoPingo, i === 1 ? guardar(new THREE.MeshBasicMaterial({ color: MENTA })) : materialPingo);
       sistema.add(pingo);
-      satelites.push({ malha: pingo, raio, vel: (i % 2 ? -0.5 : 0.4) / raio, fase: i * 2.1 });
+      satelites.push({ malha: pingo, raio, vel, fase: i * 2.1, anel: material });
     });
 
-    // poeira de estrelas em volta (um único Points)
-    const quantos = 280;
-    const posicoes = new Float32Array(quantos * 3);
-    for (let i = 0; i < quantos; i += 1) {
-      const r = 5 + Math.random() * 5;
-      const t = Math.random() * Math.PI * 2;
-      const f = Math.acos(2 * Math.random() - 1);
-      posicoes.set([r * Math.sin(f) * Math.cos(t), r * Math.cos(f) * 0.6, r * Math.sin(f) * Math.sin(t)], i * 3);
-    }
-    const geoPoeira = guardar(new THREE.BufferGeometry());
-    geoPoeira.setAttribute("position", new THREE.BufferAttribute(posicoes, 3));
-    const poeira = new THREE.Points(geoPoeira, guardar(new THREE.PointsMaterial({ color: tinta, size: 0.05, transparent: true, opacity: 0.55, depthWrite: false })));
+    // poeira de estrelas em volta: pontos redondos que cintilam (um draw call)
+    const { pontos: poeira, geo: geoPoeira, material: poeiraMat } = criarPoeira(260, tinta, menta, renderer.getPixelRatio());
+    guardar(geoPoeira);
+    guardar(poeiraMat);
     scene.add(poeira);
 
-    const geoCapa = guardar(new THREE.BoxGeometry(tamanhoCapa.x, tamanhoCapa.y, tamanhoCapa.z));
-    const geoMiolo = guardar(new THREE.BoxGeometry(tamanhoCapa.x * 0.92, tamanhoCapa.y * 0.94, tamanhoCapa.z * 0.8));
-    const materialMiolo = guardar(new THREE.MeshStandardMaterial({ color: 0xfbfaf4, roughness: 0.9 }));
+    // caderno de espiral: capa de trás, bloco de folhas, capa da frente num
+    // pivô na lombada (abre), espiral de arame e fitinha de marcador.
+    // Geometrias e materiais neutros são um só para todos os cadernos.
+    const W = tamanhoCapa.x;
+    const H = tamanhoCapa.y;
+    const geoCapa = guardar(new THREE.BoxGeometry(W, H, tamanhoCapa.z));
+    const geoFolha = guardar(new RoundedBoxGeometry(W, H, ESP_CAPA, 2, 0.012));
+    const geoMiolo = guardar(new THREE.BoxGeometry(W * 0.95, H * 0.95, ESP_MIOLO));
+    const papel = guardar(new THREE.MeshStandardMaterial({ color: 0xfbfaf4, roughness: 0.92 }));
+    const borda = (deitada: boolean) => guardar(new THREE.MeshStandardMaterial({ map: guardar(texturaDeBorda(deitada)), roughness: 0.95 }));
+    const bordaPe = borda(false);
+    const bordaDeitada = borda(true);
+    const pagina = guardar(new THREE.MeshStandardMaterial({ map: guardar(texturaDaPagina()), roughness: 0.9 }));
+    // faces do BoxGeometry: +x, -x, +y, -y, +z, -z
+    const materiaisMiolo = [bordaPe, papel, bordaDeitada, bordaDeitada, pagina, papel];
+    const geoEspiral = guardar(
+      mergeGeometries(
+        Array.from({ length: 9 }, (_, i) => {
+          const argola = new THREE.TorusGeometry(0.078, 0.011, 6, 18);
+          argola.rotateX(Math.PI / 2);
+          argola.translate(-W / 2 + 0.035, H * (0.42 - (0.84 * i) / 8), 0);
+          return argola;
+        }),
+      )!,
+    );
+    const materialEspiral = guardar(new THREE.MeshStandardMaterial({ color: escuro ? 0xc9d1e0 : 0xaab2c4, metalness: 0.85, roughness: 0.28 }));
+    // fitinha curta com ponta em V (comprida e menta ela parecia uma perna do caderno)
+    const geoFita = guardar(new THREE.BufferGeometry());
+    geoFita.setAttribute("position", new THREE.Float32BufferAttribute([-0.02, 0, 0, 0.02, 0, 0, 0.02, -0.15, 0, 0, -0.12, 0, -0.02, -0.15, 0], 3));
+    geoFita.setIndex([0, 4, 3, 0, 3, 1, 1, 3, 2]);
+    geoFita.computeVertexNormals();
+    const geoAlvo = guardar(new THREE.BoxGeometry(W * 1.12, H * 1.1, 0.34));
+    const materialAlvo = guardar(new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false }));
     const geoOnda = guardar(new THREE.RingGeometry(0.96, 1, 64));
     const soltarOnda = (cor: THREE.ColorRepresentation) => {
       if (ondas.length >= 4) return;
@@ -331,10 +511,6 @@ export default function Sistema3D({
       sistema.add(onda);
       ondas.push({ malha: onda, t: 0 });
     };
-    // espiral do caderno: argolas de arame na lombada (geometria e material únicos)
-    const geoArgola = guardar(new THREE.TorusGeometry(0.045, 0.009, 6, 14));
-    const materialArgola = guardar(new THREE.MeshStandardMaterial({ color: 0x9aa3b5, metalness: 0.6, roughness: 0.35 }));
-    const ARGOLAS = 7;
 
     // bilhete acima do caderno, sempre de frente para a câmera (um sprite):
     // preso na capa ele virava de lado com a órbita e ninguém lia o prazo
@@ -358,38 +534,55 @@ export default function Sistema3D({
       caderno.postit = postit;
     };
 
-    const adicionar = (materia: MateriaOrbita, indice: number, anima: boolean) => {
+    /** `modo`: "parado" já em órbita, "abertura" sai da Mine na entrada da cena, "novo" espera a cena de matéria nova. */
+    const adicionar = (materia: MateriaOrbita, indice: number, modo: "abertura" | "novo") => {
       const cor = new THREE.Color(materia.color);
       const textura = guardar(texturaDaCapa(materia.name, materia.color));
-      // um pouco de luz própria na cor: com o ACES as capas ficavam desbotadas (amarelo virava ocre)
-      const lateral = guardar(new THREE.MeshStandardMaterial({ color: cor, roughness: 0.55, emissive: cor, emissiveIntensity: 0.28 }));
-      const frente = guardar(new THREE.MeshStandardMaterial({ map: textura, roughness: 0.5, emissive: 0xffffff, emissiveMap: textura, emissiveIntensity: 0.3 }));
-      const capa = new THREE.Mesh(geoCapa, [lateral, lateral, lateral, lateral, frente, lateral]);
-      capa.userData.id = materia.id;
-      const miolo = new THREE.Mesh(geoMiolo, materialMiolo);
-      miolo.position.x = 0.04;
+      // só um fio de luz própria: o Neutral já segura a cor e o volume volta
+      const lateral = guardar(new THREE.MeshStandardMaterial({ color: cor, roughness: 0.6, emissive: cor, emissiveIntensity: 0.06 }));
+      // capa plastificada: verniz por cima do papel cartão
+      const frente = guardar(new THREE.MeshPhysicalMaterial({ map: textura, roughness: 0.55, clearcoat: 0.6, clearcoatRoughness: 0.3, emissive: 0xffffff, emissiveMap: textura, emissiveIntensity: 0.05 }));
       const grupo = new THREE.Group();
-      grupo.add(miolo, capa);
-      for (let i = 0; i < ARGOLAS; i += 1) {
-        const argola = new THREE.Mesh(geoArgola, materialArgola);
-        argola.rotation.y = Math.PI / 2;
-        argola.position.set(-tamanhoCapa.x / 2, tamanhoCapa.y * (0.4 - (0.8 * i) / (ARGOLAS - 1)), 0);
-        grupo.add(argola);
-      }
-      grupo.visible = !anima;
+      const zCapa = ESP_MIOLO / 2 + ESP_CAPA / 2;
+      const tras = new THREE.Mesh(geoFolha, lateral);
+      tras.position.z = -zCapa;
+      const miolo = new THREE.Mesh(geoMiolo, materiaisMiolo);
+      miolo.position.x = -W * 0.025;
+      const tampa = new THREE.Group();
+      tampa.position.set(-W / 2 + 0.035, 0, zCapa);
+      const capa = new THREE.Mesh(geoFolha, [lateral, lateral, lateral, lateral, frente, lateral]);
+      capa.position.x = W / 2 - 0.035;
+      tampa.add(capa);
+      const espiral = new THREE.Mesh(geoEspiral, materialEspiral);
+      // fita um tom acima da capa, como cetim da mesma cor
+      const fita = new THREE.Mesh(geoFita, guardar(new THREE.MeshStandardMaterial({ color: cor.clone().offsetHSL(0, 0.05, -0.12), roughness: 0.4, side: THREE.DoubleSide })));
+      fita.position.set(W * 0.2, -H * 0.46, 0);
+      const alvo = new THREE.Mesh(geoAlvo, materialAlvo);
+      alvo.userData.id = materia.id;
+      grupo.add(tras, miolo, tampa, espiral, fita, alvo);
+      grupo.visible = false;
       sistema.add(grupo);
+      const sombra = new THREE.Mesh(geoChao, guardar(new THREE.MeshBasicMaterial({ map: texRadial, color: corSombra, transparent: true, opacity: 0, depthWrite: false })));
+      sombra.visible = false;
+      sombra.renderOrder = -1;
+      sistema.add(sombra);
       const raio = raios[indice % raios.length];
       cadernos.set(materia.id, {
         id: materia.id,
         grupo,
-        capa,
+        alvo,
+        tampa,
+        abre: { v: 0, vel: 0 },
+        fita,
+        sombra,
+        silencioso: modo === "abertura",
         raio,
         angulo: (indice * 2.399) % (Math.PI * 2),
         velocidade: 0.32 / raio,
         fase: indice * 1.7,
         levanta: { v: 0, vel: 0 },
-        // nasce depois da cena de matéria nova (≈2,6 s) voar para cá
-        chegada: anima ? -2.6 : 1,
+        // abertura: um a um, saindo da Mine; matéria nova: depois da cena (≈2,6 s) voar para cá
+        chegada: modo === "abertura" ? -(0.38 + indice * 0.085) : -2.6,
         nome: materia.name,
         postit: null,
         avisoChave: "",
@@ -436,7 +629,7 @@ export default function Sistema3D({
       for (const [id, caderno] of cadernos) {
         if (!ids.has(id)) {
           colarAviso(caderno, undefined);
-          sistema.remove(caderno.grupo);
+          sistema.remove(caderno.grupo, caderno.sombra);
           cadernos.delete(id);
         }
       }
@@ -445,7 +638,7 @@ export default function Sistema3D({
         if (existente) {
           existente.nome = materia.name;
           colarAviso(existente, materia.aviso);
-        } else adicionar(materia, indice, anima);
+        } else adicionar(materia, indice, anima ? "novo" : "abertura");
       });
       if (escolhido) selecionar(escolhido);
       // sem matéria: três cadernos rascunhados a lápis (contorno tracejado,
@@ -485,7 +678,6 @@ export default function Sistema3D({
       arrasto.inercia = 0;
     };
     apiRef.current = { sincronizar, selecionar };
-
     const onDown = (event: PointerEvent) => {
       arrasto.ativo = true;
       arrasto.x = arrasto.ultimoX = event.clientX;
@@ -511,7 +703,7 @@ export default function Sistema3D({
       const p = palcoRef.current!;
       ndc.set(p.pointer.alvoX, p.pointer.alvoY);
       raycaster.setFromCamera(ndc, p.camera);
-      const toque = raycaster.intersectObjects([...[...cadernos.values()].map((c) => c.capa), ...fantasmas.map((g) => g.children[0]), mine.alvo], false)[0];
+      const toque = raycaster.intersectObjects([...[...cadernos.values()].map((c) => c.alvo), ...fantasmas.map((g) => g.children[0]), mine.alvo], false)[0];
       const id = toque?.object.userData.id as string | undefined;
       if (!id) return;
       if (id === "nucleo") {
