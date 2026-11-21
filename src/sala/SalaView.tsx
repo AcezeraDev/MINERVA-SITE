@@ -6,6 +6,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bot,
+  Calculator,
+  CheckCheck,
   Copy,
   DoorOpen,
   Headphones,
@@ -17,6 +19,7 @@ import {
   MicOff,
   NotebookPen,
   PhoneOff,
+  Reply,
   Send,
   Users,
   Volume2,
@@ -27,6 +30,8 @@ import { PageHeader, go, readSession, type User } from "../main";
 import { useSoftMotion } from "../motion";
 import { MineRichText } from "../chat/MineRichText";
 import { SALA_MAX_CHAMADA, SALA_TEXTO_MAX, codigoSalaValido, type MensagemSala, type VistaSala } from "../../shared/sala.mjs";
+import { conferirLinhas } from "../../shared/sala-contas.mjs";
+import { QuizResultadoContext } from "../chat/blocos/Blocos";
 import { ChamadaVoz, type EstadoPar } from "./voz";
 import "./sala.css";
 
@@ -226,6 +231,9 @@ function SalaAberta({ user, codigo }: { user: User; codigo: string }) {
   const [copiado, setCopiado] = useState(false);
   const [ampliada, setAmpliada] = useState("");
   const [membrosAbertos, setMembrosAbertos] = useState(false);
+  const [modoConta, setModoConta] = useState(false);
+  const [respondendo, setRespondendo] = useState<MensagemSala | null>(null);
+  const contas = useMemo(() => (modoConta ? conferirLinhas(texto) : []), [modoConta, texto]);
 
   const vivo = useRef({ desde: 0, naChamada: false, mudo: false, digitando: false, parado: false });
   const vozRef = useRef<ChamadaVoz | null>(null);
@@ -365,7 +373,17 @@ function SalaAberta({ user, codigo }: { user: User; codigo: string }) {
     setTexto("");
     setFoto("");
     try {
-      await chamar({ acao: "enviar", codigo, texto: comMine && !/@mine\b/i.test(limpo) ? `@mine ${limpo}`.trim() : limpo, foto: fotoAgora || undefined, mine: comMine });
+      const respostaA = respondendo?.id;
+      setRespondendo(null);
+      await chamar({
+        acao: "enviar",
+        codigo,
+        texto: comMine && !modoConta && !/@mine\b/i.test(limpo) ? `@mine ${limpo}`.trim() : limpo,
+        foto: fotoAgora || undefined,
+        mine: comMine,
+        tipo: modoConta ? "conta" : "texto",
+        respostaA,
+      });
     } catch (error) {
       setTexto(limpo);
       setFoto(fotoAgora);
@@ -374,6 +392,45 @@ function SalaAberta({ user, codigo }: { user: User; codigo: string }) {
       setEnviando(false);
       campoRef.current?.focus();
     }
+  };
+
+  const conferir = useCallback(
+    async (id: number) => {
+      try {
+        await chamar({ acao: "conferir", codigo, id });
+      } catch (error) {
+        setErro(error instanceof Error ? error.message : "A Mine não conseguiu conferir agora.");
+      }
+    },
+    [codigo],
+  );
+
+  const responder = useCallback((m: MensagemSala) => {
+    setRespondendo(m);
+    campoRef.current?.focus();
+  }, []);
+
+  const avisarQuiz = useCallback(
+    (r: { titulo: string; acertos: number; total: number }) => void chamar({ acao: "quiz", codigo, ...r }).catch(() => {}),
+    [codigo],
+  );
+
+  /** Tecla do teclado de contas: entra onde está o cursor. */
+  const tecla = (t: string) => {
+    const campo = campoRef.current;
+    const valor = t === "⏎" ? "\n" : t;
+    if (!campo) {
+      setTexto((x) => x + valor);
+      return;
+    }
+    const ini = campo.selectionStart ?? texto.length;
+    const fim = campo.selectionEnd ?? texto.length;
+    const novo = texto.slice(0, ini) + valor + texto.slice(fim);
+    setTexto(novo);
+    requestAnimationFrame(() => {
+      campo.focus();
+      campo.setSelectionRange(ini + valor.length, ini + valor.length);
+    });
   };
 
   const resumo = async () => {
@@ -517,9 +574,23 @@ function SalaAberta({ user, codigo }: { user: User; codigo: string }) {
             }}
             aria-live="polite"
           >
-            {mensagens.map((m, i) => (
-              <Mensagem key={m.id} m={m} anterior={mensagens[i - 1]} codigo={codigo} meuId={user.id} onAmpliar={setAmpliada} reduzido={reduzido} />
-            ))}
+            <QuizResultadoContext.Provider value={avisarQuiz}>
+              {mensagens.map((m, i) => (
+                <Mensagem
+                  key={m.id}
+                  m={m}
+                  anterior={mensagens[i - 1]}
+                  citada={m.respostaA ? mensagens.find((x) => x.id === m.respostaA) : undefined}
+                  codigo={codigo}
+                  meuId={user.id}
+                  onAmpliar={setAmpliada}
+                  onConferir={conferir}
+                  onResponder={responder}
+                  mineOcupada={Boolean(sala?.mineDigitando)}
+                  reduzido={reduzido}
+                />
+              ))}
+            </QuizResultadoContext.Provider>
             {sala?.mineDigitando ? (
               <div className="sala-msg is-mine">
                 <Avatar nome="Mine" mine />
@@ -542,6 +613,33 @@ function SalaAberta({ user, codigo }: { user: User; codigo: string }) {
               void enviar(false);
             }}
           >
+            {respondendo ? (
+              <div className="sala-respondendo">
+                <Reply className="h-4 w-4" aria-hidden />
+                <span className="truncate">
+                  Respondendo a <strong>{respondendo.tipo === "mine" ? "Mine" : respondendo.autor}</strong>: {semMarcas(respondendo.texto).slice(0, 90) || "foto"}
+                </span>
+                <button type="button" onClick={() => setRespondendo(null)} aria-label="Cancelar resposta"><X className="h-4 w-4" /></button>
+              </div>
+            ) : null}
+            {modoConta ? (
+              <div className="sala-conta-painel">
+                <div className="sala-teclado" role="group" aria-label="Teclado de contas">
+                  {["7", "8", "9", "÷", "(", ")", "4", "5", "6", "×", "x", "²", "1", "2", "3", "−", "√(", "π", "0", ",", "=", "+", "^", "⏎"].map((t) => (
+                    <button key={t} type="button" className={/[0-9,]/.test(t) ? "" : "is-op"} onClick={() => tecla(t)} aria-label={t === "⏎" ? "Nova linha" : t}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <ol className="sala-conta-previa" aria-label="Resultado de cada linha">
+                  {contas.filter((c) => c.tipo === "valor").length ? (
+                    contas.map((c) => (c.tipo === "valor" ? <li key={c.linha}><span>linha {c.linha}</span> {c.texto} <strong>{c.detalhe}</strong></li> : null))
+                  ) : (
+                    <li className="sala-conta-dica">Escreva uma conta por linha (Enter pula linha, Ctrl+Enter envia). Conta sem “=” mostra o resultado aqui; para saber se a resolução está certa, mande e peça para a Mine conferir.</li>
+                  )}
+                </ol>
+              </div>
+            ) : null}
             {foto ? (
               <div className="sala-anexo">
                 <img src={foto} alt="Foto anexada" />
@@ -553,13 +651,26 @@ function SalaAberta({ user, codigo }: { user: User; codigo: string }) {
                 <ImagePlus className="h-5 w-5" aria-hidden />
               </button>
               <input ref={arquivoRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void anexar(e.target.files?.[0])} />
+              <button
+                type="button"
+                className={`sala-btn is-icone ${modoConta ? "is-ativo" : ""}`}
+                onClick={() => {
+                  setModoConta((m) => !m);
+                  campoRef.current?.focus();
+                }}
+                aria-pressed={modoConta}
+                aria-label="Teclado de contas"
+                title="Escrever uma conta (teclado de contas)"
+              >
+                <Calculator className="h-5 w-5" aria-hidden />
+              </button>
               <textarea
                 ref={campoRef}
-                className="sala-campo sala-texto"
+                className={`sala-campo sala-texto ${modoConta ? "is-conta" : ""}`}
                 value={texto}
-                rows={1}
+                rows={modoConta ? 3 : 1}
                 maxLength={SALA_TEXTO_MAX}
-                placeholder="Mensagem para a sala… escreva @mine para chamar a Mine"
+                placeholder={modoConta ? "3x − 5 = 16\n3x = 21\nx = 7" : "Mensagem para a sala… escreva @mine para chamar a Mine"}
                 onChange={(e) => {
                   setTexto(e.target.value);
                   vivo.current.digitando = true;
@@ -572,7 +683,8 @@ function SalaAberta({ user, codigo }: { user: User; codigo: string }) {
                   }
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  // no modo conta, Enter pula linha (cada passo numa linha) e Ctrl+Enter envia
+                  if (e.key === "Enter" && !e.shiftKey && (!modoConta || e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
                     void enviar(false);
                   }
@@ -580,7 +692,7 @@ function SalaAberta({ user, codigo }: { user: User; codigo: string }) {
                 aria-label="Mensagem"
               />
               <button type="button" className="sala-btn is-mine" onClick={() => void enviar(true)} disabled={enviando || (!texto.trim() && !foto)} title="Mandar e pedir para a Mine responder">
-                <Bot className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Mine</span>
+                <Bot className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">{modoConta ? "Mine confere" : "Mine"}</span>
               </button>
               <button type="submit" className="sala-btn is-primario is-icone" disabled={enviando || (!texto.trim() && !foto)} aria-label="Enviar">
                 {enviando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
@@ -642,26 +754,51 @@ function FotoMensagem({ codigo, id, onAmpliar }: { codigo: string; id: number; o
   );
 }
 
+/** Trecho citado sem as marcas de markdown/LaTeX da Mine (**, $, ```…). */
+const semMarcas = (texto: string) => texto.replace(/```[\s\S]*?```/g, " ").replace(/[*_`#$>]/g, "").replace(/\s+/g, " ").trim();
+
 const hora = (em: number) => new Date(em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+/** Conta mandada pelo teclado de contas: folha pautada com o número de cada linha (a Mine cita "linha 2"). */
+function FolhaDeConta({ texto }: { texto: string }) {
+  return (
+    <ol className="sala-folha" aria-label="Conta">
+      {texto.split("\n").map((linha, i) => (
+        <li key={i}>
+          <span aria-hidden>{i + 1}</span>
+          <code>{linha || " "}</code>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 const Mensagem = React.memo(function Mensagem({
   m,
   anterior,
+  citada,
   codigo,
   meuId,
   onAmpliar,
+  onConferir,
+  onResponder,
+  mineOcupada,
   reduzido,
 }: {
   m: MensagemSala;
   anterior?: MensagemSala;
+  citada?: MensagemSala;
   codigo: string;
   meuId: string;
   onAmpliar: (src: string) => void;
+  onConferir: (id: number) => void;
+  onResponder: (m: MensagemSala) => void;
+  mineOcupada: boolean;
   reduzido: boolean;
 }) {
   if (m.tipo === "sistema") return <p className="sala-sistema">{m.texto} · {hora(m.em)}</p>;
   // mensagens seguidas da mesma pessoa em até 4 minutos ficam juntas
-  const junto = anterior && anterior.tipo !== "sistema" && anterior.autorId === m.autorId && m.em - anterior.em < 4 * 60_000;
+  const junto = !m.respostaA && anterior && anterior.tipo !== "sistema" && anterior.autorId === m.autorId && m.em - anterior.em < 4 * 60_000;
   const daMine = m.tipo === "mine";
   return (
     <motion.div
@@ -677,14 +814,38 @@ const Mensagem = React.memo(function Mensagem({
             {daMine ? "Mine" : m.autor} <span>{hora(m.em)}</span>
           </p>
         )}
+        {m.respostaA ? (
+          <p className="sala-citacao">
+            <Reply className="h-3.5 w-3.5" aria-hidden />
+            {citada ? <><strong>{citada.tipo === "mine" ? "Mine" : citada.autor}</strong> {semMarcas(citada.texto).slice(0, 80) || "foto"}</> : "respondendo a uma mensagem anterior"}
+          </p>
+        ) : null}
         {m.temFoto ? <FotoMensagem codigo={codigo} id={m.id} onAmpliar={onAmpliar} /> : null}
         {m.texto ? (
           daMine ? (
             <div className="sala-msg-mine-texto"><MineRichText text={m.texto} /></div>
+          ) : m.tipo === "conta" ? (
+            <FolhaDeConta texto={m.texto} />
           ) : (
             <p className="sala-msg-texto">{m.texto}</p>
           )
         ) : null}
+        <div className="sala-msg-acoes">
+          {daMine ? (
+            <button type="button" onClick={() => onResponder(m)}>
+              <Reply className="h-3.5 w-3.5" aria-hidden /> Responder à Mine
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={() => onConferir(m.id)} disabled={mineOcupada} title="A Mine confere se está certo">
+                <CheckCheck className="h-3.5 w-3.5" aria-hidden /> Mine, confere
+              </button>
+              <button type="button" onClick={() => onResponder(m)}>
+                <Reply className="h-3.5 w-3.5" aria-hidden /> Responder
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </motion.div>
   );

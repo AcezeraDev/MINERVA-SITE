@@ -3,7 +3,7 @@ export type Membro = { id: string; nome: string; avatar: string; entrouEm: numbe
 export type Sala = { codigo: string; nome: string; criadoEm: number; donoId: string; mineDigitando: number; membros: Membro[] };
 export type MembroVisto = { id: string; nome: string; avatar: string; eu: boolean; online: boolean; naChamada: boolean; mudo: boolean; digitando: boolean };
 export type VistaSala = { codigo: string; nome: string; souDono: boolean; mineDigitando: boolean; membros: MembroVisto[] };
-export type MensagemSala = { id: number; tipo: "texto" | "mine" | "sistema"; autorId: string; autor: string; texto: string; temFoto: boolean; em: number };
+export type MensagemSala = { id: number; tipo: "texto" | "conta" | "mine" | "sistema"; autorId: string; autor: string; texto: string; temFoto: boolean; respostaA: number; em: number };
 
 export const SALA_MAX_MEMBROS: number;
 export const SALA_MAX_CHAMADA: number;

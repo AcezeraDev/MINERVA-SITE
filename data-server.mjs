@@ -40,6 +40,7 @@ import {
   tocarNaSala,
   vistaSala,
 } from "./shared/sala.mjs";
+import { verificacaoParaMine } from "./shared/sala-contas.mjs";
 import { runMineRequest } from "./mine/router.mjs";
 import { pageForPanel } from "./mine/page-reader.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
@@ -996,6 +997,7 @@ async function prepararSalas() {
       criado timestamptz not null default now()
     );
     create index if not exists minerva_sala_msgs_codigo on minerva_sala_msgs (codigo, id);
+    alter table minerva_sala_msgs add column if not exists resposta_a bigint;
     create table if not exists minerva_sala_sinais (
       id bigserial primary key,
       codigo text not null,
@@ -1062,29 +1064,49 @@ async function guardarNovaSala(estado) {
   return true;
 }
 
-async function gravarMensagem({ codigo, autorId, autor, tipo, texto = "", foto = null }) {
+async function gravarMensagem({ codigo, autorId, autor, tipo, texto = "", foto = null, respostaA = null }) {
   if (pool) {
     await prepararSalas();
     const r = await pool.query(
-      `insert into minerva_sala_msgs (codigo, autor_id, autor, tipo, texto, foto) values ($1, $2, $3, $4, $5, $6) returning id`,
-      [codigo, autorId, autor, tipo, texto, foto],
+      `insert into minerva_sala_msgs (codigo, autor_id, autor, tipo, texto, foto, resposta_a) values ($1, $2, $3, $4, $5, $6, $7) returning id`,
+      [codigo, autorId, autor, tipo, texto, foto, respostaA],
     );
     return Number(r.rows[0].id);
   }
   const id = ++sequenciaLocal;
-  mensagensLocais.push({ id, codigo, autorId, autor, tipo, texto, foto, em: Date.now() });
+  mensagensLocais.push({ id, codigo, autorId, autor, tipo, texto, foto, respostaA, em: Date.now() });
   return id;
 }
 
-const linhaMensagem = (m) => ({ id: Number(m.id), tipo: m.tipo, autorId: m.autor_id ?? m.autorId, autor: m.autor, texto: m.texto || "", temFoto: Boolean(m.tem_foto ?? m.foto), em: m.criado ? new Date(m.criado).getTime() : m.em });
+/** Uma mensagem inteira (com a foto), para a Mine conferir ou para saber a quem se responde. */
+async function mensagemPorId(codigo, id) {
+  if (pool) {
+    await prepararSalas();
+    const r = await pool.query(`select id, autor_id, autor, tipo, texto, foto, resposta_a, criado from minerva_sala_msgs where codigo = $1 and id = $2`, [codigo, id]);
+    return r.rows[0] ? { ...linhaMensagem(r.rows[0]), foto: r.rows[0].foto || "" } : null;
+  }
+  const m = mensagensLocais.find((item) => item.codigo === codigo && item.id === id);
+  return m ? { ...linhaMensagem(m), foto: m.foto || "" } : null;
+}
+
+const linhaMensagem = (m) => ({
+  id: Number(m.id),
+  tipo: m.tipo,
+  autorId: m.autor_id ?? m.autorId,
+  autor: m.autor,
+  texto: m.texto || "",
+  temFoto: Boolean(m.tem_foto ?? m.foto),
+  respostaA: Number(m.resposta_a ?? m.respostaA) || 0,
+  em: m.criado ? new Date(m.criado).getTime() : m.em,
+});
 
 /** Mensagens depois de `desde` (sem a foto: ela vem à parte, sob pedido). Na primeira consulta, as últimas 50. */
 async function mensagensDesde(codigo, desde, limite = 50) {
   if (pool) {
     await prepararSalas();
     const r = desde > 0
-      ? await pool.query(`select id, autor_id, autor, tipo, texto, foto is not null as tem_foto, criado from minerva_sala_msgs where codigo = $1 and id > $2 order by id asc limit $3`, [codigo, desde, limite])
-      : await pool.query(`select * from (select id, autor_id, autor, tipo, texto, foto is not null as tem_foto, criado from minerva_sala_msgs where codigo = $1 order by id desc limit $2) t order by id asc`, [codigo, limite]);
+      ? await pool.query(`select id, autor_id, autor, tipo, texto, foto is not null as tem_foto, resposta_a, criado from minerva_sala_msgs where codigo = $1 and id > $2 order by id asc limit $3`, [codigo, desde, limite])
+      : await pool.query(`select * from (select id, autor_id, autor, tipo, texto, foto is not null as tem_foto, resposta_a, criado from minerva_sala_msgs where codigo = $1 order by id desc limit $2) t order by id asc`, [codigo, limite]);
     return r.rows.map(linhaMensagem);
   }
   const daSala = mensagensLocais.filter((m) => m.codigo === codigo);
@@ -1128,7 +1150,7 @@ async function pegarSinais(codigo, para) {
 }
 
 /** A Mine lê a conversa (e a foto mais recente) e responde ao grupo. */
-async function mineNaSala(codigo, pedido) {
+async function mineNaSala(codigo, pedido, foco = null) {
   await mudarSala(codigo, (sala) => {
     sala.mineDigitando = Date.now();
     return { ok: true };
@@ -1136,13 +1158,20 @@ async function mineNaSala(codigo, pedido) {
   let texto = "";
   try {
     const recentes = await mensagensDesde(codigo, 0, 30);
-    const comFoto = [...recentes].reverse().slice(0, 8).find((m) => m.temFoto && m.tipo === "texto");
-    const foto = comFoto ? await fotoDaMensagem(codigo, comFoto.id) : "";
+    const comFoto = foco?.temFoto ? null : [...recentes].reverse().slice(0, 8).find((m) => m.temFoto && m.tipo !== "mine");
+    const foto = foco?.temFoto ? foco.foto : comFoto ? await fotoDaMensagem(codigo, comFoto.id) : "";
+    let contexto = conversaParaMine(recentes);
+    if (foco) {
+      contexto += `\n\nMENSAGEM EM FOCO (de ${foco.autor}${foco.tipo === "conta" ? ", escrita no teclado de contas, linha por linha" : ""}):\n${foco.texto || "(so a foto)"}`;
+      if (foco.pergunta) contexto += `\n\nELA RESPONDE A ESTA MENSAGEM DA MINE:\n${foco.pergunta}`;
+      const verificacao = verificacaoParaMine(foco.texto || "");
+      if (verificacao) contexto += `\n\nVERIFICACAO AUTOMATICA DAS CONTAS (calculadora do site; confie nela, nao refaca de cabeca):\n${verificacao}`;
+    }
     const tipoFoto = /^data:(image\/[a-z]+);/.exec(foto)?.[1] || "image/jpeg";
     const resultado = await runMineRequest({
       task: "sala-grupo",
       prompt: pedido,
-      context: conversaParaMine(recentes),
+      context: contexto,
       attachments: foto ? [{ type: tipoFoto, name: "foto-do-grupo.jpg", dataUrl: foto }] : [],
       maxTokens: 2000,
     });
@@ -1226,16 +1255,53 @@ async function handleSala(req, res) {
     const foto = body.foto ? String(body.foto) : "";
     if (foto && !fotoValida(foto)) return sendError(req, res, 400, "Essa foto não deu para mandar. Tente uma imagem menor.");
     if (!texto && !foto) return sendError(req, res, 400, "Mensagem vazia.");
-    const id = await gravarMensagem({ codigo, autorId: euId, autor: eu.nome, tipo: "texto", texto, foto: foto || null });
-    const pedeMine = Boolean(body.mine) || chamaMine(texto);
+    const tipo = body.tipo === "conta" && texto ? "conta" : "texto";
+    // a quem responde: um id pedido de propósito, ou (sem pedir) a pergunta da
+    // Mine logo acima, quando a última mensagem da sala foi ela perguntando
+    const antes = (await mensagensDesde(codigo, 0, 1))[0];
+    let alvo = Number(body.respostaA) > 0 ? await mensagemPorId(codigo, Math.floor(Number(body.respostaA))) : null;
+    if (!alvo && antes?.tipo === "mine" && /\?/.test(antes.texto) && Date.now() - antes.em < 10 * 60_000) alvo = antes;
+    const id = await gravarMensagem({ codigo, autorId: euId, autor: eu.nome, tipo, texto, foto: foto || null, respostaA: alvo?.id || null });
+    const respondeMine = alvo?.tipo === "mine";
+    const pedeMine = Boolean(body.mine) || chamaMine(texto) || respondeMine;
     if (pedeMine) {
       if ((await takeQuota(euId, "sala-mine", SALA_MINE_DIARIA)) === null) {
         await gravarMensagem({ codigo, autorId: "sistema", autor: "", tipo: "sistema", texto: `${eu.nome} já chamou a Mine ${SALA_MINE_DIARIA} vezes hoje` });
       } else {
-        await mineNaSala(codigo, `${eu.nome} chamou voce na ultima mensagem. Responda ao grupo.`);
+        const foco = { autor: eu.nome, tipo, texto, temFoto: Boolean(foto), foto, pergunta: respondeMine ? alvo.texto : "" };
+        await mineNaSala(
+          codigo,
+          respondeMine
+            ? `${eu.nome} RESPONDEU a sua pergunta (mensagem em foco). Avalie a resposta: diga se esta certa; se errou, mostre onde (use a verificacao automatica quando houver) e de uma dica para ele tentar de novo, sem entregar a resposta. Se acertou, comemore e, se fizer sentido, proponha o proximo desafio.`
+            : tipo === "conta"
+              ? `${eu.nome} mandou uma conta e te chamou. Confira linha por linha e responda.`
+              : `${eu.nome} chamou voce na ultima mensagem. Responda ao grupo.`,
+          foco,
+        );
       }
     }
     return sendJson(req, res, 200, { ok: true, id });
+  }
+
+  if (acao === "conferir") {
+    const alvo = await mensagemPorId(codigo, Math.floor(Number(body.id)));
+    if (!alvo || alvo.tipo === "sistema" || alvo.tipo === "mine") return sendError(req, res, 404, "Mensagem não encontrada.");
+    if ((await takeQuota(euId, "sala-mine", SALA_MINE_DIARIA)) === null) return sendError(req, res, 429, "A Mine já respondeu muito por hoje nesta conta.");
+    await gravarMensagem({ codigo, autorId: "sistema", autor: "", tipo: "sistema", texto: `${eu.nome} pediu para a Mine conferir a mensagem de ${alvo.autor}` });
+    await mineNaSala(
+      codigo,
+      `${eu.nome} pediu para voce CONFERIR a mensagem em foco (de ${alvo.autor}). Diga se a resolucao esta certa. Se houver erro, aponte a LINHA exata e o que aconteceu (ex.: "na linha 2 o -5 passou para o outro lado sem trocar o sinal"), explique a regra e deixe o aluno corrigir; nao reescreva a solucao inteira. Se estiver certa, elogie o que foi bem feito.`,
+      alvo,
+    );
+    return sendJson(req, res, 200, { ok: true });
+  }
+
+  if (acao === "quiz") {
+    const titulo = String(body.titulo || "quiz").replace(/\s+/g, " ").trim().slice(0, 80);
+    const total = Math.max(1, Math.min(8, Math.floor(Number(body.total) || 0)));
+    const acertos = Math.max(0, Math.min(total, Math.floor(Number(body.acertos) || 0)));
+    await gravarMensagem({ codigo, autorId: "sistema", autor: "", tipo: "sistema", texto: `${eu.nome} fez o quiz "${titulo}": ${acertos} de ${total}${acertos === total ? " — gabaritou!" : ""}` });
+    return sendJson(req, res, 200, { ok: true });
   }
 
   if (acao === "resumo") {

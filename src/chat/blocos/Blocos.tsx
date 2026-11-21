@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Check, ChevronLeft, ChevronRight, Headphones, MapPin, Pause, Play, RotateCcw, Volume2, X } from "lucide-react";
 import { compile, tidyNumber } from "../../../shared/calc.mjs";
 import { prettyFormula } from "./formula";
@@ -29,16 +29,39 @@ function readJson(code: string): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Quem quiser saber do resultado de um quiz (a Sala de estudo conta para o
+ * grupo) põe um provedor em volta; no chat comum não há ninguém ouvindo.
+ */
+export const QuizResultadoContext = createContext<((r: { titulo: string; acertos: number; total: number }) => void) | null>(null);
+
 // ── Quiz ────────────────────────────────────────────────────────────────────
 type Pergunta = { pergunta: string; opcoes: string[]; correta: number; explicacao: string };
+
+/**
+ * O quiz desenha texto puro: fórmula que o modelo mandou em LaTeX
+ * ("$2x + 3 = 11$", "\frac{1}{2}") vira escrita legível em vez de símbolo cru.
+ */
+function semLatex(texto: string) {
+  return texto
+    .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "($1)/($2)")
+    .replace(/\\sqrt\{([^{}]*)\}/g, "√($1)")
+    .replace(/\\(cdot|times)/g, "×")
+    .replace(/\\div/g, "÷")
+    .replace(/\\(left|right)/g, "")
+    .replace(/\$\$?([^$]+)\$\$?/g, "$1")
+    .replace(/\^\{([^{}]*)\}/g, "^$1")
+    .replace(/\^2(?![0-9])/g, "²")
+    .replace(/\^3(?![0-9])/g, "³");
+}
 
 function lerQuiz(data: Record<string, unknown>) {
   const perguntas = (Array.isArray(data.perguntas) ? data.perguntas : [])
     .map((item) => {
       const raw = item as Record<string, unknown>;
-      const opcoes = (Array.isArray(raw.opcoes) ? raw.opcoes : []).map((op) => str(op, 240)).filter(Boolean).slice(0, 5);
+      const opcoes = (Array.isArray(raw.opcoes) ? raw.opcoes : []).map((op) => semLatex(str(op, 240))).filter(Boolean).slice(0, 5);
       const correta = Math.round(num(raw.correta, -1));
-      return { pergunta: str(raw.pergunta, 500), opcoes, correta, explicacao: str(raw.explicacao, 600) };
+      return { pergunta: semLatex(str(raw.pergunta, 500)), opcoes, correta, explicacao: semLatex(str(raw.explicacao, 600)) };
     })
     .filter((item) => item.pergunta && item.opcoes.length >= 2 && item.correta >= 0 && item.correta < item.opcoes.length)
     .slice(0, 8);
@@ -51,13 +74,17 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
   const [acertos, setAcertos] = useState(0);
   const [fim, setFim] = useState(false);
   const atual = perguntas[index];
+  const avisarResultado = useContext(QuizResultadoContext);
   const responder = (op: number) => {
     if (escolha !== null) return;
     setEscolha(op);
     if (op === atual.correta) setAcertos((value) => value + 1);
   };
   const proxima = () => {
-    if (index + 1 >= perguntas.length) setFim(true);
+    if (index + 1 >= perguntas.length) {
+      setFim(true);
+      avisarResultado?.({ titulo, acertos, total: perguntas.length });
+    }
     else {
       setIndex(index + 1);
       setEscolha(null);
