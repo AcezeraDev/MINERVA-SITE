@@ -43,6 +43,9 @@ import {
 import { verificacaoParaMine } from "./shared/sala-contas.mjs";
 import { runMineRequest } from "./mine/router.mjs";
 import { pageForPanel } from "./mine/page-reader.mjs";
+import { questoesEnem } from "./mine/tools.mjs";
+import { searchWeb, webSearchEnabled } from "./mine/web.mjs";
+import { buscarLivro, buscarVideos } from "./mine/estante.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
 import { MINE_IMAGE_DAILY_LIMIT, MineImageError, generateMineImage } from "./mine/image-gen.mjs";
 import { MINE_VOICE_DAILY_LIMIT, MineVoiceError, synthesizeVoice } from "./mine/voice.mjs";
@@ -1633,6 +1636,67 @@ export async function handleDataRequest(req, res) {
       const page = typeof body.url === "string" && body.url.length < 2048 ? await pageForPanel(body.url) : null;
       if (!page) sendError(req, res, 422, "Não deu para abrir esta página.");
       else sendJson(req, res, 200, page);
+      return true;
+    }
+
+    // Questões reais do ENEM para a aba "Questões" da matéria (21/nov/2026).
+    // Mesma busca da ferramenta questoes_enem da Mine, com até 5 por pedido.
+    if (url.pathname === "/api/enem" && req.method === "POST") {
+      const session = await requireSession(req, res);
+      if (!session) return true;
+      const body = await readJson(req);
+      const tema = typeof body.tema === "string" ? body.tema.slice(0, 120) : "";
+      try {
+        const result = await questoesEnem({ disciplina: body.disciplina, tema, quantidade: Number(body.quantidade) || 5 }, { max: 5, imagens: true });
+        sendJson(req, res, 200, result);
+      } catch {
+        sendError(req, res, 502, "Não consegui buscar questões do ENEM agora.");
+      }
+      return true;
+    }
+
+    // Busca na web sem passar pelo modelo: a aba "Vídeos e links" da matéria
+    // só precisa das fontes (URLs reais), não de uma resposta escrita.
+    if (url.pathname === "/api/busca" && req.method === "POST") {
+      const session = await requireSession(req, res);
+      if (!session) return true;
+      if (!webSearchEnabled()) {
+        sendError(req, res, 503, "A busca na web está desligada neste servidor.");
+        return true;
+      }
+      const body = await readJson(req);
+      const query = typeof body.q === "string" ? body.q.slice(0, 200) : "";
+      try {
+        const { results } = await searchWeb(query, { maxResults: 10 });
+        sendJson(req, res, 200, { results });
+      } catch {
+        sendError(req, res, 502, "A busca não respondeu agora.");
+      }
+      return true;
+    }
+
+    // Prévias da página da matéria: vídeos do YouTube (com miniatura, tocam no
+    // player embutido) e capa/leitor legal de livros. Ver mine/estante.mjs.
+    if (url.pathname === "/api/videos" && req.method === "POST") {
+      const session = await requireSession(req, res);
+      if (!session) return true;
+      const body = await readJson(req);
+      try {
+        sendJson(req, res, 200, { videos: await buscarVideos(typeof body.q === "string" ? body.q : "", { max: 6 }) });
+      } catch {
+        sendError(req, res, 502, "Não consegui buscar vídeos agora.");
+      }
+      return true;
+    }
+    if (url.pathname === "/api/livro" && req.method === "POST") {
+      const session = await requireSession(req, res);
+      if (!session) return true;
+      const body = await readJson(req);
+      try {
+        sendJson(req, res, 200, await buscarLivro(typeof body.titulo === "string" ? body.titulo : "", typeof body.autor === "string" ? body.autor : ""));
+      } catch {
+        sendJson(req, res, 200, { capa: "", leitura: null });
+      }
       return true;
     }
 

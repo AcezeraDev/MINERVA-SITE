@@ -1039,7 +1039,24 @@ Erros do estudante:
 ${context || "Nenhum erro informado."}`;
 }
 
+/**
+ * Extras da página da matéria (21/nov/2026): trilha, livros e fórmulas. O
+ * pedido traz o formato JSON exato; aqui ficam as regras que valem para todos.
+ */
+function buildSubjectExtraInstruction(context) {
+  return `Voce e a Mine, tutora de estudos de alunos brasileiros do ensino medio, montando material de apoio para uma materia.
+Responda SOMENTE com JSON valido, exatamente no formato pedido pelo estudante: sem markdown, sem cercas de codigo, sem texto antes ou depois.
+Escreva tudo em portugues do Brasil, com linguagem simples.
+Livros: cite apenas obras REAIS e conhecidas, com o autor certo. Se nao tiver certeza de que o livro existe, nao inclua.
+Formulas: escreva a expressao em LaTeX (sem cifrao), por exemplo F = m \\cdot a. Lembre que dentro do JSON a barra invertida vai dobrada.
+Use os conteudos do estudante para priorizar o que ele esta estudando agora.
+
+Materia e conteudos do estudante:
+${context || "Nenhum conteudo informado."}`;
+}
+
 const TASK_PROMPTS = {
+  "materia-extra": buildSubjectExtraInstruction,
   "prova-estudo": buildMistakeStudyInstruction,
   redacao: buildEssayInstruction,
   leitura: buildReadingInstruction,

@@ -1,4 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import type { SubjectExtras } from "./conteudo/MateriaExtras";
 import { createRoot, type Root } from "react-dom/client";
 import { createPortal } from "react-dom";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
@@ -92,6 +93,7 @@ import {
   Globe,
   HeartPulse,
   Languages,
+  Library,
   NotebookPen,
   Swords,
   ClipboardList,
@@ -504,6 +506,8 @@ export type Subject = {
   icon: IconName;
   favorite: boolean;
   createdAt: number;
+  /** Trilha, livros, fórmulas e links da página da matéria (nov/2026). */
+  extras?: SubjectExtras;
 };
 
 export type Material = {
@@ -878,7 +882,7 @@ type IconName =
 
 export type Modal =
   | { type: "subject" }
-  | { type: "material"; subjectId: string }
+  | { type: "material"; subjectId: string; kind?: Material["type"] }
   | { type: "materialView"; materialId: string }
   | { type: "task"; subjectId?: string; taskId?: string; dueAt?: number; title?: string }
   | { type: "quiz"; subjectId?: string; topic?: string; initialQuestions?: QuizQuestion[]; initialMode?: QuizMode }
@@ -975,7 +979,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
  * fecha; só a área da tela atual começa aberta. Início fica fora (é a capa) e a
  * conta vai para o rodapé da barra.
  */
-export type NavArea = "estudar" | "praticar" | "jogar" | "organizar" | "turma";
+export type NavArea = "materias" | "estudar" | "praticar" | "jogar" | "organizar" | "turma";
 const navGroups: Array<{ id: NavArea; label: string; hint: string; icon: LucideIcon; views: View[] }> = [
   { id: "estudar", label: "Estudar", hint: "Mine, leitura, laboratório, idiomas", icon: BookOpen, views: ["mine", "leitura", "laboratorio", "idiomas", "search"] },
   { id: "praticar", label: "Praticar", hint: "Atividades, provas, redação, duelo", icon: ClipboardCheck, views: ["atividades", "provas", "redacao", "duelo"] },
@@ -986,6 +990,7 @@ const navGroups: Array<{ id: NavArea; label: string; hint: string; icon: LucideI
 const accountViews: View[] = ["perfil", "como-usar", "about", "admin"];
 
 function areaOf(view: View): NavArea | null {
+  if (view === "subject") return "materias";
   return navGroups.find((group) => group.views.includes(view))?.id || null;
 }
 
@@ -2926,6 +2931,9 @@ function App() {
                 avatar={user.settings.avatar}
                 hidden={navHidden}
                 onHide={() => setNavHidden(true)}
+                subjects={userData.subjects}
+                currentSubjectId={route.view === "subject" ? route.id : undefined}
+                onNewSubject={() => setModal({ type: "subject" })}
               />
               <UtilityHeader
                 route={route.view}
@@ -3097,6 +3105,9 @@ function WorkspaceSidebar({
   progress,
   hidden,
   onHide,
+  subjects,
+  currentSubjectId,
+  onNewSubject,
 }: {
   route: View;
   displayName: string;
@@ -3106,8 +3117,12 @@ function WorkspaceSidebar({
   progress: number;
   hidden: boolean;
   onHide: () => void;
+  subjects: Subject[];
+  currentSubjectId?: string;
+  onNewSubject: () => void;
 }) {
   const { openAreas, toggleArea } = useOpenAreas(route);
+  const materiasOpen = openAreas.includes("materias");
 
   return (
     <aside
@@ -3147,6 +3162,62 @@ function WorkspaceSidebar({
           <Home className="relative h-4 w-4 shrink-0" />
           <span className="relative min-w-0 flex-1 truncate">Início</span>
         </button>
+        {/* Nov/2026: as matérias ganharam a primeira divisória do menu; antes
+            só dava para chegar nelas pela estante da Home. */}
+        <section className="caderno-area mb-1.5" data-area="materias" data-open={materiasOpen ? "true" : "false"}>
+          <button
+            type="button"
+            onClick={() => toggleArea("materias")}
+            aria-expanded={materiasOpen}
+            aria-controls="area-materias"
+            className="caderno-area-head flex w-[calc(100%-0.9rem)] items-center gap-2.5 text-left"
+          >
+            <span className="caderno-area-dot grid h-7 w-7 shrink-0 place-items-center rounded-[.55rem]">
+              <Library className="h-[15px] w-[15px]" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-black leading-tight">Matérias</span>
+              {!materiasOpen ? (
+                <span className="block truncate text-[10.5px] font-bold leading-tight opacity-55">
+                  {subjects.length ? subjects.map((subject) => subject.name).join(", ") : "Crie seu primeiro caderno"}
+                </span>
+              ) : null}
+            </span>
+            {route === "subject" && !materiasOpen ? <span className="caderno-area-here h-2 w-2 shrink-0 rounded-full" aria-label="Você está aqui" /> : null}
+            <ChevronRight className="caderno-area-chevron h-4 w-4 shrink-0 opacity-50" />
+          </button>
+          <div id="area-materias" className="caderno-area-body" hidden={!materiasOpen}>
+            <div className="grid gap-[3px] pb-2 pt-1.5">
+              {subjects.map((subject) => {
+                const Icon = iconMap[subject.icon] || BookOpen;
+                const active = route === "subject" && currentSubjectId === subject.id;
+                return (
+                  <button
+                    key={subject.id}
+                    onClick={() => go("subject", subject.id)}
+                    aria-current={active ? "page" : undefined}
+                    data-tone="materias"
+                    className="caderno-tab group relative flex min-h-10 w-full items-center gap-3 text-left text-[13px] font-bold"
+                  >
+                    <span className="relative grid h-5 w-5 shrink-0 place-items-center rounded-full text-[#11151e]" style={{ background: subject.color }}>
+                      <Icon className="h-3 w-3" />
+                    </span>
+                    <span className="relative min-w-0 flex-1 truncate">{subject.name}</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={onNewSubject}
+                data-tone="materias"
+                className="caderno-tab relative flex min-h-10 w-full items-center gap-3 text-left text-[13px] font-bold opacity-70 hover:opacity-100"
+              >
+                <Plus className="relative h-4 w-4 shrink-0" />
+                <span className="relative min-w-0 flex-1 truncate">Nova matéria</span>
+              </button>
+            </div>
+          </div>
+        </section>
         {navGroups.map((group) => {
           const items = group.views
             .filter((view) => !hiddenFromMenu.includes(view))
@@ -10163,7 +10234,7 @@ function ModalHost({
               notify={notify}
             />
           )}
-          {modal.type === "material" && <MaterialModal user={user} subjectId={modal.subjectId} update={update} close={() => setModal(null)} notify={notify} />}
+          {modal.type === "material" && <MaterialModal user={user} subjectId={modal.subjectId} initialType={modal.kind} update={update} close={() => setModal(null)} notify={notify} />}
           {modal.type === "materialView" &&
             (() => {
               const material = data.materials.find((item) => item.id === modal.materialId);
@@ -10467,10 +10538,10 @@ function SubjectModal({ user, update, close, notify }: { user: User; update: (ne
   );
 }
 
-function MaterialModal({ user, subjectId, update, close, notify }: { user: User; subjectId: string; update: (next: (draft: AppData) => AppData) => void; close: () => void; notify: (message: string) => void }) {
+function MaterialModal({ user, subjectId, initialType, update, close, notify }: { user: User; subjectId: string; initialType?: Material["type"]; update: (next: (draft: AppData) => AppData) => void; close: () => void; notify: (message: string) => void }) {
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
-  const [type, setType] = useState<Material["type"]>("note");
+  const [type, setType] = useState<Material["type"]>(initialType || "note");
   const [dataUrl, setDataUrl] = useState<string | undefined>(undefined);
   const [content, setContent] = useState<string | undefined>(undefined);
   const [fileName, setFileName] = useState("");

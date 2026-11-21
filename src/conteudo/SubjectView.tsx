@@ -1,10 +1,10 @@
 import { setTaskDone } from "../../shared/agenda.mjs";
-import { xpPerAction } from "../../shared/xp.mjs";
-import { InkCheck, celebrateFrom, cheer } from "../caderno";
+import { celebrateFrom } from "../caderno";
 import { MineRichText } from "../chat/MineRichText";
+import { MateriaExtras } from "./MateriaExtras";
 import { Reveal, Stagger, StaggerItem, spring } from "../motion";
 import { motion } from "framer-motion";
-import { ArrowRight, BookOpen, Bot, Brain, CalendarCheck, Camera, Check, CheckCircle2, ChevronLeft, ClipboardCheck, ExternalLink, FileText, Folder, Layers, Link as LinkIcon, ListChecks, Loader2, Paperclip, Plus, Sparkles, Star, Trash2, Wand2, type LucideIcon } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, Brain, CalendarCheck, Camera, Check, CheckCircle2, ChevronLeft, ClipboardCheck, ExternalLink, FileText, Layers, Link as LinkIcon, ListChecks, Loader2, Paperclip, Plus, Sparkles, Trash2, Wand2, type LucideIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { EmptyState, GlassCard, HeroCard, MineAvatar, PageHeader, PrimaryButton, SecondaryButton, SectionTitle, TaskRow, go, iconMap, materialsToImageAttachments, percent, requestAssistantResponse, toggleStudied, uid, useMemoUserData, type AppData, type Material, type Modal, type Subject } from "../main";
 
@@ -144,9 +144,12 @@ export function SubjectView({
           <>
             <IconButton icon={ChevronLeft} label="Voltar" onClick={() => go("home")} />
             <IconButton icon={Trash2} label="Excluir matéria" onClick={confirmDeleteSubject} />
-            <PrimaryButton onClick={() => setModal({ type: "material", subjectId: subject.id })} icon={Plus}>
-              Adicionar conteúdo
-            </PrimaryButton>
+            {/* Sem conteúdo, o botão grande do painel já é este: não repetir. */}
+            {materials.length ? (
+              <PrimaryButton onClick={() => setModal({ type: "material", subjectId: subject.id })} icon={Plus}>
+                Adicionar conteúdo
+              </PrimaryButton>
+            ) : null}
           </>
         }
       />
@@ -195,30 +198,51 @@ export function SubjectView({
                       </>
                     );
                   })()}
-                  <div className="mt-5">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="caderno-subj-label">progresso da matéria</span>
-                      <span className="caderno-subj-percent tabular">{percent(studied, Math.max(materials.length, 1))}%</span>
-                    </div>
-                    <div className="caderno-subj-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(studied, Math.max(materials.length, 1))} aria-label="Progresso da matéria">
-                      <span className="caderno-subj-bar-fill" style={{ "--p": `${percent(studied, Math.max(materials.length, 1))}%`, "--subj": subject.color } as React.CSSProperties}>
-                        <span className="caderno-subj-pencil" aria-hidden>✎</span>
-                      </span>
-                    </div>
-                  </div>
-                  <div className="caderno-subj-stats">
-                    {[
-                      { value: studied, label: "estudados", tone: "mint" },
-                      { value: Math.max(materials.length - studied, 0), label: "pendentes", tone: "pink" },
-                      { value: materials.length, label: "no total", tone: "lilac" },
-                    ].map((stat, index) => (
-                      <div key={stat.label} className={`caderno-subj-stat is-${stat.tone}`} style={{ "--i": index } as React.CSSProperties}>
-                        <strong className="tabular">{stat.value}</strong>
-                        <span>{stat.label}</span>
+                  {materials.length ? (
+                    <div className="mt-6">
+                      <div className="mb-2 flex items-baseline justify-between gap-3">
+                        <span className="caderno-subj-label">progresso da matéria</span>
+                        <span className="caderno-subj-percent tabular">{percent(studied, materials.length)}%</span>
                       </div>
+                      <div className="caderno-subj-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(studied, materials.length)} aria-label="Progresso da matéria">
+                        <span className="caderno-subj-bar-fill" style={{ "--p": `${percent(studied, materials.length)}%`, "--subj": subject.color } as React.CSSProperties}>
+                          <span className="caderno-subj-pencil" aria-hidden>✎</span>
+                        </span>
+                      </div>
+                      {/* Nov/2026: os três post-its grandes viraram uma legenda;
+                          repetiam o que a barra e o subtítulo já diziam. */}
+                      <p className="caderno-subj-legend tabular">
+                        <span className="is-mint">{studied} estudados</span>
+                        <span className="is-pink">{Math.max(materials.length - studied, 0)} pendentes</span>
+                        {dueCards ? <span className="is-yellow">{dueCards} flashcards para hoje</span> : null}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="caderno-subj-intro">
+                      Tudo que você colocar aqui vira contexto para a Mine: ela resume, cria flashcards, monta provas e explica usando o seu material.
+                    </p>
+                  )}
+                </div>
+                {!materials.length ? (
+                  <div className="caderno-subj-tipos">
+                    <p className="caderno-subj-label">o que dá pra colocar</p>
+                    {[
+                      { icon: FileText, label: "Anotação", hint: "cole ou digite o texto da aula", kind: "note" as const },
+                      { icon: Paperclip, label: "Arquivo", hint: "PDF, slides, apostila", kind: "file" as const },
+                      { icon: Camera, label: "Foto", hint: "do caderno ou da lousa", kind: "image" as const },
+                      { icon: LinkIcon, label: "Link", hint: "site, vídeo ou artigo", kind: "link" as const },
+                    ].map((tipo) => (
+                      <button key={tipo.label} type="button" onClick={() => setModal({ type: "material", subjectId: subject.id, kind: tipo.kind })} className="caderno-subj-tipo group">
+                        <tipo.icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+                        <span className="min-w-0 flex-1">
+                          <strong>{tipo.label}</strong>
+                          <small>{tipo.hint}</small>
+                        </span>
+                        <Plus className="h-4 w-4 shrink-0 opacity-40 transition group-hover:opacity-100" aria-hidden />
+                      </button>
                     ))}
                   </div>
-                </div>
+                ) : (
                 <Stagger className="grid content-start gap-2.5" gap={0.07}>
                   <StaggerItem>
                     <button
@@ -252,38 +276,36 @@ export function SubjectView({
                     </StaggerItem>
                   ))}
                 </Stagger>
+                )}
               </div>
+
+              {/* Nov/2026: as "Ações inteligentes" saíram do cartão próprio e
+                  viraram uma faixa no rodapé do painel; só aparecem com conteúdo. */}
+              {materials.length ? (
+                <div className="caderno-subj-pedir">
+                  <span className="caderno-subj-pedir-label">
+                    <Sparkles className="h-4 w-4" aria-hidden /> pedir à Mine sobre a matéria toda
+                  </span>
+                  <div className="caderno-subj-pedir-lista">
+                    {[
+                      { label: "Gerar resumo", icon: FileText, tone: "mint" },
+                      { label: "Criar perguntas", icon: ClipboardCheck, tone: "sky" },
+                      { label: "Plano de revisão", icon: CalendarCheck, tone: "lilac" },
+                      { label: "Explicar do zero", icon: Brain, tone: "yellow" },
+                    ].map((item) => (
+                      <button key={item.label} type="button" onClick={() => runQuick(item.label)} className={`caderno-subj-chip is-${item.tone}`}>
+                        <item.icon className="h-4 w-4 shrink-0" aria-hidden />
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </HeroCard>
         </Reveal>
 
-        <Reveal delay={0.06} className="min-w-0">
-          <GlassCard>
-            <SectionTitle icon={Sparkles} title="Ações inteligentes" hint="a Mine lê tudo que está nesta matéria" />
-            <Stagger className="caderno-subj-acoes mt-4" gap={0.05}>
-              {[
-                { label: "Gerar resumo", hint: "um panorama do conteúdo", icon: FileText, tone: "mint" },
-                { label: "Criar perguntas", hint: "teste o que você fixou", icon: ClipboardCheck, tone: "sky" },
-                { label: "Plano de revisão", hint: "o que revisar e quando", icon: CalendarCheck, tone: "lilac" },
-                { label: "Explicar do zero", hint: "como se fosse a 1ª vez", icon: Brain, tone: "yellow" },
-              ].map((item) => (
-                <StaggerItem key={item.label} className="h-full">
-                  <button type="button" onClick={() => runQuick(item.label)} className={`caderno-subj-acao is-${item.tone} group`}>
-                    <span className="caderno-subj-acao-icone" aria-hidden>
-                      <item.icon className="h-[18px] w-[18px]" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <strong>{item.label}</strong>
-                      <small>{item.hint}</small>
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 opacity-40 transition group-hover:translate-x-1 group-hover:opacity-100" aria-hidden />
-                  </button>
-                </StaggerItem>
-              ))}
-            </Stagger>
-          </GlassCard>
-        </Reveal>
-
+        {materials.length ? (
         <SubjectNotebook
           subject={subject}
           materials={materials}
@@ -304,54 +326,40 @@ export function SubjectView({
             }))
           }
         />
+        ) : null}
 
-        <div className="grid gap-5 xl:grid-cols-[1.35fr_.85fr]">
+        {/* Nov/2026: trilha, livros, fórmulas, vídeos e questões do ENEM. */}
+        <Reveal delay={0.08} className="min-w-0">
+          <MateriaExtras
+            nome={subject.name}
+            icone={subject.icon}
+            conteudos={materials.slice(0, 12).map((item) => `${item.title}: ${(item.content?.trim() || item.detail?.trim() || "").slice(0, 160)}`)}
+            extras={subject.extras || {}}
+            salvar={(next) =>
+              update((draft) => ({
+                ...draft,
+                subjects: draft.subjects.map((item) => (item.id === subject.id ? { ...item, extras: typeof next === "function" ? next(item.extras || {}) : next } : item)),
+              }))
+            }
+            perguntarMine={(prompt) => void runQuick(prompt)}
+            notify={notify}
+          />
+        </Reveal>
+
+        {/* A lista "Conteúdos" saiu: repetia o índice do caderno acima. */}
           <Reveal delay={0.1} className="min-w-0">
-            <GlassCard className="h-full">
-              <SectionTitle
-                icon={Folder}
-                title="Conteúdos"
-                hint={materials.length ? `${studied} de ${materials.length} estudados` : undefined}
-                action={
-                  <SecondaryButton icon={Plus} onClick={() => setModal({ type: "material", subjectId: subject.id })}>
-                    Adicionar
-                  </SecondaryButton>
-                }
-              />
-              <Stagger className="mt-4 space-y-2.5" gap={0.04}>
-                {materials.map((material) => (
-                  <StaggerItem key={material.id}>
-                    <MaterialRow material={material} update={update} open={() => setModal({ type: "materialView", materialId: material.id })} />
-                  </StaggerItem>
-                ))}
-              </Stagger>
-              {!materials.length ? (
-                <EmptyState
-                  icon={Folder}
-                  title="Sem conteúdo ainda"
-                  text="Adicione arquivo, link, imagem ou anotação. Tudo que entrar aqui vira contexto para a Mine responder."
-                  action={
-                    <PrimaryButton icon={Plus} onClick={() => setModal({ type: "material", subjectId: subject.id })}>
-                      Adicionar conteúdo
-                    </PrimaryButton>
-                  }
-                />
-              ) : null}
-            </GlassCard>
-          </Reveal>
-
-          <Reveal delay={0.14} direction="left" className="min-w-0">
-            <GlassCard className="h-full">
+            <GlassCard>
               <SectionTitle
                 icon={CalendarCheck}
                 title="Tarefas"
+                hint={tasks.length ? `${tasks.filter((task) => !task.done).length} abertas` : "provas, trabalhos e entregas desta matéria"}
                 action={
                   <SecondaryButton icon={Plus} onClick={() => setModal({ type: "task", subjectId: subject.id })}>
                     Nova
                   </SecondaryButton>
                 }
               />
-              <Stagger className="mt-4 space-y-2.5" gap={0.04}>
+              <Stagger className="mt-4 grid gap-2.5 lg:grid-cols-2" gap={0.04}>
                 {tasks.map((task) => (
                   <StaggerItem key={task.id}>
                     <TaskRow
@@ -372,11 +380,10 @@ export function SubjectView({
                 ))}
               </Stagger>
               {!tasks.length ? (
-                <EmptyState icon={CalendarCheck} title="Sem tarefas" text="Crie uma tarefa com prazo para esta matéria e ela aparece na Agenda." />
+                <p className="caderno-subj-semtarefa">Nenhuma entrega marcada. Crie uma com prazo e ela aparece também na Agenda.</p>
               ) : null}
             </GlassCard>
           </Reveal>
-        </div>
       </div>
     </>
   );
@@ -550,53 +557,6 @@ function SubjectNotebook({
         )}
       </section>
     </Reveal>
-  );
-}
-
-function MaterialRow({ material, update, open }: { material: Material; update: (next: (draft: AppData) => AppData) => void; open: () => void }) {
-  const Icon = material.type === "link" ? LinkIcon : material.type === "file" ? Paperclip : material.type === "image" ? Camera : FileText;
-  return (
-    <motion.div
-      whileHover={{ x: 3 }}
-      transition={spring.snappy}
-      className="card-motion-surface group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 transition-colors duration-control hover:border-mint/30 hover:bg-white/[0.065]"
-    >
-      {/* barra de estado à esquerda: verde quando estudado */}
-      <span
-        aria-hidden
-        className={`absolute inset-y-2 left-0 w-[3px] rounded-full transition-control duration-control ${material.studied ? "bg-mint" : "bg-white/0 group-hover:bg-white/20"}`}
-      />
-      <button onClick={open} className="flex min-w-0 flex-1 items-center gap-3.5 text-left">
-        <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-mint/12 text-mint transition-transform duration-control group-hover:scale-105">
-          <Icon className="h-[22px] w-[22px]" />
-          {material.favorite ? <Star className="absolute -right-1.5 -top-1.5 h-4 w-4 fill-amberGlow text-amberGlow" /> : null}
-        </span>
-        <span className="min-w-0">
-          <span className={`block truncate font-black leading-tight ${material.studied ? "text-white/65" : ""}`}>{material.title}</span>
-          <span className="block truncate text-[13px] text-white/45">
-            {material.content ? "Texto salvo — a Mine analisa" : material.detail || "Toque para abrir"}
-          </span>
-        </span>
-      </button>
-      <motion.button
-        whileTap={{ scale: 0.94 }}
-        transition={spring.snappy}
-        onClick={(event) => {
-          if (!material.studied) cheer(event.currentTarget, xpPerAction.studied, "Conteúdo estudado!");
-          update((draft) => ({
-            ...draft,
-            materials: draft.materials.map((item) => (item.id === material.id ? toggleStudied(item, !item.studied) : item)),
-          }));
-        }}
-        aria-pressed={material.studied}
-        className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-black transition-colors duration-control ${
-          material.studied ? "bg-mint text-black" : "bg-white/[0.07] text-white/60 hover:bg-white/[0.12] hover:text-white"
-        }`}
-      >
-        <InkCheck checked={material.studied} className="caderno-inkcheck-sm" />
-        {material.studied ? "Estudado" : "Marcar"}
-      </motion.button>
-    </motion.div>
   );
 }
 

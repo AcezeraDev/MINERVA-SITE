@@ -258,9 +258,9 @@ async function getJson(url, signal, timeoutMs = 8000) {
 // Ordem das áreas na prova do ENEM (as 5 primeiras questões de linguagens têm inglês e espanhol).
 const ENEM_OFFSET = { linguagens: 0, "ciencias-humanas": 45, "ciencias-natureza": 90, matematica: 135 };
 
-async function questoesEnem(args, { signal }) {
+export async function questoesEnem(args, { signal, max = 3, imagens = false } = {}) {
   const disciplina = ENEM_OFFSET[args?.disciplina] !== undefined ? args.disciplina : "matematica";
-  const quantidade = Math.min(3, Math.max(1, Number(args?.quantidade) || 1));
+  const quantidade = Math.min(max, Math.max(1, Number(args?.quantidade) || 1));
   const tema = fold(args?.tema).split(/[^a-z0-9]+/).filter((word) => word.length > 3);
   const anos = Number(args?.ano) >= 2009 && Number(args?.ano) <= 2023 ? [Number(args.ano)] : [2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016].sort(() => Math.random() - 0.5).slice(0, tema.length ? 4 : 1);
   const achadas = [];
@@ -273,12 +273,28 @@ async function questoesEnem(args, { signal }) {
       const pontos = tema.length ? tema.filter((word) => corpo.includes(word)).length : 1;
       // Questao com figura nao aparece no chat: fica para o fim da fila.
       const temFigura = String(q.context || "").includes("![") || list(q.files, 5).length > 0 || list(q.alternatives, 5).some((alt) => alt?.file);
-      if (pontos > 0) achadas.push({ q, pontos: pontos + Math.random() * 0.5 - (temFigura ? 2 : 0) });
+      if (pontos > 0) achadas.push({ q, pontos: pontos + Math.random() * 0.5 - (temFigura && !imagens ? 2 : 0) });
     }
     if (achadas.length >= quantidade * 3) break;
   }
   achadas.sort((a, b) => b.pontos - a.pontos);
   const escolhidas = achadas.slice(0, quantidade).map(({ q }) => {
+    // A aba Questões da matéria mostra as figuras (só https do próprio enem.dev).
+    if (imagens) {
+      const figuras = list(q.files, 5).filter((url) => typeof url === "string" && url.startsWith("https://"));
+      const corpo = String(q.context || "").trim();
+      return {
+        titulo: q.title,
+        ano: q.year,
+        texto_base: corpo.slice(0, 4000) + (corpo.length > 4000 ? "…" : ""),
+        figuras: figuras.filter((url) => !corpo.includes(url)),
+        tem_imagem: false,
+        comando: q.alternativesIntroduction,
+        alternativas: list(q.alternatives, 5).map((alt) => ({ letra: alt.letter, texto: alt.text || "", imagem: typeof alt.file === "string" && alt.file.startsWith("https://") ? alt.file : "" })),
+        gabarito: q.correctAlternative,
+        fonte: `ENEM ${q.year}, ${q.title}`,
+      };
+    }
     const contexto = String(q.context || "").replace(/!\[[^\]]*\]\([^)]*\)/g, "[imagem na prova original]").trim();
     return {
       titulo: q.title,

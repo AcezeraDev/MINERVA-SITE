@@ -372,6 +372,7 @@ html.theme-light {
 }
 .caderno-tab[data-tone="capa"] { --tab: var(--rule); }
 html.theme-light .caderno-tab[data-tone="capa"] { --tab: 255 255 255; }
+.caderno-area[data-area="materias"], .caderno-tab[data-tone="materias"] { --tab: var(--hl-orange); }
 .caderno-area[data-area="estudar"], .caderno-tab[data-tone="estudar"] { --tab: var(--hl-mint); }
 .caderno-area[data-area="praticar"], .caderno-tab[data-tone="praticar"] { --tab: var(--hl-lilac); }
 .caderno-area[data-area="jogar"], .caderno-tab[data-tone="jogar"] { --tab: var(--hl-pink); }
