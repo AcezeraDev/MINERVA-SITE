@@ -48,7 +48,7 @@ test("a Mine responde com o GPT-6.1 Terra e deixa as tarefas no Claude Haiku 5.5
   delete process.env.NANOGPT_TASK_MODEL;
   try {
     assert.equal(MINE_MODEL.provider, "nanogpt");
-    assert.equal(MINE_MODEL.providerModel, "openai/gpt-6.1-terra");
+    assert.equal(MINE_MODEL.providerModel, "anthropic/claude-haiku-5.5");
     assert.equal(MINE_MODEL.providerParams.reasoning_effort, "medium");
     assert.equal(MINE_TASK_MODEL.providerModel, "anthropic/claude-haiku-5.5");
     assert.equal(MINE_TASK_MODEL.providerParams.reasoning_effort, "low");
@@ -140,7 +140,7 @@ test("roteador repete o mesmo modelo com a segunda chave dentro do pedido", asyn
       assert.equal(result.alias, "mine");
     },
   );
-  assert.deepEqual(models, ["openai/gpt-6.1-terra", "openai/gpt-6.1-terra"]);
+  assert.deepEqual(models, ["anthropic/claude-haiku-5.5", "anthropic/claude-haiku-5.5"]);
 });
 
 test("se o principal falha, a reserva interna responde", async () => {
@@ -158,7 +158,7 @@ test("se o principal falha, a reserva interna responde", async () => {
       assert.equal(result.displayName, "Mine");
     },
   );
-  assert.deepEqual(models, ["openai/gpt-6.1-terra", "anthropic/claude-haiku-5.5"]);
+  assert.deepEqual(models, ["anthropic/claude-haiku-5.5", "anthropic/claude-haiku-5.5"]);
 });
 
 test("busca na web injeta resultados numerados e devolve as fontes", async () => {

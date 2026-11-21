@@ -28,19 +28,18 @@ const CAPABILITIES = { text: true, image: true, video: false, audio: false, pdf:
 /**
  * Modelo principal: responde o chat.
  *
- * 21/nov/2026: trocou do Claude Haiku 5.5 para o GPT-6.1 Terra (escolha do
- * dono), o meio da familia GPT-6: escreve e explica melhor, le imagem, chama
- * ferramentas e aceita esforco de none a max. Na NanoGPT custa US$ 1/5 por
- * milhao (10x o Haiku); acima de 272 mil tokens de contexto fica mais caro, e
- * o historico ja e cortado bem antes disso (messages.mjs). O Haiku continua
- * nas tarefas de formato rigido e como primeira reserva do chat.
+ * 21/nov/2026: passou um dia no GPT-6.1 Terra (US$ 1/5 por milhao) e voltou
+ * para o Claude Haiku 5.5 (US$ 0,10/0,50, 10x mais barato) porque o Terra
+ * saiu caro demais. O Haiku le imagem, chama ferramentas e aceita esforco
+ * low..max (effortFor troca none/minimal por low). Para testar outro modelo
+ * sem mexer no codigo: variavel NANOGPT_MODEL.
  */
 export const MINE_MODEL = {
   alias: "mine",
   displayName: "Mine",
   provider: "nanogpt",
   get providerModel() {
-    return envModel("NANOGPT_MODEL", "openai/gpt-6.1-terra");
+    return envModel("NANOGPT_MODEL", "anthropic/claude-haiku-5.5");
   },
   get providerParams() {
     return { reasoning_effort: effortFor(this.providerModel, envEffort("MINE_REASONING_EFFORT", "medium")) };
