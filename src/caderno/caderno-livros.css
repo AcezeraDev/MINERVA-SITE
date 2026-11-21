@@ -108,6 +108,17 @@
   word-break: break-word;
 }
 
+/* Biblioteca grátis dentro da aba Leitura */
+.lei-modos {
+  margin-top: 0.25rem;
+}
+.lei-biblioteca {
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border-radius: 1.2rem;
+  background: rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
 /* Biblioteca grátis */
 .caderno-lv-busca {
   display: flex;
@@ -200,26 +211,32 @@
   color: rgb(var(--theme-muted));
 }
 
-/* ── Leitor da Mine ── */
+/* ── Leitor da Mine: livro aberto com páginas medidas ── */
 .leitor-mine {
   --papel: #fbf7ee;
+  --papel-2: #f3ecdd;
+  --fundo: #e9e2d3;
   --tinta: #2a2620;
-  --suave: #776c5c;
-  --borda: #e6dccb;
+  --suave: #7a6f5f;
+  --borda: #e1d6c3;
+  --sombra: rgb(60 40 10 / 0.18);
   position: fixed;
   inset: 0;
   z-index: 210;
   display: flex;
   flex-direction: column;
-  background: var(--papel);
+  background: var(--fundo);
   color: var(--tinta);
   animation: leitor-mine-entra 200ms ease-out both;
 }
 .leitor-mine.is-escuro {
-  --papel: #16171c;
+  --papel: #1d1e24;
+  --papel-2: #191a1f;
+  --fundo: #0f1014;
   --tinta: #e7e3da;
   --suave: #9a958a;
-  --borda: #2c2e36;
+  --borda: #2e3038;
+  --sombra: rgb(0 0 0 / 0.5);
 }
 @keyframes leitor-mine-entra {
   from {
@@ -231,7 +248,8 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem clamp(1rem, 4vw, 2.5rem);
+  padding: 0.65rem clamp(1rem, 3vw, 2rem);
+  background: var(--papel);
   border-bottom: 1px solid var(--borda);
 }
 .leitor-mine-topo h2 {
@@ -251,6 +269,28 @@
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+.leitor-mine-traduzir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.3rem;
+  padding: 0 0.9rem;
+  border: 1.5px solid var(--borda);
+  border-radius: 0.7rem;
+  color: var(--tinta);
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.leitor-mine-traduzir:hover {
+  border-color: #3b5bdb;
+}
+.leitor-mine-traduzir[aria-pressed="true"] {
+  border-color: transparent;
+  background: #3b5bdb;
+  color: #fff;
 }
 .leitor-mine-ajustes {
   display: flex;
@@ -283,32 +323,139 @@
   outline: 2px solid #3b5bdb;
   outline-offset: 2px;
 }
-.leitor-mine-folha {
+
+/* Palco: o livro ocupa a altura toda entre o topo e o rodapé. */
+.leitor-mine-palco {
+  position: relative;
+  display: flex;
+  min-height: 0;
   flex: 1;
-  overflow-y: auto;
-  padding: clamp(1.25rem, 4vh, 2.75rem) 1.25rem 3rem;
+  justify-content: center;
+  padding: clamp(0.75rem, 2.5vh, 1.75rem) clamp(0.5rem, 3vw, 2.5rem);
+  overflow: hidden;
+}
+.leitor-mine-livro {
+  --pad-y: clamp(1.4rem, 4vh, 2.6rem);
+  --pad-x: clamp(1.25rem, 4vw, 3.25rem);
+  position: relative;
+  display: grid;
+  width: min(100%, 42rem);
+  height: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  border-radius: 0.4rem;
+  background: var(--papel);
+  box-shadow: 0 1px 0 var(--borda), 0 24px 50px -24px var(--sombra);
+}
+.leitor-mine-livro.is-duplo {
+  width: min(100%, 82rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* a dobra do livro no meio */
+  background:
+    linear-gradient(90deg, transparent calc(50% - 2.2rem), color-mix(in srgb, var(--sombra) 55%, transparent) 50%, transparent calc(50% + 2.2rem)),
+    linear-gradient(90deg, var(--papel-2), var(--papel) 12%, var(--papel) 88%, var(--papel-2));
+}
+.leitor-mine-pagina {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: var(--pad-y) var(--pad-x) calc(var(--pad-y) * 0.6);
+  overflow: hidden;
 }
 .leitor-mine-texto {
-  max-width: 38rem;
-  margin: 0 auto;
-  font-family: "Literata", "Georgia", "Times New Roman", serif;
-  line-height: 1.75;
-  text-wrap: pretty;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  font-family: "Literata", "Iowan Old Style", "Georgia", "Times New Roman", serif;
+  font-size: var(--fonte, 19px);
+  line-height: 1.7;
+  text-align: justify;
   hyphens: auto;
+  text-wrap: pretty;
 }
 .leitor-mine-texto p + p {
-  margin-top: 1em;
+  margin-top: 0.85em;
+}
+.leitor-mine-texto p {
+  text-indent: 1.4em;
+}
+.leitor-mine-texto p.is-continua {
+  text-indent: 0;
 }
 .leitor-mine-texto p.is-verso {
   white-space: pre-line;
+  text-align: left;
+  text-indent: 0;
   hyphens: none;
 }
+.leitor-mine-numero {
+  display: block;
+  padding-top: 0.6rem;
+  font-size: 0.75rem;
+  color: var(--suave);
+  text-align: center;
+}
+.leitor-mine-pagina.is-traduzindo .leitor-mine-texto {
+  opacity: 0.45;
+  transition: opacity 200ms ease;
+}
+
+/* Bordas clicáveis para virar a página (como num livro). */
+.leitor-mine-borda {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: clamp(1.5rem, 6%, 4.5rem);
+  cursor: pointer;
+}
+.leitor-mine-borda.is-esquerda {
+  left: 0;
+  cursor: w-resize;
+}
+.leitor-mine-borda.is-direita {
+  right: 0;
+  cursor: e-resize;
+}
+.leitor-mine-borda:disabled {
+  cursor: default;
+}
+.leitor-mine-borda:hover:not(:disabled).is-esquerda {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--sombra) 60%, transparent), transparent);
+}
+.leitor-mine-borda:hover:not(:disabled).is-direita {
+  background: linear-gradient(270deg, color-mix(in srgb, var(--sombra) 60%, transparent), transparent);
+}
+
+/* Molde de medição: mesma caixa do livro, invisível e fora do caminho. */
+.leitor-mine-molde {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: inherit;
+  visibility: hidden;
+  pointer-events: none;
+}
+.leitor-mine-molde .leitor-mine-pagina {
+  grid-column: 1;
+}
+.leitor-mine-medida {
+  position: absolute;
+  top: 0;
+  left: var(--pad-x);
+  right: var(--pad-x);
+  height: auto;
+  flex: none;
+  overflow: visible;
+}
+
 .leitor-mine-aviso {
+  grid-column: 1 / -1;
   display: flex;
+  align-self: center;
   justify-content: center;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 20vh;
   color: var(--suave);
   font-size: 1rem;
 }
@@ -316,7 +463,8 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.6rem clamp(0.75rem, 4vw, 2.5rem) max(0.6rem, env(safe-area-inset-bottom));
+  padding: 0.55rem clamp(0.75rem, 3vw, 2rem) max(0.55rem, env(safe-area-inset-bottom));
+  background: var(--papel);
   border-top: 1px solid var(--borda);
 }
 .leitor-mine-progresso {
@@ -347,9 +495,38 @@
 .leitor-mine-perguntar:disabled {
   opacity: 0.5;
 }
+.leitor-mine-tentar {
+  color: #3b5bdb;
+  font-weight: 800;
+  text-decoration: underline;
+}
 @media (max-width: 640px) {
-  .leitor-mine-ajustes span {
+  .leitor-mine-ajustes span,
+  .leitor-mine-autor,
+  .leitor-mine-fonte {
     display: none;
+  }
+  /* 1ª linha: título e fechar; 2ª linha: traduzir e ajustes. */
+  .leitor-mine-topo {
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+  .leitor-mine-topo > div:first-child {
+    flex: 1 1 calc(100% - 3rem);
+  }
+  .leitor-mine-fechar {
+    order: 1;
+  }
+  .leitor-mine-traduzir {
+    order: 2;
+  }
+  .leitor-mine-ajustes {
+    order: 3;
+    margin-left: auto;
+  }
+  .leitor-mine-texto {
+    text-align: left;
   }
   .leitor-mine-rodape {
     flex-wrap: wrap;
@@ -367,7 +544,8 @@
   .leitor-mine {
     animation: none;
   }
-  .caderno-lv-item-capa {
+  .caderno-lv-item-capa,
+  .leitor-mine-pagina.is-traduzindo .leitor-mine-texto {
     transition: none;
   }
 }

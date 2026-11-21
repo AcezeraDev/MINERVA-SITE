@@ -2,7 +2,8 @@
 // texto, grifa as palavras difíceis e faz perguntas de interpretação.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, Bot, CheckCircle2, Clock, FileUp, History, Lightbulb, RotateCcw, Sparkles, Type, XCircle } from "lucide-react";
+import { BookOpen, Bot, CheckCircle2, Clock, FileUp, History, Library, Lightbulb, RotateCcw, Sparkles, Type, XCircle } from "lucide-react";
+import { BibliotecaGratis } from "../conteudo/Livros";
 import { PageHeader, uid, type Session, type User, type useMemoUserData, type AppData } from "../main";
 import { useSoftMotion } from "../motion";
 import { celebrateFrom, floatXp, mineConversa, mineSays } from "../caderno";
@@ -77,6 +78,8 @@ export function LeituraView({ user, update }: { data: ReturnType<typeof useMemoU
     preset?.texto ? { titulo: preset.titulo || "", texto: preset.texto } : lerLocal(chaveRascunho, { titulo: "", texto: "" }),
   );
   const [fase, setFase] = useState<"colar" | "lendo" | "resultado">("colar");
+  // Nov/2026: a Biblioteca grátis (livros em domínio público) também mora aqui.
+  const [modo, setModo] = useState<"texto" | "biblioteca">("texto");
   const [atual, setAtual] = useState<Guardada | null>(null);
   const [erro, setErro] = useState("");
   const [passo, setPasso] = useState(0);
@@ -157,7 +160,7 @@ export function LeituraView({ user, update }: { data: ReturnType<typeof useMemoU
       <PageHeader
         eyebrow="Leitura · Interpretação de texto"
         title="Leitura com a Mine"
-        subtitle="Cole um texto ou abra um PDF. A Mine resume, grifa as palavras difíceis com o significado e faz perguntas de interpretação no estilo ENEM."
+        subtitle="Cole um texto, abra um PDF ou escolha um livro grátis na Biblioteca. A Mine resume, grifa as palavras difíceis com o significado e faz perguntas de interpretação no estilo ENEM."
         action={
           fase === "resultado" ? (
             <button
@@ -174,7 +177,30 @@ export function LeituraView({ user, update }: { data: ReturnType<typeof useMemoU
         }
       />
 
-      {fase === "resultado" && atual ? (
+      <div className="caderno-lv-vistas lei-modos" role="tablist" aria-label="Leitura">
+        <button type="button" role="tab" aria-selected={modo === "texto"} onClick={() => setModo("texto")} className="caderno-lv-vista">
+          <Type className="h-4 w-4" aria-hidden /> Interpretar um texto
+        </button>
+        <button type="button" role="tab" aria-selected={modo === "biblioteca"} onClick={() => setModo("biblioteca")} className="caderno-lv-vista">
+          <Library className="h-4 w-4" aria-hidden /> Biblioteca grátis
+        </button>
+      </div>
+
+      {modo === "biblioteca" ? (
+        <section className="lei-biblioteca" aria-label="Biblioteca grátis">
+          <BibliotecaGratis
+            aoInterpretar={(trecho, livro) => {
+              // O trecho do livro vira o texto da interpretação desta aba.
+              setRascunho({ titulo: `${livro.titulo}${livro.autor ? ` (${livro.autor})` : ""}`.slice(0, 120), texto: trecho });
+              setAtual(null);
+              setFase("colar");
+              setModo("texto");
+              window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+              mineSays("Trecho pronto! Clique em “Ler com a Mine” que eu interpreto com você.", "happy");
+            }}
+          />
+        </section>
+      ) : fase === "resultado" && atual ? (
         <motion.div initial={reduced ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           <Resultado
             key={atual.id}

@@ -16,6 +16,7 @@
 import { BookMarked, BookOpen, Check, ExternalLink, Gift, Library, Loader2, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import "../caderno/caderno-livros.css";
+import "../caderno/caderno-materia-extras.css";
 import { mineHeaders } from "../mineAuth";
 import { askMineTask } from "../mineTask";
 import { GENEROS, IDIOMAS, acharNoAcervo, capaAcervo, carregarAcervo, dobrar, type LivroAcervo } from "./acervo";
@@ -193,7 +194,8 @@ export function AbaLivros({
   const abrir = (livro: LivroItem) => {
     if (livro.leitura?.gutenbergId) {
       ultimaPagina.current = null;
-      setLeitor({ id: livro.leitura.gutenbergId, titulo: livro.titulo, autor: livro.autor, estanteId: livro.id });
+      const gid = livro.leitura.gutenbergId;
+      setLeitor({ id: gid, titulo: livro.titulo, autor: livro.autor, estanteId: livro.id, idioma: acervo?.find((item) => item.i === gid)?.l });
     } else if (livro.leitura) abrirEmbed(livro);
   };
 
@@ -273,7 +275,7 @@ export function AbaLivros({
         <Biblioteca acervo={acervo} erro={erroAcervo} naEstante={new Set(itens.map((item) => item.leitura?.gutenbergId).filter(Boolean) as number[])} ler={(livro) => {
             // Se o livro também está na estante, o progresso vai para lá ao fechar.
             ultimaPagina.current = null;
-            setLeitor({ id: livro.i, titulo: livro.t, autor: livro.a, estanteId: itens.find((item) => item.leitura?.gutenbergId === livro.i)?.id });
+            setLeitor({ id: livro.i, titulo: livro.t, autor: livro.a, idioma: livro.l, estanteId: itens.find((item) => item.leitura?.gutenbergId === livro.i)?.id });
           }} porNaEstante={porNaEstante} />
       )}
 
@@ -539,9 +541,10 @@ function Biblioteca({
 }: {
   acervo: LivroAcervo[] | null;
   erro: string;
-  naEstante: Set<number>;
+  naEstante?: Set<number>;
   ler: (livro: LivroAcervo) => void;
-  porNaEstante: (livro: LivroAcervo) => void;
+  /** Sem estante (aba Leitura): o botão "+ estante" não aparece. */
+  porNaEstante?: (livro: LivroAcervo) => void;
 }) {
   const [busca, setBusca] = useState("");
   const [idioma, setIdioma] = useState("pt");
@@ -627,7 +630,7 @@ function Biblioteca({
                 <button type="button" onClick={() => ler(livro)} className="caderno-mx-ler mt-0">
                   <BookOpen className="h-4 w-4" /> Ler
                 </button>
-                {naEstante.has(livro.i) ? (
+                {!porNaEstante ? null : naEstante?.has(livro.i) ? (
                   <span className="caderno-mx-seg" aria-pressed="true">
                     <Check className="h-3.5 w-3.5" /> na estante
                   </span>
@@ -641,7 +644,7 @@ function Biblioteca({
           ))}
         </div>
       ) : (
-        <p className="caderno-mx-dica">Nenhum livro com essa busca. Tente outro termo, outro gênero ou “Todos os idiomas”.</p>
+        <BuscaVazia acervo={acervo} busca={busca} idioma={idioma} genero={genero} verOutrosIdiomas={() => setIdioma("")} />
       )}
       {resultado.length > limite ? (
         <button type="button" onClick={() => setLimite((atual) => atual + POR_PAGINA)} className="caderno-mx-mini mx-auto mt-4 flex">
@@ -652,7 +655,98 @@ function Biblioteca({
   );
 }
 
+/**
+ * Busca sem resultado: se o livro existe em outro idioma, oferece trocar; se
+ * não está no acervo (obra protegida por direito autoral, como "1984" nos EUA
+ * ou livros recentes), explica e aponta onde procurar.
+ */
+function BuscaVazia({ acervo, busca, idioma, genero, verOutrosIdiomas }: { acervo: LivroAcervo[]; busca: string; idioma: string; genero: string; verOutrosIdiomas: () => void }) {
+  const termos = dobrar(busca).split(" ").filter(Boolean);
+  const emOutros =
+    idioma && termos.length
+      ? acervo.filter((livro) => livro.l !== idioma && (!genero || livro.g.includes(genero)) && termos.every((termo) => dobrar(`${livro.t} ${livro.a}`).includes(termo))).length
+      : 0;
+  const q = encodeURIComponent(busca.trim());
+  return (
+    <div className="caderno-mx-vazio">
+      <Search className="h-6 w-6 opacity-60" aria-hidden />
+      <div>
+        {emOutros ? (
+          <>
+            <strong>
+              Nada em {IDIOMAS[idioma] || idioma}, mas achei {emOutros} {emOutros === 1 ? "livro" : "livros"} em outros idiomas.
+            </strong>
+            <p>Os livros em outra língua têm o botão Traduzir no leitor.</p>
+          </>
+        ) : busca.trim() ? (
+          <>
+            <strong>“{busca.trim()}” não está na Biblioteca grátis.</strong>
+            <p>
+              Aqui só entram livros em domínio público (autores que morreram há mais de 70 anos e obras antigas). Livros recentes ou ainda protegidos por direito autoral, como muitos best-sellers, não podem ser lidos de graça aqui. Procure na biblioteca da escola ou nos links ao lado.
+            </p>
+          </>
+        ) : (
+          <strong>Nenhum livro neste gênero e idioma.</strong>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {emOutros ? (
+          <button type="button" onClick={verOutrosIdiomas} className="caderno-subj-next mt-0">
+            Ver em todos os idiomas
+          </button>
+        ) : null}
+        {busca.trim() && !emOutros ? (
+          <>
+            <a href={`https://openlibrary.org/search?q=${q}`} target="_blank" rel="noreferrer" className="caderno-mx-mini">
+              <ExternalLink className="h-3.5 w-3.5" /> Open Library (empréstimo grátis)
+            </a>
+            <a href={`https://www.google.com/search?tbm=bks&q=${q}`} target="_blank" rel="noreferrer" className="caderno-mx-mini">
+              <ExternalLink className="h-3.5 w-3.5" /> Google Livros
+            </a>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function CapaAcervo({ livro }: { livro: LivroAcervo }) {
   const [falhou, setFalhou] = useState(false);
   return !falhou ? <img src={capaAcervo(livro.i)} alt="" loading="lazy" onError={() => setFalhou(true)} /> : <CapaDesenhada titulo={livro.t} />;
+}
+
+/**
+ * Biblioteca grátis sozinha (aba Leitura): acervo + leitor da Mine, sem a
+ * estante de uma matéria. O botão da Mine no leitor leva o trecho para a
+ * interpretação da aba (`aoInterpretar`).
+ */
+export function BibliotecaGratis({ aoInterpretar }: { aoInterpretar: (trecho: string, livro: { titulo: string; autor: string }) => void }) {
+  const [acervo, setAcervo] = useState<LivroAcervo[] | null>(null);
+  const [erro, setErro] = useState("");
+  const [leitor, setLeitor] = useState<LivroParaLer | null>(null);
+  const fechar = useCallback(() => setLeitor(null), []);
+
+  useEffect(() => {
+    let vivo = true;
+    carregarAcervo()
+      .then((lista) => vivo && setAcervo(lista))
+      .catch(() => vivo && setErro("Não consegui carregar a biblioteca agora. Tente recarregar a página."));
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  return (
+    <>
+      <Biblioteca acervo={acervo} erro={erro} ler={(livro) => setLeitor({ id: livro.i, titulo: livro.t, autor: livro.a, idioma: livro.l })} />
+      {leitor ? (
+        <LeitorLivro
+          livro={leitor}
+          fechar={fechar}
+          perguntarMine={() => undefined}
+          aoInterpretar={(trecho) => aoInterpretar(trecho, { titulo: leitor.titulo, autor: leitor.autor })}
+        />
+      ) : null}
+    </>
+  );
 }

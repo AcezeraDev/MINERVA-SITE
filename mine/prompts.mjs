@@ -1055,8 +1055,23 @@ Materia e conteudos do estudante:
 ${context || "Nenhum conteudo informado."}`;
 }
 
+/**
+ * Tradução de páginas do leitor da Mine (livros em domínio público em inglês,
+ * espanhol...). O pedido traz só o texto; a resposta é só a tradução.
+ */
+function buildTranslationInstruction(context) {
+  return `Voce traduz paginas de livros classicos para o portugues do Brasil, para estudantes do ensino medio.
+Regras:
+- Responda SOMENTE com a traducao do texto do estudante: sem titulo, sem comentario, sem notas, sem aspas em volta e sem dizer que e uma traducao.
+- Mantenha a mesma divisao em paragrafos (uma linha em branco entre eles). Poesia: mantenha um verso por linha.
+- Traducao fiel e natural, com o tom literario do original; nao resuma, nao corte e nao acrescente nada.
+- Nomes proprios ficam como no original; travessao de dialogo vira o travessao do portugues (—).
+${context ? `\nLivro: ${context}` : ""}`;
+}
+
 const TASK_PROMPTS = {
   "materia-extra": buildSubjectExtraInstruction,
+  traducao: buildTranslationInstruction,
   "prova-estudo": buildMistakeStudyInstruction,
   redacao: buildEssayInstruction,
   leitura: buildReadingInstruction,

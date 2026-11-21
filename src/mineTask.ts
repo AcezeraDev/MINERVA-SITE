@@ -9,7 +9,7 @@ const reasoningReserve = 1200;
 import { mineHeaders } from "./mineAuth";
 
 export async function askMineTask(
-  payload: { task: "redacao" | "atividade" | "atividade-correcao" | "quiz" | "prova-estudo" | "leitura" | "materia-extra"; prompt: string; context: string; outputTokens: number },
+  payload: { task: "redacao" | "atividade" | "atividade-correcao" | "quiz" | "prova-estudo" | "leitura" | "materia-extra" | "traducao"; prompt: string; context: string; outputTokens: number },
   options: { signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<string> {
   const controller = new AbortController();

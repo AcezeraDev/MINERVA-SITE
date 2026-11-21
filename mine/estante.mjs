@@ -166,6 +166,12 @@ async function doOpenLibrary(titulo, autor) {
 
 const textos = new Map();
 const GUTENBERG_ESPELHO = "https://gutenberg.pglaf.org";
+/** Espelhos oficiais rápidos (medidos em 21/nov/2026), na ordem de tentativa. */
+const GUTENBERG_RAPIDOS = [
+  "https://mirror.csclub.uwaterloo.ca/gutenberg",
+  "https://mirrors.xmission.com/gutenberg",
+  "https://ftp.mirrorservice.org/sites/ftp.ibiblio.org/pub/docs/books/gutenberg",
+];
 
 /** 55752 → "5/5/7/5/55752"; ids de um dígito ficam em "0/7". */
 function pastaGutenberg(id) {
@@ -192,32 +198,45 @@ export async function textoDoLivro(idBruto) {
   const id = Number(idBruto);
   if (!Number.isInteger(id) || id < 1 || id > 200000) throw new Error("livro inválido");
   if (textos.has(id)) return textos.get(id);
-  const base = `${GUTENBERG_ESPELHO}/${pastaGutenberg(id)}`;
-  const tentativas = [
-    { url: `${base}/${id}-0.txt`, encoding: "utf-8" },
-    { url: `${GUTENBERG_ESPELHO}/cache/epub/${id}/pg${id}.txt`, encoding: "utf-8" },
-    { url: `${base}/${id}-8.txt`, encoding: "latin1" },
-    { url: `${base}/${id}.txt`, encoding: "utf-8" },
+  const pasta = pastaGutenberg(id);
+  const arquivos = [
+    { nome: `${id}-0.txt`, encoding: "utf-8" },
+    { nome: `${id}-8.txt`, encoding: "latin1" },
+    { nome: `${id}.txt`, encoding: "utf-8" },
   ];
-  for (const { url, encoding } of tentativas) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20_000);
-    try {
-      const response = await fetch(url, { headers: { "user-agent": "Minerva-Escola/1.0" }, signal: controller.signal });
-      if (!response.ok) continue;
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      const bruto = new TextDecoder(encoding).decode(bytes);
-      if (/<!DOCTYPE html/i.test(bruto.slice(0, 200))) continue;
-      // Teto de 3 MB: a resposta da Vercel não passa de 4,5 MB.
-      const texto = semLicenca(bruto).slice(0, 3_000_000);
-      if (texto.length < 200) continue;
-      if (textos.size >= 20) textos.delete(textos.keys().next().value);
-      textos.set(id, texto);
-      return texto;
-    } catch {
-      // tenta o próximo formato
-    } finally {
-      clearTimeout(timer);
+  // Os três primeiros espelhos entregam ~900 KB em ~2 s; o pglaf leva 8-15 s
+  // e fica por último (é o único com a pasta cache/epub).
+  const tentativas = [
+    ...GUTENBERG_RAPIDOS.map((base) => arquivos.map((arquivo) => ({ url: `${base}/${pasta}/${arquivo.nome}`, encoding: arquivo.encoding, base }))),
+    [
+      { url: `${GUTENBERG_ESPELHO}/${pasta}/${id}-0.txt`, encoding: "utf-8", base: GUTENBERG_ESPELHO },
+      { url: `${GUTENBERG_ESPELHO}/cache/epub/${id}/pg${id}.txt`, encoding: "utf-8", base: GUTENBERG_ESPELHO },
+      { url: `${GUTENBERG_ESPELHO}/${pasta}/${id}-8.txt`, encoding: "latin1", base: GUTENBERG_ESPELHO },
+    ],
+  ];
+  for (const doEspelho of tentativas) {
+    for (const { url, encoding } of doEspelho) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15_000);
+      try {
+        const response = await fetch(url, { headers: { "user-agent": "Minerva-Escola/1.0" }, signal: controller.signal });
+        // 404: este formato não existe aqui, tenta o próximo formato no mesmo espelho.
+        if (!response.ok) continue;
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        const bruto = new TextDecoder(encoding).decode(bytes);
+        if (/<!DOCTYPE html/i.test(bruto.slice(0, 200))) continue;
+        // Teto de 3 MB: a resposta da Vercel não passa de 4,5 MB.
+        const texto = semLicenca(bruto).slice(0, 3_000_000);
+        if (texto.length < 200) continue;
+        if (textos.size >= 20) textos.delete(textos.keys().next().value);
+        textos.set(id, texto);
+        return texto;
+      } catch {
+        // espelho fora do ar ou lento: pula para o próximo espelho
+        break;
+      } finally {
+        clearTimeout(timer);
+      }
     }
   }
   throw new Error("texto indisponível");
