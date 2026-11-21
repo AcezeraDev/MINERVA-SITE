@@ -328,8 +328,10 @@ export function SubjectView({
         />
         ) : null}
 
-        {/* Nov/2026: trilha, livros, fórmulas, vídeos e questões do ENEM. */}
-        <Reveal delay={0.08} className="min-w-0">
+        {/* Nov/2026: trilha, livros, fórmulas, vídeos e questões do ENEM.
+            amount mínimo: com a Biblioteca aberta a seção passa de 4.000 px e
+            nunca teria 18% dela na tela de um celular (ficava invisível). */}
+        <Reveal delay={0.08} className="min-w-0" amount={0.01}>
           <MateriaExtras
             nome={subject.name}
             icone={subject.icon}

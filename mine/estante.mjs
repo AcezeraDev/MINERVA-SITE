@@ -162,6 +162,67 @@ async function doOpenLibrary(titulo, autor) {
   return capa ? { capa, leitura: null } : null;
 }
 
+/* ───────── Texto integral do Projeto Gutenberg (leitor da Mine) ───────── */
+
+const textos = new Map();
+const GUTENBERG_ESPELHO = "https://gutenberg.pglaf.org";
+
+/** 55752 → "5/5/7/5/55752"; ids de um dígito ficam em "0/7". */
+function pastaGutenberg(id) {
+  const s = String(id);
+  return s.length === 1 ? `0/${s}` : `${s.slice(0, -1).split("").join("/")}/${s}`;
+}
+
+/** Tira o cabeçalho e o rodapé de licença; o aviso de domínio público fica na interface. */
+function semLicenca(texto) {
+  const inicio = texto.search(/\*\*\*\s*START OF (THE|THIS) PROJECT GUTENBERG[^\n]*\n/i);
+  const fim = texto.search(/\*\*\*\s*END OF (THE|THIS) PROJECT GUTENBERG/i);
+  let corpo = texto;
+  if (inicio >= 0) corpo = corpo.slice(corpo.indexOf("\n", inicio) + 1);
+  if (fim >= 0) corpo = corpo.slice(0, corpo.search(/\*\*\*\s*END OF (THE|THIS) PROJECT GUTENBERG/i));
+  return corpo.replace(/\r\n/g, "\n").trim();
+}
+
+/**
+ * Texto puro de um livro do Projeto Gutenberg. O site principal recusa
+ * servidor (503), então vai pelo espelho oficial pglaf; tenta UTF-8, depois
+ * o arquivo latin-1 e por fim o ASCII. Cache dos últimos 20 livros.
+ */
+export async function textoDoLivro(idBruto) {
+  const id = Number(idBruto);
+  if (!Number.isInteger(id) || id < 1 || id > 200000) throw new Error("livro inválido");
+  if (textos.has(id)) return textos.get(id);
+  const base = `${GUTENBERG_ESPELHO}/${pastaGutenberg(id)}`;
+  const tentativas = [
+    { url: `${base}/${id}-0.txt`, encoding: "utf-8" },
+    { url: `${GUTENBERG_ESPELHO}/cache/epub/${id}/pg${id}.txt`, encoding: "utf-8" },
+    { url: `${base}/${id}-8.txt`, encoding: "latin1" },
+    { url: `${base}/${id}.txt`, encoding: "utf-8" },
+  ];
+  for (const { url, encoding } of tentativas) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch(url, { headers: { "user-agent": "Minerva-Escola/1.0" }, signal: controller.signal });
+      if (!response.ok) continue;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const bruto = new TextDecoder(encoding).decode(bytes);
+      if (/<!DOCTYPE html/i.test(bruto.slice(0, 200))) continue;
+      // Teto de 3 MB: a resposta da Vercel não passa de 4,5 MB.
+      const texto = semLicenca(bruto).slice(0, 3_000_000);
+      if (texto.length < 200) continue;
+      if (textos.size >= 20) textos.delete(textos.keys().next().value);
+      textos.set(id, texto);
+      return texto;
+    } catch {
+      // tenta o próximo formato
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error("texto indisponível");
+}
+
 /** Capa e, se existir, um leitor embutido legal para o livro. */
 export async function buscarLivro(tituloBruto, autorBruto = "") {
   const titulo = texto(tituloBruto, 120).replace(/\(.*?\)/g, "").trim();

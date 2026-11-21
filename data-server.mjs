@@ -45,7 +45,7 @@ import { runMineRequest } from "./mine/router.mjs";
 import { pageForPanel } from "./mine/page-reader.mjs";
 import { questoesEnem } from "./mine/tools.mjs";
 import { searchWeb, webSearchEnabled } from "./mine/web.mjs";
-import { buscarLivro, buscarVideos } from "./mine/estante.mjs";
+import { buscarLivro, buscarVideos, textoDoLivro } from "./mine/estante.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
 import { MINE_IMAGE_DAILY_LIMIT, MineImageError, generateMineImage } from "./mine/image-gen.mjs";
 import { MINE_VOICE_DAILY_LIMIT, MineVoiceError, synthesizeVoice } from "./mine/voice.mjs";
@@ -1685,6 +1685,19 @@ export async function handleDataRequest(req, res) {
         sendJson(req, res, 200, { videos: await buscarVideos(typeof body.q === "string" ? body.q : "", { max: 6 }) });
       } catch {
         sendError(req, res, 502, "Não consegui buscar vídeos agora.");
+      }
+      return true;
+    }
+    // Texto integral de um livro em domínio público (Projeto Gutenberg) para o
+    // leitor da Mine. Um segmento só: /api/acervo?id=55752.
+    if (url.pathname === "/api/acervo" && req.method === "GET") {
+      const session = await requireSession(req, res);
+      if (!session) return true;
+      try {
+        const texto = await textoDoLivro(url.searchParams.get("id"));
+        sendJson(req, res, 200, { texto });
+      } catch {
+        sendError(req, res, 502, "Não consegui abrir este livro agora. Tente de novo em instantes.");
       }
       return true;
     }

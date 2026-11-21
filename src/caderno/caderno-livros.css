@@ -1,0 +1,373 @@
+/* ── Aba Livros (21/nov/2026): estante, biblioteca grátis e leitor da Mine ── */
+
+.caderno-lv-vistas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+}
+.caderno-lv-vista {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.6rem;
+  padding: 0 1rem;
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 0.9rem;
+  background: rgb(var(--panel));
+  color: rgb(var(--theme-muted));
+  font-size: 0.9rem;
+  font-weight: 900;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+.caderno-lv-vista:hover {
+  color: rgb(var(--theme-text));
+}
+.caderno-lv-vista[aria-selected="true"] {
+  border-color: rgb(var(--pen));
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+}
+.caderno-lv-conta {
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: rgb(var(--line) / 0.6);
+  font-size: 0.72rem;
+}
+.caderno-lv-vista[aria-selected="true"] .caderno-lv-conta {
+  background: rgb(255 255 255 / 0.22);
+}
+.caderno-lv-vista:focus-visible,
+.caderno-lv-sugerir:focus-visible,
+.caderno-lv-item-capa:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 2px;
+}
+
+.caderno-lv-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.caderno-lv-filtros,
+.caderno-lv-generos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.caderno-lv-sugerir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.4rem;
+  padding: 0 0.95rem;
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 0.75rem;
+  background: rgb(var(--panel));
+  color: rgb(var(--theme-text));
+  font-size: 0.85rem;
+  font-weight: 900;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.caderno-lv-sugerir:hover:not(:disabled) {
+  border-color: rgb(var(--pen) / 0.55);
+}
+.caderno-lv-sugerir.is-gratis {
+  border-color: transparent;
+  background: rgb(var(--hl-mint) / 0.4);
+}
+.caderno-lv-sugerir.is-gratis:hover:not(:disabled) {
+  background: rgb(var(--hl-mint) / 0.6);
+}
+.caderno-lv-sugerir:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+.caderno-mx-chip.is-gratis {
+  background: rgb(var(--hl-mint) / 0.45);
+  color: rgb(var(--theme-text));
+}
+
+.caderno-lv-capa-desenho {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 0.45rem;
+  overflow: hidden;
+  background: linear-gradient(160deg, hsl(var(--h) 55% 42%), hsl(calc(var(--h) + 30) 50% 28%));
+  color: #fff;
+  font-family: "Kalam", cursive;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  word-break: break-word;
+}
+
+/* Biblioteca grátis */
+.caderno-lv-busca {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.9rem 0 0.7rem;
+}
+.caderno-lv-campo {
+  display: flex;
+  min-width: 14rem;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.8rem;
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 0.75rem;
+  background: rgb(var(--panel));
+}
+.caderno-lv-campo:focus-within {
+  border-color: rgb(var(--pen) / 0.6);
+}
+.caderno-lv-campo input {
+  min-height: 2.5rem;
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--theme-text));
+  font-size: 0.92rem;
+}
+.caderno-lv-campo input:focus {
+  outline: none;
+}
+.caderno-lv-busca select {
+  min-height: 2.6rem;
+  padding: 0 0.8rem;
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 0.75rem;
+  background: rgb(var(--panel));
+  color: rgb(var(--theme-text));
+  font-size: 0.9rem;
+}
+.caderno-lv-grade {
+  display: grid;
+  gap: 1.1rem 0.9rem;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+}
+.caderno-lv-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.caderno-lv-item-capa {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 0.3rem 0.65rem 0.65rem 0.3rem;
+  background: rgb(var(--line) / 0.45);
+  box-shadow: 0 10px 18px -12px rgb(0 0 0 / 0.65), inset 4px 0 0 rgb(0 0 0 / 0.14);
+  transition: transform 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+.caderno-lv-item-capa:hover {
+  transform: translateY(-3px) rotate(-1deg);
+}
+.caderno-lv-item-capa img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.caderno-lv-item h3 {
+  display: -webkit-box;
+  margin-top: 0.55rem;
+  overflow: hidden;
+  font-size: 0.88rem;
+  font-weight: 900;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.caderno-lv-item .caderno-mx-autor {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.caderno-lv-item-genero {
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* ── Leitor da Mine ── */
+.leitor-mine {
+  --papel: #fbf7ee;
+  --tinta: #2a2620;
+  --suave: #776c5c;
+  --borda: #e6dccb;
+  position: fixed;
+  inset: 0;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  background: var(--papel);
+  color: var(--tinta);
+  animation: leitor-mine-entra 200ms ease-out both;
+}
+.leitor-mine.is-escuro {
+  --papel: #16171c;
+  --tinta: #e7e3da;
+  --suave: #9a958a;
+  --borda: #2c2e36;
+}
+@keyframes leitor-mine-entra {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.leitor-mine-topo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem clamp(1rem, 4vw, 2.5rem);
+  border-bottom: 1px solid var(--borda);
+}
+.leitor-mine-topo h2 {
+  overflow: hidden;
+  font-family: "Anybody Variable", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.leitor-mine-fonte,
+.leitor-mine-autor {
+  font-size: 0.75rem;
+  color: var(--suave);
+}
+.leitor-mine-fonte {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.leitor-mine-ajustes {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--suave);
+}
+.leitor-mine-ajustes button,
+.leitor-mine-fechar,
+.leitor-mine-virar {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border-radius: 0.7rem;
+  color: var(--tinta);
+  transition: background-color 140ms ease;
+}
+.leitor-mine-ajustes button:hover,
+.leitor-mine-fechar:hover,
+.leitor-mine-virar:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tinta) 10%, transparent);
+}
+.leitor-mine-virar:disabled {
+  opacity: 0.3;
+}
+.leitor-mine button:focus-visible,
+.leitor-mine input:focus-visible {
+  outline: 2px solid #3b5bdb;
+  outline-offset: 2px;
+}
+.leitor-mine-folha {
+  flex: 1;
+  overflow-y: auto;
+  padding: clamp(1.25rem, 4vh, 2.75rem) 1.25rem 3rem;
+}
+.leitor-mine-texto {
+  max-width: 38rem;
+  margin: 0 auto;
+  font-family: "Literata", "Georgia", "Times New Roman", serif;
+  line-height: 1.75;
+  text-wrap: pretty;
+  hyphens: auto;
+}
+.leitor-mine-texto p + p {
+  margin-top: 1em;
+}
+.leitor-mine-texto p.is-verso {
+  white-space: pre-line;
+  hyphens: none;
+}
+.leitor-mine-aviso {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 20vh;
+  color: var(--suave);
+  font-size: 1rem;
+}
+.leitor-mine-rodape {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem clamp(0.75rem, 4vw, 2.5rem) max(0.6rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--borda);
+}
+.leitor-mine-progresso {
+  display: grid;
+  flex: 1;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--suave);
+  text-align: center;
+}
+.leitor-mine-progresso input {
+  width: 100%;
+  accent-color: #3b5bdb;
+}
+.leitor-mine-perguntar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.3rem;
+  padding: 0 0.85rem;
+  border-radius: 0.7rem;
+  background: #2f9e64;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.leitor-mine-perguntar:disabled {
+  opacity: 0.5;
+}
+@media (max-width: 640px) {
+  .leitor-mine-ajustes span {
+    display: none;
+  }
+  .leitor-mine-rodape {
+    flex-wrap: wrap;
+  }
+  .leitor-mine-progresso {
+    order: -1;
+    flex-basis: 100%;
+  }
+  .leitor-mine-perguntar {
+    flex: 1;
+    justify-content: center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .leitor-mine {
+    animation: none;
+  }
+  .caderno-lv-item-capa {
+    transition: none;
+  }
+}

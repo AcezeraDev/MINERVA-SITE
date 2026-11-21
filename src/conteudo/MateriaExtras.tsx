@@ -12,38 +12,20 @@
  * Trilha, livros, fórmulas e links ficam salvos em `subject.extras`, dentro do
  * mesmo AppData do resto do site. As questões do ENEM não são salvas.
  */
-import { ArrowRight, BookMarked, BookOpen, Check, ExternalLink, Loader2, Pin, PinOff, Play, Plus, Printer, RefreshCw, Route, Sigma, Target, Trash2, Video, X, type LucideIcon } from "lucide-react";
+import { ArrowRight, BookMarked, Check, ExternalLink, Loader2, Pin, PinOff, Play, Printer, RefreshCw, Route, Sigma, Target, Trash2, Video, X, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MineRichText } from "../chat/MineRichText";
 import { mineHeaders } from "../mineAuth";
 import { askMineTask } from "../mineTask";
 import "../caderno/caderno-materia-extras.css";
+import { AbaLivros, type LivroItem } from "./Livros";
+import { lerJson, listaDe, novoId, semLatex, texto } from "./extrasUtil";
 
 type Id = string;
 
 export type TrilhaItem = { id: Id; titulo: string; resumo: string; estado: "falta" | "estudando" | "feito" };
-export type LivroItem = {
-  id: Id;
-  titulo: string;
-  autor: string;
-  tipo: "didatico" | "paradidatico" | "vestibular" | "aprofundar";
-  porque: string;
-  /** "sugerido" = a Mine sugeriu e o aluno ainda não escolheu nada. */
-  estado: "sugerido" | "quero" | "lendo" | "lido";
-  /** O aluno escolheu o estado (até nov/2026 "quero" era o padrão de todo livro sugerido). */
-  marcado?: boolean;
-  nota?: string;
-  /** Capa e leitor legal (Google Livros ou Internet Archive), vindos de /api/livro. */
-  capa?: string;
-  leitura?: Leitura | null;
-  /** Versão da busca de capa/prévia que já rodou (ver LIVRO_VERSAO). */
-  buscado?: boolean | number;
-};
-
-/** Subir quando a busca de capas melhorar: livros antigos são procurados de novo. */
-const LIVRO_VERSAO = 2;
-export type Leitura = { url: string; tipo: "previa" | "completo"; fonte: string };
+export type { LivroItem, Leitura } from "./Livros";
 export type FormulaItem = { id: Id; nome: string; expressao: string; explica: string; tipo: "formula" | "conceito"; fixado?: boolean };
 export type LinkItem = {
   id: Id;
@@ -64,19 +46,6 @@ type Visor = { tipo: "video" | "livro"; titulo: string; url: string; fonte: stri
 function idDoYoutube(url: string): string {
   const match = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/);
   return match ? match[1] : "";
-}
-
-/** Capa e leitor de um livro; falha vira "sem prévia" (nunca trava a lista). */
-async function infoDoLivro(livro: { titulo: string; autor: string }): Promise<Pick<LivroItem, "capa" | "leitura" | "buscado">> {
-  try {
-    const response = await fetch("/api/livro", { method: "POST", headers: mineHeaders(), body: JSON.stringify({ titulo: livro.titulo, autor: livro.autor }) });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) return { buscado: LIVRO_VERSAO, capa: "", leitura: null };
-    const leitura = data.leitura && typeof data.leitura.url === "string" && data.leitura.url.startsWith("https://") ? (data.leitura as Leitura) : null;
-    return { buscado: LIVRO_VERSAO, capa: typeof data.capa === "string" && data.capa.startsWith("https://") ? data.capa : "", leitura };
-  } catch {
-    return { buscado: LIVRO_VERSAO, capa: "", leitura: null };
-  }
 }
 
 async function videosDoYoutube(q: string): Promise<Array<{ id: string; titulo: string; canal: string; duracao: string }>> {
@@ -102,36 +71,6 @@ const ABAS: Array<{ id: Aba; label: string; icon: LucideIcon; tone: string }> = 
   { id: "links", label: "Vídeos e links", icon: Video, tone: "pink" },
   { id: "enem", label: "Questões ENEM", icon: Target, tone: "sky" },
 ];
-
-const novoId = () => `x_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-const texto = (value: unknown, max = 400) => (typeof value === "string" ? value.trim().slice(0, max) : "");
-
-/** Texto corrido não renderiza LaTeX: troca os comandos comuns por símbolos. */
-function semLatex(value: string): string {
-  return value
-    .replace(/\\cdot/g, "·")
-    .replace(/\\times/g, "×")
-    .replace(/\\Delta/g, "Δ")
-    .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, "$1/$2")
-    .replace(/\\[a-zA-Z]+/g, "")
-    .replace(/[{}$]/g, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
-/** Tira cercas de código e pega do primeiro `[`/`{` até o último `]`/`}`. */
-function lerJson(reply: string): unknown {
-  const limpo = reply.replace(/```(?:json)?/gi, "").trim();
-  const inicio = limpo.search(/[[{]/);
-  const fim = Math.max(limpo.lastIndexOf("]"), limpo.lastIndexOf("}"));
-  if (inicio < 0 || fim < inicio) throw new Error("A Mine respondeu fora do formato. Tente de novo.");
-  return JSON.parse(limpo.slice(inicio, fim + 1));
-}
-
-function listaDe(value: unknown, chave: string): Record<string, unknown>[] {
-  const lista = Array.isArray(value) ? value : value && typeof value === "object" ? (value as Record<string, unknown>)[chave] : null;
-  return Array.isArray(lista) ? lista.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object") : [];
-}
 
 /** Área do ENEM a partir do ícone ou do nome da matéria. */
 function areaEnem(nome: string, icone: string): string {
@@ -172,25 +111,6 @@ export function MateriaExtras({
   const [carregando, setCarregando] = useState<Aba | null>(null);
   const [visor, setVisor] = useState<Visor | null>(null);
   const fecharVisor = useCallback(() => setVisor(null), []);
-  // Livros salvos antes das capas (ou cuja busca falhou na hora): completa ao abrir a aba.
-  const pendentes = (extras.livros?.itens || []).filter((livro) => livro.buscado !== LIVRO_VERSAO).map((livro) => livro.id).join(",");
-  useEffect(() => {
-    if (aba !== "livros" || !pendentes) return;
-    let vivo = true;
-    const alvos = (extras.livros?.itens || []).filter((livro) => livro.buscado !== LIVRO_VERSAO);
-    void Promise.all(alvos.map(async (livro) => [livro.id, await infoDoLivro(livro)] as const)).then((resultados) => {
-      if (!vivo) return;
-      const porId = new Map(resultados);
-      salvar((atual) => ({
-        ...atual,
-        livros: atual.livros ? { ...atual.livros, itens: atual.livros.itens.map((livro) => (porId.has(livro.id) ? { ...livro, ...porId.get(livro.id) } : livro)) } : atual.livros,
-      }));
-    });
-    return () => {
-      vivo = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aba, pendentes]);
   const contexto = `Materia: ${nome}.\nConteudos ja cadastrados pelo estudante:\n${conteudos.length ? conteudos.map((item) => `- ${item}`).join("\n") : "- nenhum ainda"}`;
 
   async function gerar(alvo: Aba, executar: () => Promise<void>) {
@@ -220,29 +140,6 @@ export function MateriaExtras({
         .slice(0, 12);
       if (!itens.length) throw new Error("A Mine não montou a trilha. Tente de novo.");
       salvar({ ...extras, trilha: { itens, geradoEm: Date.now() } });
-    });
-
-  const gerarLivros = () =>
-    gerar("livros", async () => {
-      const reply = await askMineTask({
-        task: "materia-extra",
-        prompt: `Sugira de 6 a 8 livros REAIS para estudar ${nome} no ensino medio, misturando: livro didatico conhecido, paradidatico gostoso de ler, obra cobrada em vestibular (so se a materia tiver) e um para aprofundar. Formato: {"livros":[{"titulo":"","autor":"","tipo":"didatico|paradidatico|vestibular|aprofundar","porque":"uma frase dizendo por que vale ler"}]}`,
-        context: contexto,
-        outputTokens: 1400,
-      });
-      const tipos = ["didatico", "paradidatico", "vestibular", "aprofundar"] as const;
-      const meus = (extras.livros?.itens || []).filter((item) => estadoDe(item) !== "sugerido" || item.nota);
-      const vistos = new Set(meus.map((item) => item.titulo.toLowerCase()));
-      const novos = listaDe(lerJson(reply), "livros")
-        .map((item) => {
-          const tipo = tipos.find((valor) => valor === texto(item.tipo, 20)) || "aprofundar";
-          return { id: novoId(), titulo: texto(item.titulo, 120), autor: texto(item.autor, 80), tipo, porque: semLatex(texto(item.porque, 220)), estado: "sugerido" as const };
-        })
-        .filter((item) => item.titulo && !vistos.has(item.titulo.toLowerCase()));
-      if (!novos.length) throw new Error("A Mine não sugeriu livros agora. Tente de novo.");
-      // Capa e prévia de cada livro antes de mostrar a lista (em paralelo).
-      const completos = await Promise.all(novos.map(async (livro) => ({ ...livro, ...(await infoDoLivro(livro)) })));
-      salvar({ ...extras, livros: { itens: [...meus, ...completos].slice(0, 16), geradoEm: Date.now() } });
     });
 
   const gerarFormulas = () =>
@@ -354,13 +251,16 @@ export function MateriaExtras({
           />
         ) : null}
         {aba === "livros" ? (
-          <Livros
+          <AbaLivros
+            nome={nome}
+            contexto={contexto}
             itens={extras.livros?.itens || []}
-            carregando={carregando === "livros"}
-            gerar={gerarLivros}
-            mudar={(itens) => salvar({ ...extras, livros: { itens, geradoEm: extras.livros?.geradoEm || Date.now() } })}
+            salvarLivros={(atualizar) =>
+              salvar((atual) => ({ ...atual, livros: { itens: atualizar(atual.livros?.itens || []), geradoEm: atual.livros?.geradoEm || Date.now() } }))
+            }
             notify={notify}
-            abrir={(livro) =>
+            perguntarMine={perguntarMine}
+            abrirEmbed={(livro) =>
               livro.leitura &&
               setVisor({ tipo: "livro", titulo: livro.titulo, url: livro.leitura.url, fonte: livro.leitura.tipo === "completo" ? `Livro completo · ${livro.leitura.fonte}` : `Prévia oficial · ${livro.leitura.fonte}` })
             }
@@ -489,149 +389,6 @@ function Trilha({ itens, carregando, gerar, mudar, estudar }: { itens: TrilhaIte
           </li>
         ))}
       </ol>
-    </>
-  );
-}
-
-/* ───────── Livros ───────── */
-
-/** Livro antigo com "quero" que ninguém escolheu conta como sugerido. */
-function estadoDe(livro: LivroItem): LivroItem["estado"] {
-  return livro.estado === "quero" && !livro.marcado ? "sugerido" : livro.estado;
-}
-
-const ESTADO_AVISO: Record<"quero" | "lendo" | "lido", string> = {
-  quero: "está na sua lista de quero ler.",
-  lendo: "marcado como lendo. Anote onde parou.",
-  lido: "marcado como lido. Boa!",
-};
-
-const TIPO_LIVRO: Record<LivroItem["tipo"], string> = { didatico: "didático", paradidatico: "paradidático", vestibular: "vestibular", aprofundar: "para aprofundar" };
-
-function Livros({ itens, carregando, gerar, mudar, abrir, notify }: { itens: LivroItem[]; carregando: boolean; gerar: () => void; mudar: (itens: LivroItem[]) => void; abrir: (livro: LivroItem) => void; notify: (message: string) => void }) {
-  const [novo, setNovo] = useState({ titulo: "", autor: "" });
-  const alterar = (id: string, parcial: Partial<LivroItem>) => mudar(itens.map((item) => (item.id === id ? { ...item, ...parcial } : item)));
-  const ordem = { lendo: 0, quero: 1, sugerido: 2, lido: 3 } as const;
-  const lista = itens.slice().sort((a, b) => ordem[estadoDe(a)] - ordem[estadoDe(b)]);
-  const contar = (estado: LivroItem["estado"]) => itens.filter((item) => estadoDe(item) === estado).length;
-  // Clicar no estado marcado desmarca (volta a sugerido); clicar em outro marca e avisa.
-  const marcar = (livro: LivroItem, estado: "quero" | "lendo" | "lido") => {
-    if (estadoDe(livro) === estado) {
-      alterar(livro.id, { estado: "sugerido", marcado: false });
-      notify(`"${livro.titulo}" voltou para as sugestões.`);
-      return;
-    }
-    alterar(livro.id, { estado, marcado: true });
-    notify(`"${livro.titulo}" ${ESTADO_AVISO[estado]}`);
-  };
-  return (
-    <>
-      {!itens.length ? (
-        <Vazio icon={BookMarked} titulo="A estante desta matéria" texto="Livros didáticos, paradidáticos e obras de vestibular, com o que você está lendo e onde parou." botao="Sugerir livros" carregando={carregando} gerar={gerar} />
-      ) : (
-        <>
-          <div className="caderno-mx-bar">
-            <span className="tabular">
-              {contar("quero")} quero ler · {contar("lendo")} lendo · {contar("lido")} lidos
-            </span>
-            <Refazer carregando={carregando} gerar={gerar} label="Sugerir mais" />
-          </div>
-          <div className="caderno-mx-livros">
-            {lista.map((livro) => (
-              <article key={livro.id} className={`caderno-mx-livro is-${livro.tipo}`}>
-                <span className="caderno-mx-lombada" aria-hidden />
-                {/* Capa: abre o leitor quando há prévia; sem capa, um livrinho desenhado. */}
-                <button
-                  type="button"
-                  className={`caderno-mx-capa ${livro.leitura ? "is-legivel" : ""} ${livro.buscado !== LIVRO_VERSAO ? "is-carregando" : ""}`}
-                  onClick={() => livro.leitura && abrir(livro)}
-                  disabled={!livro.leitura}
-                  aria-label={livro.leitura ? `Ler ${livro.titulo}` : `Capa de ${livro.titulo}`}
-                  tabIndex={livro.leitura ? 0 : -1}
-                >
-                  {livro.capa ? <img src={livro.capa} alt="" loading="lazy" /> : <BookOpen className="h-6 w-6 opacity-50" aria-hidden />}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <span className="caderno-mx-chip">{TIPO_LIVRO[livro.tipo]}</span>
-                  <h3>{livro.titulo}</h3>
-                  {livro.autor ? <p className="caderno-mx-autor">{livro.autor}</p> : null}
-                  {livro.porque ? <p className="caderno-mx-porque">{livro.porque}</p> : null}
-                  {livro.leitura ? (
-                    <button type="button" onClick={() => abrir(livro)} className="caderno-mx-ler">
-                      <BookOpen className="h-4 w-4" />
-                      {livro.leitura.tipo === "completo" ? "Ler o livro aqui" : "Ler a prévia aqui"}
-                    </button>
-                  ) : livro.buscado === LIVRO_VERSAO ? (
-                    <p className="caderno-mx-semprevia">sem prévia grátis: procure na biblioteca da escola</p>
-                  ) : (
-                    <p className="caderno-mx-semprevia">procurando capa e prévia…</p>
-                  )}
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5" role="group" aria-label={`Leitura de ${livro.titulo}`}>
-                    {(["quero", "lendo", "lido"] as const).map((estado) => {
-                      const ativo = estadoDe(livro) === estado;
-                      return (
-                        <button
-                          key={estado}
-                          type="button"
-                          aria-pressed={ativo}
-                          onClick={() => marcar(livro, estado)}
-                          className="caderno-mx-seg"
-                          title={ativo ? "Clique de novo para desmarcar" : undefined}
-                        >
-                          {ativo ? <Check className="h-3.5 w-3.5" aria-hidden /> : estado === "quero" ? <Plus className="h-3.5 w-3.5" aria-hidden /> : null}
-                          {estado === "quero" ? "quero ler" : estado}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {estadoDe(livro) === "lendo" || estadoDe(livro) === "lido" ? (
-                    <input
-                      className="caderno-mx-nota"
-                      defaultValue={livro.nota || ""}
-                      placeholder="onde parei (ex.: capítulo 4)"
-                      aria-label={`Anotação de ${livro.titulo}`}
-                      onBlur={(event) => {
-                        const nota = event.currentTarget.value.trim().slice(0, 120);
-                        if (nota !== (livro.nota || "")) alterar(livro.id, { nota });
-                      }}
-                    />
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <a
-                    href={`https://www.google.com/search?tbm=bks&q=${encodeURIComponent(`${livro.titulo} ${livro.autor}`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="caderno-mx-icone"
-                    aria-label={`Procurar ${livro.titulo} no Google Livros`}
-                    title="Procurar no Google Livros"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                  <button type="button" onClick={() => mudar(itens.filter((item) => item.id !== livro.id))} className="caderno-mx-icone" aria-label={`Tirar ${livro.titulo} da estante`} title="Tirar da estante">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </>
-      )}
-      <form
-        className="caderno-mx-add"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!novo.titulo.trim()) return;
-          mudar([{ id: novoId(), titulo: novo.titulo.trim().slice(0, 120), autor: novo.autor.trim().slice(0, 80), tipo: "didatico", porque: "", estado: "lendo", marcado: true }, ...itens]);
-          setNovo({ titulo: "", autor: "" });
-        }}
-      >
-        <input value={novo.titulo} onChange={(event) => setNovo({ ...novo, titulo: event.target.value })} placeholder="Colocar um livro meu (título)" aria-label="Título do livro" />
-        <input value={novo.autor} onChange={(event) => setNovo({ ...novo, autor: event.target.value })} placeholder="autor" aria-label="Autor do livro" />
-        <button type="submit" className="caderno-mx-mini" disabled={!novo.titulo.trim()}>
-          <Plus className="h-3.5 w-3.5" /> colocar
-        </button>
-      </form>
     </>
   );
 }
