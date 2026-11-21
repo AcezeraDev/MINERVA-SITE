@@ -245,7 +245,12 @@ function Lightbox({
 // ---------------------------------------------------------------------------
 // Galeria na resposta
 
-export function MineImageGallery({ query, caption, style = "" }: { query: string; caption?: string; style?: string }) {
+/**
+ * `destaque`: foto que ilustra o meio da explicação, como no ChatGPT. Uma foto
+ * grande só (a mais larga e nítida), com o site por cima e o contador que abre
+ * as outras no visualizador.
+ */
+export function MineImageGallery({ query, caption, style = "", destaque = false }: { query: string; caption?: string; style?: string; destaque?: boolean }) {
   // O estilo entra na chave: "Ellie" em ícones e "Ellie" em fotos são galerias diferentes.
   const key = `${style}:${query.toLocaleLowerCase("pt-BR")}`;
   const [images, setImages] = useState<GalleryImage[] | undefined>(() => galleryCache.get(key));
@@ -281,6 +286,9 @@ export function MineImageGallery({ query, caption, style = "" }: { query: string
 
   const visible = useMemo(() => (images || []).filter((image) => !broken.has(image.url)), [images, broken]);
 
+  if (images === undefined && destaque) {
+    return <div className="mine-gallery mine-gallery--destaque mine-gallery--loading" role="status" aria-label={`Buscando foto de ${query}`}><span className="mine-gallery__hero-skeleton" aria-hidden /></div>;
+  }
   if (images === undefined) {
     return (
       <div className="mine-gallery mine-gallery--loading" role="status" aria-label={`Buscando fotos de ${query}`}>
@@ -293,6 +301,40 @@ export function MineImageGallery({ query, caption, style = "" }: { query: string
     );
   }
   if (!visible.length) return null;
+
+  if (destaque) {
+    // A mais larga (paisagem) e maior primeiro: foto em pé fica estranha na largura toda.
+    const nota = (image: GalleryImage) => (image.width && image.height ? Math.min(image.width / image.height, 2) * 1000 + Math.min(image.width, 1600) / 10 : 0);
+    const melhor = visible.reduce((best, image) => (nota(image) > nota(best) ? image : best), visible[0]);
+    const indice = visible.indexOf(melhor);
+    return (
+      <figure className="mine-gallery mine-gallery--destaque">
+        <button type="button" className="mine-gallery__hero" onClick={() => setOpenAt(indice)} aria-label={`Ampliar foto: ${melhor.title || caption || query}`}>
+          <img
+            src={melhor.url}
+            alt={melhor.title || caption || query}
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            draggable={false}
+            onError={() => setBroken((current) => new Set(current).add(melhor.url))}
+          />
+          {melhor.source ? <span className="mine-gallery__fonte">{melhor.source}</span> : null}
+          {visible.length > 1 ? (
+            <span className="mine-gallery__more" aria-hidden>
+              <Images />
+              {visible.length}
+            </span>
+          ) : null}
+        </button>
+        <AnimatePresence>
+          {openAt !== null ? (
+            <Lightbox key="lightbox" images={visible} index={openAt} setIndex={(next) => setOpenAt(next)} onClose={() => setOpenAt(null)} query={query} caption={caption} />
+          ) : null}
+        </AnimatePresence>
+      </figure>
+    );
+  }
 
   const tiles = visible.slice(0, 3);
   const extra = visible.length - tiles.length;

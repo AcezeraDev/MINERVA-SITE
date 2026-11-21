@@ -480,3 +480,13 @@
 .mine-letra-toggle:hover {
   background: rgb(var(--pen) / 0.08);
 }
+
+/* 21/nov/2026: layout do ChatGPT. Sem avatar ao lado da resposta e sem a
+   medida de 56ch: o texto usa a coluna inteira (54rem), como lá. */
+.mine-answer,
+.mine-gpt-message-body .mine-answer {
+  max-width: none;
+}
+:is(.mine-gpt-message.is-mine, .mine-streaming) .mrt {
+  --mrt-measure: none;
+}

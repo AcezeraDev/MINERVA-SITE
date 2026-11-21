@@ -6918,9 +6918,7 @@ const MineMessageList = React.memo(function MineMessageList({
           data-msg-id={message.id}
           className={`group/message mine-gpt-message flex items-start gap-3 sm:gap-4 ${message.role === "user" ? "justify-end is-user" : "justify-start is-mine"} ${fresh(message) && message.role === "mine" ? "is-fresh" : ""}`}
         >
-          {message.role !== "user" ? (
-            <span className="mt-1"><MineAvatar size="sm" /></span>
-          ) : null}
+          {/* Sem avatar na resposta: o texto usa a coluna inteira, como no ChatGPT. */}
           {/* No celular o balão usa quase toda a largura: com 86% sobrava uma
               faixa morta à direita e o texto quebrava a cada três palavras. */}
           <div
@@ -6928,7 +6926,7 @@ const MineMessageList = React.memo(function MineMessageList({
             className={`mine-gpt-message-body relative min-w-0 text-[15px] leading-[1.72] sm:text-[15.5px] sm:leading-7 ${
               message.role === "user"
                 ? "max-w-[88%] rounded-[1.4rem] bg-white/[0.09] px-4 py-2.5 text-white/90 sm:max-w-[74%] sm:px-5 sm:py-3"
-                : "max-w-[calc(100%-2.75rem)] flex-1 px-1 py-1 text-white/82 sm:max-w-[min(48rem,calc(100%-3.25rem))] sm:px-2 sm:py-1.5"
+                : "w-full max-w-full flex-1 px-1 py-1 text-white/82  sm:px-2 sm:py-1.5"
             }`}
           >
             <div className={`mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.14em] ${message.role === "user" ? "hidden justify-end text-mint/75" : "text-white/38"}`}>
@@ -8073,9 +8071,9 @@ function MineView({
               const el = event.currentTarget;
               setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
             }}
-            className="mine-conversation-scroll absolute inset-0 overflow-y-auto px-3 pb-8 pt-5 sm:px-6 sm:pb-10 sm:pt-8"
+            className="mine-conversation-scroll absolute inset-0 overflow-y-auto pb-8 pl-[2.4rem] pr-3 pt-5 sm:pb-10 sm:pl-[2.6rem] sm:pr-6 sm:pt-8"
           >
-            <div ref={logRef} role="log" aria-label="Conversa com a Mine" aria-live="polite" className="mx-auto flex max-w-[48rem] flex-col gap-7 sm:gap-9">
+            <div ref={logRef} role="log" aria-label="Conversa com a Mine" aria-live="polite" className="mx-auto flex max-w-[54rem] flex-col gap-7 sm:gap-9">
               {!messages.length ? (
                 <MineWelcome
                   key={selectedSubjectId || "geral"}
@@ -8134,9 +8132,9 @@ function MineView({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <span className="mt-1"><MineAvatar size="sm" thinking /></span>
+                  {/* Sem avatar na resposta: o texto usa a coluna inteira, como no ChatGPT. */}
                   <div
-                    className="mine-gpt-message-body mine-streaming relative min-w-0 max-w-[calc(100%-2.75rem)] flex-1 px-1 py-1 text-[15px] leading-[1.72] text-white/82 sm:max-w-[min(48rem,calc(100%-3.25rem))] sm:px-2 sm:py-1.5 sm:text-[15.5px] sm:leading-7"
+                    className="mine-gpt-message-body mine-streaming relative min-w-0 w-full max-w-full flex-1 px-1 py-1 text-[15px] leading-[1.72] text-white/82  sm:px-2 sm:py-1.5 sm:text-[15.5px] sm:leading-7"
                     aria-live="polite"
                   >
                     <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.14em] text-white/38"><span>Mine</span></div>
@@ -8183,7 +8181,7 @@ function MineView({
 
         <div data-focus-avoid className="mine-composer-area relative shrink-0 bg-gradient-to-t from-[#111310] via-[#111310]/98 to-transparent px-2.5 pb-2.5 pt-3 sm:px-5 sm:pb-4 sm:pt-4">
           {activeSuggestions.length ? (
-            <div className="mine-next mx-auto mb-2.5 max-w-[48rem]">
+            <div className="mine-next mx-auto mb-2.5 max-w-[54rem]">
               <p className="mine-next__label">
                 <Sparkles aria-hidden className="h-3 w-3" />
                 Continuar com
@@ -8201,7 +8199,7 @@ function MineView({
             </div>
           ) : null}
           {tutor ? (
-            <div className="mine-tutor-banner mx-auto mb-2 max-w-[48rem]" role="status">
+            <div className="mine-tutor-banner mx-auto mb-2 max-w-[54rem]" role="status">
               <Lightbulb aria-hidden className="h-4 w-4 shrink-0" />
               <p>
                 <strong>Modo tutor.</strong>
@@ -8214,7 +8212,7 @@ function MineView({
             </div>
           ) : null}
           {attachments.length || attachmentError ? (
-            <div className="mx-auto mb-3 max-w-[48rem]" aria-live="polite">
+            <div className="mx-auto mb-3 max-w-[54rem]" aria-live="polite">
               {attachmentError ? <p className="mb-2 text-sm font-bold text-red-200">{attachmentError}</p> : null}
               {attachments.length ? (
                 <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/[0.045] p-3 md:grid-cols-2">
@@ -8242,7 +8240,7 @@ function MineView({
           ) : null}
           <form
             onSubmit={submit}
-            className="mine-composer-shell mx-auto flex max-w-[48rem] flex-wrap items-end gap-1 rounded-[1.75rem] border border-white/[0.11] bg-[#242724] p-2 shadow-[0_16px_46px_-20px_rgba(0,0,0,.72)] transition-[border-color,box-shadow,background-color] duration-control focus-within:border-white/[0.2] focus-within:bg-[#292c29]"
+            className="mine-composer-shell mx-auto flex max-w-[54rem] flex-wrap items-end gap-1 rounded-[1.75rem] border border-white/[0.11] bg-[#242724] p-2 shadow-[0_16px_46px_-20px_rgba(0,0,0,.72)] transition-[border-color,box-shadow,background-color] duration-control focus-within:border-white/[0.2] focus-within:bg-[#292c29]"
           >
             <input
               ref={fileInputRef}
@@ -8936,7 +8934,14 @@ function MineMessageText({ text, streaming = false, attachment }: { text: string
               streaming={streaming}
             />
           ) : segment.type === "image" ? (
-            <MineImageGallery key={`image-${index}-${segment.style || ""}-${segment.query}`} query={segment.query} caption={segment.caption} style={segment.style} />
+            <MineImageGallery
+              key={`image-${index}-${segment.style || ""}-${segment.query}`}
+              query={segment.query}
+              caption={segment.caption}
+              style={segment.style}
+              // No meio da explicação (depois de texto): uma foto grande, como no ChatGPT.
+              destaque={index > 0 && !segment.style}
+            />
           ) : (
             <MineRichText key={`text-${index}`} text={segment.text} streaming={streaming} />
           ),
