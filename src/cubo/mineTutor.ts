@@ -6,6 +6,7 @@
  * Um pedido novo cancela o anterior: num cubo, o que importa é o agora.
  */
 export type TurnoTutor = { role: "user" | "assistant"; text: string };
+import { mineHeaders } from "../mineAuth";
 
 // modelos de raciocínio gastam parte do teto pensando antes de escrever
 const reservaRaciocinio = 700;
@@ -21,7 +22,7 @@ export async function perguntarMineCubo(
   try {
     const resposta = await fetch("/api/mine/chat", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: mineHeaders(),
       body: JSON.stringify({
         task: "cubo-tutor",
         prompt: pedido.evento,

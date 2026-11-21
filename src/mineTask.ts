@@ -6,6 +6,7 @@
 
 // modelos de raciocínio gastam parte do teto pensando antes de escrever
 const reasoningReserve = 1200;
+import { mineHeaders } from "./mineAuth";
 
 export async function askMineTask(
   payload: { task: "redacao" | "atividade" | "atividade-correcao" | "quiz" | "prova-estudo" | "leitura"; prompt: string; context: string; outputTokens: number },
@@ -18,7 +19,7 @@ export async function askMineTask(
   try {
     const response = await fetch("/api/mine/chat", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: mineHeaders(),
       body: JSON.stringify({
         task: payload.task,
         prompt: payload.prompt,

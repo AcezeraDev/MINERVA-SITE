@@ -257,6 +257,7 @@ import { AdminSkeleton } from "./admin/AdminSkeleton";
 import { focusRemainingOf, readFocusState, writeFocusState, type FocusState } from "./foco/focus-store";
 import { FocusWidget } from "./foco/FocusWidget";
 import { FocusQuickStart } from "./foco/FocusQuickStart";
+import { mineHeaders } from "./mineAuth";
 const AdminView = React.lazy(() => import("./admin/AdminPanel").then((m) => ({ default: m.AdminView })));
 const GamesView = React.lazy(() => import("./games/GamesPanel").then((m) => ({ default: m.GamesView })));
 const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({ default: m.AtelieView })));
@@ -12179,7 +12180,7 @@ export async function requestAssistantResponse(payload: {
 }): Promise<AssistantResponse> {
   const response = await fetch(mineEndpoint, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: mineHeaders(),
     body: JSON.stringify({ ...payload, fast: true, maxOutputTokens: 1500 }),
   });
   const data = await response.json().catch(() => ({}));
@@ -12213,7 +12214,7 @@ async function streamAssistantResponse(
 ): Promise<AssistantResponse> {
   const response = await fetch(mineEndpoint, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: mineHeaders(),
     // 6000 tokens: o raciocínio conta dentro do teto, e com 1500 as
     // explicações longas saíam cortadas ou encurtadas.
     body: JSON.stringify({ ...payload, stream: true, maxOutputTokens: 6000 }),
@@ -12320,7 +12321,7 @@ export async function requestAiTask(
 ): Promise<string> {
   const response = await fetch(mineEndpoint, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: mineHeaders(),
     // Tarefas que devolvem uma lista longa de itens (mapa, jogos) precisam de
     // mais espaço; 1500 truncava o 10º item no meio.
     body: JSON.stringify({
@@ -12340,7 +12341,7 @@ export async function streamGameTask(
 ): Promise<string> {
   const response = await fetch(mineEndpoint, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: mineHeaders(),
     body: JSON.stringify({ ...payload, stream: true, fast: true }),
     signal: options.signal,
   });

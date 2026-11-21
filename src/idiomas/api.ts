@@ -5,6 +5,7 @@
  */
 
 export type MineTurn = { role: "user" | "assistant"; text: string };
+import { mineHeaders } from "../mineAuth";
 
 // modelos de raciocínio gastam parte do teto pensando antes de escrever
 const reasoningReserve = 900;
@@ -20,7 +21,7 @@ export async function askLanguageMine(
   try {
     const response = await fetch("/api/mine/chat", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: mineHeaders(),
       body: JSON.stringify({
         task: payload.task,
         prompt: payload.prompt,

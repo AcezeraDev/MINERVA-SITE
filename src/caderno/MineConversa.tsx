@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUp, Loader2, MessageSquareShare, X } from "lucide-react";
 import { MineRichText } from "../chat/MineRichText";
+import { mineHeaders } from "../mineAuth";
 
 export type Fala = { role: "user" | "mine"; text: string; oculta?: boolean };
 
@@ -45,7 +46,7 @@ export function MineConversa({
     try {
       const response = await fetch("/api/mine/chat", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: mineHeaders(),
         signal: controller.signal,
         body: JSON.stringify({
           prompt: ultima.text,

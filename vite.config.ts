@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 // @ts-expect-error Server middleware is authored as an ESM helper.
 import { handleGeminiRequest, loadLocalEnv } from "./gemini-server.mjs";
 // @ts-expect-error Server middleware is authored as an ESM helper.
-import { handleDataRequest } from "./data-server.mjs";
+import { handleDataRequest, mineSessionOk } from "./data-server.mjs";
 // @ts-expect-error Server middleware is authored as an ESM helper.
 import { handleEducationRequest } from "./education-server.mjs";
 
@@ -25,6 +25,8 @@ export default defineConfig({
         const mineRoutes = ["/api/gemini", "/api/mine/chat"];
         for (const route of mineRoutes) {
           server.middlewares.use(route, async (req, res) => {
+            // Só quem está logado gasta saldo da Mine (mesma regra da Vercel).
+            if (!(await mineSessionOk(req, res))) return;
             await handleGeminiRequest(req, res);
           });
         }

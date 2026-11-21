@@ -448,6 +448,24 @@ async function readSession(req) {
   return { token, userId: session.userId, isAdmin: Boolean(session.isAdmin) };
 }
 
+/**
+ * A Mine (/api/mine/chat e o legado /api/gemini) gasta saldo da NanoGPT a cada
+ * pergunta: so responde quem esta logado. GET continua aberto porque so diz se
+ * a busca na web esta ligada. Devolve false quando ja respondeu com erro.
+ */
+export async function mineSessionOk(req, res) {
+  if (req.method !== "POST") return true;
+  try {
+    if (await readSession(req)) return true;
+  } catch (error) {
+    console.error("[mine] sessao", error);
+    sendJson(req, res, 503, { error: "Não consegui conferir sua sessão agora. Tente de novo em instantes.", code: "session_check" });
+    return false;
+  }
+  sendJson(req, res, 401, { error: "Entre na sua conta para conversar com a Mine.", code: "login_required" });
+  return false;
+}
+
 async function requireSession(req, res) {
   const session = await readSession(req);
   if (!session) {

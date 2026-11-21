@@ -2,7 +2,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { handleGeminiRequest, loadLocalEnv } from "./gemini-server.mjs";
-import { handleDataRequest } from "./data-server.mjs";
+import { handleDataRequest, mineSessionOk } from "./data-server.mjs";
 import { handleEducationRequest } from "./education-server.mjs";
 
 const appRoot = resolve(process.cwd());
@@ -29,6 +29,8 @@ createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   // /api/gemini e o caminho legado; /api/mine/chat e o nome novo. Mesmo handler.
   if (url.pathname === "/api/gemini" || url.pathname === "/api/mine/chat") {
+    // Só quem está logado gasta saldo da Mine (mesma regra da Vercel).
+    if (!(await mineSessionOk(req, res))) return;
     await handleGeminiRequest(req, res);
     return;
   }
