@@ -19,11 +19,13 @@ export type Block =
   | { type: "table"; header: string[]; align: Array<"left" | "right" | "center">; rows: string[][] }
   | { type: "callout"; kind: CalloutKind; title: string; children: Block[] }
   | { type: "quote"; children: Block[] }
+  | { type: "chips"; items: string[] }
   | ListBlock;
 
 export const CALLOUT_TITLES: Record<CalloutKind, string>;
 export function calloutKind(label: string): CalloutKind | null;
 export function parseBlocks(text: string, options?: { streaming?: boolean }): Block[];
 export function parseInline(text: string): InlineToken[];
+export function chipsFromLine(line: string): string[] | null;
 export function labelOf(line: string): { label: string; rest: string } | null;
 export function plainText(text: string): string;

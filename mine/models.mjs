@@ -16,7 +16,7 @@ function envEffort(name, fallback) {
 
 // Os modelos da Anthropic na NanoGPT so aceitam low/medium/high/xhigh/max:
 // "none" e "minimal" (validos na OpenAI) viram "low" em vez de erro 400.
-function effortFor(modelId, effort) {
+export function effortFor(modelId, effort) {
   if (/^anthropic\//i.test(modelId) && (effort === "none" || effort === "minimal")) return "low";
   // GLM na NanoGPT: so low/high/max.
   if (/^z-ai\/glm/i.test(modelId)) return ["high", "xhigh"].includes(effort) ? "high" : effort === "max" ? "max" : "low";

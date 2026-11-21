@@ -52,6 +52,18 @@ function normalizeImages(data: unknown): GalleryImage[] {
     .slice(0, 8);
 }
 
+/** Primeira foto de uma busca (cache compartilhado com as galerias). */
+export async function firstGalleryImage(query: string): Promise<GalleryImage | null> {
+  const key = `:${query.toLocaleLowerCase("pt-BR")}`;
+  const cached = galleryCache.get(key);
+  if (cached) return cached[0] || null;
+  const response = await fetch(`/api/image?q=${encodeURIComponent(query)}`);
+  if (!response.ok) throw new Error(String(response.status));
+  const found = normalizeImages(await response.json());
+  galleryCache.set(key, found);
+  return found[0] || null;
+}
+
 function downloadHref(image: GalleryImage, fallbackName: string) {
   const params = new URLSearchParams({ src: image.full, name: image.title || fallbackName });
   if (image.full !== image.url) params.set("fallback", image.url);

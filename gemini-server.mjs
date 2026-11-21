@@ -173,7 +173,7 @@ export async function handleGeminiRequest(req, res) {
     // Nov/2026: arquivo (PDF, Word, Excel, HTML) e resumo de prova têm teto
     // próprio. Com o teto geral de produção o documento era cortado no meio e
     // o cartão ficava em "Montando o PDF…" para sempre.
-    const fileRequest = !task && (Boolean(asksForFile(payload.prompt)) || asksForStudySheet(payload.prompt));
+    const fileRequest = !task && (payload.profundo === true || Boolean(asksForFile(payload.prompt)) || asksForStudySheet(payload.prompt));
     // Nov/2026: projeto de codigo (site com 3 arquivos, jogo) tambem precisa
     // terminar inteiro, senao o monitor fica com o arquivo pela metade.
     const codeRequest = !task && !payload.controle && Boolean(asksForCode(payload.prompt, payload.history));
@@ -201,6 +201,8 @@ export async function handleGeminiRequest(req, res) {
       photos: payload.photos === true,
       tutor: payload.tutor === true,
       controle: payload.controle === true,
+      profundo: payload.profundo === true,
+      caprichar: payload.caprichar === true,
       aluno: payload.aluno && typeof payload.aluno === "object" ? payload.aluno : null,
       maxTokens,
     });
@@ -261,6 +263,8 @@ async function streamResponse(req, res, { task, payload, maxTokens }) {
       photos: payload.photos === true,
       tutor: payload.tutor === true,
       controle: payload.controle === true,
+      profundo: payload.profundo === true,
+      caprichar: payload.caprichar === true,
       aluno: payload.aluno && typeof payload.aluno === "object" ? payload.aluno : null,
       maxTokens,
       signal: controller.signal,

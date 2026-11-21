@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, Headphones, MapPin, Pause, Play, RotateCcw, Volume2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Headphones, Lightbulb, MapPin, Pause, Play, RotateCcw, Volume2, X } from "lucide-react";
+import { MineInline } from "../MineRichText";
 import { compile, tidyNumber } from "../../../shared/calc.mjs";
 import { prettyFormula } from "./formula";
 import "./blocos.css";
@@ -33,117 +34,220 @@ function readJson(code: string): Record<string, unknown> | null {
  * Quem quiser saber do resultado de um quiz (a Sala de estudo conta para o
  * grupo) põe um provedor em volta; no chat comum não há ninguém ouvindo.
  */
+/**
+ * O que um bloco pode pedir ao chat principal: mandar uma mensagem nova,
+ * salvar flashcards numa matéria ou levar um plano para a Agenda. Só o chat da
+ * Mine fornece; na Sala de estudo os botões que dependem disso não aparecem.
+ */
+export type BlocoAcoes = {
+  enviar?: (texto: string) => void;
+  salvarFlashcards?: (baralho: { titulo: string; cartoes: { frente: string; verso: string }[] }) => void;
+  levarParaAgenda?: (plano: { titulo: string; materia: string; dias: { titulo: string; texto: string; dia: number }[] }) => void;
+};
+export const BlocoAcoesContext = createContext<BlocoAcoes | null>(null);
+
 export const QuizResultadoContext = createContext<((r: { titulo: string; acertos: number; total: number }) => void) | null>(null);
 
 // ── Quiz ────────────────────────────────────────────────────────────────────
-type Pergunta = { pergunta: string; opcoes: string[]; correta: number; explicacao: string };
+// Nov/2026 (21): no estilo do simulado do ChatGPT. Cada alternativa pode ter o
+// seu "porquê" (aparece debaixo da marcada e da certa), a lâmpada mostra uma
+// dica antes de responder, fórmula sai desenhada (KaTeX) e o fim lista cada
+// questão com ✓/✗, o que a pessoa marcou e a explicação.
+type Pergunta = { pergunta: string; opcoes: string[]; correta: number; explicacao: string; porques: string[]; dica: string };
 
 /**
- * O quiz desenha texto puro: fórmula que o modelo mandou em LaTeX
- * ("$2x + 3 = 11$", "\frac{1}{2}") vira escrita legível em vez de símbolo cru.
+ * O quiz escreve fórmula com KaTeX ($...$); o que vier em LaTeX solto, sem
+ * cifrão ("\frac{1}{2}" no meio da frase), ganha os cifrões para não aparecer cru.
  */
-function semLatex(texto: string) {
-  return texto
-    .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "($1)/($2)")
-    .replace(/\\sqrt\{([^{}]*)\}/g, "√($1)")
-    .replace(/\\(cdot|times)/g, "×")
-    .replace(/\\div/g, "÷")
-    .replace(/\\(left|right)/g, "")
-    .replace(/\$\$?([^$]+)\$\$?/g, "$1")
-    .replace(/\^\{([^{}]*)\}/g, "^$1")
-    .replace(/\^2(?![0-9])/g, "²")
-    .replace(/\^3(?![0-9])/g, "³");
+function comFormula(texto: string) {
+  if (texto.includes("$")) return texto;
+  return /\\(frac|sqrt|cdot|times|div|pi|alpha|beta|Delta|theta)\b/.test(texto) ? `$${texto}$` : texto;
 }
 
 function lerQuiz(data: Record<string, unknown>) {
   const perguntas = (Array.isArray(data.perguntas) ? data.perguntas : [])
     .map((item) => {
       const raw = item as Record<string, unknown>;
-      const opcoes = (Array.isArray(raw.opcoes) ? raw.opcoes : []).map((op) => semLatex(str(op, 240))).filter(Boolean).slice(0, 5);
+      // Alternativa pode vir como texto ou como {texto, porque}.
+      const brutas = Array.isArray(raw.opcoes) ? raw.opcoes : [];
+      const opcoes = brutas.map((op) => comFormula(str(typeof op === "object" && op ? (op as Record<string, unknown>).texto : op, 240))).slice(0, 5);
+      const porquesSoltos = Array.isArray(raw.porques) ? raw.porques : [];
+      const porques = opcoes.map((_, i) => {
+        const op = brutas[i];
+        const dentro = typeof op === "object" && op ? str((op as Record<string, unknown>).porque, 400) : "";
+        return comFormula(dentro || str(porquesSoltos[i], 400));
+      });
       const correta = Math.round(num(raw.correta, -1));
-      return { pergunta: semLatex(str(raw.pergunta, 500)), opcoes, correta, explicacao: semLatex(str(raw.explicacao, 600)) };
+      return { pergunta: comFormula(str(raw.pergunta, 700)), opcoes, correta, explicacao: comFormula(str(raw.explicacao, 600)), porques, dica: comFormula(str(raw.dica, 300)) };
     })
-    .filter((item) => item.pergunta && item.opcoes.length >= 2 && item.correta >= 0 && item.correta < item.opcoes.length)
-    .slice(0, 8);
+    .filter((item) => item.pergunta && item.opcoes.length >= 2 && item.opcoes.every(Boolean) && item.correta >= 0 && item.correta < item.opcoes.length)
+    .slice(0, 10);
   return perguntas.length ? { titulo: str(data.titulo, 120) || "Quiz rápido", perguntas } : null;
 }
 
+const letra = (i: number) => String.fromCharCode(65 + i);
+
 function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) {
   const [index, setIndex] = useState(0);
-  const [escolha, setEscolha] = useState<number | null>(null);
-  const [acertos, setAcertos] = useState(0);
+  const [respostas, setRespostas] = useState<(number | null)[]>(() => perguntas.map(() => null));
+  const [dicaAberta, setDicaAberta] = useState(false);
   const [fim, setFim] = useState(false);
-  const atual = perguntas[index];
   const avisarResultado = useContext(QuizResultadoContext);
+  const acoes = useContext(BlocoAcoesContext);
+  const atual = perguntas[index];
+  const escolha = respostas[index];
+  const acertos = respostas.filter((r, i) => r === perguntas[i].correta).length;
   const responder = (op: number) => {
     if (escolha !== null) return;
-    setEscolha(op);
-    if (op === atual.correta) setAcertos((value) => value + 1);
+    setRespostas((lista) => lista.map((r, i) => (i === index ? op : r)));
   };
   const proxima = () => {
+    setDicaAberta(false);
     if (index + 1 >= perguntas.length) {
       setFim(true);
       avisarResultado?.({ titulo, acertos, total: perguntas.length });
-    }
-    else {
-      setIndex(index + 1);
-      setEscolha(null);
-    }
+    } else setIndex(index + 1);
   };
   const refazer = () => {
     setIndex(0);
-    setEscolha(null);
-    setAcertos(0);
+    setRespostas(perguntas.map(() => null));
+    setDicaAberta(false);
     setFim(false);
   };
+  const errados = perguntas.filter((p, i) => respostas[i] !== null && respostas[i] !== p.correta);
+
+  if (fim) {
+    const frase = acertos === perguntas.length ? "Gabaritou! Pode subir o nível." : acertos >= perguntas.length / 2 ? "Mandou bem. Revise o que errou abaixo." : "Vale rever o assunto. Errar aqui é treino.";
+    return (
+      <section className="mbk mbk-quiz" aria-label={`Resultado do quiz: ${titulo}`}>
+        <header className="mbk-head">
+          <strong>{titulo}</strong>
+          <span className="mbk-meta">Resultado</span>
+        </header>
+        <div className="mbk-quiz__placar">
+          <p className="mbk-quiz__nota">
+            {acertos} de {perguntas.length}
+          </p>
+          <p className="mbk-muted">{frase}</p>
+        </div>
+        <ol className="mbk-quiz__revisao">
+          {perguntas.map((p, i) => {
+            const certa = respostas[i] === p.correta;
+            const marcada = respostas[i];
+            return (
+              <li key={i} className={certa ? "is-certa" : "is-errada"}>
+                <span className="mbk-letra" aria-label={certa ? "Acertou" : "Errou"}>
+                  {certa ? <Check aria-hidden /> : <X aria-hidden />}
+                </span>
+                <div>
+                  <p className="mbk-quiz__rev-pergunta">
+                    <MineInline text={p.pergunta} />
+                  </p>
+                  {!certa && marcada !== null ? (
+                    <p className="mbk-quiz__rev-sua">
+                      Você marcou {letra(marcada)}: <MineInline text={p.opcoes[marcada]} />
+                    </p>
+                  ) : null}
+                  <p className="mbk-quiz__rev-certa">
+                    Resposta: {letra(p.correta)}) <MineInline text={p.opcoes[p.correta]} />
+                  </p>
+                  {p.explicacao || p.porques[p.correta] ? (
+                    <p className="mbk-muted">
+                      <MineInline text={p.explicacao || p.porques[p.correta]} />
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="mbk-row">
+          <button type="button" className="mbk-btn is-ghost" onClick={refazer}>
+            <RotateCcw aria-hidden /> Tentar de novo
+          </button>
+          {acoes?.enviar ? (
+            <button
+              type="button"
+              className="mbk-btn"
+              onClick={() =>
+                acoes.enviar?.(
+                  errados.length
+                    ? `Faz outro quiz de ${perguntas.length} questões sobre "${titulo}", focando no que eu errei: ${errados.map((p) => p.pergunta.replace(/\$/g, "").slice(0, 90)).join(" | ")}`
+                    : `Faz outro quiz de ${perguntas.length} questões sobre "${titulo}", um pouco mais difícil.`,
+                )
+              }
+            >
+              Próximo quiz <ChevronRight aria-hidden />
+            </button>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="mbk mbk-quiz" aria-label={`Quiz: ${titulo}`}>
       <header className="mbk-head">
         <strong>{titulo}</strong>
-        <span className="mbk-meta">{fim ? "Resultado" : `${index + 1} de ${perguntas.length}`}</span>
+        <span className="mbk-quiz__topo">
+          <span className="mbk-meta">
+            {index + 1} de {perguntas.length}
+          </span>
+          {atual.dica ? (
+            <button type="button" className={`mbk-icon mbk-quiz__dica-btn${dicaAberta ? " is-on" : ""}`} onClick={() => setDicaAberta((v) => !v)} aria-expanded={dicaAberta} aria-label="Mostrar dica" title="Dica">
+              <Lightbulb aria-hidden />
+            </button>
+          ) : null}
+        </span>
       </header>
       <div className="mbk-progress" aria-hidden>
-        <i style={{ width: `${((fim ? perguntas.length : index + (escolha !== null ? 1 : 0)) / perguntas.length) * 100}%` }} />
+        <i style={{ width: `${((index + (escolha !== null ? 1 : 0)) / perguntas.length) * 100}%` }} />
       </div>
-      {fim ? (
-        <div className="mbk-quiz__fim">
-          <p className="mbk-quiz__nota">
-            {acertos} de {perguntas.length}
-          </p>
-          <p className="mbk-muted">{acertos === perguntas.length ? "Gabaritou. Pode subir o nível." : acertos >= perguntas.length / 2 ? "Bom caminho. Revise o que errou e tente de novo." : "Vale rever o assunto e refazer. Errar aqui é treino."}</p>
-          <button type="button" className="mbk-btn" onClick={refazer}>
-            <RotateCcw aria-hidden /> Refazer
+      <p className="mbk-quiz__pergunta">
+        <MineInline text={atual.pergunta} />
+      </p>
+      {dicaAberta && atual.dica ? (
+        <p className="mbk-quiz__dica" role="note">
+          <Lightbulb aria-hidden /> <MineInline text={atual.dica} />
+        </p>
+      ) : null}
+      <ol className="mbk-quiz__opcoes">
+        {atual.opcoes.map((op, i) => {
+          const estado = escolha === null ? "" : i === atual.correta ? "is-certa" : i === escolha ? "is-errada" : "is-apagada";
+          const porque = escolha !== null && (i === escolha || i === atual.correta) ? atual.porques[i] : "";
+          return (
+            <li key={i}>
+              <button type="button" className={estado} onClick={() => responder(i)} disabled={escolha !== null} aria-pressed={escolha === i}>
+                <span className="mbk-letra" aria-hidden>
+                  {estado === "is-certa" ? <Check /> : estado === "is-errada" ? <X /> : letra(i)}
+                </span>
+                <span className="mbk-quiz__op">
+                  <MineInline text={op} />
+                  {porque ? (
+                    <small className="mbk-quiz__porque">
+                      <MineInline text={porque} />
+                    </small>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      {escolha !== null ? (
+        <div className={`mbk-quiz__feedback ${escolha === atual.correta ? "is-certa" : "is-errada"}`} role="status">
+          <strong>{escolha === atual.correta ? "Certa!" : `A certa é a ${letra(atual.correta)}.`}</strong>
+          {atual.explicacao && !atual.porques[atual.correta] ? (
+            <span>
+              {" "}
+              <MineInline text={atual.explicacao} />
+            </span>
+          ) : null}
+          <button type="button" className="mbk-btn" onClick={proxima}>
+            {index + 1 >= perguntas.length ? "Ver resultado" : "Próxima"} <ChevronRight aria-hidden />
           </button>
         </div>
-      ) : (
-        <>
-          <p className="mbk-quiz__pergunta">{atual.pergunta}</p>
-          <ol className="mbk-quiz__opcoes">
-            {atual.opcoes.map((op, i) => {
-              const estado = escolha === null ? "" : i === atual.correta ? "is-certa" : i === escolha ? "is-errada" : "is-apagada";
-              return (
-                <li key={i}>
-                  <button type="button" className={estado} onClick={() => responder(i)} disabled={escolha !== null} aria-pressed={escolha === i}>
-                    <span className="mbk-letra" aria-hidden>
-                      {estado === "is-certa" ? <Check /> : estado === "is-errada" ? <X /> : String.fromCharCode(65 + i)}
-                    </span>
-                    <span>{op}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-          {escolha !== null ? (
-            <div className={`mbk-quiz__feedback ${escolha === atual.correta ? "is-certa" : "is-errada"}`} role="status">
-              <strong>{escolha === atual.correta ? "Certa!" : `A certa é a ${String.fromCharCode(65 + atual.correta)}.`}</strong>
-              {atual.explicacao ? <span> {atual.explicacao}</span> : null}
-              <button type="button" className="mbk-btn" onClick={proxima}>
-                {index + 1 >= perguntas.length ? "Ver resultado" : "Próxima"} <ChevronRight aria-hidden />
-              </button>
-            </div>
-          ) : null}
-        </>
-      )}
+      ) : null}
     </section>
   );
 }

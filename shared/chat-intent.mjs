@@ -55,6 +55,9 @@ export function isQuizRequest(value) {
 /** Pedido de flashcards. "cartao" sozinho e ambiguo demais; exige contexto. */
 export function isFlashcardRequest(value) {
   const normalized = normalizeIntentText(value);
+  // "Monta um plano de estudos ... e no fim me da flashcards": o pedido e o
+  // plano; a Mine responde no chat com o bloco plano e o bloco flashcards.
+  if (/\b(?:plano\s+de\s+estudos?|cronograma)\b/.test(normalized)) return false;
   if (/\bflash\s*cards?\b/.test(normalized)) return true;
   return /\b(?:cart(?:oes|ao)|fichas?)\s+(?:de\s+)?(?:estudo|revisao|memoriza)/.test(normalized);
 }

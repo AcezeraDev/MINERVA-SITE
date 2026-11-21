@@ -136,7 +136,7 @@ export function freshenQueries(queries, prompt, now = new Date()) {
 }
 
 /** Consultas validas vindas do modelo: texto, sem repeticao, no maximo tres. */
-export function cleanQueries(value) {
+export function cleanQueries(value, max = MAX_SEARCH_QUERIES) {
   const list = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
   const seen = new Set();
   const out = [];
@@ -146,7 +146,7 @@ export function cleanQueries(value) {
     if (query.length < 2 || seen.has(key)) continue;
     seen.add(key);
     out.push(query);
-    if (out.length >= MAX_SEARCH_QUERIES) break;
+    if (out.length >= max) break;
   }
   return out;
 }
@@ -156,7 +156,7 @@ export function cleanQueries(value) {
  * pesquisar: a frase do estudante ("vc sabe qnd sai o resultado do enem?")
  * raramente e uma boa busca. Falhou ou demorou, vale a frase limpa.
  */
-export async function planSearchQueries(prompt, history = [], { signal, timeoutMs = 6_000 } = {}) {
+export async function planSearchQueries(prompt, history = [], { signal, timeoutMs = 6_000, deep = false } = {}) {
   const fallback = [buildSearchQuery(prompt, history)].filter(Boolean);
   if (!providerAvailable(MINE_FAST_MODEL.provider)) return fallback;
   const previous = previousQuestion(history).slice(0, 300);
@@ -171,13 +171,13 @@ export async function planSearchQueries(prompt, history = [], { signal, timeoutM
       messages: [
         {
           role: "system",
-          content: `Hoje e ${todayInBrazil()}. Voce escreve consultas para um buscador da web. Leia a pergunta do estudante (e a anterior, se a atual depender dela) e devolva SOMENTE um JSON {"consultas": ["...", "..."]} com 1 a 3 consultas curtas e especificas: palavras-chave, nomes proprios, o ano quando importar, sem girias. Para "ultimo", "atual" ou "mais recente", use o ano de hoje ou nenhum ano, nunca o ano que voce lembra, e nao ponha na consulta a resposta que voce acha que e a certa. Use mais de uma consulta so quando a pergunta tiver partes diferentes ou quando ajudar ter uma fonte oficial e outra jornalistica.`,
+          content: `Hoje e ${todayInBrazil()}. Voce escreve consultas para um buscador da web. Leia a pergunta do estudante (e a anterior, se a atual depender dela) e devolva SOMENTE um JSON {"consultas": ["...", "..."]} com ${deep ? "3 a 5 consultas que cubram angulos diferentes do assunto (definicao, dados oficiais, noticias recentes, opinioes de especialistas, comparacoes)" : "1 a 3 consultas"} curtas e especificas: palavras-chave, nomes proprios, o ano quando importar, sem girias. Para "ultimo", "atual" ou "mais recente", use o ano de hoje ou nenhum ano, nunca o ano que voce lembra, e nao ponha na consulta a resposta que voce acha que e a certa. Use mais de uma consulta so quando a pergunta tiver partes diferentes ou quando ajudar ter uma fonte oficial e outra jornalistica.`,
         },
         { role: "user", content: `${previous ? `Pergunta anterior: ${previous}\n` : ""}Pergunta atual: ${String(prompt || "").slice(0, 600)}` },
       ],
     });
     const json = String(result.content || "").match(/\{[\s\S]*\}/)?.[0];
-    const planned = cleanQueries(json ? JSON.parse(json)?.consultas : []);
+    const planned = cleanQueries(json ? JSON.parse(json)?.consultas : [], deep ? 5 : MAX_SEARCH_QUERIES);
     return planned.length ? planned : fallback;
   } catch (error) {
     if (signal?.aborted) throw new WebSearchError("Busca cancelada.", { code: "aborted" });

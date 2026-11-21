@@ -320,6 +320,15 @@ function nestList(flat) {
  * ("Enunciado: ...", "Resposta: ...") e juntar linhas colaria rotulos no meio
  * de frases.
  */
+const CHIP_LINE = /^\s*(?:\{\{[^{}\n]{1,60}\}\}\s*){1,6}$/;
+
+/** "{{a}} {{b}}" sozinho na linha vira lista de selos; qualquer outra coisa, null. */
+export function chipsFromLine(line) {
+  if (!CHIP_LINE.test(String(line || ""))) return null;
+  const items = [...String(line).matchAll(/\{\{([^{}\n]{1,60})\}\}/g)].map((match) => match[1].trim()).filter(Boolean);
+  return items.length ? items : null;
+}
+
 export function parseBlocks(text, { streaming = false } = {}) {
   const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
   const blocks = [];
@@ -403,6 +412,15 @@ export function parseBlocks(text, { streaming = false } = {}) {
     const loneMath = line.trim().match(/^(?:\$(?!\$)([^$]+)\$|\\\((.+)\\\))[.,;:]?$/);
     if (loneMath && /[\\^_=]|\d/.test(loneMath[1] ?? loneMath[2])) {
       blocks.push({ type: "math", tex: (loneMath[1] ?? loneMath[2]).trim(), open: false });
+      index += 1;
+      continue;
+    }
+
+    // Linha so com selos ({{18 de novembro}} {{Fonte: Inep}}): metadados
+    // pequenos logo abaixo de um titulo, como o ChatGPT faz nas noticias.
+    const chips = chipsFromLine(line);
+    if (chips) {
+      blocks.push({ type: "chips", items: chips });
       index += 1;
       continue;
     }

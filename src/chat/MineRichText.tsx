@@ -21,6 +21,7 @@ import { MineCitation } from "./MineSources";
 import { isSitePage } from "./SitePreview";
 import { ProjectCard } from "./monitor/ProjectCard";
 import { BLOCO_LANGS, BlocoInterativo } from "./blocos/Blocos";
+import { ESTUDO_LANGS, BlocoEstudo } from "./blocos/Estudo";
 import { InlineRunner } from "./CodeRunner";
 import { MineChart, MineSvgFigure } from "./MineChart";
 import { emoji3dPath, splitLeadingEmoji } from "../../shared/emoji-3d.mjs";
@@ -133,6 +134,9 @@ function Inline({ text }: { text: string }) {
   const tokens = useMemo(() => parseInline(text), [text]);
   return <>{renderTokens(tokens)}</>;
 }
+
+/** Texto de uma linha com negrito, fórmula e código, para os blocos interativos. */
+export const MineInline = Inline;
 
 // ---------------------------------------------------------------------------
 // Glossário: termo sublinhado com a explicação ao passar o mouse ou tocar.
@@ -295,6 +299,29 @@ const CHART_LANGS = new Set(["grafico", "gráfico", "chart"]);
  * página HTML completa vira prévia do site funcionando;
  * Python e JavaScript ganham o botão Executar.
  */
+const NOMES_CHEGANDO: Record<string, string> = {
+  flashcards: "Montando os flashcards…",
+  plano: "Montando o plano…",
+  numeros: "Separando os números…",
+  "números": "Separando os números…",
+  colunas: "Arrumando as colunas…",
+  texto: "Escrevendo o texto…",
+  avaliacao: "Preparando a avaliação…",
+  "avaliação": "Preparando a avaliação…",
+  calculadora: "Montando a calculadora…",
+  "lista-imagens": "Separando as fotos…",
+};
+
+/** Enquanto o JSON de um bloco de estudo chega, um aviso no lugar do código cru. */
+function BlocoChegando({ lang }: { lang: string }) {
+  return (
+    <div className="mrt-chegando" role="status">
+      <span className="mrt-chegando__ponto" aria-hidden />
+      {NOMES_CHEGANDO[lang] || "Montando…"}
+    </div>
+  );
+}
+
 const CodeBlock = memo(function CodeBlock({ code: raw, lang, open, streaming = false }: { code: string; lang: string; open: boolean; streaming?: boolean }) {
   // Termo do glossário nunca é marcado em código; se escapar, sai aqui.
   const code = raw.replace(GLOSS_MARKS, "");
@@ -310,6 +337,8 @@ const CodeBlock = memo(function CodeBlock({ code: raw, lang, open, streaming = f
   if (lang === "projeto") return <ProjectCard code={code} source="projeto" open={open} streaming={streaming} />;
   // Quiz, linha do tempo, mapa, gráfico de função, timer e ditado (src/chat/blocos/).
   if (!open && BLOCO_LANGS.has(lang)) return <BlocoInterativo lang={lang} code={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
+  // Flashcards, plano, números, colunas, texto, avaliação, calculadora e lista com fotos (21/nov/2026).
+  if (ESTUDO_LANGS.has(lang)) return open ? <BlocoChegando lang={lang} /> : <BlocoEstudo lang={lang} code={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
   if (isSitePage(code, lang)) return <ProjectCard code={code} source="html" open={open} streaming={streaming} />;
   const runnable = !open ? runnableLanguage(lang) : null;
   if (!runnable) return <CodeBox code={code} lang={lang} open={open} />;
@@ -554,6 +583,16 @@ function Blocks({ blocks, streaming }: { blocks: Block[]; streaming: boolean }) 
             );
           case "list":
             return <ListView key={key} list={block} />;
+          case "chips":
+            return (
+              <p key={key} className="mrt-selos">
+                {block.items.map((item, i) => (
+                  <span key={i} className={`mrt-selo${/^fonte\s*:/i.test(item) ? " is-fonte" : ""}`}>
+                    <Inline text={item} />
+                  </span>
+                ))}
+              </p>
+            );
           default:
             return null;
         }

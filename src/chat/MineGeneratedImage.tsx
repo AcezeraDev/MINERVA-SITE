@@ -118,7 +118,7 @@ async function requestImage(
 type State =
   | { kind: "loading" }
   | { kind: "drawing"; started: number }
-  | { kind: "done"; url: string; type: string; quota?: Quota }
+  | { kind: "done"; url: string; type: string; quota?: Quota; fresh?: boolean }
   | { kind: "missing" }
   | { kind: "error"; message: string; quota: boolean };
 
@@ -131,6 +131,7 @@ function Sketching({ started, caption, shape, editing }: { started: number; capt
   }, [started]);
   return (
     <div className={`mine-gen-card is-drawing ${shape}`} role="status" aria-live="polite">
+      <span className="mine-gen-dots" aria-hidden />
       <svg className="mine-gen-sketch" viewBox="0 0 200 200" aria-hidden>
         <path pathLength={1} d="M40 150 C 60 90, 90 60, 130 70 S 170 120, 150 150" />
         <path pathLength={1} d="M70 120 C 80 100, 110 95, 120 115" />
@@ -170,11 +171,11 @@ export function MineGeneratedImage({
   const urlRef = useRef("");
 
   const show = useCallback(
-    (blob: Blob, quota?: Quota) => {
+    (blob: Blob, quota?: Quota, fresh = false) => {
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
       urlRef.current = URL.createObjectURL(blob);
       lastImageKey = key;
-      setState({ kind: "done", url: urlRef.current, type: blob.type, quota });
+      setState({ kind: "done", url: urlRef.current, type: blob.type, quota, fresh });
     },
     [key],
   );
@@ -183,7 +184,7 @@ export function MineGeneratedImage({
     (force = false) => {
       setState({ kind: "drawing", started: Date.now() });
       requestImage({ prompt, edit, key, formato, attachment }, force)
-        .then((result) => show(result.blob, result.quota))
+        .then((result) => show(result.blob, result.quota, true))
         .catch((error: unknown) =>
           setState({ kind: "error", message: error instanceof Error ? error.message : "A Mine não conseguiu desenhar agora.", quota: error instanceof ImageError && error.quota }),
         );
@@ -245,7 +246,7 @@ export function MineGeneratedImage({
   const left = state.quota ? Math.max(0, state.quota.limit - state.quota.used) : null;
   return (
     <figure className={`mine-gen-figure ${shape}`}>
-      <button type="button" className="mine-gen-frame" onClick={() => setZoom(true)} aria-label={`Ampliar imagem${caption ? `: ${caption}` : ""}`}>
+      <button type="button" className={`mine-gen-frame${state.fresh ? " is-fresca" : ""}`} onClick={() => setZoom(true)} aria-label={`Ampliar imagem${caption ? `: ${caption}` : ""}`}>
         <img src={state.url} alt={caption || "Imagem criada pela Mine"} />
       </button>
       <figcaption>

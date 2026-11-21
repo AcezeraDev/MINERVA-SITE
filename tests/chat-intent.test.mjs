@@ -172,3 +172,9 @@ test("os proprios atalhos do app nao disparam o fluxo errado", () => {
   for (const frase of naoViramProva) assert.equal(isFlashcardRequest(frase), false, frase);
   for (const frase of naoViramProva) assert.equal(isMindMapRequest(frase), false, frase);
 });
+
+test("plano de estudos com flashcards vai para o chat, que monta os dois blocos", () => {
+  assert.equal(isFlashcardRequest("Monta um plano de estudos de 2 semanas de funções e no fim me dá flashcards pra revisar"), false);
+  assert.equal(isFlashcardRequest("faz um cronograma de química com flashcards"), false);
+  assert.equal(isFlashcardRequest("crie flashcards de biologia"), true);
+});

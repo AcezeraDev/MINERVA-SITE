@@ -69,6 +69,7 @@ import {
   X,
   XCircle,
   Brain,
+  Telescope,
   Dna,
   Download,
   Dumbbell,
@@ -258,7 +259,9 @@ import { focusRemainingOf, readFocusState, writeFocusState, type FocusState } fr
 import { FocusWidget } from "./foco/FocusWidget";
 import { FocusQuickStart } from "./foco/FocusQuickStart";
 import { mineHeaders } from "./mineAuth";
+import { BlocoAcoesContext, type BlocoAcoes } from "./chat/blocos/Blocos";
 const AdminView = React.lazy(() => import("./admin/AdminPanel").then((m) => ({ default: m.AdminView })));
+const DesenharModal = React.lazy(() => import("./chat/DesenharModal").then((m) => ({ default: m.DesenharModal })));
 const GamesView = React.lazy(() => import("./games/GamesPanel").then((m) => ({ default: m.GamesView })));
 const AtelieView = React.lazy(() => import("./atelie/AtelieView").then((m) => ({ default: m.AtelieView })));
 const IdiomasView = React.lazy(() => import("./idiomas/IdiomasView").then((m) => ({ default: m.IdiomasView })));
@@ -1474,6 +1477,10 @@ function App() {
   const [mineStatus, setMineStatus] = useState<MineSearchStatus | null>(null);
   const [mineReasoning, setMineReasoning] = useState("");
   const [mineWebSearch, setMineWebSearch] = useState(false);
+  // Pesquisa aprofundada vale para UMA pergunta (é a mais cara); Pensar com
+  // calma fica ligado até a pessoa desligar.
+  const [mineProfundo, setMineProfundo] = useState(false);
+  const [mineCaprichar, setMineCaprichar] = useState(false);
   const [minePhotos, setMinePhotosState] = useState(() => readMinePhotos());
   const [commandOpen, setCommandOpen] = useState(false);
   const setMinePhotos = useCallback((enabled: boolean) => {
@@ -1944,6 +1951,89 @@ function App() {
     setToast(message);
   }
 
+  // Blocos de estudo do chat (src/chat/blocos/Estudo.tsx) pedem ao App para
+  // guardar o que montaram: o baralho vai para a revisão espaçada e o plano
+  // vira tarefas na Agenda. Matéria: a do chat, uma com o mesmo nome ou nova.
+  const blocosRef = useRef({ user, userData, update, notify });
+  blocosRef.current = { user, userData, update, notify };
+  useEffect(() => {
+    const materiaPara = (nome: string, subjectId?: string) => {
+      const { user: dono, userData: dados } = blocosRef.current;
+      if (!dono) return null;
+      const daConta = dados.subjects.filter((item) => item.userId === dono.id);
+      const existente = (subjectId && daConta.find((item) => item.id === subjectId)) || daConta.find((item) => normalizeText(item.name) === normalizeText(nome));
+      if (existente) return { materia: existente, nova: false };
+      const limpo = nome.trim() || "Estudos";
+      const materia: Subject = {
+        id: uid("subject"),
+        userId: dono.id,
+        name: limpo.length <= 40 ? limpo : limpo.slice(0, 41).replace(/\s+\S*$/, "").trim() || limpo.slice(0, 40),
+        color: "#38BDF8",
+        icon: "school",
+        favorite: false,
+        createdAt: Date.now(),
+      };
+      return { materia, nova: true };
+    };
+    const onFlashcards = (event: Event) => {
+      const detail = (event as CustomEvent<{ titulo: string; cartoes: { frente: string; verso: string }[]; subjectId?: string }>).detail;
+      const dono = blocosRef.current.user;
+      if (!dono || !detail?.cartoes?.length) return;
+      const alvo = materiaPara(detail.titulo.replace(/^flashcards?\s*(?:de|sobre|-|:|—)?\s*/i, ""), detail.subjectId);
+      if (!alvo) return;
+      const agora = Date.now();
+      const novos: Flashcard[] = detail.cartoes.slice(0, 30).map((card, index) => ({
+        id: uid("card"),
+        userId: dono.id,
+        subjectId: alvo.materia.id,
+        front: card.frente,
+        back: card.verso,
+        level: 0,
+        reps: 0,
+        lapses: 0,
+        dueAt: agora,
+        createdAt: agora + index,
+      }));
+      blocosRef.current.update((draft) => ({
+        ...draft,
+        subjects: alvo.nova ? [...draft.subjects, alvo.materia] : draft.subjects,
+        flashcards: [...draft.flashcards, ...novos],
+      }));
+      blocosRef.current.notify(`${novos.length} flashcards salvos em ${alvo.materia.name}.`);
+    };
+    const onPlano = (event: Event) => {
+      const detail = (event as CustomEvent<{ titulo: string; materia: string; dias: { titulo: string; texto: string; dia: number }[]; subjectId?: string }>).detail;
+      const dono = blocosRef.current.user;
+      if (!dono || !detail?.dias?.length) return;
+      const alvo = materiaPara(detail.materia || detail.titulo, detail.subjectId);
+      if (!alvo) return;
+      const agora = Date.now();
+      // Dia 1 do plano = amanhã: hoje o estudante acabou de montar o plano.
+      const tarefas: Task[] = detail.dias.slice(0, 31).map((dia, index) => ({
+        id: uid("task"),
+        userId: dono.id,
+        subjectId: alvo.materia.id,
+        title: dia.titulo,
+        note: [dia.texto, `Plano: ${detail.titulo}`].filter(Boolean).join("\n"),
+        dueAt: addDays(dia.dia + 1),
+        done: false,
+        createdAt: agora + index,
+      }));
+      blocosRef.current.update((draft) => ({
+        ...draft,
+        subjects: alvo.nova ? [...draft.subjects, alvo.materia] : draft.subjects,
+        tasks: [...draft.tasks, ...tarefas],
+      }));
+      blocosRef.current.notify(`${tarefas.length} dias do plano estão na sua Agenda.`);
+    };
+    window.addEventListener("mine:salvar-flashcards", onFlashcards);
+    window.addEventListener("mine:plano-agenda", onPlano);
+    return () => {
+      window.removeEventListener("mine:salvar-flashcards", onFlashcards);
+      window.removeEventListener("mine:plano-agenda", onPlano);
+    };
+  }, []);
+
   /**
    * O tempo de uma fase do Foco acabou com o aluno em outra tela (a ficha do
    * canto avisou). Mesmas consequências da aba Foco: sessão registrada (vale
@@ -2066,6 +2156,10 @@ function App() {
           webSearchAvailable={mineWebAvailable}
           tutor={mineTutor}
           setTutor={setMineTutor}
+          profundo={mineProfundo}
+          setProfundo={setMineProfundo}
+          caprichar={mineCaprichar}
+          setCaprichar={setMineCaprichar}
           controle={mineControle}
           setControle={setMineControle}
           controleLive={mineControleLive}
@@ -2669,6 +2763,8 @@ function App() {
             const startedAt = Date.now();
             try {
               const subjectImages = resolvedSubjectId ? materialsToImageAttachments(userData.materials.filter((item) => item.subjectId === resolvedSubjectId)) : [];
+              // A pesquisa aprofundada vale só para esta pergunta.
+              if (mineProfundo) setMineProfundo(false);
               const assistant = await streamAssistantResponse(
                 {
                   prompt,
@@ -2676,6 +2772,8 @@ function App() {
                   webSearch: mineWebAvailable && mineWebSearch,
                   photos: minePhotos,
                   tutor: mineTutor,
+                  profundo: (mineWebAvailable && mineProfundo) || undefined,
+                  caprichar: mineCaprichar || undefined,
                   controle: mineControle || undefined,
                   aluno: buildAlunoSnapshot(userData, user.id),
                   attachments: [...attachments, ...earlierAttachments, ...subjectImages].slice(0, maxChatAttachments),
@@ -7425,6 +7523,10 @@ function MineView({
   webSearchAvailable,
   tutor,
   setTutor,
+  profundo,
+  setProfundo,
+  caprichar,
+  setCaprichar,
   controle,
   setControle,
   controleLive,
@@ -7468,6 +7570,10 @@ function MineView({
   webSearchAvailable: boolean;
   tutor: boolean;
   setTutor: (value: boolean) => void;
+  profundo: boolean;
+  setProfundo: (value: boolean) => void;
+  caprichar: boolean;
+  setCaprichar: (value: boolean) => void;
   controle: boolean;
   setControle: (value: boolean) => void;
   /** O pedido em andamento saiu com o Controle Mine ligado. */
@@ -7532,6 +7638,7 @@ function MineView({
   const [atBottom, setAtBottom] = useState(true);
   const [contextPanelOpen, setContextPanelOpen] = useState(false);
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
+  const [desenharOpen, setDesenharOpen] = useState(false);
   const toolsMenuRef = useRef<HTMLDivElement | null>(null);
   const dictation = useDictation(input, setInput);
   const [guidedStudyOpen, setGuidedStudyOpen] = useState(false);
@@ -7540,6 +7647,15 @@ function MineView({
     sendRef.current = send;
     saveResponseRef.current = saveResponse;
   }, [send, saveResponse]);
+  // O que os blocos de estudo (quiz, flashcards, plano) podem pedir ao chat.
+  const blocoAcoes = useMemo<BlocoAcoes>(
+    () => ({
+      enviar: (texto) => void sendRef.current(texto, selectedSubjectId),
+      salvarFlashcards: (baralho) => window.dispatchEvent(new CustomEvent("mine:salvar-flashcards", { detail: { ...baralho, subjectId: selectedSubjectId } })),
+      levarParaAgenda: (plano) => window.dispatchEvent(new CustomEvent("mine:plano-agenda", { detail: { ...plano, subjectId: selectedSubjectId } })),
+    }),
+    [selectedSubjectId],
+  );
   // Memoizado porque o texto do streaming mora no App: cada token que chega
   // re-renderiza esta árvore inteira. Sem isto, a lista era recriada a cada
   // token e o <MineMessageList> memoizado abaixo nunca conseguiria pular nada.
@@ -7979,6 +8095,7 @@ function MineView({
                   }))}
                 />
               ) : (
+                <BlocoAcoesContext.Provider value={blocoAcoes}>
                 <MineMessageList
                   messages={messages}
                   reduceMotion={Boolean(reduceMotion)}
@@ -7995,6 +8112,7 @@ function MineView({
                   onFeedback={giveFeedback}
                   onShowVersion={openVersion}
                 />
+                </BlocoAcoesContext.Provider>
               )}
               {/* Um painel só, fora dos dois ramos (trabalhando / escrevendo): assim a
                   página aberta e o vídeo não recomeçam quando o texto começa a chegar. */}
@@ -8203,6 +8321,21 @@ function MineView({
                         <span className="mine-menu__detail">Também dá para colar ou arrastar</span>
                       </span>
                     </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="mine-menu__item"
+                      onClick={() => {
+                        setToolsMenuOpen(false);
+                        setDesenharOpen(true);
+                      }}
+                    >
+                      <PenLine className="h-4 w-4" />
+                      <span>
+                        Desenhar
+                        <span className="mine-menu__detail">Rabisque uma figura e mande para a Mine</span>
+                      </span>
+                    </button>
                     <div className="mine-menu__sep" />
                     {webSearchAvailable ? (
                       <button type="button" role="menuitemcheckbox" aria-checked={webSearch} className={`mine-menu__item ${webSearch ? "is-on" : ""}`} onClick={() => setWebSearch(!webSearch)}>
@@ -8214,6 +8347,24 @@ function MineView({
                         {webSearch ? <Check className="mine-menu__check h-4 w-4" /> : null}
                       </button>
                     ) : null}
+                    {webSearchAvailable ? (
+                      <button type="button" role="menuitemcheckbox" aria-checked={profundo} className={`mine-menu__item ${profundo ? "is-on" : ""}`} onClick={() => setProfundo(!profundo)}>
+                        <Telescope className="h-4 w-4" />
+                        <span>
+                          Pesquisa aprofundada
+                          <span className="mine-menu__detail">Mais fontes e um relatório completo (para trabalhos)</span>
+                        </span>
+                        {profundo ? <Check className="mine-menu__check h-4 w-4" /> : null}
+                      </button>
+                    ) : null}
+                    <button type="button" role="menuitemcheckbox" aria-checked={caprichar} className={`mine-menu__item ${caprichar ? "is-on" : ""}`} onClick={() => setCaprichar(!caprichar)}>
+                      <Brain className="h-4 w-4" />
+                      <span>
+                        Pensar com calma
+                        <span className="mine-menu__detail">Demora um pouco mais e confere melhor</span>
+                      </span>
+                      {caprichar ? <Check className="mine-menu__check h-4 w-4" /> : null}
+                    </button>
                     {/* Modo fotos. Sem flag de servidor como a busca na web: a foto vem
                         de uma enciclopedia pública e não custa nada por resposta. */}
                     <button type="button" role="menuitemcheckbox" aria-checked={photos} className={`mine-menu__item ${photos ? "is-on" : ""}`} onClick={() => setPhotos(!photos)}>
@@ -8332,6 +8483,24 @@ function MineView({
                     <Globe aria-hidden className="h-3.5 w-3.5" />
                     Web
                     <button type="button" className="mine-tool-pill__off" onClick={() => setWebSearch(false)} aria-label="Desligar pesquisa na web" disabled={loading}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ) : null}
+                {profundo && webSearchAvailable ? (
+                  <span className="mine-tool-pill">
+                    <Telescope aria-hidden className="h-3.5 w-3.5" />
+                    Pesquisa aprofundada
+                    <button type="button" className="mine-tool-pill__off" onClick={() => setProfundo(false)} aria-label="Desligar pesquisa aprofundada" disabled={loading}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ) : null}
+                {caprichar ? (
+                  <span className="mine-tool-pill">
+                    <Brain aria-hidden className="h-3.5 w-3.5" />
+                    Com calma
+                    <button type="button" className="mine-tool-pill__off" onClick={() => setCaprichar(false)} aria-label="Desligar pensar com calma" disabled={loading}>
                       <X className="h-3 w-3" />
                     </button>
                   </span>
@@ -8510,6 +8679,19 @@ function MineView({
           </>
         ) : null}
       </AnimatePresence>
+
+      {desenharOpen ? (
+        <React.Suspense fallback={null}>
+          <DesenharModal
+            onClose={() => setDesenharOpen(false)}
+            onAttach={(file) => {
+              const lista = new DataTransfer();
+              lista.items.add(file);
+              void handleFiles(lista.files);
+            }}
+          />
+        </React.Suspense>
+      ) : null}
 
       <AnimatePresence>
         {guidedStudyOpen ? (
@@ -12203,7 +12385,7 @@ export async function requestAssistantResponse(payload: {
  * pedaços, e as fontes da web quando houve pesquisa.
  */
 async function streamAssistantResponse(
-  payload: { prompt: string; history: MineHistoryItem[]; context: string; attachments?: ChatAttachment[]; webSearch?: boolean; photos?: boolean; tutor?: boolean; controle?: boolean; aluno?: unknown },
+  payload: { prompt: string; history: MineHistoryItem[]; context: string; attachments?: ChatAttachment[]; webSearch?: boolean; photos?: boolean; tutor?: boolean; profundo?: boolean; caprichar?: boolean; controle?: boolean; aluno?: unknown },
   options: {
     onDelta: (text: string) => void;
     signal: AbortSignal;

@@ -129,3 +129,9 @@ test("citacoes [n] da pesquisa viram tokens proprios, sem pegar indice de vetor 
   assert.equal(parseInline("[1](https://exemplo.com)")[0].type, "link");
   assert.equal(parseInline("`a[1]`")[0].type, "code");
 });
+
+test("linha so com {{selos}} vira selos; no meio da frase continua texto", () => {
+  const blocks = parseBlocks("## Gabaritos\n{{18 de novembro}} {{Fonte: Inep}}\nO Inep publicou {{isto}} hoje.");
+  assert.deepEqual(blocks[1], { type: "chips", items: ["18 de novembro", "Fonte: Inep"] });
+  assert.equal(blocks[2].type, "paragraph");
+});

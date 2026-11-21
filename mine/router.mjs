@@ -1,6 +1,6 @@
-import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL } from "./models.mjs";
+import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL, effortFor } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
-import { buildCodeInstruction, buildFileInstruction, buildToolsInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
+import { buildCodeInstruction, buildDeepResearchInstruction, buildFileInstruction, buildToolsInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
 import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, editsAttachedImage, extractSuggestions, imageFormatFrom, imageStyleFrom, previousGalleryStyle, withImageRequest, withImageStyle } from "../shared/chat-media.mjs";
 import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
 import { asksForCode } from "../shared/code-intent.mjs";
@@ -244,7 +244,7 @@ async function attemptModel({ model, task, prompt, context, history, attachments
  * Pesquisa na web antes de responder. Devolve a instrucao extra para o modelo,
  * as fontes para o navegador e um aviso quando a busca falhou.
  */
-async function prepareWebContext({ prompt, history, signal, deadline, queries: givenQueries = [], onStatus }) {
+async function prepareWebContext({ prompt, history, signal, deadline, queries: givenQueries = [], onStatus, deep = false }) {
   const policy = searchSourcePolicy(prompt, history);
   const originalQuery = buildSearchQuery(prompt, history);
   const startedAt = Date.now();
@@ -252,7 +252,8 @@ async function prepareWebContext({ prompt, history, signal, deadline, queries: g
     // A busca nao pode comer o tempo da resposta: fica com no maximo 14 s
     // (plano, consultas e leitura das paginas) e sempre deixa uns 30 s de
     // orcamento para o modelo.
-    const searchDeadline = Math.min(deadline - 30_000, Date.now() + 14_000);
+    // Pesquisa aprofundada: ate 5 consultas, 6 paginas abertas e 35 s de busca.
+    const searchDeadline = Math.min(deadline - (deep ? 60_000 : 30_000), Date.now() + (deep ? 35_000 : 14_000));
     // As consultas sao do modelo — as que ele pediu pela ferramenta ou as que
     // o modelo rapido escreveu. Com orgao oficial no assunto (Inep, IBGE...),
     // a primeira vira consulta dirigida (site:); se a fonte oficial foi
@@ -260,7 +261,7 @@ async function prepareWebContext({ prompt, history, signal, deadline, queries: g
     const planned = freshenQueries(
       givenQueries.length
         ? givenQueries
-        : await planSearchQueries(prompt, history, { signal, timeoutMs: Math.min(6_000, Math.max(1, searchDeadline - Date.now() - 6_000)) }),
+        : await planSearchQueries(prompt, history, { signal, deep, timeoutMs: Math.min(deep ? 8_000 : 6_000, Math.max(1, searchDeadline - Date.now() - 6_000)) }),
       prompt,
     );
     const first = planned[0] || originalQuery;
@@ -289,7 +290,7 @@ async function prepareWebContext({ prompt, history, signal, deadline, queries: g
       results = policy.required ? official(results) : [...official(results), ...results.filter((item) => !matchesSourceScope(item.url, policy.scopes))];
     }
     results = results.filter((item) => matchesSearchTopic(item, policy));
-    results = results.slice(0, resultLimit());
+    results = results.slice(0, deep ? Math.max(resultLimit(), 10) : resultLimit());
     if (!results.length) {
       console.log(`[mine] web=vazio consultas=${queries.length} ms=${Date.now() - startedAt}`);
       return { extraSystem: [webSearchFailedInstruction(policy)], sources: [], queries, notice: policy.required ? "Não encontrei uma fonte oficial que confirme esta informação." : "A busca na web não encontrou resultados para esta pergunta." };
@@ -300,7 +301,7 @@ async function prepareWebContext({ prompt, history, signal, deadline, queries: g
     // detalhe (a data no meio do edital, o numero da tabela).
     const readMs = searchDeadline - Date.now();
     if (pageReadingEnabled() && readMs >= 1_500) {
-      results = await readTopPages(results, queries.join(" "), { count: 3, signal, timeoutMs: Math.min(4_500, readMs) });
+      results = await readTopPages(results, queries.join(" "), { count: deep ? 6 : 3, signal, timeoutMs: Math.min(deep ? 9_000 : 4_500, readMs) });
     }
     if (signal?.aborted) throw new MineError("Geração cancelada.", { code: "aborted" });
     const read = results.filter((item) => item.content).length;
@@ -404,8 +405,12 @@ export async function runMineRequest({
   tutor = false,
   controle = false,
   aluno = null,
+  // "Pesquisa aprofundada" e "Pensar com calma" do "+" do chat (21/nov/2026).
+  profundo = false,
+  caprichar = false,
 }) {
   const cleanTask = String(task || "").trim();
+  const deep = Boolean(profundo) && !String(task || "").trim() && !controle;
   // Controle Mine vale só no chat livre: tarefas têm formato próprio.
   const control = Boolean(controle) && !cleanTask;
   const gameTask = FAST_TASKS.has(cleanTask);
@@ -427,7 +432,12 @@ export async function runMineRequest({
   // de codigo com o modo designer; se ele falhar antes de escrever, o
   // principal assume. Controle Mine e tarefas seguem como antes.
   const codeKind = cleanTask || control ? "" : asksForCode(prompt, history);
-  const principal = cleanTask ? MINE_TASK_MODEL : codeKind ? MINE_CODE_MODEL : MINE_MODEL;
+  // Pensar com calma / pesquisa aprofundada: o mesmo modelo com raciocinio alto.
+  const thoughtful = (Boolean(caprichar) || deep) && !cleanTask && !codeKind;
+  const chatModel = thoughtful
+    ? { ...MINE_MODEL, providerModel: MINE_MODEL.providerModel, providerParams: { reasoning_effort: effortFor(MINE_MODEL.providerModel, "high") } }
+    : MINE_MODEL;
+  const principal = cleanTask ? MINE_TASK_MODEL : codeKind ? MINE_CODE_MODEL : chatModel;
   const candidates = gameTask
     ? [MINE_FAST_MODEL, MINE_TASK_MODEL]
     : codeKind
@@ -456,9 +466,9 @@ export async function runMineRequest({
   const controlLinks = control ? await openControlLinks({ prompt, signal, onStatus }) : { extraSystem: [], visits: [] };
   const mode = control
     ? !webSearchEnabled() ? "off" : controlLinks.visits.length ? (webSearch ? "force" : "off") : "force"
-    : webSearchMode({ requested: webSearch, prompt, task: cleanTask, history });
+    : webSearchMode({ requested: webSearch || deep, prompt, task: cleanTask, history });
   const empty = { extraSystem: [], sources: [], queries: [], notice: "", opened: [] };
-  let web = mode === "force" ? await prepareWebContext({ prompt, history, signal, deadline, onStatus }) : empty;
+  let web = mode === "force" ? await prepareWebContext({ prompt, history, signal, deadline, onStatus, deep }) : empty;
   let offerTool = mode === "auto" && toolsSupported();
   // Ferramentas da Mine (mine/tools.mjs): dados do aluno (quando o navegador
   // mandou o retrato dele) e contas/dados exatos. Ate 3 rodadas por pedido.
@@ -513,6 +523,7 @@ export async function runMineRequest({
     ...(imageStyle ? [buildImageStyleInstruction(imageStyle)] : []),
     // Tutor e sugestoes sao do chat livre: tarefas tem formato proprio.
     ...(cleanTask ? [] : tutor ? [buildTutorInstruction()] : []),
+    ...(deep ? [buildDeepResearchInstruction()] : []),
     ...(control ? [CONTROL_INSTRUCTION, ...controlLinks.extraSystem] : []),
     ...(cleanTask ? [] : [buildSuggestionsInstruction({ tutor: Boolean(tutor) })]),
     ...(extraTools.length || (!cleanTask && !codeKind && !control) ? [buildToolsInstruction({ ferramentas: extraTools.length > 0, aluno: Boolean(alunoData) && extraTools.length > 0 })] : []),

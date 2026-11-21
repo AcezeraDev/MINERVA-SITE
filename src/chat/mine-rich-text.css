@@ -879,3 +879,66 @@
 @media (prefers-reduced-motion: reduce) {
   .mrt-gloss__tip { transition: none; }
 }
+
+/* Selos de metadado ({{18 de novembro}} {{Fonte: Inep}}) logo abaixo de um título. */
+.mrt-selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-width: var(--mrt-measure);
+}
+.mrt > .mrt-h2 + .mrt-selos,
+.mrt > .mrt-h3 + .mrt-selos {
+  margin-top: 0.4em;
+}
+.mrt-selo {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22em 0.7em;
+  border-radius: 999px;
+  background: rgb(var(--mint) / 0.14);
+  color: rgb(var(--theme-text) / 0.86);
+  font-size: 0.78em;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.mrt-selo.is-fonte {
+  background: transparent;
+  padding-inline: 0.1em;
+  color: rgb(var(--theme-text) / 0.6);
+  font-weight: 600;
+}
+
+/* Bloco de estudo chegando (o JSON ainda não fechou). */
+.mrt-chegando {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px dashed rgb(var(--theme-text) / 0.18);
+  border-radius: 0.8rem;
+  color: rgb(var(--theme-text) / 0.66);
+  font-size: 0.9em;
+}
+.mrt-chegando__ponto {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: rgb(var(--mint));
+  animation: mrt-pulso 1s ease-in-out infinite alternate;
+}
+@keyframes mrt-pulso {
+  from {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mrt-chegando__ponto {
+    animation: none;
+  }
+}

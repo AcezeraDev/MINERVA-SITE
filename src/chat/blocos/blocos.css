@@ -582,3 +582,90 @@
     animation: none;
   }
 }
+
+/* ── quiz completo (21/nov/2026): dica, porquê por alternativa, revisão ── */
+.mbk-quiz__topo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.mbk-quiz__dica-btn.is-on {
+  color: #f2c94c;
+  background: rgba(242, 201, 76, 0.14);
+}
+.mbk-quiz__dica {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.7rem;
+  background: rgba(242, 201, 76, 0.12);
+  line-height: 1.5;
+  animation: mbk-surge 280ms var(--mbk-ease) both;
+}
+.mbk-quiz__dica svg {
+  flex: none;
+  margin-top: 0.2rem;
+  color: #d9a91a;
+}
+.mbk-quiz__op {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.mbk-quiz__porque {
+  color: var(--mbk-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  animation: mbk-surge 280ms var(--mbk-ease) both;
+}
+.mbk-quiz__opcoes button.is-apagada {
+  opacity: 0.42;
+}
+.mbk-quiz__placar {
+  display: grid;
+  gap: 0.3rem;
+}
+.mbk-quiz__revisao {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mbk-quiz__revisao li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--mbk-line);
+  border-radius: 0.8rem;
+}
+.mbk-quiz__revisao li.is-certa .mbk-letra {
+  background: var(--mbk-good);
+  color: var(--mbk-accent-ink);
+}
+.mbk-quiz__revisao li.is-errada .mbk-letra {
+  background: var(--mbk-bad);
+  color: #fff;
+}
+.mbk-quiz__revisao p {
+  margin: 0;
+  line-height: 1.5;
+}
+.mbk-quiz__rev-pergunta {
+  font-weight: 700;
+}
+.mbk-quiz__rev-sua {
+  color: var(--mbk-bad);
+  font-size: 0.92rem;
+}
+.mbk-quiz__rev-certa {
+  color: var(--mbk-good);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.mbk .katex {
+  font-size: 1.05em;
+}
