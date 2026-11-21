@@ -8917,7 +8917,8 @@ function MineMessageText({ text, streaming = false, attachment }: { text: string
     const glossary = extractGlossary(text);
     return { body: streaming ? glossary.text : markGlossary(glossary.text, glossary.terms), terms: glossary.terms };
   }, [text, streaming]);
-  const segments = useMemo(() => splitMessageMedia(body, { streaming }), [body, streaming]);
+  // Até 3 galerias: uma abrindo a resposta e as outras no meio da explicação.
+  const segments = useMemo(() => splitMessageMedia(body, { streaming, limit: 3 }), [body, streaming]);
   if (!segments.length) return null;
 
   return (

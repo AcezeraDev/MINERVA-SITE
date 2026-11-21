@@ -594,27 +594,76 @@ function lerListaImagens(data: Record<string, unknown>) {
   return itens.length >= 2 ? { itens, galeria: data.formato === "galeria" } : null;
 }
 
-function FotoDoItem({ busca, alt }: { busca: string; alt: string }) {
+/**
+ * Termos a tentar, do mais específico ao mais simples: busca comprida
+ * ("clero francês século XVIII pintura") costuma voltar sem foto.
+ */
+function termosDeBusca(busca: string, titulo: string) {
+  const limpo = (texto: string) => texto.replace(/^\s*\d+\s*[ºo°]?\s*/i, "").replace(/\s+[-–—:]\s+/g, " ").trim();
+  const palavras = limpo(busca).split(/\s+/);
+  const lista = [busca, palavras.slice(0, 3).join(" "), limpo(titulo), limpo(titulo).split(/\s+/).slice(-2).join(" ")];
+  return [...new Set(lista.map((t) => t.trim()).filter((t) => t.length >= 3))];
+}
+
+async function primeiraFoto(termos: string[]) {
+  for (const termo of termos) {
+    try {
+      const img = await firstGalleryImage(termo);
+      if (img) return img;
+    } catch {
+      /* tenta o próximo termo */
+    }
+  }
+  return null;
+}
+
+function FotoDoItem({ busca, titulo, alt, onSemFoto }: { busca: string; titulo: string; alt: string; onSemFoto?: () => void }) {
   const [foto, setFoto] = useState<GalleryImage | null | undefined>(undefined);
   useEffect(() => {
     let ativo = true;
-    if (!busca) {
-      setFoto(null);
-      return undefined;
-    }
-    firstGalleryImage(busca)
-      .then((img) => ativo && setFoto(img))
-      .catch(() => ativo && setFoto(null));
+    primeiraFoto(termosDeBusca(busca, titulo)).then((img) => {
+      if (!ativo) return;
+      setFoto(img);
+      if (!img) onSemFoto?.();
+    });
     return () => {
       ativo = false;
     };
-  }, [busca]);
+  }, [busca, titulo]); // eslint-disable-line react-hooks/exhaustive-deps
   if (foto === undefined) return <span className="mbk-lista__foto is-carregando" aria-hidden />;
-  if (!foto) return <span className="mbk-lista__foto is-vazia" aria-hidden />;
+  if (!foto) return null;
   return (
     <a className="mbk-lista__foto" href={foto.pageUrl || foto.full} target="_blank" rel="noreferrer noopener" title={foto.source ? `Foto: ${foto.source}` : undefined}>
-      <img src={foto.url} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFoto(null)} />
+      <img
+        src={foto.url}
+        alt={alt}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => {
+          setFoto(null);
+          onSemFoto?.();
+        }}
+      />
     </a>
+  );
+}
+
+function ItemDaLista({ item }: { item: { titulo: string; texto: string; imagem: string } }) {
+  const [semFoto, setSemFoto] = useState(false);
+  return (
+    <li className={semFoto ? "is-sem-foto" : ""}>
+      {semFoto ? null : <FotoDoItem busca={item.imagem || item.titulo} titulo={item.titulo} alt={item.titulo} onSemFoto={() => setSemFoto(true)} />}
+      <span>
+        <strong>
+          <MineInline text={item.titulo} />
+        </strong>
+        {item.texto ? (
+          <span className="mbk-lista__texto">
+            <MineInline text={item.texto} />
+          </span>
+        ) : null}
+      </span>
+    </li>
   );
 }
 
@@ -624,7 +673,7 @@ function ListaImagens({ itens, galeria }: NonNullable<ReturnType<typeof lerLista
       <section className="mbk-galeria" style={{ ["--cols" as string]: String(Math.min(3, itens.length)) }}>
         {itens.slice(0, 3).map((item, i) => (
           <figure key={i}>
-            <FotoDoItem busca={item.imagem || item.titulo} alt={item.titulo} />
+            <FotoDoItem busca={item.imagem || item.titulo} titulo={item.titulo} alt={item.titulo} />
             <figcaption>
               <MineInline text={item.titulo} />
             </figcaption>
@@ -636,19 +685,7 @@ function ListaImagens({ itens, galeria }: NonNullable<ReturnType<typeof lerLista
   return (
     <ul className="mbk-lista">
       {itens.map((item, i) => (
-        <li key={i}>
-          <FotoDoItem busca={item.imagem || item.titulo} alt={item.titulo} />
-          <span>
-            <strong>
-              <MineInline text={item.titulo} />
-            </strong>
-            {item.texto ? (
-              <span className="mbk-lista__texto">
-                <MineInline text={item.texto} />
-              </span>
-            ) : null}
-          </span>
-        </li>
+        <ItemDaLista key={i} item={item} />
       ))}
     </ul>
   );

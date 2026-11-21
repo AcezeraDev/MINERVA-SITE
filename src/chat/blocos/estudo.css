@@ -554,3 +554,6 @@
 .mbk-numeros__item {
   align-content: start;
 }
+.mbk-lista li.is-sem-foto {
+  grid-template-columns: minmax(0, 1fr);
+}
