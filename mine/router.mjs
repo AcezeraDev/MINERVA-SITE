@@ -432,7 +432,9 @@ export async function runMineRequest({
     ? [MINE_FAST_MODEL, MINE_TASK_MODEL]
     : codeKind
       ? [MINE_CODE_MODEL, MINE_MODEL, MINE_FAST_MODEL]
-      : [principal, MINE_FAST_MODEL];
+      : cleanTask
+        ? [principal, MINE_FAST_MODEL]
+        : [principal, MINE_TASK_MODEL, MINE_FAST_MODEL];
   const seen = new Set();
   const chain = candidates.filter((model) => {
     const key = `${model.provider}:${model.providerModel}:${model.providerParams?.reasoning_effort || ""}`;

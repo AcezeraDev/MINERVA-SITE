@@ -28,18 +28,19 @@ const CAPABILITIES = { text: true, image: true, video: false, audio: false, pdf:
 /**
  * Modelo principal: responde o chat.
  *
- * Nov/2026: trocou do openai/gpt-6-luna para o Claude Haiku 5.5. Mesmo preco
- * na NanoGPT (US$ 0,10/0,50 por milhao), le imagem e PDF, chama ferramentas, e
- * escreve melhor os blocos visuais do chat (grafico, SVG, tabela, pagina).
- * Acima de 100 mil tokens de contexto o preco sobe 5x: o historico ja e cortado
- * bem antes disso (messages.mjs).
+ * 21/nov/2026: trocou do Claude Haiku 5.5 para o GPT-6.1 Terra (escolha do
+ * dono), o meio da familia GPT-6: escreve e explica melhor, le imagem, chama
+ * ferramentas e aceita esforco de none a max. Na NanoGPT custa US$ 1/5 por
+ * milhao (10x o Haiku); acima de 272 mil tokens de contexto fica mais caro, e
+ * o historico ja e cortado bem antes disso (messages.mjs). O Haiku continua
+ * nas tarefas de formato rigido e como primeira reserva do chat.
  */
 export const MINE_MODEL = {
   alias: "mine",
   displayName: "Mine",
   provider: "nanogpt",
   get providerModel() {
-    return envModel("NANOGPT_MODEL", "anthropic/claude-haiku-5.5");
+    return envModel("NANOGPT_MODEL", "openai/gpt-6.1-terra");
   },
   get providerParams() {
     return { reasoning_effort: effortFor(this.providerModel, envEffort("MINE_REASONING_EFFORT", "medium")) };
@@ -71,17 +72,18 @@ export const MINE_CODE_MODEL = {
 };
 
 /**
- * Mesmo modelo principal com raciocinio curto, para simulado, mapa mental,
- * flashcards e plano. Essas tarefas tem formato rigido e precisam caber no
- * corte de 60 s da Vercel; raciocinio longo so as deixava lentas.
+ * Tarefas de formato rigido (simulado, mapa mental, flashcards, plano, titulo)
+ * com raciocinio curto: precisam caber no corte de 60 s da Vercel. Ficam no
+ * Claude Haiku 5.5 (US$ 0,10/0,50), que ja dava 8/8 cartoes validos; o chat
+ * tambem cai nele se o principal falhar.
  */
 export const MINE_TASK_MODEL = {
   ...MINE_MODEL,
   get providerModel() {
-    return MINE_MODEL.providerModel;
+    return envModel("NANOGPT_TASK_MODEL", "anthropic/claude-haiku-5.5");
   },
   get providerParams() {
-    return { reasoning_effort: effortFor(MINE_MODEL.providerModel, envEffort("MINE_TASK_REASONING_EFFORT", "low")) };
+    return { reasoning_effort: effortFor(this.providerModel, envEffort("MINE_TASK_REASONING_EFFORT", "low")) };
   },
 };
 
