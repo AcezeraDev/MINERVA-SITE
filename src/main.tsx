@@ -8917,6 +8917,8 @@ function MineMessageText({ text, streaming = false, attachment }: { text: string
   }, [text, streaming]);
   // Até 3 galerias: uma abrindo a resposta e as outras no meio da explicação.
   const segments = useMemo(() => splitMessageMedia(body, { streaming, limit: 3 }), [body, streaming]);
+  // Mais de ~350 letras de texto = explicação (não um pedido de fotos).
+  const explicacao = segments.reduce((total, segment) => total + (segment.type === "text" ? segment.text.length : 0), 0) > 350;
   if (!segments.length) return null;
 
   return (
@@ -8939,8 +8941,9 @@ function MineMessageText({ text, streaming = false, attachment }: { text: string
               query={segment.query}
               caption={segment.caption}
               style={segment.style}
-              // No meio da explicação (depois de texto): uma foto grande, como no ChatGPT.
-              destaque={index > 0 && !segment.style}
+              // Resposta com explicação: cada foto é uma só e grande, como no ChatGPT.
+              // A tira de 3 miniaturas fica para quando a pessoa pediu fotos.
+              destaque={!segment.style && (index > 0 || explicacao)}
             />
           ) : (
             <MineRichText key={`text-${index}`} text={segment.text} streaming={streaming} />
