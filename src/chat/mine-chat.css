@@ -542,3 +542,110 @@
     opacity: 0.55;
   }
 }
+
+/* -------------------------------------- barra de conversas compacta (21/nov/2026)
+   Como a do ChatGPT: uma linha por conversa, sem ícone, agrupada por data; os
+   botões de fixar e apagar só aparecem ao passar o mouse, por cima do título. */
+.mine-threads {
+  gap: 0.9rem;
+}
+.mine-thread-group {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mine-thread-group ul {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mine-thread-group__title {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0 0.2rem;
+  padding: 0 0.55rem;
+  color: rgb(var(--theme-text) / 0.38);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.mine-thread,
+.mine-thread-row .mine-thread {
+  gap: 0.5rem;
+  min-height: 2.05rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.55rem;
+}
+.mine-thread__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.mine-thread.is-active .mine-thread__title {
+  font-weight: 800;
+}
+.mine-thread.is-active::before {
+  inset: 0.45rem auto 0.45rem 0;
+}
+/* Ferramentas por cima do fim do título, com um degradê para o texto sumir. */
+.mine-thread__tools {
+  right: 0.2rem;
+  padding-left: 1.4rem;
+  border-radius: 0 0.55rem 0.55rem 0;
+  background: linear-gradient(to right, transparent, rgb(var(--mine-lista-fundo, var(--paper))) 1.3rem);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.mine-thread-row:hover .mine-thread__tools,
+.mine-thread-row:focus-within .mine-thread__tools,
+.mine-thread-row.is-confirming .mine-thread__tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mine-thread__pin,
+.mine-thread__delete {
+  width: 1.6rem;
+  min-width: 1.6rem;
+  height: 1.6rem;
+  opacity: 1;
+}
+.mine-thread__delete.is-confirming {
+  width: auto;
+}
+.mine-thread-row.is-pinned .mine-thread__pin {
+  color: rgb(var(--mint));
+}
+@media (hover: none) {
+  .mine-thread__tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.mine-thread.is-new {
+  color: rgb(var(--theme-text) / 0.9);
+}
+.mine-chatgpt-sidebar {
+  --mine-lista-fundo: var(--paper);
+}
+.mine-context-drawer {
+  --mine-lista-fundo: var(--sheet);
+}
+.mine-threads {
+  overflow-x: hidden;
+}
+.mine-thread__title {
+  min-width: 0;
+  flex: 1;
+}
+.mine-thread-group,
+.mine-thread-group ul {
+  grid-template-columns: minmax(0, 1fr);
+}
+.mine-thread-row {
+  min-width: 0;
+}

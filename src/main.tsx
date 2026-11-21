@@ -7117,80 +7117,108 @@ function MineThreadList({
     );
   }
 
+  // Agrupada por data, como no ChatGPT: fixadas no topo, depois Hoje, Ontem...
+  const grupos = groupThreadsByDate(threads);
+
+  const linha = (thread: ChatThread) => {
+    const key = thread.id || "__principal__";
+    const active = !activeIsNew && (thread.id || undefined) === (activeId || undefined);
+    const confirming = confirmKey === key;
+    return (
+      <li key={key} className={`mine-thread-row ${thread.pinned ? "is-pinned" : ""} ${confirming ? "is-confirming" : ""}`}>
+        <button
+          type="button"
+          className={`mine-thread ${active ? "is-active" : ""}`}
+          aria-current={active ? "true" : undefined}
+          disabled={disabled && !active}
+          onClick={() => onSelect(thread.id)}
+          title={`${thread.title} · ${activityAge(thread.updatedAt)} · ${thread.count} ${thread.count === 1 ? "mensagem" : "mensagens"}`}
+        >
+          <span className="mine-thread__title">{thread.title}</span>
+        </button>
+        <span className="mine-thread__tools">
+          <button
+            type="button"
+            className={`mine-thread__pin ${thread.pinned ? "is-on" : ""}`}
+            onClick={() => onTogglePin(thread.id)}
+            aria-pressed={thread.pinned}
+            aria-label={thread.pinned ? `Desafixar a conversa "${thread.title}"` : `Fixar a conversa "${thread.title}" no topo`}
+            title={thread.pinned ? "Desafixar" : "Fixar no topo"}
+          >
+            {thread.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            type="button"
+            className={`mine-thread__delete ${confirming ? "is-confirming" : ""}`}
+            disabled={disabled}
+            onClick={() => {
+              if (!confirming) {
+                setConfirmKey(key);
+                return;
+              }
+              setConfirmKey(null);
+              onDelete(thread.id);
+            }}
+            aria-label={confirming ? `Confirmar: apagar a conversa "${thread.title}"` : `Apagar a conversa "${thread.title}"`}
+            title={confirming ? "Clique de novo para apagar" : "Apagar conversa"}
+          >
+            {confirming ? <span>Apagar?</span> : <Trash2 className="h-3.5 w-3.5" />}
+          </button>
+        </span>
+      </li>
+    );
+  };
+
   return (
     <div className="mine-thread-panel">
       {search}
-      <ul className="mine-threads minerva-scroll" aria-label="Conversas">
+      <div className="mine-threads minerva-scroll" aria-label="Conversas">
         {activeIsNew ? (
-          <li>
-            <span className="mine-thread is-active is-new" aria-current="true">
-              <span className="mine-thread__icon">
-                <Plus className="h-3.5 w-3.5" />
-              </span>
-              <span className="mine-thread__text">
+          <ul className="mine-thread-group">
+            <li>
+              <span className="mine-thread is-active is-new" aria-current="true">
+                <Plus className="h-3.5 w-3.5" aria-hidden />
                 <span className="mine-thread__title">Nova conversa</span>
-                <span className="mine-thread__meta">Comece a escrever</span>
-              </span>
-            </span>
-          </li>
-        ) : null}
-        {threads.map((thread) => {
-          const key = thread.id || "__principal__";
-          const active = !activeIsNew && (thread.id || undefined) === (activeId || undefined);
-          const confirming = confirmKey === key;
-          return (
-            <li key={key} className={`mine-thread-row ${thread.pinned ? "is-pinned" : ""}`}>
-              <button
-                type="button"
-                className={`mine-thread ${active ? "is-active" : ""}`}
-                aria-current={active ? "true" : undefined}
-                disabled={disabled && !active}
-                onClick={() => onSelect(thread.id)}
-              >
-                <span className="mine-thread__icon">{thread.pinned ? <Pin className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}</span>
-                <span className="mine-thread__text">
-                  <span className="mine-thread__title">{thread.title}</span>
-                  <span className="mine-thread__meta">
-                    {thread.pinned ? "Fixada · " : ""}
-                    {activityAge(thread.updatedAt)} · {thread.count} {thread.count === 1 ? "mensagem" : "mensagens"}
-                  </span>
-                </span>
-              </button>
-              <span className="mine-thread__tools">
-                <button
-                  type="button"
-                  className={`mine-thread__pin ${thread.pinned ? "is-on" : ""}`}
-                  onClick={() => onTogglePin(thread.id)}
-                  aria-pressed={thread.pinned}
-                  aria-label={thread.pinned ? `Desafixar a conversa "${thread.title}"` : `Fixar a conversa "${thread.title}" no topo`}
-                  title={thread.pinned ? "Desafixar" : "Fixar no topo"}
-                >
-                  {thread.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-                </button>
-                <button
-                  type="button"
-                  className={`mine-thread__delete ${confirming ? "is-confirming" : ""}`}
-                  disabled={disabled}
-                  onClick={() => {
-                    if (!confirming) {
-                      setConfirmKey(key);
-                      return;
-                    }
-                    setConfirmKey(null);
-                    onDelete(thread.id);
-                  }}
-                  aria-label={confirming ? `Confirmar: apagar a conversa "${thread.title}"` : `Apagar a conversa "${thread.title}"`}
-                  title={confirming ? "Clique de novo para apagar" : "Apagar conversa"}
-                >
-                  {confirming ? <span>Apagar?</span> : <Trash2 className="h-3.5 w-3.5" />}
-                </button>
               </span>
             </li>
-          );
-        })}
-      </ul>
+          </ul>
+        ) : null}
+        {grupos.map((grupo) => (
+          <section key={grupo.rotulo} className="mine-thread-group" aria-label={grupo.rotulo}>
+            <h4 className="mine-thread-group__title">
+              {grupo.rotulo === "Fixadas" ? <Pin className="h-3 w-3" aria-hidden /> : null}
+              {grupo.rotulo}
+            </h4>
+            <ul>{grupo.itens.map(linha)}</ul>
+          </section>
+        ))}
+      </div>
     </div>
   );
+}
+
+/** Fixadas, Hoje, Ontem, Últimos 7 dias, Últimos 30 dias e Mais antigas. */
+function groupThreadsByDate(threads: ChatThread[]) {
+  const inicioDeHoje = new Date();
+  inicioDeHoje.setHours(0, 0, 0, 0);
+  const hoje = inicioDeHoje.getTime();
+  const dia = 86_400_000;
+  const faixas: { rotulo: string; desde: number }[] = [
+    { rotulo: "Hoje", desde: hoje },
+    { rotulo: "Ontem", desde: hoje - dia },
+    { rotulo: "Últimos 7 dias", desde: hoje - 7 * dia },
+    { rotulo: "Últimos 30 dias", desde: hoje - 30 * dia },
+    { rotulo: "Mais antigas", desde: -Infinity },
+  ];
+  const grupos: { rotulo: string; itens: ChatThread[] }[] = [];
+  const fixadas = threads.filter((thread) => thread.pinned);
+  if (fixadas.length) grupos.push({ rotulo: "Fixadas", itens: fixadas });
+  for (const faixa of faixas) {
+    const anteriores = faixas.slice(0, faixas.indexOf(faixa));
+    const itens = threads.filter((thread) => !thread.pinned && thread.updatedAt >= faixa.desde && anteriores.every((outra) => thread.updatedAt < outra.desde));
+    if (itens.length) grupos.push({ rotulo: faixa.rotulo, itens });
+  }
+  return grupos;
 }
 
 /**
@@ -7881,7 +7909,7 @@ function MineView({
   }
   return (
     <section
-      className={`mine-chat-shell mine-chatgpt-shell relative grid h-full min-h-0 grid-rows-1 overflow-hidden bg-[#111310] lg:grid-cols-[260px_minmax(0,1fr)] ${monitorOpen ? "has-monitor" : ""}`}
+      className={`mine-chat-shell mine-chatgpt-shell relative grid h-full min-h-0 grid-rows-1 overflow-hidden bg-[#111310] lg:grid-cols-[244px_minmax(0,1fr)] ${monitorOpen ? "has-monitor" : ""}`}
       // Arrastar arquivo para qualquer ponto do chat anexa, como nos chats grandes.
       onDragEnter={(event) => {
         if (loading || !Array.from(event.dataTransfer.types).includes("Files")) return;
@@ -7913,8 +7941,8 @@ function MineView({
       ) : null}
       <aside className="mine-context-sidebar mine-chatgpt-sidebar relative hidden min-h-0 flex-col overflow-hidden border-r border-white/[0.07] bg-[#090b0a] px-3 py-3 lg:flex">
         <span aria-hidden className="pointer-events-none absolute -left-20 top-0 h-56 w-56 rounded-full bg-mint/[0.075] blur-[80px]" />
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col items-stretch">
-          <button type="button" onClick={goHome} className="group mb-3 flex items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/[0.045]" aria-label="Voltar ao início da Minerva">
+        <div className="relative flex min-h-0 min-w-0 shrink-0 flex-col items-stretch">
+          <button type="button" onClick={goHome} className="group mb-2 flex items-center gap-3 rounded-xl px-2 py-1.5 text-left transition hover:bg-white/[0.045]" aria-label="Voltar ao início da Minerva">
             <MineAvatar size="sm" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-black text-white/90">Mine</p>
@@ -7929,7 +7957,7 @@ function MineView({
             disabled={!messages.length || loading}
             aria-label="Iniciar nova conversa"
             title={messages.length ? "Nova conversa (a atual fica guardada)" : "Esta conversa ainda está vazia"}
-            className="mb-5 flex min-h-11 w-full shrink-0 items-center justify-start gap-2.5 rounded-xl border border-white/[0.09] bg-white/[0.045] px-3.5 py-2.5 text-sm font-black text-white/84 transition-[border-color,background-color,color,transform] duration-control hover:border-white/[0.16] hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-35"
+            className="mb-4 flex min-h-9 w-full shrink-0 items-center justify-start gap-2.5 rounded-xl border border-white/[0.09] bg-white/[0.045] px-3 py-2 text-[13px] font-black text-white/84 transition-[border-color,background-color,color,transform] duration-control hover:border-white/[0.16] hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-35"
           >
             <Plus className="h-[18px] w-[18px]" />
             <span>Nova conversa</span>
@@ -7939,21 +7967,20 @@ function MineView({
             <p className="text-[10px] font-black uppercase tracking-[.16em] text-white/34">Matérias</p>
             <span className="text-[10px] font-bold tabular text-white/25">{data.subjects.length + 1}</span>
           </div>
-          <div className="minerva-scroll flex min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto pb-1 pr-1">
+          <div className="minerva-scroll flex max-h-[26vh] min-h-0 min-w-0 flex-col gap-0.5 overflow-x-hidden overflow-y-auto pb-1 pr-1">
             <button
               type="button"
               onClick={() => setSelectedSubjectId(undefined)}
               aria-pressed={!selectedSubjectId}
-              className={`group relative flex w-full shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-bold transition-colors duration-control ${
+              className={`group relative flex w-full shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-bold transition-colors duration-control ${
                 !selectedSubjectId ? "bg-white/[0.085] text-white" : "text-white/64 hover:bg-white/[0.055] hover:text-white"
               }`}
             >
-              <span className={`relative grid h-7 w-7 shrink-0 place-items-center rounded-lg ${!selectedSubjectId ? "bg-mint/15 text-mint" : "bg-white/[0.05] text-white/46"}`}>
+              <span className={`relative grid h-6 w-6 shrink-0 place-items-center rounded-md ${!selectedSubjectId ? "bg-mint/15 text-mint" : "bg-white/[0.05] text-white/46"}`}>
                 <MessageCircle className="h-3.5 w-3.5" />
               </span>
               <span className="relative min-w-0 flex-1">
                 <span className="block truncate">Estudos gerais</span>
-                <span className="block truncate text-[10px] font-bold text-white/28">Conversa sem matéria</span>
               </span>
             </button>
             {data.subjects.map((subject) => {
@@ -7965,16 +7992,16 @@ function MineView({
                   key={subject.id}
                   onClick={() => setSelectedSubjectId(subject.id)}
                   aria-pressed={active}
-                  className={`group relative flex w-full shrink-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] font-bold transition-colors duration-control ${
+                  title={`${subject.name} · ${materialCount} ${materialCount === 1 ? "conteúdo" : "conteúdos"} no contexto`}
+                  className={`group relative flex w-full shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-bold transition-colors duration-control ${
                     active ? "bg-white/[0.085] text-white" : "text-white/64 hover:bg-white/[0.055] hover:text-white"
                   }`}
                 >
-                  <span className={`relative grid h-7 w-7 shrink-0 place-items-center rounded-lg ${active ? "bg-mint/15" : "bg-white/[0.05]"}`}>
+                  <span className={`relative grid h-6 w-6 shrink-0 place-items-center rounded-md ${active ? "bg-mint/15" : "bg-white/[0.05]"}`}>
                     <span className="h-2 w-2 rounded-full" style={{ background: subject.color, boxShadow: `0 0 10px ${subject.color}` }} />
                   </span>
                   <span className="relative min-w-0 flex-1">
                     <span className="block truncate">{subject.name}</span>
-                    <span className="block truncate text-[10px] font-bold text-white/28">{materialCount} {materialCount === 1 ? "conteúdo" : "conteúdos"} no contexto</span>
                   </span>
                 </button>
               );
@@ -7982,7 +8009,7 @@ function MineView({
           </div>
         </div>
 
-        <div className="relative mt-3 flex max-h-[42%] min-h-0 flex-col border-t border-white/[0.07] pt-3">
+        <div className="relative mt-3 flex min-h-0 flex-1 flex-col border-t border-white/[0.07] pt-3">
           <div className="mb-2 flex items-center justify-between px-1">
             <p className="truncate text-[10px] font-black uppercase tracking-[.16em] text-white/34">
               Conversas{selectedSubject ? ` de ${selectedSubject.name}` : " gerais"}
