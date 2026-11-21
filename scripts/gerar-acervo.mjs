@@ -124,6 +124,149 @@ for (const linha of linhas.slice(1)) {
   livros.push({ i: id, t, a, l: idioma, g: generos(estantes, linha[col.Subjects] || "") });
 }
 
+/*
+ * Projeto Gutenberg Austrália (opcional): autores mortos até 1954, em domínio
+ * público no Brasil (70 anos após a morte) e na Austrália, como George Orwell
+ * ("1984"), F. Scott Fitzgerald e Virginia Woolf. Escolha do dono do site em
+ * 21/nov/2026, sabendo que parte dessas obras ainda é protegida nos EUA.
+ *   node scripts/gerar-acervo.mjs pg_catalog.csv --au gutindex_aus.txt --au-categorias pasta/
+ * A pasta tem as páginas de categoria do site (crime-mystery.html etc.),
+ * usadas só para dar gênero aos livros.
+ */
+const argAu = process.argv.indexOf("--au");
+const argCategorias = process.argv.indexOf("--au-categorias");
+let australianos = 0;
+if (argAu > 0) {
+  const indice = readFileSync(resolve(process.argv[argAu + 1]), "utf8");
+  const generoPorId = new Map();
+  if (argCategorias > 0) {
+    const pasta = resolve(process.argv[argCategorias + 1]);
+    const categorias = {
+      "sfproject.html": "Fantasia e ficção científica",
+      "crime-mystery.html": "Mistério",
+      "drama.html": "Teatro",
+      "westerns.html": "Aventura",
+      "biography.html": "História e biografia",
+      "explorers.html": "História e biografia",
+      "aust-history.html": "História e biografia",
+      "voyagesandtravels.html": "Viagens",
+    };
+    for (const [arquivo, genero] of Object.entries(categorias)) {
+      let html = "";
+      try {
+        html = readFileSync(resolve(pasta, arquivo), "utf8");
+      } catch {
+        continue;
+      }
+      for (const achado of html.matchAll(/ebooks\d{2}\/(\d{7})/g)) {
+        const lista = generoPorId.get(achado[1]) || [];
+        if (!lista.includes(genero)) generoPorId.set(achado[1], [...lista, genero]);
+      }
+    }
+  }
+  const jaTem = new Set(livros.filter((livro) => livro.l === "en").map((livro) => `${livro.t}|${livro.a}`.toLowerCase().replace(/[^a-z0-9|]+/g, "")));
+  // "Aug 2001 Nineteen eighty-four, by George Orwell     [010002xx.xxx] 0002A"
+  for (const linha of indice.split(/\r?\n/)) {
+    const achado = linha.match(/^[A-Z][a-z]{2}\s+\d{4}\s+(.+?)\s+\[(\d{6})xx\.xxx\]/);
+    if (!achado) continue;
+    const corpo = achado[1].trim();
+    const id = `${achado[2]}1`;
+    const virgula = corpo.lastIndexOf(", ");
+    if (virgula < 1) continue;
+    const t = titulo(corpo.slice(0, virgula));
+    const a = corpo.slice(virgula + 2).replace(/^by\s+/i, "").replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!t || /abridged|index|catalogue/i.test(t)) continue;
+    const chave = `${t}|${a}`.toLowerCase().replace(/[^a-z0-9|]+/g, "");
+    if (jaTem.has(chave)) continue;
+    jaTem.add(chave);
+    let g = generoPorId.get(id) || [];
+    if (!g.length) g = /poems|verse|ballads|poetry/i.test(t) ? ["Poesia"] : /stories|tales/i.test(t) ? ["Contos"] : /essays|letters/i.test(t) ? ["Filosofia"] : ["Romance"];
+    // id numérico deslocado em 10 milhões: o cliente sabe que é da Austrália.
+    livros.push({ i: 10_000_000 + Number(id), t, a, l: "en", g, f: "au" });
+    australianos += 1;
+  }
+}
+
+/*
+ * Nomes em português dos clássicos estrangeiros mais lidos na escola: entram
+ * no campo `s` (busca e a Mine sugerindo "A Revolução dos Bichos" acham o
+ * "Animal Farm"). Chave: título em inglês/espanhol sem acento e minúsculo.
+ */
+const NOMES_PT = {
+  "nineteen eighty-four": "1984 mil novecentos e oitenta e quatro",
+  "animal farm": "a revolução dos bichos a fazenda dos animais",
+  "the great gatsby": "o grande gatsby",
+  "tender is the night": "suave é a noite",
+  "mrs dalloway": "mrs dalloway senhora dalloway",
+  "to the lighthouse": "ao farol",
+  "a room of one's own": "um teto todo seu",
+  "pride and prejudice": "orgulho e preconceito",
+  "sense and sensibility": "razão e sensibilidade",
+  "emma": "emma",
+  "frankenstein; or, the modern prometheus": "frankenstein o prometeu moderno",
+  "dracula": "drácula",
+  "alice's adventures in wonderland": "alice no país das maravilhas",
+  "through the looking-glass": "alice através do espelho",
+  "the time machine": "a máquina do tempo",
+  "the war of the worlds": "a guerra dos mundos",
+  "the invisible man": "o homem invisível",
+  "the island of doctor moreau": "a ilha do doutor moreau",
+  "treasure island": "a ilha do tesouro",
+  "the strange case of dr. jekyll and mr. hyde": "o médico e o monstro",
+  "robinson crusoe": "robinson crusoé",
+  "gulliver's travels": "as viagens de gulliver",
+  "the picture of dorian gray": "o retrato de dorian gray",
+  "the importance of being earnest": "a importância de ser prudente",
+  "the adventures of sherlock holmes": "as aventuras de sherlock holmes",
+  "the hound of the baskervilles": "o cão dos baskerville",
+  "a study in scarlet": "um estudo em vermelho",
+  "moby dick; or, the whale": "moby dick a baleia",
+  "the adventures of tom sawyer": "as aventuras de tom sawyer",
+  "adventures of huckleberry finn": "as aventuras de huckleberry finn",
+  "little women": "mulherzinhas adoráveis mulheres",
+  "the jungle book": "o livro da selva",
+  "peter pan": "peter pan",
+  "the secret garden": "o jardim secreto",
+  "jane eyre: an autobiography": "jane eyre",
+  "wuthering heights": "o morro dos ventos uivantes",
+  "great expectations": "grandes esperanças",
+  "a christmas carol": "um conto de natal",
+  "oliver twist": "oliver twist",
+  "a tale of two cities": "um conto de duas cidades",
+  "the call of the wild": "o chamado da floresta",
+  "white fang": "caninos brancos",
+  "heart of darkness": "o coração das trevas",
+  "the metamorphosis": "a metamorfose",
+  "metamorphosis": "a metamorfose",
+  "the trial": "o processo",
+  "romeo and juliet": "romeu e julieta",
+  "hamlet, prince of denmark": "hamlet",
+  "macbeth": "macbeth",
+  "the odyssey": "a odisseia",
+  "the iliad": "a ilíada",
+  "the art of war": "a arte da guerra",
+  "the prince": "o príncipe maquiavel",
+  "twenty thousand leagues under the seas: an underwater tour of the world": "vinte mil léguas submarinas",
+  "around the world in eighty days": "a volta ao mundo em oitenta dias 80 dias",
+  "a journey to the centre of the earth": "viagem ao centro da terra",
+  "from the earth to the moon, direct in ninety-seven hours and twenty minutes: and a trip round it": "da terra à lua",
+  "don quijote": "dom quixote",
+  "the count of monte cristo": "o conde de monte cristo",
+  "the three musketeers": "os três mosqueteiros",
+  "les misérables": "os miseráveis",
+  "crime and punishment": "crime e castigo",
+  "the brothers karamazov": "os irmãos karamazov",
+  "war and peace": "guerra e paz",
+  "anna karenina": "anna kariênina",
+  "the old man and the sea": "o velho e o mar",
+  "the little prince": "o pequeno príncipe",
+};
+const semAcento = (texto) => texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+for (const livro of livros) {
+  const nome = NOMES_PT[semAcento(livro.t)];
+  if (nome) livro.s = nome;
+}
+
 // Português primeiro, depois espanhol e inglês; dentro de cada um, por título.
 const ordemIdioma = { pt: 0, es: 1, en: 2 };
 livros.sort((x, y) => ordemIdioma[x.l] - ordemIdioma[y.l] || x.t.localeCompare(y.t, "pt"));
@@ -133,6 +276,6 @@ mkdirSync(dirname(saida), { recursive: true });
 writeFileSync(saida, JSON.stringify(livros));
 const porIdioma = livros.reduce((soma, livro) => ({ ...soma, [livro.l]: (soma[livro.l] || 0) + 1 }), {});
 const porGenero = livros.flatMap((livro) => livro.g).reduce((soma, genero) => ({ ...soma, [genero]: (soma[genero] || 0) + 1 }), {});
-console.log(`${livros.length} livros →`, saida);
+console.log(`${livros.length} livros (${australianos} da Austrália) →`, saida);
 console.log(porIdioma);
 console.log(porGenero);

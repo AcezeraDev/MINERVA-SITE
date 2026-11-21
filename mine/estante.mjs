@@ -194,10 +194,81 @@ function semLicenca(texto) {
  * servidor (503), então vai pelo espelho oficial pglaf; tenta UTF-8, depois
  * o arquivo latin-1 e por fim o ASCII. Cache dos últimos 20 livros.
  */
+/* ── Projeto Gutenberg Austrália (ids do catálogo deslocados em 10 milhões) ── */
+
+const ENTIDADES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", mdash: "—", ndash: "–", hellip: "…", eacute: "é", egrave: "è", agrave: "à", aacute: "á", ccedil: "ç", ouml: "ö", uuml: "ü", auml: "ä", pound: "£", shy: "" };
+
+function decodificar(texto) {
+  return texto
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&([a-z]+);/gi, (todo, nome) => ENTIDADES[nome.toLowerCase()] ?? todo);
+}
+
+/** HTML simples do Gutenberg Austrália → texto com parágrafos separados por linha em branco. */
+function htmlParaTexto(html) {
+  const inicio = html.search(/<h1[\s>]/i);
+  let corpo = html.slice(inicio >= 0 ? inicio : 0);
+  const fim = corpo.search(/<\/body>/i);
+  if (fim >= 0) corpo = corpo.slice(0, fim);
+  return decodificar(
+    corpo
+      .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|h[1-6]|div|li|blockquote)>/gi, "\n\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/[ \t]+\n/g, "\n"),
+  )
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\n*Project Gutenberg Australia\s*$/i, "")
+    .trim();
+}
+
+/** Tira o bloco de licença do começo e o "Project Gutenberg Australia" do fim. */
+function semLicencaAustralia(texto) {
+  let corpo = texto.replace(/\r\n/g, "\n");
+  const contato = corpo.search(/To contact Project Gutenberg of Australia[^\n]*\n/i);
+  if (contato >= 0) corpo = corpo.slice(corpo.indexOf("\n", contato) + 1);
+  return corpo.replace(/\n+\s*Project Gutenberg (of )?Australia\s*$/i, "").trim();
+}
+
+async function textoAustralia(numero) {
+  const codigo = String(numero).padStart(7, "0");
+  const base = `https://gutenberg.net.au/ebooks${codigo.slice(0, 2)}/${codigo}`;
+  for (const [url, ehHtml] of [
+    [`${base}.txt`, false],
+    [`${base}h.html`, true],
+  ]) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch(url, { headers: { "user-agent": "Minerva-Escola/1.0" }, signal: controller.signal });
+      if (!response.ok) continue;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      // Arquivos antigos vêm em windows-1252: se o UTF-8 der caractere inválido, relê.
+      let bruto = new TextDecoder("utf-8").decode(bytes);
+      if (bruto.includes("�")) bruto = new TextDecoder("windows-1252").decode(bytes);
+      const texto = (ehHtml ? htmlParaTexto(bruto) : semLicencaAustralia(bruto)).slice(0, 3_000_000);
+      if (texto.length >= 200) return texto;
+    } catch {
+      // tenta o HTML
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error("texto indisponível");
+}
+
 export async function textoDoLivro(idBruto) {
   const id = Number(idBruto);
-  if (!Number.isInteger(id) || id < 1 || id > 200000) throw new Error("livro inválido");
+  if (!Number.isInteger(id) || id < 1 || (id > 200000 && (id < 10_000_000 || id > 19_999_999))) throw new Error("livro inválido");
   if (textos.has(id)) return textos.get(id);
+  if (id >= 10_000_000) {
+    const texto = await textoAustralia(id - 10_000_000);
+    if (textos.size >= 20) textos.delete(textos.keys().next().value);
+    textos.set(id, texto);
+    return texto;
+  }
   const pasta = pastaGutenberg(id);
   const arquivos = [
     { nome: `${id}-0.txt`, encoding: "utf-8" },

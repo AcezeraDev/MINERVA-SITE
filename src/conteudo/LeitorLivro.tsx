@@ -22,7 +22,7 @@ import { createPortal } from "react-dom";
 import { askMineTask } from "../mineTask";
 import { IDIOMAS, paragrafos, textoDoAcervo } from "./acervo";
 
-export type LivroParaLer = { id: number; titulo: string; autor: string; /** pt, en, es… (sem idioma: não oferece tradução) */ idioma?: string };
+export type LivroParaLer = { id: number; titulo: string; autor: string; /** pt, en, es… (sem idioma: não oferece tradução) */ idioma?: string; /** "Projeto Gutenberg" ou "Projeto Gutenberg Austrália" */ fonte?: string };
 
 const chave = (id: number) => `minerva-leitura-${id}`;
 const PREFERENCIAS = "minerva-leitor-preferencias";
@@ -354,7 +354,8 @@ export function LeitorLivro({
       <header className="leitor-mine-topo">
         <div className="min-w-0 flex-1">
           <p className="leitor-mine-fonte">
-            domínio público · Projeto Gutenberg{nomeIdioma ? ` · ${nomeIdioma}` : ""}
+            domínio público · {livro.fonte || "Projeto Gutenberg"}
+            {nomeIdioma ? ` · ${nomeIdioma}` : ""}
           </p>
           <h2>{livro.titulo}</h2>
           {livro.autor ? <p className="leitor-mine-autor">{livro.autor}</p> : null}

@@ -17,7 +17,16 @@ export type LivroAcervo = {
   l: string;
   /** gêneros em português (ver GENEROS) */
   g: string[];
+  /** "au" = Projeto Gutenberg Austrália (id deslocado em 10 milhões, sem capa) */
+  f?: "au";
+  /** nome em português de um clássico estrangeiro ("a revolução dos bichos") */
+  s?: string;
 };
+
+/** Nome da fonte para mostrar no leitor. */
+export function fonteAcervo(livro: Pick<LivroAcervo, "f">): string {
+  return livro.f === "au" ? "Projeto Gutenberg Austrália" : "Projeto Gutenberg";
+}
 
 export const GENEROS = [
   "Romance",
@@ -58,6 +67,8 @@ export function carregarAcervo(): Promise<LivroAcervo[]> {
 
 /** Capa pelo espelho oficial: o www.gutenberg.org recusa muitos acessos (503). */
 export function capaAcervo(id: number): string {
+  // O Gutenberg Austrália não tem capas: fica a capa desenhada.
+  if (id >= 10_000_000) return "";
   return `https://gutenberg.pglaf.org/cache/epub/${id}/pg${id}.cover.medium.jpg`;
 }
 
@@ -83,7 +94,7 @@ export function acharNoAcervo(lista: LivroAcervo[], titulo: string, autor: strin
   const sobrenome = palavras(autor).slice(-1)[0];
   let melhor: { livro: LivroAcervo; nota: number } | null = null;
   for (const livro of lista) {
-    const tituloLivro = new Set(palavras(livro.t));
+    const tituloLivro = new Set(palavras(`${livro.t} ${livro.s || ""}`));
     const acertos = alvo.filter((word) => tituloLivro.has(word)).length / alvo.length;
     if (acertos < 0.7) continue;
     if (sobrenome && !dobrar(livro.a).includes(sobrenome)) continue;

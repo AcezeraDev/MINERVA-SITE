@@ -19,7 +19,7 @@ import "../caderno/caderno-livros.css";
 import "../caderno/caderno-materia-extras.css";
 import { mineHeaders } from "../mineAuth";
 import { askMineTask } from "../mineTask";
-import { GENEROS, IDIOMAS, acharNoAcervo, capaAcervo, carregarAcervo, dobrar, type LivroAcervo } from "./acervo";
+import { GENEROS, IDIOMAS, acharNoAcervo, capaAcervo, carregarAcervo, dobrar, fonteAcervo, type LivroAcervo } from "./acervo";
 import { lerJson, listaDe, novoId, semLatex, texto } from "./extrasUtil";
 import { LeitorLivro, type LivroParaLer } from "./LeitorLivro";
 
@@ -67,7 +67,7 @@ const ESTADO_AVISO: Record<"quero" | "lendo" | "lido", string> = {
 const TIPO_LIVRO: Record<LivroItem["tipo"], string> = { didatico: "didático", paradidatico: "paradidático", vestibular: "vestibular", aprofundar: "para aprofundar" };
 
 function leituraDoAcervo(livro: LivroAcervo): Leitura {
-  return { url: "", tipo: "completo", fonte: "Projeto Gutenberg (domínio público)", gutenbergId: livro.i };
+  return { url: "", tipo: "completo", fonte: `${fonteAcervo(livro)} (domínio público)`, gutenbergId: livro.i };
 }
 
 /** Capa e leitura de um livro: primeiro o acervo grátis, depois Google Livros / Internet Archive. */
@@ -195,7 +195,8 @@ export function AbaLivros({
     if (livro.leitura?.gutenbergId) {
       ultimaPagina.current = null;
       const gid = livro.leitura.gutenbergId;
-      setLeitor({ id: gid, titulo: livro.titulo, autor: livro.autor, estanteId: livro.id, idioma: acervo?.find((item) => item.i === gid)?.l });
+      const doAcervo = acervo?.find((item) => item.i === gid);
+      setLeitor({ id: gid, titulo: livro.titulo, autor: livro.autor, estanteId: livro.id, idioma: doAcervo?.l, fonte: doAcervo ? fonteAcervo(doAcervo) : undefined });
     } else if (livro.leitura) abrirEmbed(livro);
   };
 
@@ -275,7 +276,7 @@ export function AbaLivros({
         <Biblioteca acervo={acervo} erro={erroAcervo} naEstante={new Set(itens.map((item) => item.leitura?.gutenbergId).filter(Boolean) as number[])} ler={(livro) => {
             // Se o livro também está na estante, o progresso vai para lá ao fechar.
             ultimaPagina.current = null;
-            setLeitor({ id: livro.i, titulo: livro.t, autor: livro.a, idioma: livro.l, estanteId: itens.find((item) => item.leitura?.gutenbergId === livro.i)?.id });
+            setLeitor({ id: livro.i, titulo: livro.t, autor: livro.a, idioma: livro.l, fonte: fonteAcervo(livro), estanteId: itens.find((item) => item.leitura?.gutenbergId === livro.i)?.id });
           }} porNaEstante={porNaEstante} />
       )}
 
@@ -516,6 +517,10 @@ const DESTAQUES = [
   "antero de quental",
   "gil vicente",
   "padre antonio vieira",
+  "george orwell",
+  "f scott fitzgerald",
+  "virginia woolf",
+  "h g wells",
   "miguel de cervantes",
   "william shakespeare",
   "jane austen",
@@ -558,7 +563,7 @@ function Biblioteca({
       if (idioma && livro.l !== idioma) return false;
       if (genero && !livro.g.includes(genero)) return false;
       if (!termos.length) return true;
-      const alvo = dobrar(`${livro.t} ${livro.a}`);
+      const alvo = dobrar(`${livro.t} ${livro.a} ${livro.s || ""}`);
       return termos.every((termo) => alvo.includes(termo));
     });
     // sort estável: dentro do mesmo autor (ou dos demais) segue a ordem alfabética do catálogo
@@ -584,7 +589,7 @@ function Biblioteca({
   return (
     <>
       <p className="caderno-mx-dica mt-0">
-        Livros em domínio público do Projeto Gutenberg: grátis e legais para ler inteiros, aqui mesmo na Mine. Clássicos como Machado de Assis, Camões, José de Alencar, Eça de Queirós e Aluísio Azevedo.
+        Livros em domínio público no Brasil, do Projeto Gutenberg e do Projeto Gutenberg Austrália: grátis para ler inteiros, aqui mesmo na Mine. Machado de Assis, Camões, José de Alencar, Eça de Queirós e também George Orwell (1984), Fitzgerald e Virginia Woolf. Busque pelo nome em português.
       </p>
       <div className="caderno-lv-busca">
         <label className="caderno-lv-campo">
@@ -664,7 +669,7 @@ function BuscaVazia({ acervo, busca, idioma, genero, verOutrosIdiomas }: { acerv
   const termos = dobrar(busca).split(" ").filter(Boolean);
   const emOutros =
     idioma && termos.length
-      ? acervo.filter((livro) => livro.l !== idioma && (!genero || livro.g.includes(genero)) && termos.every((termo) => dobrar(`${livro.t} ${livro.a}`).includes(termo))).length
+      ? acervo.filter((livro) => livro.l !== idioma && (!genero || livro.g.includes(genero)) && termos.every((termo) => dobrar(`${livro.t} ${livro.a} ${livro.s || ""}`).includes(termo))).length
       : 0;
   const q = encodeURIComponent(busca.trim());
   return (
@@ -712,7 +717,8 @@ function BuscaVazia({ acervo, busca, idioma, genero, verOutrosIdiomas }: { acerv
 
 function CapaAcervo({ livro }: { livro: LivroAcervo }) {
   const [falhou, setFalhou] = useState(false);
-  return !falhou ? <img src={capaAcervo(livro.i)} alt="" loading="lazy" onError={() => setFalhou(true)} /> : <CapaDesenhada titulo={livro.t} />;
+  const capa = capaAcervo(livro.i);
+  return capa && !falhou ? <img src={capa} alt="" loading="lazy" onError={() => setFalhou(true)} /> : <CapaDesenhada titulo={livro.t} />;
 }
 
 /**
@@ -738,7 +744,7 @@ export function BibliotecaGratis({ aoInterpretar }: { aoInterpretar: (trecho: st
 
   return (
     <>
-      <Biblioteca acervo={acervo} erro={erro} ler={(livro) => setLeitor({ id: livro.i, titulo: livro.t, autor: livro.a, idioma: livro.l })} />
+      <Biblioteca acervo={acervo} erro={erro} ler={(livro) => setLeitor({ id: livro.i, titulo: livro.t, autor: livro.a, idioma: livro.l, fonte: fonteAcervo(livro) })} />
       {leitor ? (
         <LeitorLivro
           livro={leitor}
