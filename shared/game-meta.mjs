@@ -180,3 +180,37 @@ export function unlockedGameAchievementIds(sessions = [], value = Date.now()) {
   if (seasonPoints(sessions, value) >= 300) ids.add("liga-prata");
   return ids;
 }
+
+/**
+ * Placar por jogo (nov/2026): a melhor partida de cada jogo, para o ranking
+ * da aba Games. Vale a precisão; empate decide quem acertou mais e depois
+ * quem foi mais rápido. Só números: nenhuma pergunta sai da conta.
+ */
+export const placarGameIds = Object.freeze(["corrida", "memoria", "forca", "caca", "nexo", "sequencia", "daily"]);
+
+export function melhorPorJogo(sessions = []) {
+  const melhor = {};
+  for (const session of Array.isArray(sessions) ? sessions : []) {
+    if (!session || session.kind !== "Games") continue;
+    const id = session.dailyChallenge ? "daily" : String(session.gameId || "");
+    if (!placarGameIds.includes(id)) continue;
+    const t = Number(session.questionsAnswered || 0);
+    const c = Math.min(t, Number(session.correctAnswers || 0));
+    if (!t) continue;
+    const ms = Number(session.durationMs || 0) || 0;
+    const atual = melhor[id];
+    const novo = { c, t, ms, n: (atual?.n || 0) + 1 };
+    if (!atual || compararPartidas(novo, atual) < 0) melhor[id] = novo;
+    else atual.n = novo.n;
+  }
+  return melhor;
+}
+
+/** Negativo quando `a` é melhor que `b`. */
+export function compararPartidas(a, b) {
+  const pa = a.t ? a.c / a.t : 0;
+  const pb = b.t ? b.c / b.t : 0;
+  if (pa !== pb) return pb - pa;
+  if (a.c !== b.c) return b.c - a.c;
+  return (a.ms || Infinity) - (b.ms || Infinity);
+}

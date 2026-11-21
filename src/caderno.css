@@ -361,6 +361,88 @@ body {
 .caderno-tab[data-tone="com"] { --tab: var(--tab-com); }
 .caderno-tab[data-tone="conta"] { --tab: var(--tab-conta); }
 
+/* ── Cinco áreas do menu (nov/2026): cada uma é a cor de uma divisória. ── */
+:root {
+  --hl-sky: 110 190 255;
+  --hl-orange: 245 165 95;
+}
+html.theme-light {
+  --hl-sky: 168 216 255;
+  --hl-orange: 255 205 150;
+}
+.caderno-tab[data-tone="capa"] { --tab: var(--rule); }
+html.theme-light .caderno-tab[data-tone="capa"] { --tab: 255 255 255; }
+.caderno-area[data-area="estudar"], .caderno-tab[data-tone="estudar"] { --tab: var(--hl-mint); }
+.caderno-area[data-area="praticar"], .caderno-tab[data-tone="praticar"] { --tab: var(--hl-lilac); }
+.caderno-area[data-area="jogar"], .caderno-tab[data-tone="jogar"] { --tab: var(--hl-pink); }
+.caderno-area[data-area="organizar"], .caderno-tab[data-tone="organizar"] { --tab: var(--hl-yellow); }
+.caderno-area[data-area="turma"], .caderno-tab[data-tone="turma"] { --tab: var(--hl-sky); }
+.caderno-area[data-area="conta"] { --tab: var(--hl-orange); }
+
+html:not(.theme-light) .caderno-tab[data-tone="capa"] {
+  color: rgb(var(--theme-text));
+}
+
+.caderno-area-head {
+  min-height: 2.9rem;
+  padding: 0.35rem 0.6rem 0.35rem 0.4rem;
+  border-radius: 0.6rem;
+  color: rgb(var(--theme-text));
+  transition: background-color 140ms ease;
+}
+.caderno-area-head:hover {
+  background: rgb(var(--tab) / 0.12);
+}
+.caderno-area-head:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 1px;
+}
+.caderno-area-dot {
+  background: rgb(var(--tab));
+  color: #14161b;
+  box-shadow: inset -3px -3px 0 rgb(0 0 0 / 0.12);
+}
+.caderno-area-here {
+  background: rgb(var(--tab));
+  box-shadow: 0 0 0 3px rgb(var(--tab) / 0.25);
+}
+.caderno-area-chevron {
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+.caderno-area[data-open="true"] .caderno-area-chevron {
+  transform: rotate(90deg);
+}
+.caderno-area-body {
+  margin-left: 0.85rem;
+  padding-left: 0.55rem;
+  border-left: 2px dashed rgb(var(--tab) / 0.45);
+}
+.caderno-area[data-open="true"] .caderno-area-body {
+  animation: caderno-area-in 260ms cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes caderno-area-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .caderno-area[data-open="true"] .caderno-area-body { animation: none; }
+  .caderno-area-chevron { transition: none; }
+}
+.caderno-account-btn[aria-current="page"] {
+  background: rgb(var(--pen) / 0.16);
+  color: rgb(var(--pen));
+}
+html.theme-light .caderno-account-btn {
+  color: rgb(var(--theme-muted));
+}
+html.theme-light .caderno-account-btn:hover {
+  background: rgb(var(--rule) / 0.6);
+  color: rgb(var(--theme-text));
+}
+html.theme-light .caderno-account {
+  border-top-color: rgb(var(--line));
+}
+
 .caderno-tab:hover {
   transform: translateX(0.35rem);
 }

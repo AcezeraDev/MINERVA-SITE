@@ -984,3 +984,203 @@
     transition: none;
   }
 }
+
+/* ───────────── cartão "o plano de hoje" (nov/2026) ─────────────
+   Três post-its em fila: tarefa mais urgente, o que revisar, desafio do dia.
+   O feito fica riscado de caneta, como num caderno de verdade. */
+.he-hoje {
+  margin: 0.4rem 0 1.4rem;
+}
+
+.he-hoje-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.7rem;
+}
+
+.he-hoje-topo h2 {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.45rem;
+  line-height: 1;
+  color: rgb(var(--pen));
+}
+
+.he-hoje-conta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: rgb(var(--theme-muted));
+}
+
+.he-hoje-conta i {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  border: 1.5px solid rgb(var(--line));
+}
+
+.he-hoje-conta i.is-on {
+  background: rgb(var(--hl-mint));
+  border-color: rgb(var(--hl-mint));
+}
+
+.he-hoje-conta b {
+  margin-left: 0.25rem;
+  font-weight: 800;
+}
+
+.he-hoje-lista {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.he-passo {
+  --tom: var(--hl-yellow);
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  height: 100%;
+  min-height: 6.2rem;
+  padding: 0.95rem 0.95rem 0.9rem;
+  border-radius: 0.25rem 0.25rem 0.9rem 0.25rem;
+  background: rgb(var(--tom) / 0.42);
+  color: rgb(var(--theme-text));
+  text-align: left;
+  box-shadow: var(--card-shadow);
+  transform: rotate(var(--giro, -0.6deg));
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1), background-color 140ms ease;
+}
+
+html.theme-light .he-passo {
+  background: rgb(var(--tom) / 0.7);
+}
+
+/* fita adesiva no topo do post-it */
+.he-passo::before {
+  content: "";
+  position: absolute;
+  top: -0.45rem;
+  left: 50%;
+  width: 3.2rem;
+  height: 0.9rem;
+  translate: -50% 0;
+  rotate: -3deg;
+  background: rgb(255 255 255 / 0.38);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
+.he-hoje-lista li:nth-child(2) .he-passo { --giro: 0.7deg; }
+.he-hoje-lista li:nth-child(3) .he-passo { --giro: -0.3deg; }
+
+.he-passo:hover {
+  transform: rotate(0deg) translateY(-3px);
+}
+
+.he-passo:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 3px;
+}
+
+.he-passo.is-rosa { --tom: var(--hl-pink); }
+.he-passo.is-lilas { --tom: var(--hl-lilac); }
+.he-passo.is-menta { --tom: var(--hl-mint); }
+
+.he-passo-num {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.he-passo-texto {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.15rem;
+}
+
+.he-passo-texto small {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+}
+
+.he-passo-texto strong {
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.he-passo-texto > span {
+  font-size: 0.8rem;
+  opacity: 0.72;
+}
+
+.he-passo-seta {
+  align-self: center;
+  flex-shrink: 0;
+  opacity: 0.45;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.he-passo:hover .he-passo-seta {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
+/* feito: risco de caneta por cima do título e o círculo preenchido */
+.he-passo.is-feito {
+  background: rgb(var(--tom) / 0.2);
+}
+
+html.theme-light .he-passo.is-feito {
+  background: rgb(var(--tom) / 0.35);
+}
+
+.he-passo.is-feito .he-passo-num {
+  background: rgb(var(--pen));
+  border-color: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+}
+
+.he-passo.is-feito strong {
+  text-decoration: line-through;
+  text-decoration-color: rgb(var(--pen));
+  text-decoration-thickness: 2px;
+}
+
+@media (max-width: 860px) {
+  .he-hoje-lista {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  .he-passo {
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .he-passo,
+  .he-passo:hover {
+    transform: none;
+    transition: none;
+  }
+}

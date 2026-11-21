@@ -267,6 +267,88 @@ export function AtelieView({ data, user, update }: AtelieProps) {
       .catch(() => undefined);
   }, [panel, hasPhoto, iaQuota]);
 
+  /**
+   * Imagem preto no branco (da IA) vira contorno: tinta onde é escuro,
+   * transparente onde é papel, encaixada na folha sem distorcer.
+   */
+  const imagemParaContorno = useCallback(async (dataUrl: string) => {
+    const img = new Image();
+    img.src = dataUrl;
+    await img.decode();
+    const { w, h } = sheetRef.current;
+    const tmp = document.createElement("canvas");
+    tmp.width = w;
+    tmp.height = h;
+    const t = tmp.getContext("2d", { willReadFrequently: true });
+    const lines = ctx2d(lineRef.current);
+    if (!t || !lines) return false;
+    t.fillStyle = "#ffffff";
+    t.fillRect(0, 0, w, h);
+    const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+    const dw = img.naturalWidth * scale;
+    const dh = img.naturalHeight * scale;
+    t.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    const pixels = t.getImageData(0, 0, w, h);
+    const d = pixels.data;
+    // Só o traço escuro vira tinta. O modelo às vezes devolve áreas em
+    // cinza (sombra que ele não deveria ter feito); cinza claro vira papel
+    // para não ficar por cima da pintura e escurecer a cor escolhida.
+    for (let i = 0; i < d.length; i += 4) {
+      const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const k = Math.min(1, Math.max(0, (165 - l) / 75));
+      d[i + 3] = Math.round(k * k * (3 - 2 * k) * 255);
+      d[i] = 30;
+      d[i + 1] = 28;
+      d[i + 2] = 40;
+    }
+    lines.clearRect(0, 0, w, h);
+    lines.putImageData(pixels, 0, 0);
+    return true;
+  }, []);
+
+  /* ───────────── "Mine, desenha um…": a IA cria a folha de colorir do zero (nov/2026) ───────────── */
+
+  const [pedido, setPedido] = useState("");
+  const [cotaDesenho, setCotaDesenho] = useState<{ used: number; limit: number } | null>(null);
+
+  const pedirDesenho = async (tema: string) => {
+    const assunto = tema.trim().slice(0, 120);
+    const token = readSession().token;
+    if (!assunto || !token || busy) return;
+    setError(null);
+    setBusy(`A Mine está desenhando ${assunto}… (leva uns 20 segundos)`);
+    try {
+      const response = await fetch("/api/mine-imagem", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          formato: "retrato",
+          prompt: `Página de livro de colorir para estudante: ${assunto}. Só contorno preto grosso e limpo sobre fundo totalmente branco, sem sombras, sem cinza, sem cor e sem texto. Áreas grandes e fechadas para pintar com balde de tinta, traço de ilustração didática e simpática, o desenho ocupa a página inteira.`,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { image?: string; error?: string; used?: number; limit?: number };
+      if (typeof payload.used === "number" && typeof payload.limit === "number") setCotaDesenho({ used: payload.used, limit: payload.limit });
+      if (!response.ok || !payload.image) throw new Error(payload.error || "A Mine não conseguiu desenhar agora.");
+      prepare(SHEET_W, SHEET_H);
+      photoSrcRef.current = null;
+      setHasPhoto(false);
+      setGuideOn(false);
+      setPageId(null);
+      setCurrentId(null);
+      setShowLines(true);
+      setSheet({ w: SHEET_W, h: SHEET_H, kind: "mine", title: assunto.charAt(0).toUpperCase() + assunto.slice(1, 40) });
+      if (!(await imagemParaContorno(payload.image))) throw new Error("canvas");
+      setTool("balde");
+      setPedido("");
+      mineSays("Desenhei pra você! Agora é só pintar.", "wow");
+      scheduleDraft();
+    } catch (err) {
+      setError((err as Error)?.message === "canvas" ? "Não consegui montar a folha. Tenta de novo." : (err as Error)?.message || "A Mine não conseguiu desenhar agora.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const caprichar = async () => {
     const src = photoSrcRef.current;
     const token = readSession().token;
@@ -284,39 +366,7 @@ export function AtelieView({ data, user, update }: AtelieProps) {
         body: JSON.stringify({ image: send.toDataURL("image/jpeg", 0.88) }),
       });
       setIaQuota({ used: result.used, limit: result.limit });
-      const img = new Image();
-      img.src = result.image;
-      await img.decode();
-      // A folha volta como imagem preto no branco; vira contorno: tinta onde
-      // é escuro, transparente onde é papel. Encaixada sem distorcer.
-      const { w, h } = sheetRef.current;
-      const tmp = document.createElement("canvas");
-      tmp.width = w;
-      tmp.height = h;
-      const t = tmp.getContext("2d", { willReadFrequently: true });
-      const lines = ctx2d(lineRef.current);
-      if (!t || !lines) return;
-      t.fillStyle = "#ffffff";
-      t.fillRect(0, 0, w, h);
-      const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
-      const dw = img.naturalWidth * scale;
-      const dh = img.naturalHeight * scale;
-      t.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-      const pixels = t.getImageData(0, 0, w, h);
-      const d = pixels.data;
-      // Só o traço escuro vira tinta. O modelo às vezes devolve áreas em
-      // cinza (sombra que ele não deveria ter feito); cinza claro vira papel
-      // para não ficar por cima da pintura e escurecer a cor escolhida.
-      for (let i = 0; i < d.length; i += 4) {
-        const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-        const t = Math.min(1, Math.max(0, (165 - l) / 75));
-        d[i + 3] = Math.round(t * t * (3 - 2 * t) * 255);
-        d[i] = 30;
-        d[i + 1] = 28;
-        d[i + 2] = 40;
-      }
-      lines.clearRect(0, 0, w, h);
-      lines.putImageData(pixels, 0, 0);
+      if (!(await imagemParaContorno(result.image))) return;
       setShowLines(true);
       setTool("balde");
       mineSays("Caprichei! Agora é só pintar.", "wow");
@@ -917,6 +967,41 @@ export function AtelieView({ data, user, update }: AtelieProps) {
 
           {panel === "mine" ? (
             <div className="atelie-secao">
+              <form
+                className="atelie-pedido"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void pedirDesenho(pedido);
+                }}
+              >
+                <label htmlFor="atelie-pedido-campo">
+                  <Sparkles className="h-4 w-4" /> <strong>Mine, desenha…</strong>
+                </label>
+                <div>
+                  <input
+                    id="atelie-pedido-campo"
+                    value={pedido}
+                    onChange={(event) => setPedido(event.target.value)}
+                    placeholder="um vulcão em erupção"
+                    maxLength={120}
+                    disabled={Boolean(busy)}
+                  />
+                  <button type="submit" disabled={!pedido.trim() || Boolean(busy) || (cotaDesenho ? cotaDesenho.used >= cotaDesenho.limit : false)}>
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desenhar"}
+                  </button>
+                </div>
+                <div className="atelie-pedido-ideias" aria-label="Ideias">
+                  {["uma célula animal", "o sistema solar", "um vulcão", "um dinossauro", "o ciclo da água"].map((ideia) => (
+                    <button key={ideia} type="button" onClick={() => void pedirDesenho(ideia)} disabled={Boolean(busy)}>
+                      {ideia}
+                    </button>
+                  ))}
+                </div>
+                <small>
+                  A Mine cria a folha de colorir com IA de imagens.
+                  {cotaDesenho ? ` Hoje: ${cotaDesenho.used}/${cotaDesenho.limit}.` : ""}
+                </small>
+              </form>
               <button type="button" className="atelie-branco" onClick={startBlank}>
                 <FilePlus2 className="h-5 w-5" />
                 <span><strong>Folha em branco</strong><small>Desenhe do zero com os seus traços.</small></span>

@@ -186,6 +186,7 @@ import {
   type XpStats,
 } from "../../shared/xp.mjs";
 import {
+  compararPartidas,
   currentSeason,
   dailyChallengeKey,
   dailyChallengeQuestions,
@@ -193,6 +194,8 @@ import {
   gameAchievementRules,
   gameNames,
   leagueFromPoints,
+  placarGameIds,
+  type MelhorPartida,
   seasonPoints,
   unlockedGameAchievementIds,
   unresolvedGameErrors,
@@ -200,7 +203,10 @@ import {
 } from "../../shared/game-meta.mjs";
 import {
   AppData,
+  Avatar,
   EmptyState,
+  apiJson,
+  readSession,
   GameId,
   GlassCard,
   HangmanItem,
@@ -1719,11 +1725,12 @@ export function GameSetup({
   );
 }
 
-export type GamesHubTab = "jogar" | "diario" | "missoes" | "erros" | "historico" | "temporada";
+export type GamesHubTab = "jogar" | "diario" | "placar" | "missoes" | "erros" | "historico" | "temporada";
 
 export const gamesHubTabs: Array<{ id: GamesHubTab; label: string; hint: string; icon: LucideIcon }> = [
   { id: "jogar", label: "Jogar", hint: "6 aventuras", icon: Gamepad2 },
   { id: "diario", label: "Desafio", hint: "5 perguntas", icon: CalendarCheck },
+  { id: "placar", label: "Placar", hint: "Por jogo", icon: Award },
   { id: "missoes", label: "Missões", hint: "Metas do dia", icon: Target },
   { id: "erros", label: "Erros", hint: "Revisão ativa", icon: BookOpen },
   { id: "historico", label: "Histórico", hint: "Suas partidas", icon: ListChecks },
@@ -1940,8 +1947,12 @@ export function GameSeasonPanel({ sessions }: { sessions: Session[] }) {
   </div>;
 }
 
-export function GamesView({ data, user, update }: { data: ReturnType<typeof useMemoUserData>; user: User; update: (next: (draft: AppData) => AppData) => void }) {
-  const [hubTab, setHubTab] = useState<GamesHubTab>("jogar");
+export function GamesView({ data, user, update, tabInicial }: { data: ReturnType<typeof useMemoUserData>; user: User; update: (next: (draft: AppData) => AppData) => void; tabInicial?: string }) {
+  // #/games/diario (o cartão "Hoje" da Home) abre direto no desafio do dia.
+  const [hubTab, setHubTab] = useState<GamesHubTab>(() => (gamesHubTabs.some((tab) => tab.id === tabInicial) ? (tabInicial as GamesHubTab) : "jogar"));
+  useEffect(() => {
+    if (tabInicial && gamesHubTabs.some((tab) => tab.id === tabInicial)) setHubTab(tabInicial as GamesHubTab);
+  }, [tabInicial]);
   const [subjectId, setSubjectId] = useState<string | undefined>(data.subjects[0]?.id);
   const [game, setGame] = useState<GameId | null>(null);
   const reducedGames = useSoftMotion();
@@ -2368,6 +2379,8 @@ export function GamesView({ data, user, update }: { data: ReturnType<typeof useM
           </>
           ) : hubTab === "diario" ? (
             <DailyChallengePanel data={data} user={user} update={update} />
+          ) : hubTab === "placar" ? (
+            <GamePlacarPanel onJogar={(id) => { if (id === "daily") { setHubTab("diario"); return; } setHubTab("jogar"); if (subject) abrirJogo(id as GameId); }} />
           ) : hubTab === "missoes" ? (
             <GameMissionsPanel sessions={data.sessions} />
           ) : hubTab === "erros" ? (
@@ -2457,3 +2470,117 @@ export function GamesView({ data, user, update }: { data: ReturnType<typeof useM
   );
 }
 
+
+
+/* ───────────── Placar por jogo (nov/2026) ───────────── */
+
+type PlacarLinha = { id: string; displayName: string; avatar?: string; you: boolean; games?: Record<string, MelhorPartida> };
+
+function tempoCurto(ms: number) {
+  if (!ms) return "—";
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}min ${String(s % 60).padStart(2, "0")}s`;
+}
+
+/**
+ * A melhor partida de cada aluno, jogo por jogo. Os números vêm do servidor
+ * (POST /api/leaderboard, campo games): ninguém recebe as perguntas dos
+ * outros, só acertos e tempo.
+ */
+export function GamePlacarPanel({ onJogar }: { onJogar: (id: string) => void }) {
+  const [rows, setRows] = useState<PlacarLinha[] | null>(null);
+  const [erro, setErro] = useState("");
+  const [jogo, setJogo] = useState<string>("corrida");
+  const reduced = useSoftMotion();
+
+  useEffect(() => {
+    const token = readSession().token;
+    if (!token) return;
+    let vivo = true;
+    apiJson<{ rows: PlacarLinha[] }>("/api/leaderboard", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ friends: [] }) })
+      .then((payload) => vivo && setRows(payload.rows || []))
+      .catch(() => vivo && setErro("Não consegui buscar o placar agora. Tente de novo em instantes."));
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  const lista = useMemo(
+    () =>
+      (rows || [])
+        .filter((row) => row.games?.[jogo])
+        .map((row) => ({ row, p: row.games![jogo] }))
+        .sort((a, b) => compararPartidas(a.p, b.p)),
+    [rows, jogo],
+  );
+  const minhaPosicao = lista.findIndex((item) => item.row.you);
+  const contagem = (id: string) => (rows || []).filter((row) => row.games?.[id]).length;
+
+  return (
+    <div className="gp-placar">
+      <div className="gp-placar-jogos" role="tablist" aria-label="Escolha o jogo">
+        {placarGameIds.map((id) => (
+          <button key={id} type="button" role="tab" aria-selected={jogo === id} className={jogo === id ? "is-on" : ""} onClick={() => setJogo(id)}>
+            <span>{gameNames[id as keyof typeof gameNames] || id}</span>
+            <small>{rows ? `${contagem(id)} ${contagem(id) === 1 ? "jogador" : "jogadores"}` : "…"}</small>
+          </button>
+        ))}
+      </div>
+
+      {erro ? <p className="gp-placar-vazio">{erro}</p> : null}
+      {!rows && !erro ? <p className="gp-placar-vazio">Carregando o placar…</p> : null}
+
+      {rows ? (
+        lista.length ? (
+          <>
+            <p className="gp-placar-voce">
+              {minhaPosicao >= 0 ? (
+                <>
+                  Sua melhor partida está em <b>{minhaPosicao + 1}º</b> de {lista.length}.
+                </>
+              ) : (
+                <>Você ainda não jogou este. Uma partida já te coloca no placar.</>
+              )}
+            </p>
+            <ol className="gp-placar-lista">
+              {lista.slice(0, 15).map(({ row, p }, indice) => (
+                <motion.li
+                  key={row.id}
+                  className={`${row.you ? "is-voce" : ""} ${indice < 3 ? `is-top is-top-${indice + 1}` : ""}`}
+                  initial={reduced ? false : { opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: reduced ? 0 : indice * 0.03 }}
+                >
+                  <span className="gp-placar-pos">{indice + 1}</span>
+                  <Avatar name={row.displayName} src={row.avatar} size={34} />
+                  <span className="gp-placar-nome">
+                    {row.displayName}
+                    {row.you ? <em> · você</em> : null}
+                  </span>
+                  <span className="gp-placar-num" title="acertos na melhor partida">
+                    <b>
+                      {p.c}/{p.t}
+                    </b>
+                    <small>{Math.round((p.c / Math.max(1, p.t)) * 100)}%</small>
+                  </span>
+                  <span className="gp-placar-num" title="tempo da melhor partida">
+                    <b>{tempoCurto(p.ms)}</b>
+                    <small>
+                      {p.n} {p.n === 1 ? "partida" : "partidas"}
+                    </small>
+                  </span>
+                </motion.li>
+              ))}
+            </ol>
+          </>
+        ) : (
+          <p className="gp-placar-vazio">Ninguém jogou este ainda. Seja a primeira pessoa no placar!</p>
+        )
+      ) : null}
+
+      <button type="button" className="gp-placar-jogar" onClick={() => onJogar(jogo)}>
+        <Gamepad2 className="h-4 w-4" /> Jogar {gameNames[jogo as keyof typeof gameNames] || ""}
+      </button>
+    </div>
+  );
+}

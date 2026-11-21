@@ -1138,3 +1138,43 @@
 
 .prv-folha i:nth-child(2) { width: 75%; }
 .prv-folha i:nth-child(3) { width: 55%; background: rgb(var(--hl-mint) / 0.8); }
+
+/* Nov/2026: leva o assunto que mais errou para o Duelo ou para as Atividades. */
+.prv-treinar {
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.8rem;
+  border: 1.5px dashed rgb(var(--line));
+  border-radius: 0.8rem;
+}
+.prv-treinar p {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  color: rgb(var(--theme-muted));
+}
+.prv-treinar p b {
+  color: rgb(var(--theme-text));
+}
+.prv-treinar div {
+  display: flex;
+  gap: 0.4rem;
+}
+.prv-treinar button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.4rem;
+  border-radius: 0.65rem;
+  background: rgb(var(--hl-lilac) / 0.35);
+  color: rgb(var(--theme-text));
+  font-weight: 800;
+  font-size: 0.82rem;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+.prv-treinar button:hover {
+  background: rgb(var(--hl-lilac) / 0.6);
+}
+.prv-treinar button:active {
+  transform: scale(0.97);
+}

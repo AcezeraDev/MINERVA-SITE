@@ -281,3 +281,33 @@ D) membrana plasmática
 CORRETA: C
 EXPLICACAO: Sem luz não há fotossíntese, então a raiz praticamente não tem cloroplastos ativos.`,
 };
+
+/**
+ * Nov/2026: o caderno de erros passou a ir junto com a conta (settings.provas),
+ * e não só no navegador. Ao abrir num aparelho, junta o que está guardado aqui
+ * com o que veio da conta: por id, vence a versão mais recente.
+ */
+export const limiteCadernoConta = 80;
+export const limiteHistoricoConta = 40;
+
+export function juntarCadernos(...listas) {
+  const porId = new Map();
+  for (const lista of listas) {
+    for (const item of Array.isArray(lista) ? lista : []) {
+      if (!item || !item.id) continue;
+      const atual = porId.get(item.id);
+      if (!atual || Number(item.atualizadoEm || 0) >= Number(atual.atualizadoEm || 0)) porId.set(item.id, item);
+    }
+  }
+  // Pendentes primeiro, depois os mais recentes: o corte nunca joga fora um erro ainda não dominado
+  // antes de um que já foi.
+  return [...porId.values()]
+    .sort((a, b) => Number(a.status === "dominado") - Number(b.status === "dominado") || Number(b.atualizadoEm || 0) - Number(a.atualizadoEm || 0))
+    .slice(0, limiteCadernoConta);
+}
+
+export function juntarHistorico(...listas) {
+  const porId = new Map();
+  for (const lista of listas) for (const item of Array.isArray(lista) ? lista : []) if (item && item.id && !porId.has(item.id)) porId.set(item.id, item);
+  return [...porId.values()].sort((a, b) => Number(b.quando || 0) - Number(a.quando || 0)).slice(0, limiteHistoricoConta);
+}

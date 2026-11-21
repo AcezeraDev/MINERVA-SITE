@@ -43,3 +43,7 @@ export function resumoCaderno(caderno: ErroCaderno[]): {
 export function contextoEstudo(erros: ErroParaEstudo[]): string;
 export function lerEstudo(text: string): EstudoErro[];
 export const provaExemplo: { assunto: string; questoes: QuizQuestion[]; estudos: string };
+export const limiteCadernoConta: number;
+export const limiteHistoricoConta: number;
+export function juntarCadernos(...listas: Array<ErroCaderno[] | undefined | null>): ErroCaderno[];
+export function juntarHistorico<T extends { id: string; quando: number }>(...listas: Array<T[] | undefined | null>): T[];

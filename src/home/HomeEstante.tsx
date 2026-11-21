@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Bot, ChevronLeft, ChevronRight, Plus, type LucideIcon } from "lucide-react";
+import { ArrowRight, Bot, Check, ChevronLeft, ChevronRight, Plus, type LucideIcon } from "lucide-react";
 import { useCena3D } from "../cena3d/Cena3D";
 import { useSoftMotion } from "../motion";
 import { MineFace } from "../caderno/MineFace";
@@ -49,6 +49,62 @@ export type DiaSemana = {
   hoje: boolean;
   tarefas: Array<{ id: string; titulo: string; cor: string; prova: boolean }>;
 };
+
+/** Um passo do cartão "Hoje": a tarefa mais urgente, o que revisar e o desafio do dia. */
+export type PassoHoje = {
+  id: string;
+  tom: "rosa" | "amarelo" | "lilas" | "menta";
+  rotulo: string;
+  titulo: string;
+  detalhe: string;
+  feito: boolean;
+  onClick: () => void;
+};
+
+/**
+ * Cartão "Hoje" (nov/2026): a Home dizia tudo o que existe, mas não o que
+ * fazer primeiro. São três post-its em ordem; o que já foi feito fica riscado.
+ */
+function CartaoHoje({ passos, reduced }: { passos: PassoHoje[]; reduced: boolean }) {
+  const feitos = passos.filter((passo) => passo.feito).length;
+  return (
+    <section className="he-hoje" aria-labelledby="he-hoje-titulo">
+      <div className="he-hoje-topo">
+        <h2 id="he-hoje-titulo">o plano de hoje</h2>
+        <span className="he-hoje-conta" aria-label={`${feitos} de ${passos.length} feitos`}>
+          {passos.map((passo) => (
+            <i key={passo.id} className={passo.feito ? "is-on" : ""} aria-hidden />
+          ))}
+          <b>
+            {feitos} de {passos.length}
+          </b>
+        </span>
+      </div>
+      <ol className="he-hoje-lista">
+        {passos.map((passo, indice) => (
+          <motion.li
+            key={passo.id}
+            initial={reduced ? false : { opacity: 0, y: 14, rotate: 0 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...mola, delay: reduced ? 0 : 0.12 + indice * 0.07 }}
+          >
+            <button type="button" className={`he-passo is-${passo.tom} ${passo.feito ? "is-feito" : ""}`} onClick={passo.onClick}>
+              <span className="he-passo-num" aria-hidden>
+                {passo.feito ? <Check className="h-4 w-4" strokeWidth={3} /> : indice + 1}
+              </span>
+              <span className="he-passo-texto">
+                <small>{passo.rotulo}</small>
+                <strong>{passo.titulo}</strong>
+                <span>{passo.detalhe}</span>
+              </span>
+              <ArrowRight className="he-passo-seta h-4 w-4" aria-hidden />
+            </button>
+          </motion.li>
+        ))}
+      </ol>
+    </section>
+  );
+}
 
 export type AtalhoFichario = { id: string; label: string; icon: LucideIcon; tom: "lilas" | "amarelo" | "rosa" | "menta"; onClick: () => void };
 
@@ -255,7 +311,9 @@ export function HomeEstante({
   onMine,
   onProgresso,
   onAgenda,
+  passosHoje = [],
 }: {
+  passosHoje?: PassoHoje[];
   dataHoje: string;
   proximos: DiaSemana[];
   xpHoje: number;
@@ -352,6 +410,8 @@ export function HomeEstante({
           </motion.div>
         </div>
       </header>
+
+      {passosHoje.length ? <CartaoHoje passos={passosHoje} reduced={reduced} /> : null}
 
       <section className="he-palco" aria-label="Sua estante de matérias">
         <motion.div

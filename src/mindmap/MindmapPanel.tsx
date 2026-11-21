@@ -78,6 +78,8 @@ import {
   RotateCcw,
   SkipForward,
   Minus,
+  ArrowUp,
+  ArrowDown,
   Coffee,
   ChevronRight,
   MoreHorizontal,
@@ -637,6 +639,116 @@ export function mindmapToHtmlDocument(map: Mindmap, palette: string[], central: 
 </html>`;
 }
 
+/**
+ * Rascunho do mapa (nov/2026): o mapa deixou de ser só para olhar. No modo
+ * "Editar" cada ramo vira uma ficha com campos: renomear, reescrever, apagar,
+ * mudar a ordem e pedir para a Mine aprofundar um ramo. O desenho do mapa
+ * volta ao clicar em "Pronto" e já usa o que foi escrito.
+ */
+function MindmapEditor({
+  map,
+  palette,
+  onChange,
+  onExpand,
+  expanding,
+}: {
+  map: Mindmap;
+  palette: string[];
+  onChange: (next: Mindmap) => void;
+  onExpand?: (index: number) => void;
+  expanding: number | null;
+}) {
+  const setBranch = (index: number, patch: Partial<Mindmap["branches"][number]>) =>
+    onChange({ ...map, branches: map.branches.map((branch, i) => (i === index ? { ...branch, ...patch } : branch)) });
+  const moveBranch = (index: number, step: number) => {
+    const target = index + step;
+    if (target < 0 || target >= map.branches.length) return;
+    const branches = map.branches.slice();
+    [branches[index], branches[target]] = [branches[target], branches[index]];
+    onChange({ ...map, branches });
+  };
+  return (
+    <div className="mm-editor">
+      <label className="mm-editor-central">
+        <span>tema central</span>
+        <input value={map.title} onChange={(event) => onChange({ ...map, title: event.target.value.slice(0, 80) })} placeholder="Tema do mapa" />
+      </label>
+      <p className="mm-editor-dica">
+        Escreva cada conceito como <b>palavra-chave: explicação</b>. Assim ele vira cartão de flashcard com frente e verso.
+      </p>
+      <div className="mm-editor-ramos">
+        {map.branches.map((branch, index) => (
+          <section key={index} className="mm-editor-ramo" style={{ "--mindmap-branch-color": palette[index % palette.length] } as React.CSSProperties}>
+            <header>
+              <span className="mm-editor-num">{index + 1}</span>
+              <input
+                aria-label={`Nome do ramo ${index + 1}`}
+                value={branch.label}
+                onChange={(event) => setBranch(index, { label: event.target.value.slice(0, 60) })}
+                placeholder="Nome do ramo"
+              />
+              <button type="button" onClick={() => moveBranch(index, -1)} disabled={index === 0} aria-label="Subir ramo" title="Subir">
+                <ArrowUp className="h-4 w-4" />
+              </button>
+              <button type="button" onClick={() => moveBranch(index, 1)} disabled={index === map.branches.length - 1} aria-label="Descer ramo" title="Descer">
+                <ArrowDown className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange({ ...map, branches: map.branches.filter((_, i) => i !== index) })}
+                aria-label={`Apagar o ramo ${branch.label || index + 1}`}
+                title="Apagar ramo"
+                className="is-perigo"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </header>
+            <ul>
+              {branch.items.map((item, itemIndex) => (
+                <li key={itemIndex}>
+                  <textarea
+                    aria-label={`Conceito ${itemIndex + 1} do ramo ${branch.label}`}
+                    value={item}
+                    rows={2}
+                    onChange={(event) => setBranch(index, { items: branch.items.map((value, i) => (i === itemIndex ? event.target.value.slice(0, 260) : value)) })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setBranch(index, { items: branch.items.filter((_, i) => i !== itemIndex) })}
+                    aria-label="Apagar conceito"
+                    title="Apagar conceito"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="mm-editor-ramo-acoes">
+              <button type="button" onClick={() => setBranch(index, { items: [...branch.items, ""] })}>
+                <Plus className="h-4 w-4" /> conceito
+              </button>
+              {onExpand ? (
+                <button type="button" className="is-mine" onClick={() => onExpand(index)} disabled={expanding !== null || !branch.label.trim()}>
+                  {expanding === index ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {expanding === index ? "a Mine está pensando…" : "Mine, aprofunda"}
+                </button>
+              ) : null}
+            </div>
+          </section>
+        ))}
+        <button
+          type="button"
+          className="mm-editor-novo"
+          onClick={() => onChange({ ...map, branches: [...map.branches, { label: "Novo ramo", items: [""] }] })}
+          disabled={map.branches.length >= 10}
+        >
+          <Plus className="h-5 w-5" /> novo ramo
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function MindmapExperience({
   map,
   subject,
@@ -656,7 +768,15 @@ export function MindmapExperience({
   copyMindmapText,
   copied,
   close,
+  onChange,
+  onExpand,
+  expanding = null,
+  onFlashcards,
 }: {
+  onChange?: (next: Mindmap) => void;
+  onExpand?: (index: number) => void;
+  expanding?: number | null;
+  onFlashcards?: () => void;
   map: Mindmap;
   subject: Subject;
   palette: string[];
@@ -679,6 +799,7 @@ export function MindmapExperience({
   const [focusedBranch, setFocusedBranch] = useState<number | null>(null);
   const [hoveredBranch, setHoveredBranch] = useState<number | null>(null);
   const [expandedMobile, setExpandedMobile] = useState(0);
+  const [editing, setEditing] = useState(false);
   const reduceMotion = Boolean(useReducedMotion());
   const layout = useMemo(() => buildMindmapLayout({ ...map, title: map.title || subject.name }, palette), [map, palette, subject.name]);
   // A cascata de entrada só vale na primeira vez. Depois, destacar um ramo
@@ -740,7 +861,21 @@ export function MindmapExperience({
           <span className="mindmap-summary-pill mindmap-summary-pill--primary">{layout.branches.length} ramos</span>
           <span className="mindmap-summary-pill">{conceptCount} conceitos</span>
         </div>
-        <div className="mindmap-command-actions hidden md:flex">
+        {onChange ? (
+          <div className="mm-edit-toggle">
+            {focusedBranch !== null && onExpand && !editing ? (
+              <button type="button" className="mm-btn-mine" onClick={() => onExpand(focusedBranch)} disabled={expanding !== null}>
+                {expanding !== null ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {expanding !== null ? "aprofundando…" : "Mine, aprofunda"}
+              </button>
+            ) : null}
+            <button type="button" className={`mm-btn-edit ${editing ? "is-on" : ""}`} onClick={() => setEditing((value) => !value)} aria-pressed={editing}>
+              {editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+              {editing ? "Pronto" : "Editar"}
+            </button>
+          </div>
+        ) : null}
+        <div className={`mindmap-command-actions hidden md:flex ${editing ? "mm-esconder" : ""}`}>
           <button
             type="button"
             onClick={() => focusBranch(null)}
@@ -773,7 +908,11 @@ export function MindmapExperience({
         </div>
       </div>
 
-      <div className="space-y-3 md:hidden">
+      {editing && onChange ? (
+        <MindmapEditor map={map} palette={palette} onChange={onChange} onExpand={onExpand} expanding={expanding} />
+      ) : null}
+
+      <div className={`space-y-3 md:hidden ${editing ? "hidden" : ""}`}>
         <motion.div
           className="mindmap-mobile-topic"
           initial={reduceMotion ? false : { opacity: 0, y: 10 }}
@@ -837,7 +976,7 @@ export function MindmapExperience({
       </div>
 
 
-      <div className="relative hidden md:block">
+      <div className={`relative hidden ${editing ? "" : "md:block"}`}>
         <div
           ref={scrollRef}
           onPointerDown={onPanDown}
@@ -958,6 +1097,7 @@ export function MindmapExperience({
 
       <div className="mindmap-actions flex flex-wrap gap-3">
         <PrimaryButton icon={RefreshCw} onClick={reload}>Gerar de novo</PrimaryButton>
+        {onFlashcards ? <SecondaryButton icon={Layers} onClick={onFlashcards}>Virar flashcards</SecondaryButton> : null}
         <SecondaryButton icon={Download} onClick={exportPng}>Baixar PNG</SecondaryButton>
         <SecondaryButton icon={FileText} onClick={exportHtml}>Baixar HTML</SecondaryButton>
         <SecondaryButton icon={Share2} onClick={sharePng}>Compartilhar</SecondaryButton>
@@ -968,10 +1108,110 @@ export function MindmapExperience({
   );
 }
 
-export function MindmapModal({ subject, materials, initialMap, close }: { subject: Subject; materials: Material[]; initialMap?: Mindmap; close: () => void }) {
+/** O mapa de uma matéria fica guardado neste navegador: abrir de novo mostra o que foi editado. */
+const mapaChave = (subjectId: string) => `minerva:mapa:${subjectId}`;
+function lerMapaSalvo(subjectId: string): Mindmap | null {
+  try {
+    const salvo = JSON.parse(localStorage.getItem(mapaChave(subjectId)) || "null");
+    return salvo && typeof salvo.title === "string" && Array.isArray(salvo.branches) && salvo.branches.length ? (salvo as Mindmap) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Itens "palavra: explicação" viram frente e verso; sem os dois pontos, o ramo é a frente. */
+export function mindmapToCards(map: Mindmap) {
+  const cards: Array<{ front: string; back: string }> = [];
+  for (const branch of map.branches) {
+    for (const raw of branch.items) {
+      // Aqui vale até chave de uma letra ("a: inclinação da reta"), que o desenho do mapa não separa.
+      const keyed = cleanMindmapLabel(raw).match(/^([^:]{1,40}):\s*(.+)$/);
+      if (keyed) {
+        cards.push({ front: `${keyed[1].trim()} (${branch.label})`, back: keyed[2].trim() });
+        continue;
+      }
+      const item = splitMindmapItem(raw);
+      if (!item.detail.trim()) continue;
+      cards.push({ front: `${branch.label} (${map.title})`, back: item.detail });
+    }
+  }
+  return cards;
+}
+
+export function MindmapModal({
+  subject,
+  materials,
+  initialMap,
+  close,
+  onFlashcards,
+}: {
+  subject: Subject;
+  materials: Material[];
+  initialMap?: Mindmap;
+  close: () => void;
+  /** Só existe quando a matéria é de verdade (mapa do chat sobre um tema solto não tem onde guardar cartões). */
+  onFlashcards?: (cards: Array<{ front: string; back: string }>) => number;
+}) {
   const [reloadKey, setReloadKey] = useState(0);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(initialMap ? "ready" : "loading");
-  const [map, setMap] = useState<Mindmap>(initialMap || { title: "", branches: [] });
+  const salvoInicial = useMemo(() => (initialMap ? null : lerMapaSalvo(subject.id)), [initialMap, subject.id]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">(initialMap || salvoInicial ? "ready" : "loading");
+  const [map, setMap] = useState<Mindmap>(initialMap || salvoInicial || { title: "", branches: [] });
+  const [expanding, setExpanding] = useState<number | null>(null);
+  const [aviso, setAviso] = useState("");
+
+  function changeMap(next: Mindmap) {
+    setMap(next);
+    if (initialMap) return;
+    try {
+      localStorage.setItem(mapaChave(subject.id), JSON.stringify(next));
+    } catch {
+      // sem espaço: a edição vale só enquanto o mapa está aberto
+    }
+  }
+
+  async function expandBranch(index: number) {
+    const branch = map.branches[index];
+    if (!branch || expanding !== null) return;
+    setExpanding(index);
+    setAviso("");
+    try {
+      const ja = branch.items.map((item) => `- ${item}`).join(String.fromCharCode(10)) || "- nenhum";
+      const context = [subjectContentContext(subject, materials), `O aluno ja tem estes conceitos no ramo "${branch.label}":`, ja].join(String.fromCharCode(10));
+      const text = await requestAiTask({
+        task: "mindmap",
+        prompt: `Crie um mapa mental que aprofunde "${branch.label}" dentro do tema ${map.title || subject.name}. Traga conceitos novos, diferentes dos que o aluno ja tem.`,
+        context,
+      });
+      const parsed = parseMindmap(text);
+      const chave = (item: string) => (splitMindmapItem(item).keyword || item).toLowerCase().trim();
+      const existing = new Set(branch.items.map(chave));
+      const fresh = parsed.branches
+        .flatMap((item) => item.items)
+        .filter((item) => {
+          const key = chave(item);
+          if (!key || existing.has(key)) return false;
+          existing.add(key);
+          return true;
+        })
+        .slice(0, 3);
+      if (!fresh.length) {
+        setAviso("A Mine não achou nada novo para esse ramo agora. Tente de novo daqui a pouco.");
+        return;
+      }
+      changeMap({ ...map, branches: map.branches.map((item, i) => (i === index ? { ...item, items: [...item.items, ...fresh] } : item)) });
+      setAviso(`A Mine colocou ${fresh.length} ${fresh.length === 1 ? "conceito novo" : "conceitos novos"} em “${branch.label}”.`);
+    } catch {
+      setAviso("Não consegui falar com a Mine agora. Tente de novo em instantes.");
+    } finally {
+      setExpanding(null);
+    }
+  }
+
+  function makeFlashcards() {
+    if (!onFlashcards) return;
+    const created = onFlashcards(mindmapToCards(map));
+    setAviso(created ? `${created} ${created === 1 ? "flashcard criado" : "flashcards criados"} em ${subject.name}. Eles já aparecem para revisar hoje.` : "Esses conceitos já viraram flashcards antes.");
+  }
   const [copied, setCopied] = useState(false);
   const [zoom, setZoom] = useState(1);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -1086,6 +1326,7 @@ export function MindmapModal({ subject, materials, initialMap, close }: { subjec
       setStatus("ready");
       return;
     }
+    if (salvoInicial && reloadKey === 0) return;
     let active = true;
     setStatus("loading");
     const context = subjectContentContext(subject, materials);
@@ -1097,7 +1338,7 @@ export function MindmapModal({ subject, materials, initialMap, close }: { subjec
           setStatus("error");
           return;
         }
-        setMap(parsed);
+        changeMap(parsed);
         setStatus("ready");
       })
       .catch(() => {
@@ -1197,7 +1438,16 @@ export function MindmapModal({ subject, materials, initialMap, close }: { subjec
           copyMindmapText={copyMindmapText}
           copied={copied}
           close={close}
+          onChange={changeMap}
+          onExpand={expandBranch}
+          expanding={expanding}
+          onFlashcards={onFlashcards ? makeFlashcards : undefined}
         />
+      ) : null}
+      {aviso ? (
+        <p className="mm-aviso" role="status">
+          {aviso}
+        </p>
       ) : null}
     </div>
   );

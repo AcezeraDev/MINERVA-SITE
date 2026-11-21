@@ -410,3 +410,138 @@
   .nexus-node.is-correct,
   .nexus-hud .is-alert strong { animation: none; }
 }
+
+/* ───────────── placar por jogo (nov/2026) ───────────── */
+.gp-placar {
+  display: grid;
+  gap: 1rem;
+}
+.gp-placar-jogos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.gp-placar-jogos button {
+  display: grid;
+  gap: 0.05rem;
+  padding: 0.5rem 0.8rem;
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 0.75rem;
+  background: rgb(var(--sheet));
+  color: rgb(var(--theme-text));
+  text-align: left;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.gp-placar-jogos button span {
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+.gp-placar-jogos button small {
+  font-size: 0.72rem;
+  color: rgb(var(--theme-muted));
+}
+.gp-placar-jogos button:hover {
+  border-color: rgb(var(--pen) / 0.5);
+}
+.gp-placar-jogos button.is-on {
+  border-color: rgb(var(--pen));
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+}
+.gp-placar-jogos button.is-on small {
+  color: rgb(var(--pen-ink) / 0.75);
+}
+.gp-placar-voce {
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.25rem;
+  color: rgb(var(--pen));
+}
+.gp-placar-voce b {
+  padding: 0 0.2rem;
+  background: rgb(var(--hl-yellow) / 0.6);
+  color: rgb(var(--theme-text));
+}
+.gp-placar-lista {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gp-placar-lista li {
+  display: grid;
+  grid-template-columns: 2rem auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border: 1.5px solid rgb(var(--line));
+  border-radius: 0.8rem;
+  background: rgb(var(--panel));
+}
+.gp-placar-lista li.is-voce {
+  border-color: rgb(var(--pen));
+  background: rgb(var(--pen) / 0.08);
+}
+.gp-placar-pos {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  font-weight: 900;
+  color: rgb(var(--theme-muted));
+}
+.gp-placar-lista li.is-top-1 .gp-placar-pos { background: rgb(var(--hl-yellow)); color: #14161b; }
+.gp-placar-lista li.is-top-2 .gp-placar-pos { background: rgb(var(--rule)); color: rgb(var(--theme-text)); }
+.gp-placar-lista li.is-top-3 .gp-placar-pos { background: rgb(var(--hl-orange, 245 165 95) / 0.7); color: #14161b; }
+.gp-placar-nome {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gp-placar-nome em {
+  font-style: normal;
+  font-weight: 700;
+  color: rgb(var(--pen));
+}
+.gp-placar-num {
+  display: grid;
+  min-width: 4.2rem;
+  text-align: right;
+}
+.gp-placar-num b {
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.gp-placar-num small {
+  font-size: 0.72rem;
+  color: rgb(var(--theme-muted));
+}
+.gp-placar-vazio {
+  padding: 1.4rem;
+  border: 1.5px dashed rgb(var(--line));
+  border-radius: 0.9rem;
+  text-align: center;
+  color: rgb(var(--theme-muted));
+}
+.gp-placar-jogar {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.7rem;
+  padding: 0 1rem;
+  border-radius: 0.75rem;
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+  font-weight: 800;
+}
+@media (max-width: 560px) {
+  .gp-placar-lista li {
+    grid-template-columns: 1.8rem auto minmax(0, 1fr) auto;
+  }
+  .gp-placar-lista li .gp-placar-num:last-child {
+    display: none;
+  }
+}

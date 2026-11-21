@@ -208,7 +208,7 @@ import { PencilTimer } from "./caderno/PencilTimer";
 import { InkBarChart, LevelStamp, StickerBook } from "./caderno/Progress";
 import { BookshelfPodium } from "./caderno/Bookshelf";
 import { MineFace } from "./caderno/MineFace";
-import { HomeEstante, type DiaSemana, type ItemFicha, type MateriaEstante } from "./home/HomeEstante";
+import { HomeEstante, type DiaSemana, type ItemFicha, type MateriaEstante, type PassoHoje } from "./home/HomeEstante";
 import type { AvisoCaderno } from "./home/Sistema3D";
 import { NovaMateriaFx, anunciarMateria } from "./home/NovaMateriaFx";
 import { MineWelcome } from "./caderno/MineWelcome";
@@ -273,6 +273,10 @@ const LaboratorioView = React.lazy(() => import("./laboratorio/LaboratorioView")
 const LeituraView = React.lazy(() => import("./leitura/LeituraView").then((m) => ({ default: m.LeituraView })));
 const DueloView = React.lazy(() => import("./duelo/DueloView").then((m) => ({ default: m.DueloView })));
 const ProvasView = React.lazy(() => import("./provas/ProvasView").then((m) => ({ default: m.ProvasView })));
+// Nov/2026: Conteúdo (matéria), Ranking e Perfil saíram do main.tsx para pastas próprias.
+const SubjectView = React.lazy(() => import("./conteudo/SubjectView").then((m) => ({ default: m.SubjectView })));
+const RankingView = React.lazy(() => import("./ranking/RankingView").then((m) => ({ default: m.RankingView })));
+const ProfileView = React.lazy(() => import("./perfil/ProfileView").then((m) => ({ default: m.ProfileView })));
 const AgendaView = React.lazy(() => import("./agenda/AgendaView").then((m) => ({ default: m.AgendaView })));
 const TaskEditor = React.lazy(() => import("./agenda/TaskEditor").then((m) => ({ default: m.TaskEditor })));
 
@@ -313,7 +317,7 @@ type AppearanceChoice = {
 const defaultAppearance: AppearanceChoice = { themeMode: "light", accentColor: "#39F59A" };
 const accentPresets = ["#39F59A", "#F4F05A", "#FF8FB1", "#B7A5FF", "#FFB347", "#5CE1E6"];
 
-function normalizeAccent(value: string | undefined) {
+export function normalizeAccent(value: string | undefined) {
   return value && /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : defaultAppearance.accentColor;
 }
 
@@ -487,6 +491,8 @@ export type User = {
      * contas antigas guardavam "dark" só porque era o padrão do servidor. */
     themeChosen?: boolean;
     accentColor?: string;
+    /** Caderno de erros e provas feitas: vão com a conta para qualquer aparelho (nov/2026). */
+    provas?: { caderno: unknown[]; historico: unknown[]; atualizadoEm: number };
   };
 };
 
@@ -880,7 +886,7 @@ export type Modal =
   | { type: "flashcards"; subjectId: string }
   | { type: "confirm"; title: string; body: string; onConfirm: () => void };
 
-const iconMap: Record<IconName, LucideIcon> = {
+export const iconMap: Record<IconName, LucideIcon> = {
   book: BookOpen,
   math: Calculator,
   physics: Atom,
@@ -963,13 +969,25 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
   { view: "admin", label: "Admin", icon: Shield },
 ];
 
-/** A barra lateral agrupa os destinos em quatro blocos para virar uma lista escaneável. */
-const navGroups: Array<{ label: string; views: View[] }> = [
-  { label: "Estudo", views: ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "progress", "ranking"] },
-  { label: "Inteligência", views: ["mine", "sala", "games", "cubo", "duelo", "idiomas", "atelie", "search", "plan"] },
-  { label: "Comunidade", views: ["comments", "suggestions"] },
-  { label: "Conta", views: ["como-usar", "about", "perfil", "admin"] },
+/**
+ * Nov/2026: o menu tinha 24 destinos em listas longas e o aluno novo se
+ * perdia. Agora são cinco áreas, cada uma uma divisória de fichário que abre e
+ * fecha; só a área da tela atual começa aberta. Início fica fora (é a capa) e a
+ * conta vai para o rodapé da barra.
+ */
+export type NavArea = "estudar" | "praticar" | "jogar" | "organizar" | "turma";
+const navGroups: Array<{ id: NavArea; label: string; hint: string; icon: LucideIcon; views: View[] }> = [
+  { id: "estudar", label: "Estudar", hint: "Mine, leitura, laboratório, idiomas", icon: BookOpen, views: ["mine", "leitura", "laboratorio", "idiomas", "search"] },
+  { id: "praticar", label: "Praticar", hint: "Atividades, provas, redação, duelo", icon: ClipboardCheck, views: ["atividades", "provas", "redacao", "duelo"] },
+  { id: "jogar", label: "Jogar", hint: "Games, cubo mágico, ateliê", icon: Gamepad2, views: ["games", "cubo", "atelie"] },
+  { id: "organizar", label: "Organizar", hint: "Agenda, plano, progresso", icon: CalendarDays, views: ["agenda", "plan", "progress", "foco"] },
+  { id: "turma", label: "Turma", hint: "Sala, ranking, comentários", icon: Headphones, views: ["sala", "ranking", "comments", "suggestions"] },
 ];
+const accountViews: View[] = ["perfil", "como-usar", "about", "admin"];
+
+function areaOf(view: View): NavArea | null {
+  return navGroups.find((group) => group.views.includes(view))?.id || null;
+}
 
 /** Barra inferior mobile: só os 4 destinos de uso diário; o resto vive na gaveta "Mais". */
 const mobilePrimary: View[] = ["home", "agenda", "atividades", "mine"];
@@ -1003,7 +1021,7 @@ function formatFileSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function readFileAsDataUrl(file: File): Promise<string> {
+export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
@@ -1021,7 +1039,7 @@ function readFileAsText(file: File): Promise<string> {
   });
 }
 
-function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+export function loadImage(dataUrl: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
@@ -1044,28 +1062,6 @@ async function imageFileToDataUrl(file: File) {
   if (!context) return original;
   context.drawImage(image, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", 0.78);
-}
-
-/**
- * Foto de perfil: recorta no quadrado central e reduz para 192px.
- *
- * O tamanho é apertado de propósito. O estado inteiro da conta viaja como um
- * JSON só, e a foto ainda vai junto no ranking, uma por linha — a 192px em
- * JPEG isso dá uns 12KB, então trinta pessoas no placar custam menos que uma
- * única foto de câmera.
- */
-async function avatarFileToDataUrl(file: File) {
-  const original = await readFileAsDataUrl(file);
-  const image = await loadImage(original);
-  const lado = Math.min(image.width, image.height);
-  const alvo = 192;
-  const canvas = document.createElement("canvas");
-  canvas.width = alvo;
-  canvas.height = alvo;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Nao foi possivel preparar a imagem.");
-  context.drawImage(image, (image.width - lado) / 2, (image.height - lado) / 2, lado, lado, 0, 0, alvo, alvo);
-  return canvas.toDataURL("image/jpeg", 0.72);
 }
 
 async function inflateRaw(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
@@ -1241,7 +1237,7 @@ function toggleDone(task: Task, done: boolean): Task {
   return { ...task, done, doneAt: done ? Date.now() : undefined };
 }
 
-function toggleStudied(material: Material, studied: boolean): Material {
+export function toggleStudied(material: Material, studied: boolean): Material {
   return { ...material, studied, studiedAt: studied ? Date.now() : undefined };
 }
 
@@ -2127,12 +2123,12 @@ function App() {
   const currentSubject = route.view === "subject" ? userData.subjects.find((item) => item.id === route.id) : undefined;
   const content = (() => {
     if (route.view === "subject" && currentSubject) {
-      return <SubjectView subject={currentSubject} data={userData} setModal={setModal} update={update} notify={notify} setSelectedSubjectId={setSelectedSubjectId} />;
+      return <React.Suspense fallback={<PageLoading />}><SubjectView subject={currentSubject} data={userData} setModal={setModal} update={update} notify={notify} setSelectedSubjectId={setSelectedSubjectId} /></React.Suspense>;
     }
     if (route.view === "agenda") return <React.Suspense fallback={<PageLoading />}><AgendaView data={userData} user={user} setModal={setModal} update={update} notify={notify} /></React.Suspense>;
     if (route.view === "foco") return <FocusView data={userData} user={user} update={update} notify={notify} />;
     if (route.view === "progress") return <ProgressView data={userData} user={user} />;
-    if (route.view === "ranking") return <RankingView user={user} update={update} notify={notify} />;
+    if (route.view === "ranking") return <React.Suspense fallback={<PageLoading />}><RankingView user={user} update={update} notify={notify} /></React.Suspense>;
     if (route.view === "mine") {
       return (
         <MineView
@@ -2869,7 +2865,7 @@ function App() {
         />
       );
     }
-    if (route.view === "games") return <React.Suspense fallback={<PageLoading />}><GamesView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "games") return <React.Suspense fallback={<PageLoading />}><GamesView data={userData} user={user} update={update} tabInicial={route.id} /></React.Suspense>;
     if (route.view === "atelie") return <React.Suspense fallback={<PageLoading />}><AtelieView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "redacao") return <React.Suspense fallback={<PageLoading />}><RedacaoView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "atividades") return <React.Suspense fallback={<PageLoading />}><AtividadesView data={userData} user={user} update={update} /></React.Suspense>;
@@ -2886,9 +2882,9 @@ function App() {
     if (route.view === "suggestions") return <SuggestionsView data={userData} user={user} update={update} notify={notify} setModal={setModal} />;
     if (route.view === "about") return <AboutView />;
     if (route.view === "como-usar") return <React.Suspense fallback={<PageLoading />}><ComoUsarView /></React.Suspense>;
-    if (route.view === "perfil") return <ProfileView user={user} data={userData} update={update} notify={notify} logout={logout} targetId={route.id} />;
+    if (route.view === "perfil") return <React.Suspense fallback={<PageLoading />}><ProfileView user={user} data={userData} update={update} notify={notify} logout={logout} targetId={route.id} /></React.Suspense>;
     if (route.view === "admin") return hasAdminAccess ? <React.Suspense fallback={<AdminSkeleton />}><AdminView data={data} syncStatus={syncStatus} databaseMode={databaseMode} section={route.id} currentUserId={user.id} onDeleteUser={requestDeleteUser} onDeleteComment={requestDeleteComment} update={update} notify={notify} setModal={setModal} themeMode={appearance.themeMode} onToggleTheme={() => changeAppearance({ themeMode: appearance.themeMode === "dark" ? "light" : "dark" })} /></React.Suspense> : <AdminRestrictedView />;
-    return <HomeView data={userData} userId={user.id} displayName={displayName} accentColor={appearance.accentColor} themeMode={appearance.themeMode} setModal={setModal} update={update} openCommand={() => setCommandOpen(true)} openMine={(subjectId) => { setSelectedSubjectId(subjectId); go("mine"); }} />;
+    return <HomeView data={userData} userId={user.id} provasConta={user.settings.provas} displayName={displayName} accentColor={appearance.accentColor} themeMode={appearance.themeMode} setModal={setModal} update={update} openCommand={() => setCommandOpen(true)} openMine={(subjectId) => { setSelectedSubjectId(subjectId); go("mine"); }} />;
   })();
 
   return (
@@ -3069,6 +3065,28 @@ export function Input({
   );
 }
 
+/**
+ * Quais áreas do menu estão abertas. Ao trocar de tela, fica aberta só a área
+ * dela (as outras fecham), para o menu nunca virar a lista comprida de antes;
+ * o aluno ainda pode abrir outras à mão para espiar.
+ */
+function useOpenAreas(route: View) {
+  const [openAreas, setOpenAreas] = useState<NavArea[]>(() => {
+    const current = areaOf(route);
+    return current ? [current] : [];
+  });
+
+  useEffect(() => {
+    const current = areaOf(route);
+    setOpenAreas(current ? [current] : []);
+  }, [route]);
+
+  const toggleArea = useCallback((id: NavArea) => {
+    setOpenAreas((areas) => (areas.includes(id) ? areas.filter((area) => area !== id) : [...areas, id]));
+  }, []);
+
+  return { openAreas, toggleArea };
+}
 
 function WorkspaceSidebar({
   route,
@@ -3089,6 +3107,7 @@ function WorkspaceSidebar({
   hidden: boolean;
   onHide: () => void;
 }) {
+  const { openAreas, toggleArea } = useOpenAreas(route);
 
   return (
     <aside
@@ -3118,40 +3137,93 @@ function WorkspaceSidebar({
       {/* Divisórias do caderno: cada grupo tem a cor de uma aba de fichário,
           e a aba aberta avança até encostar na folha. */}
       <nav aria-label="Todas as áreas" className="caderno-tabs minerva-scroll relative min-h-0 flex-1 overflow-y-auto py-4 pl-3">
-        {navGroups.map((group, groupIndex) => {
+        <button
+          onClick={() => go("home")}
+          aria-current={route === "home" ? "page" : undefined}
+          data-tone="capa"
+          data-tour="home"
+          className="caderno-tab relative mb-3 flex min-h-10 w-full items-center gap-3 text-left text-[13px] font-bold"
+        >
+          <Home className="relative h-4 w-4 shrink-0" />
+          <span className="relative min-w-0 flex-1 truncate">Início</span>
+        </button>
+        {navGroups.map((group) => {
           const items = group.views
+            .filter((view) => !hiddenFromMenu.includes(view))
             .map(navItemOf)
-            .filter((item): item is { view: View; label: string; icon: LucideIcon } => Boolean(item) && (item!.view !== "admin" || isAdmin));
-          if (!items.length) return null;
-          const tone = ["estudo", "ia", "com", "conta"][groupIndex] || "estudo";
+            .filter((item): item is { view: View; label: string; icon: LucideIcon } => Boolean(item));
+          const isOpen = openAreas.includes(group.id);
+          const hasActive = group.views.includes(route);
+          const GroupIcon = group.icon;
           return (
-            <section key={group.label} className="mb-3 last:mb-0">
-              <p className="caderno-tab-group mb-1.5 px-2 font-mono text-[10px] uppercase tracking-[.14em]">{group.label}</p>
-              <div className="grid gap-[3px]">
-                {items.map((item) => {
-                  const Icon = item.icon;
-                  const active = route === item.view;
-                  return (
-                    <button
-                      key={item.view}
-                      onClick={() => go(item.view)}
-                      aria-current={active ? "page" : undefined}
-                      data-tone={tone}
-                      data-tour={item.view}
-                      className="caderno-tab group relative flex min-h-10 w-full items-center gap-3 text-left text-[13px] font-bold"
-                    >
-                      <Icon className="relative h-4 w-4 shrink-0" />
-                      <span className="relative min-w-0 flex-1 truncate">{item.label}</span>
-                    </button>
-                  );
-                })}
+            <section key={group.id} className="caderno-area mb-1.5 last:mb-0" data-area={group.id} data-open={isOpen ? "true" : "false"}>
+              <button
+                type="button"
+                onClick={() => toggleArea(group.id)}
+                aria-expanded={isOpen}
+                aria-controls={`area-${group.id}`}
+                className="caderno-area-head flex w-[calc(100%-0.9rem)] items-center gap-2.5 text-left"
+              >
+                <span className="caderno-area-dot grid h-7 w-7 shrink-0 place-items-center rounded-[.55rem]">
+                  <GroupIcon className="h-[15px] w-[15px]" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-black leading-tight">{group.label}</span>
+                  {!isOpen ? <span className="block truncate text-[10.5px] font-bold leading-tight opacity-55">{group.hint}</span> : null}
+                </span>
+                {hasActive && !isOpen ? <span className="caderno-area-here h-2 w-2 shrink-0 rounded-full" aria-label="Você está aqui" /> : null}
+                <ChevronRight className="caderno-area-chevron h-4 w-4 shrink-0 opacity-50" />
+              </button>
+              <div id={`area-${group.id}`} className="caderno-area-body" hidden={!isOpen}>
+                <div className="grid gap-[3px] pb-2 pt-1.5">
+                  {items.map((item) => {
+                    const Icon = item.icon;
+                    const active = route === item.view;
+                    return (
+                      <button
+                        key={item.view}
+                        onClick={() => go(item.view)}
+                        aria-current={active ? "page" : undefined}
+                        data-tone={group.id}
+                        data-tour={item.view}
+                        className="caderno-tab group relative flex min-h-10 w-full items-center gap-3 text-left text-[13px] font-bold"
+                      >
+                        <Icon className="relative h-4 w-4 shrink-0" />
+                        <span className="relative min-w-0 flex-1 truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </section>
           );
         })}
       </nav>
 
-      <button onClick={() => go("progress")} className="relative m-3 mt-0 flex min-h-[4rem] shrink-0 items-center gap-3 border-t border-white/10 px-2 pt-3 text-left transition hover:text-mint">
+      <div className="caderno-account mx-3 flex shrink-0 items-center gap-1 border-t border-white/10 pt-2" aria-label="Conta">
+        {accountViews
+          .filter((view) => view !== "admin" || isAdmin)
+          .map((view) => {
+            const item = navItemOf(view);
+            if (!item) return null;
+            const Icon = item.icon;
+            return (
+              <button
+                key={view}
+                onClick={() => go(view)}
+                aria-current={route === view ? "page" : undefined}
+                aria-label={item.label}
+                title={item.label}
+                data-tour={view}
+                className="caderno-account-btn grid h-9 flex-1 place-items-center rounded-[.6rem] text-white/45 transition-colors hover:bg-white/[0.06] hover:text-white"
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            );
+          })}
+      </div>
+
+      <button onClick={() => go("progress")} className="relative m-3 mt-1 flex min-h-[3.5rem] shrink-0 items-center gap-3 px-2 text-left transition hover:text-mint">
         <span className="relative grid h-10 w-10 shrink-0 place-items-center">
           <svg className="absolute inset-0 h-10 w-10 -rotate-90" viewBox="0 0 40 40" aria-hidden>
             <circle cx="20" cy="20" r="18" fill="none" stroke="rgb(var(--line))" strokeWidth="2" />
@@ -3189,7 +3261,7 @@ function UtilityHeader({
   onShowNav: () => void;
   onOpenCommand: () => void;
 }) {
-  const current = navItemOf(route);
+  const current = route === "subject" ? { label: "Matéria", icon: BookOpen } : navItemOf(route);
   const Icon = current?.icon || LayoutDashboard;
 
   return (
@@ -3460,7 +3532,7 @@ function CommandPalette({
   );
 }
 
-function AppearanceControls({
+export function AppearanceControls({
   appearance,
   onChange,
   floating = false,
@@ -3559,27 +3631,39 @@ function MobileNav({ route, isAdmin, displayName, avatar, level }: { route: View
                   <Award className="h-3.5 w-3.5" /> Nível {level}
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {rest.map((item, index) => {
-                  const Icon = item.icon;
-                  const active = route === item.view;
-                  return (
-                    <motion.button
-                      key={item.view}
-                      onClick={() => go(item.view)}
-                      initial={reduced ? false : { opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: reduced ? 0 : index * 0.035, ease: ease.out }}
-                      className={`grid place-items-center gap-1.5 rounded-[.85rem] border p-3 text-[11px] font-black transition ${
-                        active ? "border-mint bg-mint text-black" : "border-white/10 bg-white/[0.025] text-white/65 active:scale-95"
-                      }`}
-                    >
-                      <Icon className="h-5 w-5" />
-                      <span className="line-clamp-2 w-full text-center leading-tight">{item.label}</span>
-                    </motion.button>
-                  );
-                })}
-              </div>
+              {[...navGroups.map((group) => ({ id: group.id as string, label: group.label, views: group.views })), { id: "conta", label: "Conta", views: accountViews }].map((group, groupIndex) => {
+                const items = rest.filter((item) => group.views.includes(item.view));
+                if (!items.length) return null;
+                return (
+                  <section key={group.id} className="caderno-area mb-3 last:mb-0" data-area={group.id}>
+                    <p className="mb-1.5 flex items-center gap-2 text-[11px] font-black uppercase tracking-[.14em] text-white/45">
+                      <span className="caderno-area-here h-2 w-2 rounded-full" aria-hidden />
+                      {group.label}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {items.map((item, index) => {
+                        const Icon = item.icon;
+                        const active = route === item.view;
+                        return (
+                          <motion.button
+                            key={item.view}
+                            onClick={() => go(item.view)}
+                            initial={reduced ? false : { opacity: 0, y: 14 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: reduced ? 0 : (groupIndex * 2 + index) * 0.025, ease: ease.out }}
+                            className={`grid place-items-center gap-1.5 rounded-[.85rem] border p-3 text-[11px] font-black transition ${
+                              active ? "border-mint bg-mint text-black" : "border-white/10 bg-white/[0.025] text-white/65 active:scale-95"
+                            }`}
+                          >
+                            <Icon className="h-5 w-5" />
+                            <span className="line-clamp-2 w-full text-center leading-tight">{item.label}</span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
               <button
                 onClick={() => go("perfil")}
                 className="mt-3 flex w-full items-center gap-3 rounded-[.9rem] border border-white/10 bg-white/[0.035] p-3 text-left"
@@ -3726,9 +3810,11 @@ function HomeView({
   openCommand,
   openMine,
   userId,
+  provasConta,
 }: {
   data: ReturnType<typeof useMemoUserData>;
   userId: string;
+  provasConta?: User["settings"]["provas"];
   displayName: string;
   accentColor: string;
   themeMode: ThemeMode;
@@ -3819,15 +3905,19 @@ function HomeView({
     const start = today() - (6 - index) * 86400000;
     return data.sessions.some((session) => session.createdAt >= start && session.createdAt < start + 86400000);
   });
+  // Caderno de erros: o da conta somado ao deste navegador (a aba Provas sincroniza os dois).
   const provasResumo = useMemo(() => {
+    let local: Array<{ id?: string; status?: string }> = [];
     try {
       const salvo = JSON.parse(localStorage.getItem(`minerva:provas:${userId}`) || "{}");
-      const caderno: Array<{ status?: string }> = Array.isArray(salvo.caderno) ? salvo.caderno : [];
-      return { pendentes: caderno.filter((item) => item.status !== "dominado").length, feitas: Array.isArray(salvo.historico) ? salvo.historico.length : 0 };
+      if (Array.isArray(salvo.caderno)) local = salvo.caderno;
     } catch {
-      return { pendentes: 0, feitas: 0 };
+      // sem armazenamento local: vale o da conta
     }
-  }, [userId]);
+    const porId = new Map<string, { status?: string }>();
+    for (const item of [...((provasConta?.caderno || []) as Array<{ id?: string; status?: string }>), ...local]) if (item?.id) porId.set(item.id, item);
+    return { pendentes: [...porId.values()].filter((item) => item.status !== "dominado").length };
+  }, [userId, provasConta]);
 
   // ── Estante em órbita (nov/2026): uma matéria por vez, a mais urgente primeiro ──
   const diaCurto = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -3937,6 +4027,71 @@ function HomeView({
       : `Tudo em dia por aqui! ${data.materials.length ? `Você já estudou ${studied} de ${data.materials.length} conteúdos.` : ""} Bom dia pra adiantar um conteúdo ou testar o que já sabe num jogo.`;
   const dataHoje = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
+  // ── Cartão "Hoje" (nov/2026): três passos que respondem "o que eu faço agora?" ──
+  const desafioFeito = data.sessions.some((session) => session.dailyChallenge && session.dailyKey === dailyChallengeKey());
+  const tarefaFoco = pendingTasks.find((task) => task.dueAt < today() + 86400000) || proximaProva;
+  const materiaFoco = tarefaFoco ? data.subjects.find((subject) => subject.id === tarefaFoco.subjectId)?.name : undefined;
+  const feitasHoje = data.tasks.filter((task) => task.done && (task.doneAt || 0) >= today()).length;
+  const passosHoje: PassoHoje[] = [
+    tarefaFoco
+      ? {
+          id: "tarefa",
+          tom: tarefaFoco.dueAt < today() ? "rosa" : "amarelo",
+          rotulo: tarefaFoco.dueAt < today() ? "atrasada" : tarefaFoco.kind === "prova" ? quandoProva(tarefaFoco.dueAt) : "pra hoje",
+          titulo: tarefaFoco.title,
+          detalhe: materiaFoco ? `${materiaFoco} · abrir na agenda` : "abrir na agenda",
+          feito: false,
+          onClick: () => go(tarefaFoco.kind === "prova" && tarefaFoco.dueAt >= today() ? "provas" : "agenda"),
+        }
+      : {
+          id: "tarefa",
+          tom: "amarelo",
+          rotulo: "agenda",
+          titulo: feitasHoje ? `${feitasHoje} ${feitasHoje === 1 ? "entrega feita" : "entregas feitas"} hoje` : "Nada vencendo hoje",
+          detalhe: pendingTasks.length ? `próxima: ${pendingTasks[0].title}` : "anote a próxima tarefa",
+          feito: true,
+          onClick: () => go("agenda"),
+        },
+    provasResumo.pendentes
+      ? {
+          id: "erros",
+          tom: "lilas",
+          rotulo: "revisar",
+          titulo: `${provasResumo.pendentes} ${provasResumo.pendentes === 1 ? "erro" : "erros"} de prova para estudar`,
+          detalhe: "a Mine explica cada um",
+          feito: false,
+          onClick: () => go("provas"),
+        }
+      : dueCards
+        ? {
+            id: "erros",
+            tom: "lilas",
+            rotulo: "revisar",
+            titulo: `${dueCards} ${dueCards === 1 ? "flashcard" : "flashcards"} para revisar`,
+            detalhe: "uns 5 minutinhos",
+            feito: false,
+            onClick: () => setModal({ type: "flashcards", subjectId: dueBySubject[0]?.subject.id || data.subjects[0]?.id || "" }),
+          }
+        : {
+            id: "erros",
+            tom: "lilas",
+            rotulo: "testar",
+            titulo: "Fazer uma prova rápida",
+            detalhe: "nenhum erro pendente: hora de testar",
+            feito: false,
+            onClick: () => go("provas"),
+          },
+    {
+      id: "desafio",
+      tom: "menta",
+      rotulo: "desafio do dia",
+      titulo: desafioFeito ? "Desafio de hoje concluído" : "5 perguntas rápidas",
+      detalhe: desafioFeito ? "volte amanhã para outro" : "vale XP e mantém a sequência",
+      feito: desafioFeito,
+      onClick: () => go("games", "diario"),
+    },
+  ];
+
   return (
     <HomeEstante
       saudacao={greeting()}
@@ -3970,6 +4125,7 @@ function HomeView({
       }}
       onNovaMateria={() => setModal({ type: "subject" })}
       dataHoje={dataHoje}
+      passosHoje={passosHoje}
       proximos={proximosDias}
       xpHoje={xpSince(data, today())}
       estudados={studied}
@@ -4524,578 +4680,6 @@ function MinePromo() {
           <ArrowRight className="ml-auto h-5 w-5 shrink-0 transition-transform duration-control group-hover:translate-x-1" />
         </div>
     </motion.button>
-  );
-}
-
-function SubjectView({
-  subject,
-  data,
-  setModal,
-  update,
-  notify,
-  setSelectedSubjectId,
-}: {
-  subject: Subject;
-  data: ReturnType<typeof useMemoUserData>;
-  setModal: (modal: Modal | null) => void;
-  update: (next: (draft: AppData) => AppData) => void;
-  notify: (message: string) => void;
-  setSelectedSubjectId: (id: string | undefined) => void;
-}) {
-  const Icon = iconMap[subject.icon];
-  const materials = data.materials.filter((item) => item.subjectId === subject.id);
-  const tasks = data.tasks.filter((item) => item.subjectId === subject.id);
-  const studied = materials.filter((item) => item.studied).length;
-  const dueCards = data.flashcards.filter((item) => item.subjectId === subject.id && item.dueAt <= Date.now()).length;
-  const [deskMaterialId, setDeskMaterialId] = useState<string | undefined>(() => materials.slice().sort((a, b) => b.createdAt - a.createdAt)[0]?.id);
-  const deskMaterial = materials.find((item) => item.id === deskMaterialId) || materials[0];
-
-  useEffect(() => {
-    if (!materials.length) {
-      setDeskMaterialId(undefined);
-      return;
-    }
-    if (!materials.some((item) => item.id === deskMaterialId)) setDeskMaterialId(materials[0].id);
-  }, [deskMaterialId, materials]);
-
-  function confirmDeleteSubject() {
-    setModal({
-      type: "confirm",
-      title: "Excluir matéria?",
-      body: `"${subject.name}" será apagada com todos os conteúdos, tarefas, flashcards e conversas dela. Essa ação não tem volta.`,
-      onConfirm: () => {
-        update((draft) => ({
-          ...draft,
-          subjects: draft.subjects.filter((item) => item.id !== subject.id),
-          materials: draft.materials.filter((item) => item.subjectId !== subject.id),
-          tasks: draft.tasks.filter((item) => item.subjectId !== subject.id),
-          chats: draft.chats.filter((item) => item.subjectId !== subject.id),
-          sessions: draft.sessions.filter((item) => item.subjectId !== subject.id),
-          flashcards: draft.flashcards.filter((item) => item.subjectId !== subject.id),
-        }));
-        notify("Matéria excluída.");
-        go("home");
-      },
-    });
-  }
-
-  /**
-   * "Mine ao lado": responde no próprio caderno da matéria, sem trocar de
-   * página (relatório de QA de 16/11). A pergunta e a resposta também entram
-   * na conversa da matéria, para continuar lá se o aluno quiser.
-   */
-  async function askAside(label: string, material: Material) {
-    const prompt = `${label} com foco no material "${material.title}".`;
-    const body = (material.content?.trim() || material.detail?.trim() || "").slice(0, 12000);
-    const others = materials
-      .filter((item) => item.id !== material.id)
-      .slice(0, 8)
-      .map((item) => `- ${item.title}: ${(item.content?.trim() || item.detail?.trim() || "").slice(0, 600) || "sem detalhe"}`)
-      .join("\n");
-    const context = [
-      `Materia: ${subject.name}.`,
-      `Material em foco: ${material.title}${material.type === "image" ? " [imagem enviada]" : ""}`,
-      body ? `Texto do material:\n${body}` : "",
-      others ? `Outros conteudos da materia (use se ajudar):\n${others}` : "",
-      "Responda de forma curta e direta: cabe num painel lateral pequeno.",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-    const attachments = materialsToImageAttachments([material]);
-    const assistant = await requestAssistantResponse({ prompt, history: [], context, attachments });
-    const reply = assistant.reply.trim() || "Não consegui analisar agora. Tente novamente em instantes.";
-    const now = Date.now();
-    update((draft) => ({
-      ...draft,
-      chats: [
-        ...draft.chats,
-        { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "user", text: prompt, createdAt: now },
-        { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "mine", text: reply, createdAt: now + 1 },
-      ],
-    }));
-    return reply;
-  }
-
-  async function runQuick(label: string) {
-    const fullPrompt = `${label} com base nos conteúdos que adicionei na matéria ${subject.name}. Use o que está cadastrado nesta matéria.`;
-    update((draft) => ({
-      ...draft,
-      chats: [...draft.chats, { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "user", text: fullPrompt, createdAt: Date.now() }],
-    }));
-    setSelectedSubjectId(subject.id);
-    go("mine");
-    let quickBudget = 40_000;
-    const contentLines = materials
-      .map((item) => {
-        const body = (item.content?.trim() || item.detail?.trim() || "").slice(0, Math.max(0, Math.min(4000, quickBudget)));
-        quickBudget -= body.length;
-        return `- ${item.title}${item.type === "image" ? " [imagem enviada]" : ""}: ${body || "sem detalhe"}`;
-      })
-      .join("\n");
-    const context = `Materia: ${subject.name}.\nConteudos desta materia (analise TODOS para responder):\n${contentLines || "- nenhum conteudo ainda"}`;
-    const imageAttachments = materialsToImageAttachments(materials);
-    try {
-      const assistant = await requestAssistantResponse({ prompt: fullPrompt, history: [], context, attachments: imageAttachments });
-      const reply = assistant.reply.trim() || "Não consegui analisar agora. Tente novamente em instantes.";
-      update((draft) => ({
-        ...draft,
-        chats: [...draft.chats, { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "mine", text: reply, createdAt: Date.now() + 1 }],
-      }));
-    } catch {
-      update((draft) => ({
-        ...draft,
-        chats: [...draft.chats, { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "mine", text: "Tive um problema para responder agora. Tente de novo em instantes.", createdAt: Date.now() + 1 }],
-      }));
-    }
-  }
-
-  return (
-    <>
-      <PageHeader
-        eyebrow="Matéria"
-        title={subject.name}
-        subtitle={(() => {
-          const open = tasks.filter((task) => !task.done).length;
-          return `${materials.length} ${materials.length === 1 ? "conteúdo" : "conteúdos"} · ${open} ${open === 1 ? "tarefa aberta" : "tarefas abertas"}`;
-        })()}
-        action={
-          <>
-            <IconButton icon={ChevronLeft} label="Voltar" onClick={() => go("home")} />
-            <IconButton icon={Trash2} label="Excluir matéria" onClick={confirmDeleteSubject} />
-            <PrimaryButton onClick={() => setModal({ type: "material", subjectId: subject.id })} icon={Plus}>
-              Adicionar conteúdo
-            </PrimaryButton>
-          </>
-        }
-      />
-      <div className="grid min-w-0 gap-5">
-        <Reveal className="min-w-0">
-          <HeroCard>
-            {/* Capa da matéria: etiqueta colada, barra de progresso a marca-texto
-                com o lápis na ponta e as ferramentas como fichas de fichário. */}
-            <div className="caderno-subj">
-              <div className="caderno-subj-grid">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="caderno-subj-sticker" style={{ "--subj": subject.color } as React.CSSProperties}>
-                      <Icon className="h-7 w-7" />
-                    </span>
-                    <span className="caderno-note">painel da matéria</span>
-                  </div>
-                  <h2 className="caderno-subj-title">
-                    Conteúdos, tarefas e revisões <span className="caderno-hl">na mesma página</span>.
-                  </h2>
-                  <div className="mt-5">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="caderno-subj-label">progresso da matéria</span>
-                      <span className="caderno-subj-percent tabular">{percent(studied, Math.max(materials.length, 1))}%</span>
-                    </div>
-                    <div className="caderno-subj-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(studied, Math.max(materials.length, 1))} aria-label="Progresso da matéria">
-                      <span className="caderno-subj-bar-fill" style={{ "--p": `${percent(studied, Math.max(materials.length, 1))}%`, "--subj": subject.color } as React.CSSProperties}>
-                        <span className="caderno-subj-pencil" aria-hidden>✎</span>
-                      </span>
-                    </div>
-                  </div>
-                  <div className="caderno-subj-stats">
-                    {[
-                      { value: studied, label: "estudados", tone: "mint" },
-                      { value: Math.max(materials.length - studied, 0), label: "pendentes", tone: "pink" },
-                      { value: materials.length, label: "no total", tone: "lilac" },
-                    ].map((stat, index) => (
-                      <div key={stat.label} className={`caderno-subj-stat is-${stat.tone}`} style={{ "--i": index } as React.CSSProperties}>
-                        <strong className="tabular">{stat.value}</strong>
-                        <span>{stat.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <Stagger className="grid content-start gap-2.5" gap={0.07}>
-                  <StaggerItem>
-                    <button
-                      onClick={() => {
-                        setSelectedSubjectId(subject.id);
-                        go("mine");
-                      }}
-                      className="caderno-subj-mine group"
-                    >
-                      <Bot className="h-5 w-5" /> Abrir Mine
-                      <ArrowRight className="ml-auto h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </button>
-                  </StaggerItem>
-                  {(
-                    [
-                      { icon: Layers, label: dueCards > 0 ? `Flashcards (${dueCards} hoje)` : "Flashcards", modal: { type: "flashcards" as const, subjectId: subject.id }, badge: dueCards, tone: "yellow" },
-                      { icon: ClipboardCheck, label: "Modo prova", modal: { type: "quiz" as const, subjectId: subject.id }, badge: 0, tone: "pink" },
-                      { icon: Wand2, label: "Mapa mental", modal: { type: "mindmap" as const, subjectId: subject.id }, badge: 0, tone: "lilac" },
-                    ] as const
-                  ).map((entry) => (
-                    <StaggerItem key={entry.label}>
-                      <button onClick={() => setModal(entry.modal)} className={`caderno-subj-tool is-${entry.tone} group`}>
-                        <entry.icon className="h-5 w-5 shrink-0" />
-                        <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-                        {entry.badge > 0 ? (
-                          <span className="caderno-subj-badge">{entry.badge}</span>
-                        ) : (
-                          <ArrowRight className="h-4 w-4 shrink-0 opacity-50 transition group-hover:translate-x-1 group-hover:opacity-100" />
-                        )}
-                      </button>
-                    </StaggerItem>
-                  ))}
-                </Stagger>
-              </div>
-            </div>
-          </HeroCard>
-        </Reveal>
-
-        <Reveal delay={0.06} className="min-w-0">
-          <GlassCard>
-            <SectionTitle icon={Sparkles} title="Ações inteligentes" hint="a Mine lê tudo que está nesta matéria" />
-            <Stagger className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" gap={0.06}>
-              {[
-                { label: "Gerar resumo", hint: "Um panorama do conteúdo", icon: FileText, accent: "#34D399" },
-                { label: "Criar perguntas", hint: "Teste o que você fixou", icon: ClipboardCheck, accent: "#38BDF8" },
-                { label: "Plano de revisão", hint: "O que revisar e quando", icon: CalendarCheck, accent: "#A78BFA" },
-                { label: "Explicar do zero", hint: "Como se fosse a 1ª vez", icon: Brain, accent: "#FBBF24" },
-              ].map((item) => (
-                <StaggerItem key={item.label} className="h-full">
-                  <button
-                    onClick={() => runQuick(item.label)}
-                    className="group relative h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] p-5 text-left transition-control duration-control hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.075]"
-                  >
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-0 blur-2xl transition-opacity duration-surface group-hover:opacity-50"
-                      style={{ background: item.accent }}
-                    />
-                    <span
-                      className="relative grid h-11 w-11 place-items-center rounded-xl transition-transform duration-control group-hover:scale-110"
-                      style={{ backgroundColor: `${item.accent}1f`, color: item.accent }}
-                    >
-                      <item.icon className="h-5 w-5" />
-                    </span>
-                    <p className="relative mt-6 font-display text-[1.15rem] font-black leading-tight">{item.label}</p>
-                    <p className="relative mt-1 text-[13px] text-white/48">{item.hint}</p>
-                    <ArrowRight className="relative mt-4 h-4 w-4 -translate-x-1 text-mint opacity-0 transition-control duration-control group-hover:translate-x-0 group-hover:opacity-100" />
-                  </button>
-                </StaggerItem>
-              ))}
-            </Stagger>
-          </GlassCard>
-        </Reveal>
-
-        <SubjectNotebook
-          subject={subject}
-          materials={materials}
-          selectedMaterial={deskMaterial}
-          selectMaterial={setDeskMaterialId}
-          openMaterial={(materialId) => setModal({ type: "materialView", materialId })}
-          addMaterial={() => setModal({ type: "material", subjectId: subject.id })}
-          askMine={(prompt) => void runQuick(prompt)}
-          askAside={askAside}
-          openConversation={() => {
-            setSelectedSubjectId(subject.id);
-            go("mine");
-          }}
-          markStudied={(materialId) =>
-            update((draft) => ({
-              ...draft,
-              materials: draft.materials.map((item) => (item.id === materialId ? toggleStudied(item, true) : item)),
-            }))
-          }
-        />
-
-        <div className="grid gap-5 xl:grid-cols-[1.35fr_.85fr]">
-          <Reveal delay={0.1} className="min-w-0">
-            <GlassCard className="h-full">
-              <SectionTitle
-                icon={Folder}
-                title="Conteúdos"
-                hint={materials.length ? `${studied} de ${materials.length} estudados` : undefined}
-                action={
-                  <SecondaryButton icon={Plus} onClick={() => setModal({ type: "material", subjectId: subject.id })}>
-                    Adicionar
-                  </SecondaryButton>
-                }
-              />
-              <Stagger className="mt-4 space-y-2.5" gap={0.04}>
-                {materials.map((material) => (
-                  <StaggerItem key={material.id}>
-                    <MaterialRow material={material} update={update} open={() => setModal({ type: "materialView", materialId: material.id })} />
-                  </StaggerItem>
-                ))}
-              </Stagger>
-              {!materials.length ? (
-                <EmptyState
-                  icon={Folder}
-                  title="Sem conteúdo ainda"
-                  text="Adicione arquivo, link, imagem ou anotação. Tudo que entrar aqui vira contexto para a Mine responder."
-                  action={
-                    <PrimaryButton icon={Plus} onClick={() => setModal({ type: "material", subjectId: subject.id })}>
-                      Adicionar conteúdo
-                    </PrimaryButton>
-                  }
-                />
-              ) : null}
-            </GlassCard>
-          </Reveal>
-
-          <Reveal delay={0.14} direction="left" className="min-w-0">
-            <GlassCard className="h-full">
-              <SectionTitle
-                icon={CalendarCheck}
-                title="Tarefas"
-                action={
-                  <SecondaryButton icon={Plus} onClick={() => setModal({ type: "task", subjectId: subject.id })}>
-                    Nova
-                  </SecondaryButton>
-                }
-              />
-              <Stagger className="mt-4 space-y-2.5" gap={0.04}>
-                {tasks.map((task) => (
-                  <StaggerItem key={task.id}>
-                    <TaskRow
-                      task={task}
-                      subject={subject}
-                      toggle={() =>
-                        update((draft) => ({
-                          ...draft,
-                          tasks: setTaskDone(draft.tasks, task.id, undefined),
-                        }))
-                      }
-                      remove={() => {
-                        update((draft) => ({ ...draft, tasks: draft.tasks.filter((item) => item.id !== task.id) }));
-                        notify("Tarefa excluída.");
-                      }}
-                    />
-                  </StaggerItem>
-                ))}
-              </Stagger>
-              {!tasks.length ? (
-                <EmptyState icon={CalendarCheck} title="Sem tarefas" text="Crie uma tarefa com prazo para esta matéria e ela aparece na Agenda." />
-              ) : null}
-            </GlassCard>
-          </Reveal>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function SubjectNotebook({
-  subject,
-  materials,
-  selectedMaterial,
-  selectMaterial,
-  openMaterial,
-  addMaterial,
-  askAside,
-  openConversation,
-  markStudied,
-}: {
-  subject: Subject;
-  materials: Material[];
-  selectedMaterial?: Material;
-  selectMaterial: (materialId: string) => void;
-  openMaterial: (materialId: string) => void;
-  addMaterial: () => void;
-  askMine: (prompt: string) => void;
-  askAside: (label: string, material: Material) => Promise<string>;
-  openConversation: () => void;
-  markStudied: (materialId: string) => void;
-}) {
-  const [aside, setAside] = useState<{ materialId: string; label: string; status: "loading" | "done" | "error"; text: string } | null>(null);
-  const asideFor = aside && aside.materialId === selectedMaterial?.id ? aside : null;
-  const runAside = (label: string) => {
-    if (!selectedMaterial || asideFor?.status === "loading") return;
-    const materialId = selectedMaterial.id;
-    setAside({ materialId, label, status: "loading", text: "" });
-    askAside(label, selectedMaterial)
-      .then((text) => setAside((current) => (current && current.materialId === materialId && current.label === label ? { ...current, status: "done", text } : current)))
-      .catch(() =>
-        setAside((current) =>
-          current && current.materialId === materialId ? { ...current, status: "error", text: "Não consegui responder agora. Tente de novo em instantes." } : current,
-        ),
-      );
-  };
-  const previewText = selectedMaterial?.content?.trim() || selectedMaterial?.detail?.trim() || "Este conteúdo ainda não possui texto para pré-visualizar.";
-  const MaterialIcon = selectedMaterial
-    ? selectedMaterial.type === "link" ? LinkIcon : selectedMaterial.type === "file" ? Paperclip : selectedMaterial.type === "image" ? Camera : FileText
-    : BookOpen;
-
-  return (
-    <Reveal delay={0.08} className="min-w-0">
-      {/* O caderno aberto: índice à esquerda, a folha pautada no meio e um
-          post-it da Mine colado na borda. */}
-      <section className="caderno-sn">
-        <header className="caderno-sn-head">
-          <div>
-            <p className="caderno-note">caderno da matéria</p>
-            <h2 className="mt-1 font-display text-xl font-black tracking-[-.03em]">Leia, conecte e pergunte <span className="caderno-hl">sem trocar de página</span>.</h2>
-          </div>
-          <span className="caderno-sn-count">{materials.length} {materials.length === 1 ? "conteúdo" : "conteúdos"} em {subject.name}</span>
-        </header>
-
-        {selectedMaterial ? (
-          <div className="caderno-sn-spread">
-            <aside className="caderno-sn-index">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <p className="caderno-sn-label">índice</p>
-                <button type="button" onClick={addMaterial} aria-label="Adicionar conteúdo ao caderno" className="caderno-sn-add"><Plus className="h-4 w-4" /></button>
-              </div>
-              <ol className="caderno-sn-list minerva-scroll">
-                {materials.map((material, index) => {
-                  const active = material.id === selectedMaterial.id;
-                  return (
-                    <li key={material.id}>
-                      <button
-                        type="button"
-                        onClick={() => selectMaterial(material.id)}
-                        aria-pressed={active}
-                        className={`caderno-sn-entry ${active ? "is-active" : ""}`}
-                      >
-                        <span className="caderno-sn-entry-num">{String(index + 1).padStart(2, "0")}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="caderno-sn-entry-title">{material.title}</span>
-                          <span className="caderno-sn-entry-state">{material.studied ? "✓ estudado" : "pendente"}</span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
-            </aside>
-
-            <article className="caderno-sn-page">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className="caderno-sn-icon"><MaterialIcon className="h-5 w-5" /></span>
-                  <div className="min-w-0">
-                    <p className="caderno-sn-label">lendo agora</p>
-                    <h3 className="caderno-sn-title">{selectedMaterial.title}</h3>
-                  </div>
-                </div>
-                <button type="button" onClick={() => openMaterial(selectedMaterial.id)} className="caderno-sn-open">abrir ↗</button>
-              </div>
-
-              {selectedMaterial.type === "image" && selectedMaterial.dataUrl ? (
-                <figure className="caderno-sn-photo">
-                  <img src={selectedMaterial.dataUrl} alt={selectedMaterial.title} className="max-h-64 w-full object-contain" />
-                </figure>
-              ) : (
-                <div className="caderno-sn-text minerva-scroll">
-                  {previewText.split(/\n+/).map((paragraph, index) => <p key={`${paragraph.slice(0, 20)}-${index}`}>{paragraph}</p>)}
-                </div>
-              )}
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {!selectedMaterial.studied ? (
-                  <button type="button" onClick={(event) => { const el = event.currentTarget; markStudied(selectedMaterial.id); celebrateFrom(el, { count: 18 }); }} className="caderno-sn-done"><Check className="h-4 w-4" /> Marcar estudado</button>
-                ) : <span className="caderno-sn-stamp"><CheckCircle2 className="h-4 w-4" /> estudado!</span>}
-                {selectedMaterial.type === "link" && selectedMaterial.detail ? <a href={selectedMaterial.detail} target="_blank" rel="noreferrer" className="caderno-sn-open">Visitar fonte <ExternalLink className="h-3.5 w-3.5" /></a> : null}
-              </div>
-            </article>
-
-            <aside className="caderno-sn-postit">
-              <span className="caderno-sn-tape" aria-hidden />
-              <div className="flex items-center gap-3">
-                <MineAvatar size="sm" />
-                <div className="min-w-0"><p className="caderno-sn-postit-title">Mine ao lado</p><p className="caderno-sn-postit-sub truncate">sobre: {selectedMaterial.title}</p></div>
-              </div>
-              <p className="caderno-sn-postit-text">Me chama que eu explico este conteúdo, e ainda uso os outros materiais da matéria.</p>
-              <div className="mt-3 space-y-1.5">
-                {[
-                  ["Explicar passo a passo", ListChecks],
-                  ["Criar perguntas", ClipboardCheck],
-                  ["Resumir em tópicos", FileText],
-                ].map(([label, Icon]) => (
-                  <button
-                    key={String(label)}
-                    type="button"
-                    onClick={() => runAside(label as string)}
-                    disabled={asideFor?.status === "loading"}
-                    aria-pressed={asideFor?.label === label}
-                    className="caderno-sn-ask group"
-                  >
-                    {asideFor?.status === "loading" && asideFor.label === label
-                      ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                      : React.createElement(Icon as LucideIcon, { className: "h-4 w-4 shrink-0" })}
-                    <span className="min-w-0 flex-1 truncate">{label as string}</span>
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-1" />
-                  </button>
-                ))}
-              </div>
-              {asideFor ? (
-                <div className="caderno-sn-answer minerva-scroll" role="status" aria-live="polite">
-                  {asideFor.status === "loading" ? (
-                    <p className="caderno-note">a Mine está lendo o material…</p>
-                  ) : asideFor.status === "error" ? (
-                    <p>{asideFor.text}</p>
-                  ) : (
-                    <MineRichText text={asideFor.text} />
-                  )}
-                  {asideFor.status !== "loading" ? (
-                    <button type="button" onClick={openConversation} className="caderno-sn-open mt-2">
-                      continuar na conversa ↗
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </aside>
-          </div>
-        ) : (
-          <div className="p-5 sm:p-8">
-            <EmptyState icon={BookOpen} title="Seu caderno começa com um conteúdo" text="Adicione uma anotação, arquivo, link ou imagem para ler e conversar com a Mine no mesmo espaço." action={<PrimaryButton icon={Plus} onClick={addMaterial}>Adicionar conteúdo</PrimaryButton>} />
-          </div>
-        )}
-      </section>
-    </Reveal>
-  );
-}
-
-function MaterialRow({ material, update, open }: { material: Material; update: (next: (draft: AppData) => AppData) => void; open: () => void }) {
-  const Icon = material.type === "link" ? LinkIcon : material.type === "file" ? Paperclip : material.type === "image" ? Camera : FileText;
-  return (
-    <motion.div
-      whileHover={{ x: 3 }}
-      transition={spring.snappy}
-      className="card-motion-surface group relative flex items-center gap-3.5 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 transition-colors duration-control hover:border-mint/30 hover:bg-white/[0.065]"
-    >
-      {/* barra de estado à esquerda: verde quando estudado */}
-      <span
-        aria-hidden
-        className={`absolute inset-y-2 left-0 w-[3px] rounded-full transition-control duration-control ${material.studied ? "bg-mint" : "bg-white/0 group-hover:bg-white/20"}`}
-      />
-      <button onClick={open} className="flex min-w-0 flex-1 items-center gap-3.5 text-left">
-        <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-mint/12 text-mint transition-transform duration-control group-hover:scale-105">
-          <Icon className="h-[22px] w-[22px]" />
-          {material.favorite ? <Star className="absolute -right-1.5 -top-1.5 h-4 w-4 fill-amberGlow text-amberGlow" /> : null}
-        </span>
-        <span className="min-w-0">
-          <span className={`block truncate font-black leading-tight ${material.studied ? "text-white/65" : ""}`}>{material.title}</span>
-          <span className="block truncate text-[13px] text-white/45">
-            {material.content ? "Texto salvo — a Mine analisa" : material.detail || "Toque para abrir"}
-          </span>
-        </span>
-      </button>
-      <motion.button
-        whileTap={{ scale: 0.94 }}
-        transition={spring.snappy}
-        onClick={(event) => {
-          if (!material.studied) cheer(event.currentTarget, xpPerAction.studied, "Conteúdo estudado!");
-          update((draft) => ({
-            ...draft,
-            materials: draft.materials.map((item) => (item.id === material.id ? toggleStudied(item, !item.studied) : item)),
-          }));
-        }}
-        aria-pressed={material.studied}
-        className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-black transition-colors duration-control ${
-          material.studied ? "bg-mint text-black" : "bg-white/[0.07] text-white/60 hover:bg-white/[0.12] hover:text-white"
-        }`}
-      >
-        <InkCheck checked={material.studied} className="caderno-inkcheck-sm" />
-        {material.studied ? "Estudado" : "Marcar"}
-      </motion.button>
-    </motion.div>
   );
 }
 
@@ -5783,7 +5367,7 @@ type Achievement = AchievementRule & { icon: LucideIcon; value: number };
  * O ícone é a única parte da conquista que não sai de shared/xp.mjs — lá é
  * código que também roda no servidor, e servidor não desenha ícone.
  */
-const achievementIcons: Record<string, LucideIcon> = {
+export const achievementIcons: Record<string, LucideIcon> = {
   "subject-1": BookOpen,
   "subject-5": Layers,
   "material-1": FileText,
@@ -6053,394 +5637,6 @@ function ProgressView({ data, user }: { data: ReturnType<typeof useMemoUserData>
         </Reveal>
       </div>
     </>
-  );
-}
-
-type RankingRow = {
-  id: string;
-  name: string;
-  displayName: string;
-  avatar?: string;
-  you: boolean;
-  friend: boolean;
-  xp: number;
-  level: number;
-  title: string;
-  dayXp: number;
-  weekXp: number;
-  streak: number;
-  focus: number;
-  tasksDone: number;
-  seasonPoints: number;
-  league: string;
-  dailyCorrect: number;
-  dailyDurationMs: number;
-};
-
-type RankingRange = "dayXp" | "weekXp" | "seasonPoints" | "dailyCorrect" | "xp";
-
-const rankingRanges: Array<{ id: RankingRange; label: string; hint: string; unit: string }> = [
-  { id: "dayXp", label: "Hoje", hint: "XP conquistado desde a meia-noite", unit: "XP" },
-  { id: "weekXp", label: "Semana", hint: "XP dos últimos 7 dias", unit: "XP" },
-  { id: "seasonPoints", label: "Temporada", hint: "Pontos dos jogos nesta temporada", unit: "PTS" },
-  { id: "dailyCorrect", label: "Desafio", hint: "Acertos no desafio compartilhado de hoje", unit: "ACERTOS" },
-  { id: "xp", label: "Total", hint: "XP acumulado desde o começo", unit: "XP" },
-];
-
-/**
- * Ranking do site inteiro.
- *
- * Nasceu como placar entre amigos digitados à mão e não funcionava: ninguém
- * sabe o nome de conta de ninguém, então a lista abria vazia. Agora vem todo
- * mundo, e "amigos" virou um filtro por cima — marcar alguém é uma estrela na
- * linha, não um formulário.
- *
- * O XP de cada pessoa é calculado no servidor (POST /api/leaderboard): o
- * navegador nunca recebe os dados de estudo de ninguém além dos próprios — só
- * nome, foto e números.
- */
-function RankingView({
-  user,
-  update,
-  notify,
-}: {
-  user: User;
-  update: (next: (draft: AppData) => AppData) => void;
-  notify: (message: string) => void;
-}) {
-  const friends = useMemo(() => user.settings.friends || [], [user.settings.friends]);
-  const [range, setRange] = useState<RankingRange>("weekXp");
-  const [escopo, setEscopo] = useState<"todos" | "amigos">("todos");
-  const [rows, setRows] = useState<RankingRow[]>([]);
-  const [ocultos, setOcultos] = useState(0);
-  const [busca, setBusca] = useState("");
-  const [status, setStatus] = useState<"carregando" | "pronto" | "erro">("carregando");
-  const [erro, setErro] = useState("");
-  const reduced = useSoftMotion();
-
-  // A lista de amigos entra no corpo do pedido só para o servidor marcar quem
-  // é quem; ela não filtra nada lá — o filtro é local, e por isso trocar de
-  // aba não custa uma ida ao servidor.
-  const friendsRef = useRef(friends);
-  friendsRef.current = friends;
-
-  const carregar = useCallback(async () => {
-    const token = readSession().token;
-    if (!token) {
-      setErro("Entre na sua conta para ver o ranking.");
-      setStatus("erro");
-      return;
-    }
-    setStatus((atual) => (atual === "pronto" ? "pronto" : "carregando"));
-    setErro("");
-    try {
-      const payload = await apiJson<{ rows: RankingRow[]; ocultos: number }>("/api/leaderboard", {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}` },
-        body: JSON.stringify({ friends: friendsRef.current }),
-      });
-      setRows(payload.rows || []);
-      setOcultos(payload.ocultos || 0);
-      setStatus("pronto");
-    } catch (error) {
-      setErro(error instanceof Error ? error.message : "Não consegui carregar o ranking agora.");
-      setStatus("erro");
-    }
-  }, []);
-
-  useEffect(() => {
-    void carregar();
-  }, [carregar]);
-
-  function alternarAmigo(row: RankingRow) {
-    // O servidor só manda o nome da conta de quem já é amigo; os outros viram
-    // amigos pelo id (o servidor reconhece os dois).
-    const chaves = [row.name, row.id].filter(Boolean).map((item) => item.toLowerCase());
-    const jaEra = row.friend || friends.some((item) => chaves.includes(item.toLowerCase()));
-    const proximos = jaEra ? friends.filter((item) => !chaves.includes(item.toLowerCase())) : [...friends, row.name || row.id];
-    update((draft) => ({
-      ...draft,
-      users: draft.users.map((item) => (item.id === user.id ? { ...item, settings: { ...item.settings, friends: proximos } } : item)),
-    }));
-    setRows((atuais) => atuais.map((item) => (item.id === row.id ? { ...item, friend: !jaEra } : item)));
-    notify(jaEra ? `${row.displayName} saiu dos seus amigos.` : `${row.displayName} entrou nos seus amigos.`);
-  }
-
-  // Ordena a lista inteira primeiro: assim a posição mostrada é a posição no
-  // site, e não muda quando a busca ou o filtro de amigos escondem alguém.
-  const ordenado = useMemo(() => {
-    const lista = [...rows].sort((a, b) => {
-      const score = b[range] - a[range];
-      if (score) return score;
-      if (range === "dailyCorrect") {
-        const aTime = a.dailyDurationMs || Number.POSITIVE_INFINITY;
-        const bTime = b.dailyDurationMs || Number.POSITIVE_INFINITY;
-        if (aTime !== bTime) return aTime - bTime;
-      }
-      return b.xp - a.xp;
-    });
-    return lista.map((row, index) => ({ row, position: index + 1 }));
-  }, [rows, range]);
-
-  const termo = normalizeText(busca);
-  const visivel = ordenado.filter(
-    ({ row }) => (escopo === "todos" || row.friend || row.you) && (!termo || normalizeText(row.displayName).includes(termo) || normalizeText(row.name).includes(termo)),
-  );
-  const lider = ordenado[0]?.row[range] || 0;
-  const rangeInfo = rankingRanges.find((item) => item.id === range) || rankingRanges[1];
-  const eu = ordenado.find(({ row }) => row.you);
-  const acimaDeMim = eu && eu.position > 1 ? ordenado[eu.position - 2] : null;
-  const podium = [ordenado[1], ordenado[0], ordenado[2]].filter(Boolean) as Array<{ row: RankingRow; position: number }>;
-  const totalDoPeriodo = ordenado.reduce((total, item) => total + item.row[range], 0);
-  const maiorSequencia = Math.max(0, ...ordenado.map((item) => item.row.streak));
-  const progressoDoLider = eu && lider > 0 ? Math.min(100, Math.round((eu.row[range] / lider) * 100)) : 0;
-
-  return (
-    <div className="ranking-arena">
-      <section className="ranking-hero-grid">
-        <Reveal className="ranking-intro">
-          <p className="caderno-note">ranking da minerva</p>
-          <h1>A estante <span className="caderno-hl">da turma</span></h1>
-          <p>Cada livro na pilha é XP de estudo. Quanto mais você estuda, mais alta fica a sua.</p>
-          <button type="button" onClick={() => void carregar()} className="caderno-btn-pencil ranking-refresh-pencil" disabled={status === "carregando"}>
-            {status === "carregando" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            {status === "carregando" ? "Atualizando" : "Atualizar placar"}
-          </button>
-        </Reveal>
-
-        {eu && status === "pronto" ? (
-          <Reveal delay={0.04} className="ranking-self-wrap">
-            {/* Boletim: a posição carimbada, o nível num selo e a meta a lápis. */}
-            <article className="caderno-rank-card">
-              <span className="caderno-rank-tape" aria-hidden />
-              <div className="caderno-rank-stamp" aria-label={`${eu.position}º lugar de ${ordenado.length}`}>
-                <strong>{eu.position}º</strong>
-                <small>de {ordenado.length}</small>
-              </div>
-              <div className="min-w-0">
-                <p className="caderno-note">sua posição</p>
-                <p className="caderno-rank-score"><mark>{eu.row[range].toLocaleString("pt-BR")} {rangeInfo.unit}</mark> · {rangeInfo.label.toLowerCase()}</p>
-                <div className="caderno-rank-bar" aria-label={`${progressoDoLider}% da pontuação do líder`}>
-                  <span style={{ width: `${Math.max(4, progressoDoLider)}%` }} />
-                  <em>líder</em>
-                </div>
-                <p className="caderno-rank-target">
-                  {acimaDeMim
-                    ? <>Faltam <strong>{Math.max(0, acimaDeMim.row[range] - eu.row[range])} {rangeInfo.unit}</strong> para passar {acimaDeMim.row.displayName}.</>
-                    : ordenado.length > 1
-                      ? "Você está liderando. Mantenha o ritmo!"
-                      : "Convide a turma para começar a disputa."}
-                </p>
-              </div>
-              <div className="caderno-rank-side">
-                <span className="caderno-rank-level"><small>nível</small><strong>{eu.row.level}</strong></span>
-                <span className="caderno-rank-streak"><Flame className="h-4 w-4" />{eu.row.streak} {eu.row.streak === 1 ? "dia" : "dias"}</span>
-              </div>
-            </article>
-          </Reveal>
-        ) : null}
-      </section>
-
-      <div className="ranking-workspace">
-        <main className="ranking-primary">
-          {podium.length && status === "pronto" ? (
-            <Reveal delay={0.07}>
-              <section className="ranking-podium-panel" aria-labelledby="ranking-podium-title">
-                <div className="ranking-section-heading">
-                  <div><p>Destaques do período</p><h2 id="ranking-podium-title">Pódio atual</h2></div>
-                  <span>{rangeInfo.hint}</span>
-                </div>
-                <BookshelfPodium
-                  entries={podium.map(({ row, position }) => ({
-                    id: row.id,
-                    name: row.displayName,
-                    position,
-                    score: row[range],
-                    unit: rangeInfo.unit,
-                    subtitle: `Nível ${row.level} · ${row.title}`,
-                    avatar: <Avatar name={row.displayName} src={row.avatar} size={position === 1 ? 64 : 54} />,
-                  }))}
-                  leader={lider}
-                  stackKey={range}
-                  reduced={Boolean(reduced)}
-                  onOpen={(id) => go("perfil", id)}
-                />
-              </section>
-            </Reveal>
-          ) : null}
-
-          <Reveal delay={0.1}>
-            <section className="ranking-board" aria-labelledby="ranking-board-title">
-              <div className="ranking-board-top">
-                <div><p>Classificação completa</p><h2 id="ranking-board-title">Leaderboard</h2></div>
-                <div className="ranking-range-tabs" aria-label="Período do ranking">
-                  {rankingRanges.map((item) => {
-                    const ativo = item.id === range;
-                    return (
-                      <button key={item.id} type="button" aria-pressed={ativo} onClick={() => setRange(item.id)} className={ativo ? "is-active" : ""}>
-                        {ativo && !reduced ? <motion.span layoutId="ranking-range-v2" transition={spring.snappy} /> : null}
-                        {ativo && reduced ? <span /> : null}
-                        <em>{item.label}</em>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="ranking-board-tools">
-                <div className="ranking-scope-tabs">
-                  {([
-                    { id: "todos" as const, label: `Todos (${ordenado.length})`, icon: Users },
-                    { id: "amigos" as const, label: `Amigos (${rows.filter((row) => row.friend).length})`, icon: Star },
-                  ]).map((item) => (
-                    <button key={item.id} type="button" aria-pressed={escopo === item.id} onClick={() => setEscopo(item.id)} className={escopo === item.id ? "is-active" : ""}>
-                      <item.icon className="h-3.5 w-3.5" />{item.label}
-                    </button>
-                  ))}
-                </div>
-                <label className="ranking-search">
-                  <span className="sr-only">Procurar uma pessoa</span>
-                  <Search className="h-4 w-4" />
-                  <input value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Buscar usuário" />
-                </label>
-              </div>
-
-              <div className="ranking-table-head" aria-hidden><span>Pos.</span><span>Usuário</span><span>Pontuação</span><span>Acompanhar</span></div>
-              {status === "erro" ? (
-                <EmptyState icon={XCircle} title="Não deu para carregar" text={erro} action={<PrimaryButton icon={RotateCcw} onClick={() => void carregar()}>Tentar de novo</PrimaryButton>} />
-              ) : status === "carregando" && !rows.length ? (
-                <div className="ranking-loading"><Loader2 className="h-8 w-8 animate-spin text-mint" /><p>Somando o XP de todo mundo...</p></div>
-              ) : !visivel.length ? (
-                <EmptyState
-                  icon={escopo === "amigos" ? Star : Search}
-                  title={escopo === "amigos" ? "Você ainda não marcou ninguém" : "Ninguém com esse nome"}
-                  text={escopo === "amigos" ? "Use a estrela na classificação geral para acompanhar alguém." : "Tente outro trecho do nome ou volte para a lista completa."}
-                />
-              ) : (
-                <Stagger className="ranking-rows" gap={0.035}>
-                  {visivel.map(({ row, position }) => (
-                    <StaggerItem key={row.id}>
-                      <RankingRowCard row={row} position={position} value={row[range]} unit={rangeInfo.unit} leader={lider} reduced={Boolean(reduced)} onOpen={() => go("perfil", row.id)} onToggleFriend={() => alternarAmigo(row)} />
-                    </StaggerItem>
-                  ))}
-                </Stagger>
-              )}
-              {ocultos > 0 ? <p className="ranking-privacy-note">{ocultos === 1 ? "Uma pessoa preferiu" : `${ocultos} pessoas preferiram`} não aparecer no ranking.</p> : null}
-            </section>
-          </Reveal>
-        </main>
-
-        <aside className="ranking-insights" aria-label="Indicadores do ranking">
-          <Reveal delay={0.12}>
-            <section className="ranking-insight-card">
-              <div className="ranking-insight-title"><Activity className="h-4 w-4" /><h2>Visão rápida</h2></div>
-              <dl className="ranking-stat-list">
-                <div><dt><Users className="h-4 w-4" />Participantes</dt><dd>{ordenado.length}</dd></div>
-                <div><dt><Zap className="h-4 w-4" />{rangeInfo.unit} distribuído</dt><dd>{totalDoPeriodo.toLocaleString("pt-BR")}</dd></div>
-                <div><dt><Flame className="h-4 w-4" />Maior sequência</dt><dd>{maiorSequencia}d</dd></div>
-              </dl>
-            </section>
-          </Reveal>
-          {eu ? (
-            <Reveal delay={0.15}>
-              <section className="ranking-insight-card ranking-chase-card">
-                <div className="ranking-insight-title"><Target className="h-4 w-4" /><h2>Próximo avanço</h2></div>
-                {acimaDeMim ? (
-                  <><p>Alcance <strong>{acimaDeMim.row.displayName}</strong> para subir ao {acimaDeMim.position}º lugar.</p><div className="ranking-chase-person"><Avatar name={acimaDeMim.row.displayName} src={acimaDeMim.row.avatar} size={38} /><span><strong>{acimaDeMim.row[range].toLocaleString("pt-BR")} {rangeInfo.unit}</strong><small>meta atual</small></span></div></>
-                ) : <p>Você ocupa a liderança deste período. Continue somando pontos para defender a posição.</p>}
-              </section>
-            </Reveal>
-          ) : null}
-          <Reveal delay={0.18}>
-            <section className="ranking-insight-card ranking-rules-card">
-              <div className="ranking-insight-title"><Sparkles className="h-4 w-4" /><h2>Como subir</h2></div>
-              <ul><li>Conclua atividades do plano</li><li>Estude seus materiais</li><li>Acerte nos jogos da Mine</li></ul>
-            </section>
-          </Reveal>
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-function RankingRowCard({
-  row,
-  position,
-  value,
-  unit,
-  leader,
-  reduced,
-  onOpen,
-  onToggleFriend,
-}: {
-  row: RankingRow;
-  position: number;
-  value: number;
-  unit: string;
-  leader: number;
-  reduced: boolean;
-  onOpen: () => void;
-  onToggleFriend: () => void;
-}) {
-  const medalha = position <= 3;
-  const cor = position === 1 ? "#FBBF24" : position === 2 ? "#D2D2D8" : position === 3 ? "#FB923C" : "#34D399";
-  return (
-    <div className={`ranking-row ${row.you ? "is-you" : ""}`}>
-      <motion.span
-        aria-hidden
-        className="ranking-row-progress"
-        style={{ background: `linear-gradient(transparent 62%, ${cor}55 62% 92%, transparent 92%)` }}
-        initial={reduced ? false : { width: 0 }}
-        animate={{ width: `${leader > 0 ? Math.max(4, (value / leader) * 100) : 4}%` }}
-        transition={{ duration: 0.7, ease: ease.out }}
-      />
-      <div className="ranking-row-inner">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="ranking-row-main"
-        >
-          <span
-            className={`ranking-row-position ${medalha ? "is-medal" : ""}`}
-            style={medalha ? { backgroundColor: cor } : undefined}
-          >
-            {position}
-          </span>
-          <span className="ranking-row-user">
-            <Avatar name={row.displayName} src={row.avatar} size={40} />
-            <span className="ranking-row-identity">
-              <span className="ranking-row-name">
-              <span className="truncate">{row.displayName}</span>
-                {row.you ? <span>você</span> : null}
-              </span>
-              <span className="ranking-row-meta">
-                <span>Nível {row.level}</span><i>·</i><span>{row.title}</span>
-              {row.streak ? (
-                  <><i>·</i><span className="ranking-row-streak"><Flame className="h-3 w-3" />{row.streak}d</span></>
-              ) : null}
-              </span>
-            </span>
-          </span>
-          <span className="ranking-row-score">
-            <strong>{value.toLocaleString("pt-BR")}</strong><small>{unit}</small>
-          </span>
-        </button>
-        {!row.you ? (
-          <button
-            type="button"
-            onClick={onToggleFriend}
-            aria-pressed={row.friend}
-            aria-label={row.friend ? `Remover ${row.displayName} dos amigos` : `Marcar ${row.displayName} como amigo`}
-            title={row.friend ? "Remover dos amigos" : "Marcar como amigo"}
-            className={`ranking-row-friend ${row.friend ? "is-friend" : ""}`}
-          >
-            <Star className={`h-[18px] w-[18px] ${row.friend ? "fill-current" : ""}`} />
-          </button>
-        ) : (
-          <ChevronRight className="ranking-row-chevron" />
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -7256,7 +6452,7 @@ function HandwritingToggle() {
   );
 }
 
-function MineAvatar({ size = "md", thinking = false }: { size?: "sm" | "md" | "lg"; thinking?: boolean }) {
+export function MineAvatar({ size = "md", thinking = false }: { size?: "sm" | "md" | "lg"; thinking?: boolean }) {
   return (
     <span className={`mine-avatar mine-avatar-${size}`} aria-hidden>
       <span className="mine-avatar-halo" />
@@ -10589,36 +9785,6 @@ function AboutView() {
   );
 }
 
-function ToggleSwitch({ icon: Icon, label, hint, on, onChange }: { icon: LucideIcon; label: string; hint?: string; on: boolean; onChange: (value: boolean) => void }) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-3 transition-colors hover:border-white/15 hover:bg-white/[0.045]">
-      <span
-        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-colors duration-control ${on ? "bg-mint/15 text-mint" : "bg-white/[0.07] text-white/40"}`}
-      >
-        <Icon className="h-5 w-5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-black leading-tight">{label}</p>
-        {hint ? <p className="text-[13px] leading-snug text-white/45">{hint}</p> : null}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        onClick={() => onChange(!on)}
-        aria-checked={on}
-        aria-label={label}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-control ${on ? "bg-mint shadow-glowSoft" : "bg-white/14"}`}
-      >
-        <motion.span
-          className={`absolute top-1 h-5 w-5 rounded-full ${on ? "bg-black" : "bg-white"}`}
-          animate={{ left: on ? 24 : 4 }}
-          transition={spring.snappy}
-        />
-      </button>
-    </div>
-  );
-}
-
 export type GameId = "corrida" | "memoria" | "forca" | "caca" | "nexo" | "sequencia";
 export type LegacyGameId = "runner";
 
@@ -10904,548 +10070,6 @@ export function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-/** Placar do topo, igual em todos os jogos. */
-/**
- * Perfil e ajustes na mesma tela.
- *
- * Eram duas ideias com um dono só: a apresentação (nome, foto, bio) e as
- * preferências. Quem clica no próprio nome quer as duas, e quem chega pelo
- * ranking cai aqui com o `id` de outra pessoa — nesse caso a tela vira o
- * cartão público, sem nada de configuração.
- */
-function ProfileView({
-  user,
-  data,
-  update,
-  notify,
-  logout,
-  targetId,
-}: {
-  user: User;
-  data: ReturnType<typeof useMemoUserData>;
-  update: (next: (draft: AppData) => AppData) => void;
-  notify: (message: string) => void;
-  logout: () => void;
-  targetId?: string;
-}) {
-  if (targetId && targetId !== user.id) return <PublicProfileView userId={targetId} />;
-  return <OwnProfileView user={user} data={data} update={update} notify={notify} logout={logout} />;
-}
-
-function OwnProfileView({ user, data, update, notify, logout }: { user: User; data: ReturnType<typeof useMemoUserData>; update: (next: (draft: AppData) => AppData) => void; notify: (message: string) => void; logout: () => void }) {
-  const [name, setName] = useState(user.settings.displayName);
-  const [bio, setBio] = useState(user.settings.bio || "");
-  const [fotoErro, setFotoErro] = useState("");
-  const [enviandoFoto, setEnviandoFoto] = useState(false);
-  const fotoInputRef = useRef<HTMLInputElement | null>(null);
-  const gam = gamificationOf(data);
-  const s = user.settings;
-  const setSetting = (patch: Partial<User["settings"]>) =>
-    update((draft) => ({
-      ...draft,
-      users: draft.users.map((item) => (item.id === user.id ? { ...item, settings: { ...item.settings, ...patch } } : item)),
-    }));
-
-  const nomeSujo = name.trim() !== (s.displayName || "").trim();
-  const bioSuja = bio.trim() !== (s.bio || "").trim();
-
-  function salvarApresentacao() {
-    const limpo = name.trim();
-    if (!limpo) {
-      notify("O nome não pode ficar vazio.");
-      return;
-    }
-    setSetting({ displayName: limpo, bio: bio.trim() || undefined });
-    notify("Perfil atualizado.");
-  }
-
-  async function salvarAvatar(avatar?: string) {
-    const session = readSession();
-    if (!session.token) throw new Error("Sua sessão expirou. Entre novamente.");
-    const response = await apiJson<{ user: User }>("/api/profile", {
-      method: "PUT",
-      headers: { authorization: `Bearer ${session.token}` },
-      body: JSON.stringify({ avatar: avatar || null }),
-    });
-    update((draft) => ({
-      ...draft,
-      users: draft.users.map((item) => (item.id === response.user.id ? response.user : item)),
-    }));
-  }
-
-  async function escolherFoto(file: File | undefined) {
-    if (!file) return;
-    setFotoErro("");
-    if (!file.type.startsWith("image/")) {
-      setFotoErro("Escolha um arquivo de imagem.");
-      return;
-    }
-    setEnviandoFoto(true);
-    try {
-      const avatar = await avatarFileToDataUrl(file);
-      await salvarAvatar(avatar);
-      notify("Foto publicada no seu perfil.");
-    } catch (error) {
-      setFotoErro(error instanceof Error ? error.message : "Não consegui usar essa imagem. Tente outra.");
-    } finally {
-      setEnviandoFoto(false);
-    }
-  }
-
-  function exportBackup() {
-    const backup = {
-      app: "minerva",
-      exportedAt: new Date().toISOString(),
-      user: { name: user.name, settings: user.settings },
-      subjects: data.subjects,
-      materials: data.materials,
-      tasks: data.tasks,
-      chats: data.chats,
-      sessions: data.sessions,
-      flashcards: data.flashcards,
-    };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `minerva-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    notify("Backup baixado.");
-  }
-  return (
-    <>
-      <PageHeader
-        eyebrow="Perfil e ajustes"
-        title="Seu perfil"
-        subtitle="Como você aparece para a turma no ranking, e as preferências do app."
-        action={
-          <SecondaryButton icon={LogOut} onClick={logout}>
-            Sair
-          </SecondaryButton>
-        }
-      />
-
-      <Reveal>
-        {/* A capa do perfil é a carteirinha de estudante: inclina com o mouse. */}
-        <Tilt3D max={4} scale={1.004} lift={3} className="mb-5">
-        <HeroCard className="caderno-idcard">
-          <div className="grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)]">
-            <div className="flex shrink-0 flex-col items-center gap-3 border-b border-white/10 pb-7 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-7">
-              <div className="relative">
-                <Avatar name={s.displayName || user.name} src={s.avatar} size={112} ring />
-                <button
-                  type="button"
-                  onClick={() => fotoInputRef.current?.click()}
-                  disabled={enviandoFoto}
-                  aria-label="Trocar foto de perfil"
-                  title="Trocar foto de perfil"
-                  className="absolute -bottom-1 -right-1 grid h-10 w-10 place-items-center rounded-full border-2 border-[#08080b] bg-mint text-black shadow-glowSoft transition-transform hover:scale-105 disabled:opacity-60"
-                >
-                  {enviandoFoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                </button>
-              </div>
-              <input
-                ref={fotoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => {
-                  void escolherFoto(event.currentTarget.files?.[0]);
-                  event.currentTarget.value = "";
-                }}
-              />
-              {s.avatar ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEnviandoFoto(true);
-                    void salvarAvatar(undefined)
-                      .then(() => notify("Foto removida."))
-                      .catch((error) => setFotoErro(error instanceof Error ? error.message : "Não consegui remover a foto."))
-                      .finally(() => setEnviandoFoto(false));
-                  }}
-                  className="text-[12px] font-black text-white/40 transition-colors hover:text-roseGlow"
-                >
-                  Remover foto
-                </button>
-              ) : (
-                <p className="max-w-[8rem] text-center text-[11px] font-bold leading-snug text-white/35">A foto aparece no ranking</p>
-              )}
-              {fotoErro ? <p className="max-w-[9rem] text-center text-[11px] font-bold text-roseGlow">{fotoErro}</p> : null}
-            </div>
-
-            <div className="min-w-0 space-y-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <Pill icon={Award}>{gam.title}</Pill>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.07] px-3 py-1 text-[12px] font-black text-white/60">
-                  Nível {gam.level}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.07] px-3 py-1 text-[12px] font-black text-white/60">
-                  <Zap className="h-3.5 w-3.5 text-mint" />
-                  {gam.xp} XP
-                </span>
-                <span className="text-[12px] font-bold text-white/32">@{user.name}</span>
-              </div>
-
-              <Input label="Nome de exibição" value={name} onChange={setName} placeholder="Como a turma vê você" />
-
-              <label className="block">
-                <span className="mb-2 flex items-center justify-between text-[13px] font-black text-white/70">
-                  Sobre você
-                  <span className="font-bold text-white/30">{bio.length}/140</span>
-                </span>
-                <textarea
-                  value={bio}
-                  onChange={(event) => setBio(event.target.value.slice(0, 140))}
-                  rows={2}
-                  placeholder="Uma linha sobre o que você está estudando"
-                  className="w-full resize-none rounded-lg border border-white/12 bg-white/[0.06] p-4 text-white outline-none transition-control duration-control placeholder:text-white/40 focus:border-mint/60 focus:bg-black/35 focus:shadow-glowSoft"
-                />
-              </label>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <PrimaryButton icon={Check} onClick={salvarApresentacao}>
-                  Salvar perfil
-                </PrimaryButton>
-                {nomeSujo || bioSuja ? <span className="text-[12px] font-bold text-amber-300">Alterações ainda não salvas</span> : null}
-                <SecondaryButton icon={Trophy} onClick={() => go("ranking")}>
-                  Ver o ranking
-                </SecondaryButton>
-              </div>
-            </div>
-          </div>
-        </HeroCard>
-        </Tilt3D>
-      </Reveal>
-
-      <div className="grid gap-6 xl:grid-cols-12">
-        <Reveal className="xl:col-span-7" delay={0.05} direction="left">
-          <GlassCard className="h-full">
-            <SectionTitle icon={Bell} title="Preferências" />
-            <div className="mt-5 grid gap-2.5">
-              <SettingLine icon={Target} label={`Meta diária: ${s.dailyGoal} min`} />
-              <SettingLine icon={MoonStar} label={`Sessão de foco: ${s.focusMinutes} min`} />
-              <SettingLine icon={Bot} label={`Mine: ${s.mineStyle}`} />
-              <ToggleSwitch icon={Bell} label="Lembretes de prova" hint="Avisa tarefas vencendo ao abrir." on={s.reminders} onChange={(v) => setSetting({ reminders: v })} />
-            </div>
-          </GlassCard>
-        </Reveal>
-
-        <Reveal className="xl:col-span-5" delay={0.1}>
-          <GlassCard className="h-full">
-            <SectionTitle icon={Timer} title="Foco" />
-            <div className="mt-5 grid gap-2.5">
-              <ToggleSwitch
-                icon={Zap}
-                label="Vibrar ao terminar"
-                hint="Vibra quando o foco ou a pausa acaba."
-                on={s.focusVibrate !== false}
-                onChange={(v) => setSetting({ focusVibrate: v })}
-              />
-              <ToggleSwitch
-                icon={Timer}
-                label="Manter a tela ligada"
-                hint="Impede a tela de apagar durante o foco."
-                on={s.keepScreenOnFocus !== false}
-                onChange={(v) => setSetting({ keepScreenOnFocus: v })}
-              />
-            </div>
-          </GlassCard>
-        </Reveal>
-
-        <Reveal className="xl:col-span-5" delay={0.15} direction="left">
-          <GlassCard className="h-full">
-            <SectionTitle icon={Wand2} title="Aparência" />
-            <div className="mt-5 grid gap-2.5">
-              <div className="flex flex-col gap-3 rounded-[.9rem] border border-white/10 bg-white/[0.035] p-4">
-                <div>
-                  <p className="text-[13px] font-black text-white/74">Tema e cor dominante</p>
-                  <p className="mt-1 text-[11px] font-bold leading-relaxed text-white/38">A escolha colore a logo, a intro, a home e os controles do site.</p>
-                </div>
-                <AppearanceControls
-                  appearance={{ themeMode: s.themeChosen && s.themeMode ? s.themeMode : "light", accentColor: normalizeAccent(s.accentColor) }}
-                  onChange={(patch) => setSetting(patch)}
-                />
-              </div>
-              <button type="button" onClick={() => window.dispatchEvent(new Event("minerva:tour"))} className="caderno-btn-pencil inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[13px] font-black">
-                <Sparkles className="h-4 w-4" />
-                Ver o tour da Mine de novo
-              </button>
-              <ToggleSwitch
-                icon={Volume2}
-                label="Sons do caderno"
-                hint="Lápis riscando, página virando e confete. Começa desligado."
-                on={!!s.sounds}
-                onChange={(v) => {
-                  setSoundsEnabled(v);
-                  if (v) playChime();
-                  setSetting({ sounds: v });
-                }}
-              />
-              <ToggleSwitch
-                icon={Wand2}
-                label="Reduzir animações"
-                hint="Desliga o fundo 3D e as transições. Bom em máquinas mais lentas."
-                on={!!s.reducedMotion}
-                onChange={(v) => setSetting({ reducedMotion: v })}
-              />
-              <ToggleSwitch
-                icon={Bot}
-                label="Mine andando pelo site"
-                hint={s.reducedMotion ? "Some enquanto \"Reduzir animações\" estiver ligado." : "Ela passeia pelas abas e brinca com você: arraste, jogue, faça carinho ou pare o mouse num card."}
-                on={s.pets !== "off"}
-                onChange={(v) => setSetting({ pets: v ? "mine" : "off" })}
-              />
-            </div>
-          </GlassCard>
-        </Reveal>
-
-        <Reveal className="xl:col-span-7" delay={0.18}>
-          <GlassCard className="h-full">
-            <SectionTitle icon={Trophy} title="Ranking" />
-            <div className="mt-5 grid gap-2.5">
-              <ToggleSwitch
-                icon={Users}
-                label="Aparecer no ranking"
-                hint="Desligado, seu nome e seu XP somem do placar dos outros e o seu perfil não mostra o progresso. Você continua vendo o ranking normalmente."
-                on={!s.hideFromRanking}
-                onChange={(v) => setSetting({ hideFromRanking: !v })}
-              />
-            </div>
-          </GlassCard>
-        </Reveal>
-
-        <Reveal className="xl:col-span-12" delay={0.2}>
-          <GlassCard>
-            <SectionTitle icon={Download} title="Seus dados" />
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/52">
-              Baixe uma cópia de tudo o que você salvou na Minerva: matérias, conteúdos, tarefas, flashcards e conversas com a Mine.
-            </p>
-            <div className="mt-4">
-              <SecondaryButton icon={Download} onClick={exportBackup}>
-                Baixar backup (JSON)
-              </SecondaryButton>
-            </div>
-          </GlassCard>
-        </Reveal>
-      </div>
-      <p className="mx-auto mt-6 flex max-w-3xl items-center justify-center gap-2 px-4 text-center text-[13px] leading-relaxed text-white/40">
-        <Users className="h-4 w-4 shrink-0" />
-        Equipe: Davi (criador), Samuel, Gabriel Batochi, Gabriel dos Santos, Lucas e Jonathan — 3º ano de Desenvolvimento de Sistemas.
-      </p>
-    </>
-  );
-}
-
-type PublicProfile = {
-  id: string;
-  name: string;
-  displayName: string;
-  avatar?: string;
-  bio?: string;
-  createdAt: number;
-  you: boolean;
-  hidden: boolean;
-  xp?: number;
-  level?: number;
-  title?: string;
-  levelXp?: number;
-  levelNeed?: number;
-  dayXp?: number;
-  weekXp?: number;
-  stats?: XpStats;
-  unlocked?: string[];
-};
-
-/**
- * Perfil de outra pessoa, aberto pelo ranking.
- *
- * Tudo vem de `GET /api/profile/:id`, que devolve números e apresentação —
- * nunca matérias, conteúdos, tarefas ou conversas. Quem desligou a
- * visibilidade continua tendo nome e foto, só não mostra o progresso.
- */
-function PublicProfileView({ userId }: { userId: string }) {
-  const [profile, setProfile] = useState<PublicProfile | null>(null);
-  const [status, setStatus] = useState<"carregando" | "pronto" | "erro">("carregando");
-  const [erro, setErro] = useState("");
-
-  useEffect(() => {
-    let vivo = true;
-    const token = readSession().token;
-    if (!token) {
-      setErro("Entre na sua conta para ver perfis.");
-      setStatus("erro");
-      return;
-    }
-    setStatus("carregando");
-    // Query em vez de `/api/profile/<id>`: ver a nota em data-server.mjs sobre
-    // o catch-all da Vercel não atender caminho com mais de um segmento.
-    apiJson<{ profile: PublicProfile }>(`/api/profile?userId=${encodeURIComponent(userId)}`, {
-      headers: { authorization: `Bearer ${token}` },
-    })
-      .then((payload) => {
-        if (!vivo) return;
-        setProfile(payload.profile);
-        setStatus("pronto");
-      })
-      .catch((error) => {
-        if (!vivo) return;
-        setErro(error instanceof Error ? error.message : "Não consegui abrir esse perfil.");
-        setStatus("erro");
-      });
-    return () => {
-      vivo = false;
-    };
-  }, [userId]);
-
-  const voltar = (
-    <SecondaryButton icon={ChevronLeft} onClick={() => go("ranking")}>
-      Voltar ao ranking
-    </SecondaryButton>
-  );
-
-  if (status === "erro") {
-    return (
-      <>
-        <PageHeader eyebrow="Perfil" title="Perfil" action={voltar} />
-        <GlassCard>
-          <EmptyState icon={XCircle} title="Não deu para abrir" text={erro} />
-        </GlassCard>
-      </>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <>
-        <PageHeader eyebrow="Perfil" title="Carregando..." action={voltar} />
-        <GlassCard>
-          <div className="grid place-items-center gap-3 py-14">
-            <Loader2 className="h-8 w-8 animate-spin text-mint" />
-          </div>
-        </GlassCard>
-      </>
-    );
-  }
-
-  const desde = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(profile.createdAt || Date.now()));
-  const stats = profile.stats;
-  const conquistas = profile.unlocked?.length || 0;
-
-  return (
-    <>
-      <PageHeader eyebrow="Perfil" title={profile.displayName} subtitle={`@${profile.name} · na Minerva desde ${desde}`} action={voltar} />
-
-      <div className="grid gap-5">
-        <Reveal>
-          <HeroCard>
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-              <Avatar name={profile.displayName} src={profile.avatar} size={112} ring />
-              <div className="min-w-0 flex-1">
-                {profile.hidden ? (
-                  <p className="text-[13px] font-bold leading-relaxed text-white/50">
-                    {profile.displayName} preferiu não mostrar o progresso. Você ainda pode estudar junto — só não dá para comparar o XP.
-                  </p>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Pill icon={Award}>{profile.title}</Pill>
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.07] px-3 py-1 text-[12px] font-black text-white/60">
-                        Nível {profile.level}
-                      </span>
-                      {stats?.streakDays ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-roseGlow/12 px-3 py-1 text-[12px] font-black text-roseGlow">
-                          <Flame className="h-3.5 w-3.5" />
-                          {stats.streakDays} dias seguidos
-                        </span>
-                      ) : null}
-                    </div>
-                    <h2 className="mt-4 font-display text-[2.6rem] font-black leading-none tabular md:text-5xl">{profile.xp} XP</h2>
-                    <p className="mt-2 text-[13px] font-bold text-white/50">
-                      {profile.dayXp} XP hoje · {profile.weekXp} XP nesta semana
-                    </p>
-                    <AnimatedBar value={percent(profile.levelXp || 0, profile.levelNeed || 100)} className="mt-4 max-w-md" height={10} />
-                  </>
-                )}
-                {profile.bio ? <p className="mt-4 border-t border-white/10 pt-4 text-[14px] leading-relaxed text-white/65">{profile.bio}</p> : null}
-              </div>
-            </div>
-          </HeroCard>
-        </Reveal>
-
-        {!profile.hidden && stats ? (
-          <>
-            <Stagger className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4" gap={0.06}>
-              <StaggerItem>
-                <Metric icon={Timer} value={stats.focus} label="sessões de foco" accent="#38BDF8" />
-              </StaggerItem>
-              <StaggerItem>
-                <Metric icon={ListChecks} value={stats.tasksDone} label="tarefas concluídas" accent="#34D399" />
-              </StaggerItem>
-              <StaggerItem>
-                <Metric icon={Gamepad2} value={stats.games} label="partidas nos jogos" accent="#A78BFA" />
-              </StaggerItem>
-              <StaggerItem>
-                <Metric icon={Trophy} value={`${conquistas}/${achievementList.length}`} label="conquistas" accent="#FBBF24" />
-              </StaggerItem>
-            </Stagger>
-
-            <Reveal delay={0.06}>
-              <GlassCard>
-                <SectionTitle icon={Activity} title="Rotina de estudo" hint="números públicos do perfil" />
-                <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
-                  {[
-                    { label: "Matérias criadas", value: stats.subjects, icon: BookOpen },
-                    { label: "Conteúdos guardados", value: stats.materials, icon: FileText },
-                    { label: "Conteúdos estudados", value: stats.studied, icon: CheckCircle2 },
-                    { label: "Simulados concluídos", value: stats.provas, icon: ClipboardCheck },
-                    { label: "Flashcards revisados", value: stats.cardReviews, icon: RefreshCw },
-                    { label: "Mensagens para a Mine", value: stats.mineMessages, icon: Bot },
-                  ].map((item) => (
-                    <div key={item.label} className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.03] p-3.5">
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-mint">
-                        <item.icon className="h-5 w-5" />
-                      </span>
-                      <p className="min-w-0 flex-1 truncate text-[13px] font-bold text-white/60">{item.label}</p>
-                      <p className="shrink-0 font-display text-lg font-black tabular">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </GlassCard>
-            </Reveal>
-
-            {conquistas ? (
-              <Reveal delay={0.08}>
-                <GlassCard>
-                  <SectionTitle icon={Trophy} title={`Conquistas (${conquistas}/${achievementList.length})`} />
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {achievementList
-                      .filter((item) => profile.unlocked?.includes(item.id))
-                      .map((item) => {
-                        const Icon = achievementIcons[item.id] || Sparkles;
-                        return (
-                          <span
-                            key={item.id}
-                            title={item.text}
-                            className="inline-flex items-center gap-2 rounded-full border border-mint/25 bg-mint/[0.08] px-3.5 py-2 text-[12px] font-black text-white/75"
-                          >
-                            <Icon className="h-4 w-4 text-mint" />
-                            {item.title}
-                          </span>
-                        );
-                      })}
-                  </div>
-                </GlassCard>
-              </Reveal>
-            ) : null}
-          </>
-        ) : null}
-      </div>
-    </>
-  );
-}
-
 function AdminRestrictedView() {
   return (
     <>
@@ -11587,7 +10211,19 @@ function ModalHost({
                     createdAt: Date.now(),
                   }
                 : undefined);
-              return mindMapSubject ? <React.Suspense fallback={<PageLoading />}><MindmapModal subject={mindMapSubject} materials={subject ? data.materials.filter((item) => item.subjectId === subject.id) : []} initialMap={modal.initialMap} close={() => setModal(null)} /></React.Suspense> : null;
+              return mindMapSubject ? <React.Suspense fallback={<PageLoading />}><MindmapModal subject={mindMapSubject} materials={subject ? data.materials.filter((item) => item.subjectId === subject.id) : []} initialMap={modal.initialMap} close={() => setModal(null)} onFlashcards={subject ? (cards) => {
+                const existing = new Set(data.flashcards.filter((card) => card.subjectId === subject.id).map((card) => normalizeText(card.front)));
+                const fresh = cards
+                  .filter((card) => {
+                    const key = normalizeText(card.front);
+                    if (!key || existing.has(key)) return false;
+                    existing.add(key);
+                    return true;
+                  })
+                  .map((card) => ({ id: uid("card"), userId: subject.userId, subjectId: subject.id, front: card.front.slice(0, 300), back: card.back.slice(0, 700), level: 0, dueAt: Date.now(), reps: 0, lapses: 0, createdAt: Date.now() }));
+                if (fresh.length) update((draft) => ({ ...draft, flashcards: [...draft.flashcards, ...fresh] }));
+                return fresh.length;
+              } : undefined} /></React.Suspense> : null;
             })()}
           {modal.type === "flashcards" &&
             (() => {
@@ -11977,7 +10613,7 @@ export function SectionTitle({ icon: Icon, title, action, hint }: { icon: Lucide
   );
 }
 
-function Pill({ icon: Icon, children, tone = "mint" }: { icon: LucideIcon; children: React.ReactNode; tone?: "mint" | "cyan" | "violet" }) {
+export function Pill({ icon: Icon, children, tone = "mint" }: { icon: LucideIcon; children: React.ReactNode; tone?: "mint" | "cyan" | "violet" }) {
   const tones = {
     mint: "border-mint/25 from-mint/15 to-cyanGlow/10 text-mint",
     cyan: "border-cyanGlow/25 from-cyanGlow/15 to-violetGlow/10 text-cyanGlow",
@@ -11991,7 +10627,7 @@ function Pill({ icon: Icon, children, tone = "mint" }: { icon: LucideIcon; child
   );
 }
 
-function Metric({ icon: Icon, value, label, accent = "#34D399" }: { icon: LucideIcon; value: number | string; label: string; accent?: string }) {
+export function Metric({ icon: Icon, value, label, accent = "#34D399" }: { icon: LucideIcon; value: number | string; label: string; accent?: string }) {
   const numeric = typeof value === "number";
   return (
     // Número escrito à mão, sublinhado com o marca-texto da cor do indicador.
@@ -12036,21 +10672,6 @@ export function SecondaryButton({ children, icon: Icon, onClick }: { children: R
   );
 }
 
-function IconButton({ icon: Icon, onClick, label }: { icon: LucideIcon; onClick: () => void; label: string }) {
-  return (
-    <motion.button
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      whileTap={{ scale: 0.94 }}
-      transition={spring.snappy}
-      className="group relative grid h-13 w-13 place-items-center rounded-[.85rem] border border-white/10 bg-transparent text-white/65 transition-control duration-control hover:border-white/25 hover:bg-white/[0.04] hover:text-white"
-    >
-      <Icon className="relative h-[21px] w-[21px]" />
-    </motion.button>
-  );
-}
-
 /**
  * Foto da pessoa, ou a inicial do nome quando não há foto.
  *
@@ -12058,7 +10679,7 @@ function IconButton({ icon: Icon, onClick, label }: { icon: LucideIcon; onClick:
  * escalas muito diferentes — barra lateral, cabeçalho, linha do ranking,
  * capa do perfil — e classe utilitária por tamanho viraria uma lista enorme.
  */
-function Avatar({ name, src, size = 40, ring = false }: { name: string; src?: string; size?: number; ring?: boolean }) {
+export function Avatar({ name, src, size = 40, ring = false }: { name: string; src?: string; size?: number; ring?: boolean }) {
   const inicial = (name || "?").trim().slice(0, 1).toUpperCase();
   const estilo = { width: size, height: size, borderRadius: Math.max(8, size * 0.28) };
   if (src) {
@@ -12100,17 +10721,6 @@ export function EmptyState({ title, text, icon: Icon = Sparkles, action }: { tit
   );
 }
 
-function SettingLine({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return (
-    <div className="depth-panel flex items-center gap-3 rounded-lg border border-white/[0.07] bg-white/[0.025] p-3 transition-colors hover:border-white/15">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-mint">
-        <Icon className="h-5 w-5" />
-      </span>
-      <p className="min-w-0 truncate font-black">{label}</p>
-    </div>
-  );
-}
-
 function Toast({ message }: { message: string }) {
   const reduced = useSoftMotion();
   return (
@@ -12148,7 +10758,7 @@ export function normalizeText(value: string) {
   return normalizeIntentText(value);
 }
 
-function materialsToImageAttachments(items: Material[]): ChatAttachment[] {
+export function materialsToImageAttachments(items: Material[]): ChatAttachment[] {
   return items
     .filter((item) => item.type === "image" && !!item.dataUrl && item.dataUrl.startsWith("data:image/"))
     .slice(-3)

@@ -1,8 +1,8 @@
 // Carregado sob demanda (React.lazy): a aba Provas — fazer a prova, ver o que errou e estudar aquilo.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, BookOpenCheck, Check, Flag, Layers, Lightbulb, Loader2, NotebookTabs, RotateCcw, Send, Sparkles, Target, Wand2, X } from "lucide-react";
-import { PageHeader, subjectContentContext, uid, type AppData, type Flashcard, type Session, type User, type useMemoUserData } from "../main";
+import { ArrowLeft, ArrowRight, BookOpenCheck, ClipboardList, Swords, Check, Flag, Layers, Lightbulb, Loader2, NotebookTabs, RotateCcw, Send, Sparkles, Target, Wand2, X } from "lucide-react";
+import { PageHeader, go, subjectContentContext, uid, type AppData, type Flashcard, type Session, type User, type useMemoUserData } from "../main";
 import { useSoftMotion } from "../motion";
 import { celebrateFrom, floatXp, mineSays } from "../caderno";
 import { parseQuiz, type QuizQuestion } from "../../shared/study-parsers.mjs";
@@ -12,6 +12,8 @@ import {
   corrigirProva,
   dificuldadesProva,
   embaralharAlternativas,
+  juntarCadernos,
+  juntarHistorico,
   lerEstudo,
   letrasProva,
   provaExemplo,
@@ -23,6 +25,7 @@ import {
 } from "../../shared/provas.mjs";
 import { xpPerAction } from "../../shared/xp.mjs";
 import { askMineTask } from "../mineTask";
+import { deixarPreset } from "../chat/presets";
 import "./provas.css";
 
 type Dados = ReturnType<typeof useMemoUserData>;
@@ -95,7 +98,17 @@ function formatarTempo(segundos: number) {
 export function ProvasView({ data, user, update }: { data: Dados; user: User; update: Atualizar }) {
   const reduced = useSoftMotion();
   const chave = `minerva:provas:${user.id}`;
-  const [guardado, setGuardado] = useState<Guardado>(() => lerGuardado(chave));
+  // O caderno vem da conta (qualquer aparelho) somado ao deste navegador.
+  const [guardado, setGuardado] = useState<Guardado>(() => {
+    const local = lerGuardado(chave);
+    const conta = user.settings.provas;
+    if (!conta) return local;
+    return {
+      ...local,
+      caderno: juntarCadernos(local.caderno, conta.caderno as ErroCaderno[]),
+      historico: juntarHistorico(local.historico, conta.historico as ProvaFeita[]),
+    };
+  });
   const [fase, setFase] = useState<Fase>(() => (lerGuardado(chave).atual ? "prova" : "inicio"));
   const [resultado, setResultado] = useState<{ prova: ProvaAtual; xp: number } | null>(null);
   const [estudando, setEstudando] = useState<ErroCaderno[]>([]);
@@ -111,6 +124,22 @@ export function ProvasView({ data, user, update }: { data: Dados; user: User; up
   const [dificuldade, setDificuldade] = useState<"facil" | "medio" | "dificil">("medio");
 
   useEffect(() => gravar(chave, guardado), [chave, guardado]);
+  // Sobe para a conta com um respiro: cada resposta de prova não vira um salvamento.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const caderno = juntarCadernos(guardado.caderno);
+      const historico = juntarHistorico(guardado.historico);
+      const conta = user.settings.provas;
+      if (conta && JSON.stringify(conta.caderno) === JSON.stringify(caderno) && JSON.stringify(conta.historico) === JSON.stringify(historico)) return;
+      if (!conta && !caderno.length && !historico.length) return;
+      update((draft) => ({
+        ...draft,
+        users: draft.users.map((item) => (item.id === user.id ? { ...item, settings: { ...item.settings, provas: { caderno, historico, atualizadoEm: Date.now() } } } : item)),
+      }));
+    }, 1500);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardado.caderno, guardado.historico]);
   useEffect(() => () => abortRef.current?.abort(), []);
   useEffect(() => {
     if (!carregando) return;
@@ -1156,6 +1185,33 @@ function CadernoErros({
                 <RotateCcw className="h-4 w-4" /> Refazer como prova
               </button>
             </div>
+            {resumo.pendentes && resumo.assuntos[0] ? (
+              <div className="prv-treinar" aria-label="Treinar o que mais errou em outra aba">
+                <p>
+                  treinar <b>{resumo.assuntos[0].assunto}</b> em outra aba:
+                </p>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deixarPreset("duelo", { tema: resumo.assuntos[0].assunto });
+                      go("duelo");
+                    }}
+                  >
+                    <Swords className="h-4 w-4" /> Duelo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deixarPreset("atividades", { assunto: resumo.assuntos[0].assunto });
+                      go("atividades");
+                    }}
+                  >
+                    <ClipboardList className="h-4 w-4" /> Atividade
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <div className="prv-caderno-abas">
               <button type="button" className={!verDominados ? "is-on" : ""} onClick={() => setVerDominados(false)}>
                 pendentes

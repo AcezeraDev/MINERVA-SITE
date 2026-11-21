@@ -46,3 +46,8 @@ export function reviewedErrorIds(sessions?: GameSessionLike[]): Set<string>;
 export function unresolvedGameErrors(sessions?: GameSessionLike[]): GameAnswer[];
 export function dailyMissionProgress(sessions?: GameSessionLike[], value?: number | string | Date): Array<{ id: string; title: string; description: string; current: number; goal: number; reward: number; completed: boolean }>;
 export function unlockedGameAchievementIds(sessions?: GameSessionLike[], value?: number | string | Date): Set<string>;
+
+export type MelhorPartida = { c: number; t: number; ms: number; n: number };
+export const placarGameIds: readonly string[];
+export function melhorPorJogo(sessions?: unknown[]): Record<string, MelhorPartida>;
+export function compararPartidas(a: MelhorPartida, b: MelhorPartida): number;

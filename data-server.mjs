@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import pg from "pg";
 import { loadLocalEnv } from "./gemini-server.mjs";
 import { gamificationStats, levelFromXp, rankingWindows, totalXp, unlockedAchievements, xpSince } from "./shared/xp.mjs";
-import { dailyChallengeKey, leagueFromPoints, seasonPoints } from "./shared/game-meta.mjs";
+import { dailyChallengeKey, leagueFromPoints, melhorPorJogo, seasonPoints } from "./shared/game-meta.mjs";
 import { nomePublico } from "./shared/nome-publico.mjs";
 import { parseQuiz } from "./shared/study-parsers.mjs";
 import {
@@ -1388,6 +1388,8 @@ function leaderboardRow(user, scope, windows, { you = false, friend = false } = 
     league: leagueFromPoints(seasonScore).name,
     dailyCorrect: Number(dailySession?.correctAnswers || 0),
     dailyDurationMs: Number(dailySession?.durationMs || 0),
+    // Placar por jogo da aba Games: a melhor partida de cada jogo, só números.
+    games: melhorPorJogo(scope.sessions || []),
   };
 }
 
