@@ -607,15 +607,50 @@ test("controle de qualidade rejeita codigo aberto e limite de saida mesmo com te
   assert.equal(replyQualityIssue({ reply: '```python\ndef soma(a, b):\n    return a + b\n```', finishReason: 'stop' }), '');
 });
 
-test("fallback substitui resposta cortada antes de publicar texto como completo", async () => {
+test("resposta cortada pelo limite continua de onde parou em vez de ser descartada", async () => {
   let count = 0;
-  await withNano({ NANOGPT_API_KEY: 'nano_resposta_cortada_auditoria', MINE_WEB_SEARCH: 'off' }, async () => {
+  const pedidos = [];
+  await withNano({ NANOGPT_API_KEY: 'nano_resposta_cortada_auditoria', MINE_WEB_SEARCH: 'off' }, async (_url, options) => {
     count++;
-    return jsonResponse({ choices: [{ message: { content: count === 1 ? 'Explicação cortada no meio de' : 'Explicação completa e correta.' }, finish_reason: count === 1 ? 'length' : 'stop' }] });
+    pedidos.push(JSON.parse(options.body).messages.at(-1).content);
+    return jsonResponse({ choices: [{ message: { content: count === 1 ? 'Explicação cortada no meio de' : ' uma frase, agora completa.' }, finish_reason: count === 1 ? 'length' : 'stop' }] });
   }, async () => {
     const result = await runMineRequest({ prompt: 'Explique a fotossíntese.' });
-    assert.equal(result.reply, 'Explicação completa e correta.');
+    assert.equal(result.reply, 'Explicação cortada no meio de uma frase, agora completa.');
     assert.equal(count, 2);
+    assert.match(pedidos[1], /cortada pelo limite/);
+  });
+});
+
+test("bloco ```linha-do-tempo cortado no meio é continuado e sai fechado", async () => {
+  let count = 0;
+  const pedidos = [];
+  await withNano({ NANOGPT_API_KEY: 'nano_bloco_cortado', MINE_WEB_SEARCH: 'off' }, async (_url, options) => {
+    count++;
+    pedidos.push(JSON.parse(options.body).messages.at(-1).content);
+    return jsonResponse({
+      choices: [{
+        message: { content: count === 1 ? 'Abaixo, a linha do tempo:\n\n```linha-do-tempo\n{"titulo": "Guerra", "eventos": [{"data": "1914"' : ', "titulo": "Início"}]}\n```' },
+        finish_reason: count === 1 ? 'length' : 'stop',
+      }],
+    });
+  }, async () => {
+    const result = await runMineRequest({ prompt: 'Faça uma linha do tempo da Primeira Guerra.' });
+    assert.equal(count, 2);
+    assert.match(pedidos[1], /meio do bloco ```linha-do-tempo/);
+    assert.match(result.reply, /"eventos": \[\{"data": "1914", "titulo": "Início"\}\]\}\n```$/);
+  });
+});
+
+test("bloco que continua aberto depois das continuações é fechado com aviso", async () => {
+  let count = 0;
+  await withNano({ NANOGPT_API_KEY: 'nano_bloco_sem_fim', MINE_WEB_SEARCH: 'off' }, async () => {
+    count++;
+    return jsonResponse({ choices: [{ message: { content: count === 1 ? 'Veja:\n\n```quiz\n{"perguntas": [' : '{"p": 1},' }, finish_reason: 'length' }] });
+  }, async () => {
+    const result = await runMineRequest({ prompt: 'Monte um quiz enorme.' });
+    assert.equal(count, 3);
+    assert.match(result.reply, /\n```\n\n_\(A resposta ficou longa demais/);
   });
 });
 

@@ -2847,10 +2847,13 @@ function App() {
               // Parou no meio: o que já apareceu na tela continua valendo.
               const stopped = controller.signal.aborted;
               const code = (error as { code?: string } | null)?.code;
+              // Bloco (```linha-do-tempo, ```quiz…) cortado no meio não tem
+              // como ser desenhado: sai inteiro, e o aviso fica fora dele.
+              const inteiro = semBlocoAberto(partial);
               const text = stopped
-                ? partial || "Geração interrompida."
-                : partial
-                  ? `${partial}\n\n_(A resposta foi interrompida por um problema. Tente perguntar de novo.)_`
+                ? inteiro || "Geração interrompida."
+                : inteiro
+                  ? `${inteiro}\n\n_(A resposta foi interrompida por um problema. Tente perguntar de novo.)_`
                   : code === "rate_limit"
                     ? "Recebi muitas perguntas agora e atingi o limite por alguns instantes. Espere um pouquinho e tente de novo."
                     : (error as Error | null)?.message || "Tive um problema para responder agora. Tente novamente em alguns instantes.";
@@ -11070,6 +11073,19 @@ function buildAssistantContext(data: ReturnType<typeof useMemoUserData>, user: U
 const mineEndpoint = "/api/mine/chat";
 
 type MineHistoryItem = { role: ChatMessage["role"]; text: string };
+
+/**
+ * Tira do fim do texto um bloco de código que ficou aberto (resposta cortada
+ * no meio de um ```linha-do-tempo, ```quiz…). Blocos fechados ficam como estão.
+ */
+function semBlocoAberto(text: string): string {
+  const linhas = text.split("\n");
+  let inicio = -1;
+  linhas.forEach((linha, index) => {
+    if (/^[ \t]*```/.test(linha)) inicio = inicio < 0 ? index : -1;
+  });
+  return inicio < 0 ? text : linhas.slice(0, inicio).join("\n").trimEnd();
+}
 
 export async function requestAssistantResponse(payload: {
   prompt: string;

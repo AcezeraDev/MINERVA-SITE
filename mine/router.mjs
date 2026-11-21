@@ -133,6 +133,20 @@ export function fileBlockOpen(text) {
 }
 
 /**
+ * Nome do bloco de código que ficou aberto no fim do texto ("linha-do-tempo",
+ * "quiz", "" para ``` sem nome), ou null se todas as cercas estão fechadas.
+ */
+export function openFence(text) {
+  let aberto = null;
+  for (const linha of String(text || "").split("\n")) {
+    const cerca = linha.match(/^[ \t]*```+[ \t]*([\w-]*)/);
+    if (!cerca) continue;
+    aberto = aberto === null ? cerca[1] || "" : null;
+  }
+  return aberto;
+}
+
+/**
  * Uma tentativa contra um modelo ja resolvido.
  * Com `onDelta` a resposta vem em streaming; sem ele, de uma vez so.
  */
@@ -188,32 +202,56 @@ async function attemptModel({ model, task, prompt, context, history, attachments
     // streaming a continuação chega na tela emendada no mesmo balão.
     let content = String(result.content || "");
     let finishReason = result.finishReason;
-    for (let rodada = 0; rodada < 2 && finishReason === "length" && fileBlockOpen(content); rodada += 1) {
-      const continuacao = await call({
-        provider: model.provider,
-        providerModel: model.providerModel,
-        messages: [
-          ...messages,
-          { role: "assistant", content },
-          {
-            role: "user",
-            content: "Sua resposta foi cortada pelo limite de tamanho no meio do bloco ```arquivo. Continue EXATAMENTE do ponto onde parou (sem repetir nada do que já escreveu e sem comentar o corte), termine o conteúdo de forma mais enxuta e feche o bloco com ``` numa linha própria. Depois do bloco, no máximo uma frase.",
-          },
-        ],
-        maxTokens,
-        timeoutMs,
-        signal,
-        onDelta,
-        providerParams: model.providerParams,
-      });
-      content += String(continuacao.content || "");
+    // 21/nov/2026: vale para QUALQUER resposta cortada (```linha-do-tempo,
+    // ```quiz, texto comum), não só ```arquivo: antes o corte no meio de um
+    // bloco virava "resposta interrompida" com o JSON cru na tela.
+    for (let rodada = 0; rodada < 2 && finishReason === "length" && content.trim(); rodada += 1) {
+      const bloco = openFence(content);
+      const pedido =
+        bloco === null
+          ? "Sua resposta foi cortada pelo limite de tamanho. Continue EXATAMENTE do ponto onde parou (sem repetir nada do que já escreveu e sem comentar o corte) e termine de forma mais enxuta."
+          : `Sua resposta foi cortada pelo limite de tamanho no meio do bloco \`\`\`${bloco}. Continue EXATAMENTE do ponto onde parou (sem repetir nada do que já escreveu e sem comentar o corte), termine o conteúdo de forma mais enxuta e feche o bloco com \`\`\` numa linha própria. Depois do bloco, no máximo uma frase.`;
+      let continuacao;
+      try {
+        continuacao = await call({
+          provider: model.provider,
+          providerModel: model.providerModel,
+          messages: [
+            ...messages,
+            { role: "assistant", content },
+            { role: "user", content: pedido },
+          ],
+          maxTokens,
+          timeoutMs,
+          signal,
+          onDelta,
+          providerParams: model.providerParams,
+        });
+      } catch (error) {
+        // Cancelado pelo aluno: para tudo. Outra falha (vazio, tempo): fica
+        // com o que já chegou e o fecho logo abaixo cuida do bloco aberto.
+        if (signal?.aborted) throw error;
+        console.log(`[mine] continuado=${bloco ?? "texto"} rodada=${rodada + 1} falhou=${error?.code || "erro"}`);
+        break;
+      }
+      content += String(continuacao.contentRaw ?? continuacao.content ?? "");
       finishReason = continuacao.finishReason;
-      console.log(`[mine] arquivo=continuado rodada=${rodada + 1} fim=${finishReason || "ok"}`);
+      console.log(`[mine] continuado=${bloco ?? "texto"} rodada=${rodada + 1} fim=${finishReason || "ok"}`);
     }
-    // Ainda aberto (não deu para terminar): fecha o bloco para o arquivo
-    // aparecer com o que chegou, e a resposta não é descartada por isso.
+    // Ainda aberto (não deu para terminar): fecha o bloco para ele aparecer
+    // com o que chegou, e a resposta não é descartada por isso.
     if (fileBlockOpen(content)) {
       const fecho = "\n```\n\n_(O arquivo ficou maior que o limite e saiu resumido. Peça \"continua o arquivo\" para eu completar.)_";
+      content += fecho;
+      onDelta?.(fecho);
+      finishReason = "stop";
+    } else if (openFence(content) !== null) {
+      const fecho = "\n```\n\n_(A resposta ficou longa demais e foi cortada aqui. Peça \"continua\" para eu terminar.)_";
+      content += fecho;
+      onDelta?.(fecho);
+      finishReason = "stop";
+    } else if (finishReason === "length" && content.trim()) {
+      const fecho = "\n\n_(A resposta ficou longa demais e foi cortada aqui. Peça \"continua\" para eu terminar.)_";
       content += fecho;
       onDelta?.(fecho);
       finishReason = "stop";

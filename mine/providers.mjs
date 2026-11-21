@@ -369,6 +369,9 @@ export async function callProviderStream({
     markKeySuccess(provider, apiKey);
     return {
       content: content.trim(),
+      // Sem o trim do começo: a continuação de uma resposta cortada precisa
+      // do espaço inicial para não colar na última palavra.
+      contentRaw: content.trimEnd(),
       toolCalls,
       reasoning: reasoning.trim(),
       provider,
@@ -493,7 +496,8 @@ export async function callProvider({
     }
 
     const message = data?.choices?.[0]?.message || {};
-    const content = pickMessageText(message).trim();
+    const contentRaw = pickMessageText(message).trimEnd();
+    const content = contentRaw.trim();
     const toolCalls = finishToolCalls(
       (Array.isArray(message.tool_calls) ? message.tool_calls : []).map((call) => ({
         name: call?.function?.name || "",
@@ -511,6 +515,7 @@ export async function callProvider({
     markKeySuccess(provider, apiKey);
     return {
       content,
+      contentRaw,
       toolCalls,
       reasoning: String(message.reasoning || "").trim(),
       provider,
