@@ -1,8 +1,8 @@
 // Carregado sob demanda (React.lazy): a aba Laboratório, com simulações de
 // física e química para mexer e desafios que valem XP.
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Atom, Beaker, Bot, CheckCircle2, CircuitBoard, FlaskConical, Play, RotateCcw, Rocket, Target, Triangle } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Atom, Beaker, Bot, CheckCircle2, CircuitBoard, FlaskConical, Hand, Play, RotateCcw, Rocket, Target, Triangle } from "lucide-react";
 import { PageHeader, uid, type Session, type User, type useMemoUserData, type AppData } from "../main";
 import { useSoftMotion } from "../motion";
 import { celebrateFrom, floatXp, mineConversa, mineSays } from "../caderno";
@@ -21,16 +21,32 @@ import {
   type Lancamento,
   type Plano,
 } from "./simulacoes";
+import { useCena3D } from "../cena3d/Cena3D";
+import type { AcaoLab, EstadoLab, ExpId, Valores } from "./tipos";
 import "./laboratorio.css";
+import "./laboratorio-3d.css";
 
-type ExpId = "plano" | "circuito" | "ph" | "lancamento";
-type Valores = { plano: Plano; circuito: Circuito; ph: { acido: number; base: number }; lancamento: Lancamento & { gid: string } };
+const Bancada3D = React.lazy(() => import("./Bancada3D"));
 
-const experimentos: Array<{ id: ExpId; nome: string; materia: string; icone: typeof Atom; resumo: string }> = [
-  { id: "plano", nome: "Plano inclinado", materia: "Física · Dinâmica", icone: Triangle, resumo: "Peso, normal e atrito decidem se o bloco escorrega." },
-  { id: "circuito", nome: "Circuito elétrico", materia: "Física · Eletricidade", icone: CircuitBoard, resumo: "Lei de Ohm com resistores em série e em paralelo." },
-  { id: "ph", nome: "Ácido + base", materia: "Química · Soluções", icone: Beaker, resumo: "Misture HCl e NaOH e veja o repolho roxo mudar de cor." },
-  { id: "lancamento", nome: "Lançamento oblíquo", materia: "Física · Cinemática", icone: Rocket, resumo: "Velocidade, ângulo e gravidade desenham a parábola." },
+/** Se a cena 3D quebrar, a bancada volta para o desenho 2D sem derrubar a aba. */
+class Guarda extends React.Component<{ onFail: () => void; children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    this.props.onFail();
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+const experimentos: Array<{ id: ExpId; nome: string; materia: string; icone: typeof Atom; resumo: string; cor: string; gesto: string }> = [
+  { id: "plano", nome: "Plano inclinado", materia: "Física · Dinâmica", icone: Triangle, resumo: "Peso, normal e atrito decidem se o bloco escorrega.", cor: "var(--hl-lilac)", gesto: "arraste a bolinha verde no topo da rampa" },
+  { id: "circuito", nome: "Circuito elétrico", materia: "Física · Eletricidade", icone: CircuitBoard, resumo: "Lei de Ohm com resistores em série e em paralelo.", cor: "var(--hl-yellow)", gesto: "arraste a bateria ou um resistor · toque no seletor" },
+  { id: "ph", nome: "Ácido + base", materia: "Química · Soluções", icone: Beaker, resumo: "Misture HCl e NaOH e veja o repolho roxo mudar de cor.", cor: "var(--hl-pink)", gesto: "toque numa bureta para pingar 1 mL" },
+  { id: "lancamento", nome: "Lançamento oblíquo", materia: "Física · Cinemática", icone: Rocket, resumo: "Velocidade, ângulo e gravidade desenham a parábola.", cor: "var(--hl-mint)", gesto: "arraste o cano para mirar · toque no canhão para lançar" },
 ];
 
 type Desafio = { id: string; exp: ExpId; texto: string; dica: string; cumprido: (v: Valores, extra: { lancou: boolean }) => boolean };
@@ -611,8 +627,9 @@ function desenhoLancamento(v: Lancamento, lance: { inicio: number } | null, alvo
 
 function Controle({ rotulo, valor, unidade, min, max, passo, onChange }: { rotulo: string; valor: number; unidade: string; min: number; max: number; passo: number; onChange: (n: number) => void }) {
   const id = `lab-${rotulo.replace(/\W+/g, "-")}`;
+  const pct = ((valor - min) / (max - min)) * 100;
   return (
-    <div className="lab-controle">
+    <div className="lab-controle" style={{ "--pct": `${pct}%` } as React.CSSProperties}>
       <label htmlFor={id}>
         <span>{rotulo}</span>
         <strong>
@@ -624,15 +641,34 @@ function Controle({ rotulo, valor, unidade, min, max, passo, onChange }: { rotul
   );
 }
 
-function Leitura({ itens }: { itens: Array<[string, string, string?]> }) {
+function Leitura({ itens, reduced }: { itens: Array<[string, string, string?]>; reduced: boolean }) {
   return (
     <dl className="lab-leituras">
-      {itens.map(([nome, valor, formula]) => (
-        <div key={nome}>
+      {itens.map(([nome, valor, formula], i) => (
+        <motion.div
+          key={nome}
+          className="lab-leitura"
+          initial={reduced ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30, delay: i * 0.04 }}
+        >
           <dt>{nome}</dt>
-          <dd>{valor}</dd>
+          <dd className="lab-leitura-valor">
+            {/* cada valor novo entra por cima (o número "rola" como num visor) */}
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={valor}
+                initial={reduced ? false : { y: -14, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 14, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+              >
+                {valor}
+              </motion.span>
+            </AnimatePresence>
+          </dd>
           {formula ? <dd className="lab-formula">{formula}</dd> : null}
-        </div>
+        </motion.div>
       ))}
     </dl>
   );
@@ -649,6 +685,18 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
   const [feitos, setFeitos] = useState<{ dia: string; ids: string[] }>(() => lerLocal(chaveFeitos, { dia: hojeChave(), ids: [] as string[] }));
   const [desafioId, setDesafioId] = useState<string>(() => desafios.find((item) => item.exp === exp)?.id || desafios[0].id);
   const desafioRef = useRef<HTMLDivElement>(null);
+  const [comemorar, setComemorar] = useState(0);
+  const escolhaRef = useRef<HTMLDivElement>(null);
+  // no celular a escolha é uma faixa que rola de lado: traz o experimento ativo para a vista
+  useEffect(() => {
+    const faixa = escolhaRef.current;
+    const ativo = faixa?.querySelector<HTMLElement>(".lab-exp.is-on");
+    if (!faixa || !ativo || faixa.scrollWidth <= faixa.clientWidth) return;
+    faixa.scrollTo({ left: ativo.offsetLeft - 16, behavior: reduced ? "auto" : "smooth" });
+  }, [exp, reduced]);
+  const ligada3d = useCena3D();
+  const [falhou3d, setFalhou3d] = useState(false);
+  const em3d = ligada3d && !falhou3d;
 
   useEffect(() => gravarLocal(chaveValores, { exp, v: valores }), [chaveValores, exp, valores]);
 
@@ -682,6 +730,7 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
       celebrateFrom(desafioRef.current, { count: 28 });
     }, 80);
     mineSays("Desafio cumprido! Experimento perfeito 🔬", "wow");
+    setComemorar((n) => n + 1);
   }, [cumprido, jaFeito, desafio, hoje, chaveFeitos, update, user.id]);
 
   const trocarExp = (id: ExpId) => {
@@ -706,16 +755,22 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
     window.setTimeout(() => setLancou(true), reduced ? 0 : duracao * 1000 + 50);
   };
 
+  const mudarRef = useRef(mudar);
+  mudarRef.current = mudar;
+  const lancarRef = useRef(lancar);
+  lancarRef.current = lancar;
+
   const info = experimentos.find((item) => item.id === exp)!;
   // O lançamento só anima durante o voo; depois da bola cair, um quadro parado basta.
-  const animado = !reduced && (exp !== "lancamento" || (Boolean(lance) && !lancou));
+  const animado = !reduced && !em3d && (exp !== "lancamento" || (Boolean(lance) && !lancou));
 
-  const { desenho, leituras, pergunta, controles } = useMemo(() => {
+  const { desenho, leituras, pergunta, controles, destaque } = useMemo(() => {
     if (exp === "plano") {
       const v = valores.plano;
       const r = plano(v);
       return {
         desenho: desenhoPlano(v, reduced),
+        destaque: r.desliza ? (["aceleração", `${fmt(r.aceleracao, 2)} m/s²`] as [string, string]) : (["o bloco", "fica parado"] as [string, string]),
         leituras: [
           ["Peso", `${fmt(r.peso)} N`, "P = m·g"],
           ["Componente na rampa", `${fmt(r.px)} N`, "Px = P·sen θ"],
@@ -739,6 +794,7 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
       const r = circuito(v);
       return {
         desenho: desenhoCircuito(v, reduced),
+        destaque: ["corrente total", `${fmt(r.corrente, 2)} A`] as [string, string],
         leituras: [
           ["Resistência equivalente", `${fmt(r.req, 2)} Ω`, v.ligacao === "serie" ? "Req = R1 + R2" : "1/Req = 1/R1 + 1/R2"],
           ["Corrente total", `${fmt(r.corrente, 2)} A`, "I = U / Req"],
@@ -769,6 +825,7 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
       const indicador = corRepolho(valor);
       return {
         desenho: desenhoPh(v.acido, v.base, reduced),
+        destaque: [`solução ${classificaPh(valor)}`, `pH ${fmt(valor, 2)}`] as [string, string],
         leituras: [
           ["pH", fmt(valor, 2), "pH = −log [H⁺]"],
           ["A solução está", classificaPh(valor), valor < 7 ? "sobra H⁺ (ácido)" : valor > 7 ? "sobra OH⁻ (base)" : "H⁺ + OH⁻ → H₂O"],
@@ -790,6 +847,7 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
     const planeta = gravidades.find((item) => item.id === v.gid)?.nome || "Terra";
     return {
       desenho: desenhoLancamento(v, lance, desafio.id === "lanc-alvo" ? 40 : null, reduced),
+      destaque: [lancou ? "a bola caiu a" : "alcance previsto", `${fmt(r.alcance, 1)} m`] as [string, string],
       leituras: [
         ["Alcance", `${fmt(r.alcance)} m`, "A = v²·sen 2θ / g"],
         ["Altura máxima", `${fmt(r.alturaMax)} m`, "H = (v·sen θ)² / 2g"],
@@ -816,23 +874,60 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
       ),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exp, valores, lance, reduced, desafio.id]);
+  }, [exp, valores, lance, lancou, reduced, desafio.id]);
+
+  const alvoLancamento = exp === "lancamento" && desafio.id === "lanc-alvo" ? 40 : null;
+  const estado3d: EstadoLab = useMemo(() => ({ exp, valores, lance, alvo: alvoLancamento, comemorar }), [exp, valores, lance, alvoLancamento, comemorar]);
+  const aoAgir = useCallback((acao: AcaoLab) => {
+    if (acao.tipo === "lancar") lancarRef.current();
+    else mudarRef.current(acao.tipo, acao.parcial as never);
+  }, []);
+  const perguntarMine = () =>
+    mineConversa(
+      pergunta,
+      `O estudante esta na aba Laboratorio do Minerva, mexendo na simulacao "${info.nome}" (${info.materia}). Valores e resultados que ele ve na tela agora: ${leituras.map(([nome, valor]) => `${nome}: ${valor}`).join("; ")}. Desafio da vez: ${desafio.texto}${cumprido || jaFeito ? " (ja cumprido)" : " (ainda nao cumprido; de pistas, nao a resposta pronta)"}.`,
+      info.nome,
+    );
+  const perguntarRef = useRef(perguntarMine);
+  perguntarRef.current = perguntarMine;
+  const aoMine = useCallback(() => perguntarRef.current(), []);
+
+  const totalDesafios = desafios.length;
+  const feitosHoje = hoje.length;
+  const anel = 2 * Math.PI * 17;
 
   return (
     <div className="lab-page">
       <PageHeader
         eyebrow="Laboratório · Física e Química"
         title="Laboratório da Mine"
-        subtitle="Mexa nos controles e veja a ciência acontecer. Cada experimento mostra as contas ao vivo, e os desafios valem XP."
+        subtitle="Mexa nas peças da bancada e veja a ciência acontecer. Cada experimento mostra as contas ao vivo, e os desafios valem XP."
       />
 
-      <div className="lab-escolha" role="tablist" aria-label="Experimentos">
-        {experimentos.map((item) => {
+      <div ref={escolhaRef} className="lab-escolha" role="tablist" aria-label="Experimentos">
+        {experimentos.map((item, indice) => {
           const Icone = item.icone;
-          const feitosAqui = desafios.filter((d) => d.exp === item.id && hoje.includes(d.id)).length;
+          const doExp = desafios.filter((d) => d.exp === item.id);
+          const feitosAqui = doExp.filter((d) => hoje.includes(d.id)).length;
           return (
-            <button key={item.id} type="button" role="tab" aria-selected={exp === item.id} className={`lab-exp ${exp === item.id ? "is-on" : ""}`} onClick={() => trocarExp(item.id)}>
+            <motion.button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={exp === item.id}
+              className={`lab-exp ${exp === item.id ? "is-on" : ""}`}
+              style={{ "--exp-cor": item.cor } as React.CSSProperties}
+              onClick={() => trocarExp(item.id)}
+              initial={reduced ? false : { opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={reduced ? undefined : { y: -4 }}
+              whileTap={reduced ? undefined : { scale: 0.97 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26, delay: reduced ? 0 : 0.05 * indice }}
+            >
               {exp === item.id ? <motion.span layoutId="lab-exp-grifo" className="lab-exp-grifo" transition={{ type: "spring", stiffness: 320, damping: 30 }} /> : null}
+              <span className="lab-exp-numero" aria-hidden>
+                0{indice + 1}
+              </span>
               <span className="lab-exp-icone">
                 <Icone className="h-5 w-5" />
               </span>
@@ -840,20 +935,72 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
                 <span className="lab-exp-materia">{item.materia}</span>
                 <strong>{item.nome}</strong>
                 <span className="lab-exp-resumo">{item.resumo}</span>
+                <span className="lab-exp-tubos" aria-label={`${feitosAqui} de ${doExp.length} desafios cumpridos hoje`}>
+                  {doExp.map((d) => (
+                    <i key={d.id} className={hoje.includes(d.id) ? "is-cheio" : ""} />
+                  ))}
+                </span>
               </span>
-              {feitosAqui ? <span className="lab-exp-selo" aria-label={`${feitosAqui} desafios cumpridos hoje`}>{feitosAqui}✓</span> : null}
-            </button>
+            </motion.button>
           );
         })}
       </div>
 
       <div className="lab-grid">
         <section className="lab-bancada" aria-label={`Bancada: ${info.nome}`}>
-          <div className="lab-palco">
-            <Palco desenhar={desenho} animado={animado} rotulo={`Simulação de ${info.nome}`} />
-            <p className="lab-palco-legenda caderno-note">{info.nome.toLocaleLowerCase("pt-BR")}</p>
+          <div className={`lab-palco ${em3d ? "is-3d" : ""}`} style={{ "--exp-cor": info.cor } as React.CSSProperties}>
+            {em3d ? (
+              <Guarda onFail={() => setFalhou3d(true)}>
+                <React.Suspense
+                  fallback={
+                    <div className="lab3d-carregando" aria-hidden>
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  }
+                >
+                  <Bancada3D estado={estado3d} onAcao={aoAgir} onMine={aoMine} />
+                </React.Suspense>
+              </Guarda>
+            ) : (
+              <Palco desenhar={desenho} animado={animado} rotulo={`Simulação de ${info.nome}`} />
+            )}
+            <div className="lab-hud" aria-live="polite">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.p
+                  key={exp}
+                  className="lab-palco-legenda caderno-note"
+                  initial={reduced ? false : { opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 12 }}
+                  transition={{ duration: 0.22 }}
+                >
+                  {info.nome.toLocaleLowerCase("pt-BR")}
+                </motion.p>
+              </AnimatePresence>
+              <div className="lab-visor">
+                <span>{destaque[0]}</span>
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.strong
+                    key={destaque[1]}
+                    initial={reduced ? false : { y: -16, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 16, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  >
+                    {destaque[1]}
+                  </motion.strong>
+                </AnimatePresence>
+              </div>
+              {em3d ? (
+                <p className="lab-gesto">
+                  <Hand className="h-4 w-4" /> {info.gesto}
+                </p>
+              ) : null}
+            </div>
           </div>
-          <Leitura itens={leituras} />
+          <Leitura key={exp} itens={leituras} reduced={reduced} />
         </section>
 
         <aside className="lab-lado">
@@ -886,33 +1033,52 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
                 ))}
               </div>
             </div>
-            <p className="lab-desafio-texto">{desafio.texto}</p>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.p
+                key={desafio.id}
+                className="lab-desafio-texto"
+                initial={reduced ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                {desafio.texto}
+              </motion.p>
+            </AnimatePresence>
             {cumprido || jaFeito ? (
-              <p className="lab-desafio-ok">
+              <motion.p className="lab-desafio-ok" initial={reduced ? false : { scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 18 }}>
                 <CheckCircle2 className="h-4 w-4" /> {jaFeito && !cumprido ? "Você já cumpriu este hoje." : `Cumprido! +${labXp()} XP`}
-              </p>
+              </motion.p>
             ) : (
               <details className="lab-dica">
                 <summary>preciso de uma dica</summary>
                 <p>{desafio.dica}</p>
               </details>
             )}
-            <p className="lab-desafio-cota">
-              {Math.min(hoje.length, labPorDia)}/{labPorDia} desafios com XP hoje
-            </p>
+            <div className="lab-desafio-cota">
+              <svg viewBox="0 0 40 40" className="lab-anel" aria-hidden>
+                <circle cx="20" cy="20" r="17" />
+                <motion.circle
+                  cx="20"
+                  cy="20"
+                  r="17"
+                  className="is-cheio"
+                  strokeDasharray={anel}
+                  initial={false}
+                  animate={{ strokeDashoffset: anel * (1 - Math.min(1, feitosHoje / totalDesafios)) }}
+                  transition={{ type: "spring", stiffness: 120, damping: 20 }}
+                />
+              </svg>
+              <span>
+                <strong>
+                  {feitosHoje}/{totalDesafios}
+                </strong>{" "}
+                desafios hoje · {Math.min(feitosHoje, labPorDia)}/{labPorDia} com XP
+              </span>
+            </div>
           </div>
 
-          <button
-            type="button"
-            className="lab-mine"
-            onClick={() =>
-              mineConversa(
-                pergunta,
-                `O estudante esta na aba Laboratorio do Minerva, mexendo na simulacao "${info.nome}" (${info.materia}). Valores e resultados que ele ve na tela agora: ${leituras.map(([nome, valor]) => `${nome}: ${valor}`).join("; ")}. Desafio da vez: ${desafio.texto}${cumprido || jaFeito ? " (ja cumprido)" : " (ainda nao cumprido; de pistas, nao a resposta pronta)"}.`,
-                info.nome,
-              )
-            }
-          >
+          <button type="button" className="lab-mine" onClick={perguntarMine}>
             <Bot className="h-5 w-5" />
             <span>
               <strong>Perguntar à Mine</strong>
