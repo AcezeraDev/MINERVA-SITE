@@ -25,6 +25,7 @@ import { LessonPlayer, LessonResultSheet, type LessonFinish } from "./LessonPlay
 import { Conversa } from "./Conversa";
 import { setVoiceSource, speak, voiceSource, type VoiceSource } from "./voz";
 import type { CityStop, StopState } from "./CidadePopUp";
+import { BorderBeam, MagneticShimmerButton, SPRING_GENTLE, SPRING_UI } from "./IdiomasFx";
 import "./idiomas.css";
 
 const CidadePopUp = React.lazy(() => import("./CidadePopUp"));
@@ -240,7 +241,14 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
         </button>
       </div>
 
-      <section className="idi-hero" aria-label="Mapa do intercâmbio">
+      <motion.section
+        className="idi-hero"
+        aria-label="Mapa do intercâmbio"
+        initial={reduced ? false : { opacity: 0, y: 18, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={SPRING_GENTLE}
+      >
+        <BorderBeam size={140} duration={8} colorFrom="#93a3ff" colorTo="#2fd483" borderWidth={1.5} />
         {use3d ? (
           <CityBoundary onFail={() => setCityFailed(true)}>
             <React.Suspense fallback={<div className="idi-city3d" />}>
@@ -274,13 +282,13 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
             </span>
           </div>
           {nextUnit ? (
-            <button type="button" className="idi-go" onClick={() => startStage(nextUnit, progress.next!.stage)}>
+            <MagneticShimmerButton onClick={() => startStage(nextUnit, progress.next!.stage)}>
               <Play className="h-4 w-4" /> {progress.totals.lessons ? "Continuar" : "Começar a viagem"}
-            </button>
+            </MagneticShimmerButton>
           ) : null}
         </div>
         {use3d ? <p className="idi-hero-hint caderno-note">arraste para girar a cidade · clique num prédio</p> : null}
-      </section>
+      </motion.section>
 
       <div className="idi-strip">
         <button type="button" className={`idi-postcard ${flipped ? "is-flipped" : ""}`} onClick={() => { setFlipped((value) => !value); void speak(word.en); }} aria-label={`Palavra do dia: ${word.en}, ${word.pt}. Toque para virar e ouvir.`}>
@@ -334,10 +342,11 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
               data-unit={unit.id}
               className={`idi-stop is-${state} ${index % 2 ? "is-right" : "is-left"}`}
               style={{ "--tone": toneHex[unit.color] } as React.CSSProperties}
-              initial={reduced ? false : { opacity: 0, y: 26, rotate: index % 2 ? 1.5 : -1.5 }}
-              whileInView={{ opacity: 1, y: 0, rotate: index % 2 ? 0.6 : -0.6 }}
+              initial={reduced ? false : { opacity: 0, y: 26, rotate: index % 2 ? 1.5 : -1.5, scale: 0.97 }}
+              whileInView={{ opacity: 1, y: 0, rotate: index % 2 ? 0.6 : -0.6, scale: 1 }}
+              whileHover={reduced ? undefined : { y: -4, scale: 1.012 }}
               viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              transition={SPRING_UI}
             >
               <span className="idi-stop-sticker" aria-hidden>{state === "locked" ? "🔒" : unit.emoji}</span>
               <div className="idi-stop-head">
@@ -428,7 +437,7 @@ export function IdiomasView({ data, user, update }: { data: ReturnType<typeof us
         ) : null}
         {passport ? (
           <motion.div key="passaporte" className="idi-lesson" role="dialog" aria-modal="true" aria-label="Passaporte" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={(event) => event.target === event.currentTarget && setPassport(false)}>
-            <motion.div className="idi-passport idi-print" initial={reduced ? false : { rotateY: -80, opacity: 0 }} animate={{ rotateY: 0, opacity: 1 }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}>
+            <motion.div className="idi-passport idi-print" initial={reduced ? false : { rotateY: -65, opacity: 0, scale: 0.94 }} animate={{ rotateY: 0, opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={SPRING_UI}>
               <button type="button" className="idi-close idi-noprint" onClick={() => setPassport(false)} aria-label="Fechar passaporte">
                 <X />
               </button>
