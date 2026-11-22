@@ -908,7 +908,170 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cubo-faixa-ponto,
-  .cubo-faixa-pensando span {
+  .cubo-faixa-pensando span,
+  .cubo-border-beam-runner,
+  .cubo-shimmer-conic {
     animation: none;
   }
+}
+
+/* ---------- botão flutuante de ângulo do palco 3D ---------- */
+
+.cubo-vista-btn {
+  position: absolute;
+  right: 0.9rem;
+  bottom: 0.75rem;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgb(var(--theme-text) / 0.85);
+  background: rgb(var(--panel-2) / 0.85);
+  border: 1px solid rgb(var(--line) / 0.8);
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 160ms ease, background-color 160ms ease;
+}
+
+.cubo-vista-btn:hover {
+  transform: translateY(-1px) scale(1.04);
+  border-color: rgb(var(--pen) / 0.7);
+}
+
+.cubo-vista-btn:active {
+  transform: scale(0.96);
+}
+
+/* ---------- Glassmorphism Awwwards (somente modo escuro) ---------- */
+
+html:not(.theme-light) .cubo-palco-card {
+  background:
+    radial-gradient(95% 70% at 50% 42%, rgba(142, 158, 255, 0.14) 0%, rgba(47, 212, 131, 0.04) 44%, transparent 72%),
+    linear-gradient(180deg, rgba(22, 27, 45, 0.92) 0%, rgba(14, 18, 32, 0.96) 100%);
+  box-shadow: 0 28px 80px -24px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 0 0 1px rgba(147, 163, 255, 0.16);
+}
+
+html:not(.theme-light) .cubo-relogio,
+html:not(.theme-light) .cubo-card {
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  background: linear-gradient(180deg, rgba(24, 30, 50, 0.76) 0%, rgba(16, 21, 36, 0.88) 100%);
+  box-shadow: 0 20px 56px -22px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(147, 163, 255, 0.14);
+}
+
+html:not(.theme-light) .cubo-vista-btn {
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  background: rgba(18, 24, 42, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+html:not(.theme-light) .cubo-vista-btn:hover {
+  background: rgba(34, 45, 76, 0.82);
+  border-color: rgba(147, 163, 255, 0.45);
+}
+
+/* ---------- Magic UI: BorderBeam ---------- */
+
+.cubo-border-beam {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border-radius: inherit;
+  border: var(--cubo-beam-width, 1.5px) solid transparent;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  overflow: hidden;
+}
+
+.cubo-border-beam-runner {
+  position: absolute;
+  width: var(--cubo-beam-size, 130px);
+  aspect-ratio: 1;
+  background: linear-gradient(to left, var(--cubo-beam-from, #93a3ff), var(--cubo-beam-to, #2fd483), transparent);
+  offset-path: rect(0 auto auto 0 round var(--cubo-beam-radius, 1.25rem));
+  animation: cubo-beam-orbit var(--cubo-beam-duration, 8s) linear var(--cubo-beam-delay, 0s) infinite;
+}
+
+@keyframes cubo-beam-orbit {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
+/* ---------- Magic UI: ShimmerButton + atração magnética ---------- */
+
+.cubo-shimmer-btn {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.cubo-shimmer-spark {
+  position: absolute;
+  inset: -2px;
+  z-index: -2;
+  overflow: hidden;
+  border-radius: inherit;
+  filter: blur(2px);
+}
+
+.cubo-shimmer-conic {
+  position: absolute;
+  inset: -120%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(255, 255, 255, 0.85) 50deg, transparent 105deg);
+  animation: cubo-shimmer-spin 3.4s linear infinite;
+}
+
+.cubo-shimmer-backdrop {
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  border-radius: calc(0.75rem - 2px);
+  background: rgb(var(--pen));
+  box-shadow: inset 0 -6px 12px rgba(255, 255, 255, 0.18);
+  transition: box-shadow 220ms ease;
+}
+
+.cubo-shimmer-btn:hover .cubo-shimmer-backdrop {
+  box-shadow: inset 0 -4px 14px rgba(255, 255, 255, 0.34);
+}
+
+.cubo-shimmer-content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+@keyframes cubo-shimmer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+html.no-motion .cubo-border-beam,
+.low-fx .cubo-border-beam,
+html.no-motion .cubo-shimmer-spark,
+.low-fx .cubo-shimmer-spark {
+  display: none;
+}
+
+.low-fx .cubo-relogio,
+.low-fx .cubo-card,
+.low-fx .cubo-vista-btn {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

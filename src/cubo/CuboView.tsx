@@ -3,7 +3,7 @@
 // e um modo "cubo de verdade", em que o site só embaralha e cronometra.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Box, Hand, Keyboard, RotateCcw, Shuffle, Timer, Trash2, Undo2, Wand2 } from "lucide-react";
+import { Bot, Box, Compass, Hand, Keyboard, RotateCcw, Shuffle, Timer, Trash2, Undo2, Wand2 } from "lucide-react";
 import { PageHeader, uid, type User } from "../main";
 import { useSoftMotion } from "../motion";
 import { celebrateFrom, mineConversa, mineSays } from "../caderno";
@@ -26,6 +26,7 @@ import {
   type Solve,
 } from "../../shared/cubo.mjs";
 import { CuboCena } from "./CuboCena";
+import { CuboBorderBeam, CuboShimmerButton } from "./CuboFx";
 import { perguntarMineCubo, type TurnoTutor } from "./mineTutor";
 import { AulaDaMine, FichasAlgoritmo } from "./AulaDaMine";
 import { elogio, explicarToken, instrucao, lerToken, passosAula, teclaDoToken, type PassoAula } from "./aula";
@@ -905,7 +906,15 @@ export function CuboView({ user }: { user: User }) {
       />
 
       <div className="cubo-grade">
-        <section ref={palcoCardRef} className="cubo-palco-card" aria-label="Cubo 3D">
+        <motion.section
+          ref={palcoCardRef}
+          className="cubo-palco-card"
+          aria-label="Cubo 3D"
+          initial={reduzido ? false : { opacity: 0, y: 16, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={mola}
+        >
+          <CuboBorderBeam size={150} duration={8} colorFrom="#93a3ff" colorTo="#2fd483" borderWidth={1.5} radius="1.25rem" />
           <div className="cubo-palco-topo">
             <div className="cubo-seg cubo-seg-modo" role="radiogroup" aria-label="Modo">
               {([["tela", "No site", Box], ["real", "Cubo de verdade", Hand]] as const).map(([id, rotulo, Icone]) => (
@@ -920,6 +929,14 @@ export function CuboView({ user }: { user: User }) {
 
           <div className="relative">
             <div ref={palcoRef} className={`cubo-palco ${prefs.modo === "real" ? "is-real" : ""}`} />
+            <button
+              type="button"
+              className="cubo-vista-btn"
+              onClick={() => cenaRef.current?.vistaPadrao(false)}
+              title="Centralizar ângulo do cubo"
+            >
+              <Compass className="h-3.5 w-3.5" aria-hidden /> Centralizar
+            </button>
             <AnimatePresence>
               {aulaViva || aoVivo ? (
                 <motion.div
@@ -997,29 +1014,29 @@ export function CuboView({ user }: { user: User }) {
           ) : null}
 
           <div className="cubo-acoes">
-            <motion.button type="button" className="cubo-btn is-primario" onClick={embaralhar} disabled={ocupada || correndo} whileTap={reduzido ? undefined : { scale: 0.96 }} transition={mola}>
+            <CuboShimmerButton onClick={embaralhar} disabled={ocupada || correndo}>
               <Shuffle className="h-4 w-4" aria-hidden /> Embaralhar
-            </motion.button>
+            </CuboShimmerButton>
             {prefs.modo === "tela" ? (
               <>
-                <button type="button" className="cubo-btn" onClick={desfazer} disabled={ocupada}>
+                <motion.button type="button" className="cubo-btn" onClick={desfazer} disabled={ocupada} whileHover={reduzido ? undefined : { y: -2 }} whileTap={reduzido ? undefined : { scale: 0.96 }} transition={mola}>
                   <Undo2 className="h-4 w-4" aria-hidden /> Desfazer
-                </button>
-                <button type="button" className="cubo-btn" onClick={resolverSozinho} disabled={ocupada} title="Refaz o caminho de volta, giro por giro (não vale tempo)">
+                </motion.button>
+                <motion.button type="button" className="cubo-btn" onClick={resolverSozinho} disabled={ocupada} title="Refaz o caminho de volta, giro por giro (não vale tempo)" whileHover={reduzido ? undefined : { y: -2 }} whileTap={reduzido ? undefined : { scale: 0.96 }} transition={mola}>
                   <Wand2 className="h-4 w-4" aria-hidden /> Mostrar a volta
-                </button>
+                </motion.button>
               </>
             ) : null}
             {prefs.modo === "tela" && !aoVivo && !aulaViva ? (
-              <button type="button" className="cubo-btn is-mine" onClick={() => setAoVivo(true)}>
+              <motion.button type="button" className="cubo-btn is-mine" onClick={() => setAoVivo(true)} whileHover={reduzido ? undefined : { y: -2, scale: 1.02 }} whileTap={reduzido ? undefined : { scale: 0.96 }} transition={mola}>
                 <Bot className="h-4 w-4" aria-hidden /> Mine ao vivo
-              </button>
+              </motion.button>
             ) : null}
-            <button type="button" className="cubo-btn" onClick={recomecar} disabled={ocupada}>
+            <motion.button type="button" className="cubo-btn" onClick={recomecar} disabled={ocupada} whileHover={reduzido ? undefined : { y: -2 }} whileTap={reduzido ? undefined : { scale: 0.96 }} transition={mola}>
               <RotateCcw className="h-4 w-4" aria-hidden /> Recomeçar
-            </button>
+            </motion.button>
           </div>
-        </section>
+        </motion.section>
 
         <aside className="cubo-lado">
           <section
@@ -1029,6 +1046,16 @@ export function CuboView({ user }: { user: User }) {
             onPointerUp={prefs.modo === "real" ? soltarReal : undefined}
             onPointerCancel={prefs.modo === "real" ? soltarReal : undefined}
           >
+            {fase === "valendo" || fase === "liberado" || fase === "inspecao" ? (
+              <CuboBorderBeam
+                size={110}
+                duration={3.5}
+                colorFrom={fase === "inspecao" ? "#ffaabd" : "#2fd483"}
+                colorTo="#93a3ff"
+                borderWidth={2}
+                radius="1.1rem"
+              />
+            ) : null}
             <p className="cubo-relogio-rotulo">
               <Timer className="h-4 w-4" aria-hidden /> {fase === "inspecao" ? "inspeção" : "tempo"}
             </p>
