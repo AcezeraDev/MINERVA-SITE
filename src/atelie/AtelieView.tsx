@@ -1,6 +1,7 @@
 // Carregado sob demanda (React.lazy): canvas, worker e IndexedDB só descem
 // para quem abre o ateliê.
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, LayoutGroup, motion, useMotionValue, useSpring } from "framer-motion";
 import {
   Brush,
   Camera,
@@ -15,6 +16,7 @@ import {
   ImagePlus,
   Loader2,
   PaintBucket,
+  Palette,
   Pencil,
   Printer,
   Redo2,
@@ -26,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader, PrimaryButton, SecondaryButton, apiJson, readSession, uid, type AppData, type Session, type User } from "../main";
+import { useSoftMotion } from "../motion";
 import { celebrateFrom, floatXp, mineSays } from "../caderno";
 import { drawingsPerDay, startOfDay, xpPerAction } from "../../shared/xp.mjs";
 import { MineFace } from "../caderno/MineFace";
@@ -148,7 +151,62 @@ function slug(text: string) {
   return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "desenho";
 }
 
-function PageThumb({ page, seed, onPick, active }: { page: MinePage; seed: number; onPick: () => void; active: boolean }) {
+const AWWWARDS_SPRING = {
+  type: "spring" as const,
+  stiffness: 300,
+  damping: 30,
+  mass: 1,
+};
+
+function MagneticAction({
+  children,
+  className = "",
+  onClick,
+  disabled,
+  type = "button",
+  reduced,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  disabled?: boolean;
+  type?: "button" | "submit";
+  reduced: boolean;
+}) {
+  const ref = useRef<HTMLButtonElement | null>(null);
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
+  const x = useSpring(rawX, { stiffness: 300, damping: 24, mass: 0.8 });
+  const y = useSpring(rawY, { stiffness: 300, damping: 24, mass: 0.8 });
+
+  return (
+    <motion.button
+      ref={ref}
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      onMouseMove={(event) => {
+        if (reduced || disabled || !ref.current) return;
+        const rect = ref.current.getBoundingClientRect();
+        rawX.set(Math.max(-6, Math.min(6, (event.clientX - (rect.left + rect.width / 2)) * 0.1)));
+        rawY.set(Math.max(-5, Math.min(5, (event.clientY - (rect.top + rect.height / 2)) * 0.1)));
+      }}
+      onMouseLeave={() => {
+        rawX.set(0);
+        rawY.set(0);
+      }}
+      style={reduced ? undefined : { x, y }}
+      whileHover={reduced || disabled ? undefined : { scale: 1.03 }}
+      whileTap={reduced || disabled ? undefined : { scale: 0.96 }}
+      transition={AWWWARDS_SPRING}
+      className={className}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+function PageThumb({ page, seed, onPick, active, reduced }: { page: MinePage; seed: number; onPick: () => void; active: boolean; reduced: boolean }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -157,10 +215,18 @@ function PageThumb({ page, seed, onPick, active }: { page: MinePage; seed: numbe
     drawMinePage(ctx, page, canvas.width, canvas.height, seed);
   }, [page, seed]);
   return (
-    <button type="button" className={`atelie-thumb ${active ? "is-active" : ""}`} onClick={onPick} aria-pressed={active}>
+    <motion.button
+      type="button"
+      className={`atelie-thumb ${active ? "is-active" : ""}`}
+      onClick={onPick}
+      aria-pressed={active}
+      whileHover={reduced ? undefined : { y: -3, scale: 1.025 }}
+      whileTap={reduced ? undefined : { scale: 0.96 }}
+      transition={AWWWARDS_SPRING}
+    >
       <canvas ref={ref} width={150} height={195} aria-hidden />
       <span>{page.title}</span>
-    </button>
+    </motion.button>
   );
 }
 
@@ -171,6 +237,7 @@ type AtelieProps = {
 };
 
 export function AtelieView({ data, user, update }: AtelieProps) {
+  const reduced = useSoftMotion();
   const [sheet, setSheet] = useState<Sheet>({ w: SHEET_W, h: SHEET_H, kind: "mine", title: minePages[0].title });
   const [tool, setTool] = useState<Tool>("balde");
   const [color, setColor] = useState("#F472B6");
@@ -903,14 +970,17 @@ export function AtelieView({ data, user, update }: AtelieProps) {
     if (file) void startPhoto(file);
   };
 
-  const sizePreview = Math.min(40, Math.max(4, tool === "lapis" ? size * 0.35 : tool === "marca" ? size * 1.2 : size));
+  const sizePreview = Math.min(34, Math.max(5, tool === "lapis" ? size * 0.35 : tool === "marca" ? size * 1.2 : size));
+  const activeToolMeta = tools.find((item) => item.id === tool) ?? tools[0];
+  const uiSpring = AWWWARDS_SPRING;
 
   return (
-    <>
+    <LayoutGroup id="atelie-studio">
+      <div className="atelie-page">
       <PageHeader
         eyebrow="Ateliê da Mine"
         title="Desenhar e pintar"
-        subtitle="Pinte os desenhos da Mine, desenhe numa folha em branco ou mande uma foto que eu transformo em folha de colorir."
+        subtitle="Pinte os desenhos da Mine, crie numa folha em branco ou transforme uma foto em folha de colorir."
         action={
           <>
             <SecondaryButton icon={Printer} onClick={printSheet}>Imprimir folha</SecondaryButton>
@@ -921,58 +991,139 @@ export function AtelieView({ data, user, update }: AtelieProps) {
       />
 
       <div className="atelie">
-        <section className="atelie-mesa" aria-label="Folha de desenho">
-          <div className="atelie-ferramentas" role="toolbar" aria-label="Ferramentas">
-            <div className="atelie-grupo">
-              {tools.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`atelie-tool ${tool === item.id ? "is-active" : ""}`}
-                  aria-pressed={tool === item.id}
-                  title={`${item.label} (${item.key.toUpperCase()})`}
-                  onClick={() => setTool(item.id)}
-                >
-                  <item.icon className="h-[18px] w-[18px]" />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-            <label className="atelie-tamanho" title="Tamanho ( [ e ] )">
-              <span className="atelie-tamanho-dot" style={{ width: sizePreview, height: sizePreview, background: tool === "borracha" ? "transparent" : color }} aria-hidden />
-              <span className="sr-only">Tamanho do traço</span>
-              <input type="range" min={2} max={64} value={size} onChange={(event) => setSize(Number(event.target.value))} disabled={tool === "balde"} />
-            </label>
-            <div className="atelie-grupo">
-              <button type="button" className="atelie-icon" onClick={undo} disabled={!history.undo} title="Desfazer (Ctrl+Z)" aria-label="Desfazer"><Undo2 className="h-[18px] w-[18px]" /></button>
-              <button type="button" className="atelie-icon" onClick={redo} disabled={!history.redo} title="Refazer (Ctrl+Y)" aria-label="Refazer"><Redo2 className="h-[18px] w-[18px]" /></button>
-              <button type="button" className="atelie-icon" onClick={() => setShowLines((v) => !v)} aria-pressed={!showLines} title={showLines ? "Esconder contorno" : "Mostrar contorno"} aria-label={showLines ? "Esconder contorno" : "Mostrar contorno"}>
-                {showLines ? <Eye className="h-[18px] w-[18px]" /> : <EyeOff className="h-[18px] w-[18px]" />}
-              </button>
-              <button type="button" className="atelie-icon" onClick={clearPaint} title="Apagar a pintura (mantém o contorno)" aria-label="Apagar a pintura"><Trash2 className="h-[18px] w-[18px]" /></button>
-            </div>
-          </div>
+        <section className="atelie-mesa" aria-label="Mesa de desenho">
+          <div className="atelie-dock">
+            <div className="atelie-ferramentas" role="toolbar" aria-label="Ferramentas">
+              <div className="atelie-grupo" role="group" aria-label="Instrumentos">
+                {tools.map((item) => {
+                  const active = tool === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`atelie-tool ${active ? "is-active" : ""}`}
+                      aria-pressed={active}
+                      title={`${item.label} (${item.key.toUpperCase()})`}
+                      onClick={() => setTool(item.id)}
+                    >
+                      {active ? (
+                        <motion.span
+                          layoutId="atelie-tool-pill"
+                          className="atelie-tool-bg"
+                          transition={reduced ? { duration: 0 } : uiSpring}
+                          aria-hidden
+                        />
+                      ) : null}
+                      <item.icon className="relative h-[17px] w-[17px]" aria-hidden />
+                      <span className="relative">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-          <div className="atelie-cores" role="radiogroup" aria-label="Cores">
-            {palette.map((hex) => (
-              <button
-                key={hex}
-                type="button"
-                role="radio"
-                aria-checked={color.toLowerCase() === hex.toLowerCase()}
-                aria-label={`Cor ${hex}`}
-                className={`atelie-cor ${color.toLowerCase() === hex.toLowerCase() ? "is-active" : ""}`}
-                style={{ background: hex }}
-                onClick={() => {
-                  setColor(hex);
-                  if (tool === "borracha") setTool("pincel");
-                }}
-              />
-            ))}
-            <label className="atelie-cor atelie-cor-livre" title="Outra cor">
-              <span className="sr-only">Escolher outra cor</span>
-              <input type="color" value={color} onChange={(event) => setColor(event.target.value)} />
-            </label>
+              <span className="atelie-sep" aria-hidden />
+
+              <label className={`atelie-tamanho ${tool === "balde" ? "is-disabled" : ""}`} title="Tamanho do traço ( [ e ] )">
+                <span className="atelie-tamanho-box" aria-hidden>
+                  <span
+                    className="atelie-tamanho-dot"
+                    style={{
+                      transform: `scale(${(sizePreview / 34).toFixed(3)})`,
+                      background: tool === "borracha" ? "transparent" : color,
+                    }}
+                  />
+                </span>
+                <span className="sr-only">Tamanho do traço</span>
+                <input
+                  type="range"
+                  min={2}
+                  max={64}
+                  value={size}
+                  onChange={(event) => setSize(Number(event.target.value))}
+                  disabled={tool === "balde"}
+                />
+                <span className="atelie-tamanho-val" aria-hidden>{tool === "balde" ? "—" : `${size}px`}</span>
+              </label>
+
+              <span className="atelie-sep" aria-hidden />
+
+              <div className="atelie-grupo atelie-acoes-grupo" role="group" aria-label="Histórico e folha">
+                <button type="button" className="atelie-icon" onClick={undo} disabled={!history.undo} title="Desfazer (Ctrl+Z)" aria-label="Desfazer">
+                  <Undo2 className="h-[17px] w-[17px]" />
+                </button>
+                <button type="button" className="atelie-icon" onClick={redo} disabled={!history.redo} title="Refazer (Ctrl+Y)" aria-label="Refazer">
+                  <Redo2 className="h-[17px] w-[17px]" />
+                </button>
+                <button
+                  type="button"
+                  className="atelie-icon"
+                  onClick={() => setShowLines((v) => !v)}
+                  aria-pressed={!showLines}
+                  title={showLines ? "Esconder contorno" : "Mostrar contorno"}
+                  aria-label={showLines ? "Esconder contorno" : "Mostrar contorno"}
+                >
+                  {showLines ? <Eye className="h-[17px] w-[17px]" /> : <EyeOff className="h-[17px] w-[17px]" />}
+                </button>
+                <button
+                  type="button"
+                  className="atelie-icon is-danger"
+                  onClick={clearPaint}
+                  title="Apagar a pintura (mantém o contorno)"
+                  aria-label="Apagar a pintura"
+                >
+                  <Trash2 className="h-[17px] w-[17px]" />
+                </button>
+              </div>
+            </div>
+
+            <div className="atelie-estojo">
+              <div className="atelie-cor-atual" title={`Cor ativa: ${color.toUpperCase()}`}>
+                <motion.span
+                  key={color}
+                  className="atelie-cor-atual-swatch"
+                  style={{ background: color }}
+                  initial={reduced ? false : { scale: 0.72 }}
+                  animate={{ scale: 1 }}
+                  transition={uiSpring}
+                  aria-hidden
+                />
+                <span className="atelie-cor-atual-hex">{color.toUpperCase()}</span>
+              </div>
+              <div className="atelie-cores" role="radiogroup" aria-label="Cores">
+                {palette.map((hex) => {
+                  const selected = color.toLowerCase() === hex.toLowerCase();
+                  return (
+                    <motion.button
+                      key={hex}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={`Cor ${hex}`}
+                      className={`atelie-cor ${selected ? "is-active" : ""}`}
+                      style={{ background: hex }}
+                      whileHover={reduced ? undefined : { scale: 1.18, y: -2 }}
+                      whileTap={reduced ? undefined : { scale: 0.9 }}
+                      transition={uiSpring}
+                      onClick={() => {
+                        setColor(hex);
+                        if (tool === "borracha") setTool("pincel");
+                      }}
+                    />
+                  );
+                })}
+                <label className="atelie-cor atelie-cor-livre" title="Escolher outra cor">
+                  <span className="sr-only">Escolher outra cor</span>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(event) => {
+                      setColor(event.target.value);
+                      if (tool === "borracha") setTool("pincel");
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
           </div>
 
           <div
@@ -1005,201 +1156,288 @@ export function AtelieView({ data, user, update }: AtelieProps) {
                 </div>
               ) : null}
             </div>
-            <p className="atelie-legenda">
-              <span className="caderno-note">{sheet.title}</span>
-              {currentId ? <span className="atelie-guardado"><Check className="h-3.5 w-3.5" /> no caderno</span> : null}
-            </p>
+
+            <div className="atelie-status">
+              <span className="atelie-status-titulo">
+                <strong className="caderno-note">{sheet.title}</strong>
+                {currentId ? (
+                  <span className="atelie-guardado">
+                    <Check className="h-3.5 w-3.5" aria-hidden /> salvo no caderno
+                  </span>
+                ) : null}
+              </span>
+              <span className="atelie-status-meta">
+                <span>{activeToolMeta.label}</span>
+                <kbd>{activeToolMeta.key.toUpperCase()}</kbd>
+                <span className="atelie-status-sep" aria-hidden>·</span>
+                <span>arraste uma foto para colorir</span>
+              </span>
+            </div>
           </div>
         </section>
 
-        <aside className="atelie-painel">
+        <aside className="atelie-painel" aria-label="Origem da folha e desenhos guardados">
           <div className="atelie-abas" role="tablist" aria-label="De onde vem a folha">
             {([
-              ["mine", "Desenhos da Mine"],
-              ["foto", "Foto vira desenho"],
-              ["guardados", "Meus desenhos"],
-            ] as const).map(([id, label]) => (
-              <button key={id} type="button" role="tab" aria-selected={panel === id} className={panel === id ? "is-active" : ""} onClick={() => { setPanel(id); if (id === "guardados") refreshSaved(); }}>
-                {label}
-              </button>
-            ))}
+              ["mine", "Da Mine"],
+              ["foto", "Foto"],
+              ["guardados", `Guardados${saved.length ? ` (${saved.length})` : ""}`],
+            ] as const).map(([id, label]) => {
+              const active = panel === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  className={active ? "is-active" : ""}
+                  onClick={() => { setPanel(id); if (id === "guardados") refreshSaved(); }}
+                >
+                  {active ? (
+                    <motion.span
+                      layoutId="atelie-tab-pill"
+                      className="atelie-aba-bg"
+                      transition={reduced ? { duration: 0 } : uiSpring}
+                      aria-hidden
+                    />
+                  ) : null}
+                  <span className="relative">{label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {error ? (
             <p className="atelie-erro" role="alert">
-              {error}
+              <span>{error}</span>
               <button type="button" onClick={() => setError(null)} aria-label="Fechar aviso">×</button>
             </p>
           ) : null}
 
-          {panel === "mine" ? (
-            <div className="atelie-secao">
-              <form
-                className="atelie-pedido"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void pedirDesenho(pedido);
-                }}
+          <AnimatePresence mode="wait" initial={false}>
+            {panel === "mine" ? (
+              <motion.div
+                key="mine"
+                className="atelie-secao"
+                initial={reduced ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduced ? undefined : { opacity: 0, y: -6 }}
+                transition={uiSpring}
               >
-                <label htmlFor="atelie-pedido-campo">
-                  <Sparkles className="h-4 w-4" /> <strong>Mine, desenha…</strong>
-                </label>
-                <div>
-                  <input
-                    id="atelie-pedido-campo"
-                    value={pedido}
-                    onChange={(event) => setPedido(event.target.value)}
-                    placeholder="um vulcão em erupção"
-                    maxLength={120}
-                    disabled={Boolean(busy)}
-                  />
-                  <button type="submit" disabled={!pedido.trim() || Boolean(busy) || (cotaDesenho ? cotaDesenho.used >= cotaDesenho.limit : false)}>
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desenhar"}
-                  </button>
-                </div>
-                <div className="atelie-pedido-ideias" aria-label="Ideias">
-                  {["uma célula animal", "o sistema solar", "um vulcão", "um dinossauro", "o ciclo da água"].map((ideia) => (
-                    <button key={ideia} type="button" onClick={() => void pedirDesenho(ideia)} disabled={Boolean(busy)}>
-                      {ideia}
-                    </button>
-                  ))}
-                </div>
-                {ultimoPedido ? (
-                  <button type="button" className="atelie-pedido-outra" onClick={() => void pedirDesenho(ultimoPedido)} disabled={Boolean(busy) || (cotaDesenho ? cotaDesenho.used >= cotaDesenho.limit : false)}>
-                    <RefreshCw className="h-4 w-4" /> Não gostei, desenhar outra versão de “{ultimoPedido}”
-                  </button>
-                ) : null}
-                <small>
-                  A Mine cria a folha de colorir com IA de imagens.
-                  {cotaDesenho ? ` Hoje: ${cotaDesenho.used}/${cotaDesenho.limit}.` : ""}
-                </small>
-              </form>
-              <button type="button" className="atelie-branco" onClick={startBlank}>
-                <FilePlus2 className="h-5 w-5" />
-                <span><strong>Folha em branco</strong><small>Desenhe do zero com os seus traços.</small></span>
-              </button>
-              <div className="atelie-thumbs">
-                {minePages.map((page) => (
-                  <PageThumb
-                    key={page.id}
-                    page={page}
-                    seed={mandalaSeed}
-                    active={pageId === page.id}
-                    onPick={() => {
-                      let seed = mandalaSeed;
-                      if (page.varies && pageId === page.id) {
-                        seed = Math.floor(Math.random() * 1e9);
-                        setMandalaSeed(seed);
-                      }
-                      startPage(page, seed);
-                    }}
-                  />
-                ))}
-              </div>
-              <p className="atelie-dica">Toque na mandala de novo para ganhar outra diferente.</p>
-            </div>
-          ) : null}
-
-          {panel === "foto" ? (
-            <div className="atelie-secao">
-              <div className={`atelie-drop ${dragOver ? "is-drag" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={onDrop}>
-                <ImagePlus className="h-7 w-7" />
-                <p><strong>Mande uma foto</strong> e eu transformo em folha de colorir.</p>
-                <div className="atelie-drop-botoes">
-                  <button type="button" className="atelie-botao" onClick={() => fileRef.current?.click()}><FolderOpen className="h-4 w-4" /> Escolher foto</button>
-                  <button type="button" className="atelie-botao" onClick={() => cameraRef.current?.click()}><Camera className="h-4 w-4" /> Tirar foto</button>
-                </div>
-                <small>Também dá para arrastar ou colar (Ctrl+V). A foto não sai do seu aparelho.</small>
-                <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickFile} />
-                <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={pickFile} />
-              </div>
-
-              {hasPhoto ? (
-                <div className="atelie-ia">
-                  <button type="button" className="atelie-ia-botao" onClick={() => void caprichar()} disabled={Boolean(busy) || (iaQuota ? iaQuota.used >= iaQuota.limit : false)}>
-                    {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                    <span><strong>Caprichar com a Mine</strong><small>A IA redesenha a foto com traço limpo de livro de colorir.</small></span>
-                  </button>
-                  <p className="atelie-dica">
-                    A foto é enviada para a IA para ser redesenhada.
-                    {iaQuota ? ` Hoje: ${iaQuota.used}/${iaQuota.limit}.` : ""}
-                  </p>
-                </div>
-              ) : null}
-
-              {hasPhoto ? (
-                <div className="atelie-ajustes">
-                  <div className="atelie-segmento" role="radiogroup" aria-label="Estilo">
-                    {([
-                      ["pintar", "Para pintar", "Áreas fechadas para o balde"],
-                      ["esboco", "Esboço a lápis", "Traço solto para desenhar por cima"],
-                    ] as const).map(([id, label, hint]) => (
-                      <button key={id} type="button" role="radio" aria-checked={photoOpts.style === id} className={photoOpts.style === id ? "is-active" : ""} onClick={() => setPhotoOpts((o) => ({ ...o, style: id }))}>
-                        <strong>{label}</strong>
-                        <small>{hint}</small>
-                      </button>
+                <form
+                  className="atelie-pedido"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void pedirDesenho(pedido);
+                  }}
+                >
+                  <label htmlFor="atelie-pedido-campo">
+                    <Sparkles className="h-4 w-4" aria-hidden /> <strong>Mine, desenha…</strong>
+                  </label>
+                  <div className="atelie-pedido-row">
+                    <input
+                      id="atelie-pedido-campo"
+                      value={pedido}
+                      onChange={(event) => setPedido(event.target.value)}
+                      placeholder="um vulcão em erupção"
+                      maxLength={120}
+                      disabled={Boolean(busy)}
+                    />
+                    <MagneticAction
+                      type="submit"
+                      reduced={reduced}
+                      disabled={!pedido.trim() || Boolean(busy) || (cotaDesenho ? cotaDesenho.used >= cotaDesenho.limit : false)}
+                    >
+                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desenhar"}
+                    </MagneticAction>
+                  </div>
+                  <div className="atelie-pedido-ideias" aria-label="Sugestões de tema">
+                    {["uma célula animal", "o sistema solar", "um vulcão", "um dinossauro", "o ciclo da água"].map((ideia) => (
+                      <motion.button
+                        key={ideia}
+                        type="button"
+                        onClick={() => void pedirDesenho(ideia)}
+                        disabled={Boolean(busy)}
+                        whileHover={reduced ? undefined : { y: -1, scale: 1.03 }}
+                        whileTap={reduced ? undefined : { scale: 0.96 }}
+                        transition={uiSpring}
+                      >
+                        {ideia}
+                      </motion.button>
                     ))}
                   </div>
-                  <label className="atelie-slider">
-                    <span>Detalhes <em>{photoOpts.detail < 0.34 ? "poucos" : photoOpts.detail < 0.67 ? "médios" : "muitos"}</em></span>
-                    <input type="range" min={0} max={1} step={0.05} value={photoOpts.detail} onChange={(event) => setPhotoOpts((o) => ({ ...o, detail: Number(event.target.value) }))} />
-                  </label>
-                  <label className="atelie-slider">
-                    <span>Traço <em>{["fino", "médio", "grosso", "bem grosso"][photoOpts.thickness - 1]}</em></span>
-                    <input type="range" min={1} max={4} step={1} value={photoOpts.thickness} onChange={(event) => setPhotoOpts((o) => ({ ...o, thickness: Number(event.target.value) }))} />
-                  </label>
-                  <label className="atelie-toggle">
-                    <input type="checkbox" checked={guideOn} onChange={(event) => setGuideOn(event.target.checked)} />
-                    <span><strong>Foto por baixo</strong><small>Decalque: desenhe seguindo a foto. Não sai no download.</small></span>
-                  </label>
-                  {guideOn ? (
-                    <label className="atelie-slider">
-                      <span>Transparência da foto</span>
-                      <input type="range" min={0.1} max={0.9} step={0.05} value={guideOpacity} onChange={(event) => setGuideOpacity(Number(event.target.value))} />
-                    </label>
+                  {ultimoPedido ? (
+                    <button type="button" className="atelie-pedido-outra" onClick={() => void pedirDesenho(ultimoPedido)} disabled={Boolean(busy) || (cotaDesenho ? cotaDesenho.used >= cotaDesenho.limit : false)}>
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Tentar outra versão de “{ultimoPedido}”
+                    </button>
                   ) : null}
-                  <button type="button" className="atelie-botao" onClick={() => setPhotoVersion((v) => v + 1)} disabled={Boolean(busy)}>
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Refazer contorno
-                  </button>
-                  <p className="atelie-dica">Mudar os ajustes refaz só o contorno: o que você já pintou continua.</p>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+                  <small>
+                    A Mine gera a folha de colorir com IA.
+                    {cotaDesenho ? ` Hoje: ${cotaDesenho.used}/${cotaDesenho.limit}.` : ""}
+                  </small>
+                </form>
 
-          {panel === "guardados" ? (
-            <div className="atelie-secao">
-              <button type="button" className="atelie-branco" onClick={(event) => void saveCurrent(event.currentTarget)}>
-                <Save className="h-5 w-5" />
-                <span><strong>{currentId ? "Atualizar este desenho" : "Guardar este desenho"}</strong><small>Fica salvo neste aparelho.</small></span>
-              </button>
-              <p className="atelie-xp">
-                <strong>+{xpPerAction.drawing} XP</strong> por desenho pintado guardado
-                <span>{Math.min(drawingsToday, drawingsPerDay)}/{drawingsPerDay} hoje</span>
-              </p>
-              {saved.length ? (
+                <div className="atelie-bloco-head">
+                  <h3>Folhas prontas</h3>
+                  <button type="button" className="atelie-branco-inline" onClick={startBlank}>
+                    <FilePlus2 className="h-4 w-4" aria-hidden /> Em branco
+                  </button>
+                </div>
+
                 <div className="atelie-thumbs">
-                  {saved.map((item) => (
-                    <div key={item.id} className={`atelie-thumb ${currentId === item.id ? "is-active" : ""}`}>
-                      <button type="button" className="atelie-thumb-abrir" onClick={() => void openDrawing(item)}>
-                        <img src={item.thumb} alt="" />
-                        <span>{item.title}</span>
-                      </button>
-                      {confirmDelete === item.id ? (
-                        <button type="button" className="atelie-thumb-apagar is-confirm" onClick={() => void removeSaved(item.id)}>Apagar?</button>
-                      ) : (
-                        <button type="button" className="atelie-thumb-apagar" onClick={() => setConfirmDelete(item.id)} aria-label={`Apagar ${item.title}`}><Trash2 className="h-3.5 w-3.5" /></button>
-                      )}
-                    </div>
+                  {minePages.map((page) => (
+                    <PageThumb
+                      key={page.id}
+                      page={page}
+                      seed={mandalaSeed}
+                      active={pageId === page.id}
+                      reduced={reduced}
+                      onPick={() => {
+                        let seed = mandalaSeed;
+                        if (page.varies && pageId === page.id) {
+                          seed = Math.floor(Math.random() * 1e9);
+                          setMandalaSeed(seed);
+                        }
+                        startPage(page, seed);
+                      }}
+                    />
                   ))}
                 </div>
-              ) : (
-                <p className="atelie-dica">Nenhum desenho guardado ainda. Pinte algo e aperte em guardar!</p>
-              )}
-            </div>
-          ) : null}
+                <p className="atelie-dica">Toque na mandala de novo para gerar um padrão diferente.</p>
+              </motion.div>
+            ) : null}
+
+            {panel === "foto" ? (
+              <motion.div
+                key="foto"
+                className="atelie-secao"
+                initial={reduced ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduced ? undefined : { opacity: 0, y: -6 }}
+                transition={uiSpring}
+              >
+                <div className={`atelie-drop ${dragOver ? "is-drag" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={onDrop}>
+                  <ImagePlus className="h-7 w-7" aria-hidden />
+                  <p><strong>Mande uma foto</strong> e eu transformo em folha de colorir.</p>
+                  <div className="atelie-drop-botoes">
+                    <button type="button" className="atelie-botao" onClick={() => fileRef.current?.click()}><FolderOpen className="h-4 w-4" aria-hidden /> Escolher foto</button>
+                    <button type="button" className="atelie-botao" onClick={() => cameraRef.current?.click()}><Camera className="h-4 w-4" aria-hidden /> Tirar foto</button>
+                  </div>
+                  <small>Arraste aqui ou cole com Ctrl+V. A foto fica só no seu aparelho.</small>
+                  <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickFile} />
+                  <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={pickFile} />
+                </div>
+
+                {hasPhoto ? (
+                  <div className="atelie-ia">
+                    <MagneticAction
+                      className="atelie-ia-botao"
+                      reduced={reduced}
+                      onClick={() => void caprichar()}
+                      disabled={Boolean(busy) || (iaQuota ? iaQuota.used >= iaQuota.limit : false)}
+                    >
+                      {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                      <span><strong>Caprichar com a Mine</strong><small>Redesenha a foto com traço limpo de livro de colorir.</small></span>
+                    </MagneticAction>
+                    <p className="atelie-dica">
+                      A foto é enviada para a IA para ser redesenhada.
+                      {iaQuota ? ` Hoje: ${iaQuota.used}/${iaQuota.limit}.` : ""}
+                    </p>
+                  </div>
+                ) : null}
+
+                {hasPhoto ? (
+                  <div className="atelie-ajustes">
+                    <div className="atelie-segmento" role="radiogroup" aria-label="Estilo">
+                      {([
+                        ["pintar", "Para pintar", "Áreas fechadas para o balde"],
+                        ["esboco", "Esboço a lápis", "Traço solto para desenhar por cima"],
+                      ] as const).map(([id, label, hint]) => (
+                        <button key={id} type="button" role="radio" aria-checked={photoOpts.style === id} className={photoOpts.style === id ? "is-active" : ""} onClick={() => setPhotoOpts((o) => ({ ...o, style: id }))}>
+                          <strong>{label}</strong>
+                          <small>{hint}</small>
+                        </button>
+                      ))}
+                    </div>
+                    <label className="atelie-slider">
+                      <span>Detalhes <em>{photoOpts.detail < 0.34 ? "poucos" : photoOpts.detail < 0.67 ? "médios" : "muitos"}</em></span>
+                      <input type="range" min={0} max={1} step={0.05} value={photoOpts.detail} onChange={(event) => setPhotoOpts((o) => ({ ...o, detail: Number(event.target.value) }))} />
+                    </label>
+                    <label className="atelie-slider">
+                      <span>Traço <em>{["fino", "médio", "grosso", "bem grosso"][photoOpts.thickness - 1]}</em></span>
+                      <input type="range" min={1} max={4} step={1} value={photoOpts.thickness} onChange={(event) => setPhotoOpts((o) => ({ ...o, thickness: Number(event.target.value) }))} />
+                    </label>
+                    <label className="atelie-toggle">
+                      <input type="checkbox" checked={guideOn} onChange={(event) => setGuideOn(event.target.checked)} />
+                      <span><strong>Foto por baixo</strong><small>Decalque: desenhe seguindo a foto. Não sai no download.</small></span>
+                    </label>
+                    {guideOn ? (
+                      <label className="atelie-slider">
+                        <span>Transparência da foto</span>
+                        <input type="range" min={0.1} max={0.9} step={0.05} value={guideOpacity} onChange={(event) => setGuideOpacity(Number(event.target.value))} />
+                      </label>
+                    ) : null}
+                    <button type="button" className="atelie-botao" onClick={() => setPhotoVersion((v) => v + 1)} disabled={Boolean(busy)}>
+                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Refazer contorno
+                    </button>
+                    <p className="atelie-dica">Mudar os ajustes refaz só o contorno: o que você já pintou continua.</p>
+                  </div>
+                ) : null}
+              </motion.div>
+            ) : null}
+
+            {panel === "guardados" ? (
+              <motion.div
+                key="guardados"
+                className="atelie-secao"
+                initial={reduced ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduced ? undefined : { opacity: 0, y: -6 }}
+                transition={uiSpring}
+              >
+                <MagneticAction className="atelie-branco" reduced={reduced} onClick={(event) => void saveCurrent(event.currentTarget)}>
+                  <Save className="h-5 w-5" aria-hidden />
+                  <span><strong>{currentId ? "Atualizar este desenho" : "Guardar este desenho"}</strong><small>Fica salvo neste aparelho.</small></span>
+                </MagneticAction>
+                <p className="atelie-xp">
+                  <strong>+{xpPerAction.drawing} XP</strong> por desenho pintado guardado
+                  <span>{Math.min(drawingsToday, drawingsPerDay)}/{drawingsPerDay} hoje</span>
+                </p>
+                {saved.length ? (
+                  <div className="atelie-thumbs">
+                    {saved.map((item) => (
+                      <motion.div
+                        key={item.id}
+                        layout="position"
+                        className={`atelie-thumb ${currentId === item.id ? "is-active" : ""}`}
+                        whileHover={reduced ? undefined : { y: -3, scale: 1.02 }}
+                        transition={uiSpring}
+                      >
+                        <button type="button" className="atelie-thumb-abrir" onClick={() => void openDrawing(item)}>
+                          <img src={item.thumb} alt="" />
+                          <span>{item.title}</span>
+                        </button>
+                        {confirmDelete === item.id ? (
+                          <button type="button" className="atelie-thumb-apagar is-confirm" onClick={() => void removeSaved(item.id)}>Apagar?</button>
+                        ) : (
+                          <button type="button" className="atelie-thumb-apagar" onClick={() => setConfirmDelete(item.id)} aria-label={`Apagar ${item.title}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="atelie-empty">
+                    <Palette className="h-6 w-6" aria-hidden />
+                    <strong>Seu caderno está vazio</strong>
+                    <p>Pinte uma folha da Mine ou crie do zero e aperte em Guardar para montar sua galeria.</p>
+                  </div>
+                )}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </aside>
       </div>
-    </>
+    </div>
+    </LayoutGroup>
   );
 }
