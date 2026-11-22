@@ -629,7 +629,7 @@ export function startPets(): PetsHandle {
       fim: () => "plano pronto!",
     },
   };
-  type Acao = Truque | "pulapula" | "bater" | "letra" | "chuteletra" | "chute3d";
+  type Acao = Truque | "pulapula" | "letra" | "chuteletra" | "chute3d";
   const ACOES: Record<Acao, Tr> = {
     ...TRUQUES,
     // pula-pula no card: três pulinhos, o card balança a cada um
@@ -637,17 +637,6 @@ export function startPets(): PetsHandle {
       d: 0,
       pose: () => {},
       inicio: () => { S.hops = 3; hopUp(); say(pick(["pula-pula!", "boing boing!", "trampolim!"]), 1.4); return false; },
-    },
-    // bate no card como numa porta
-    bater: {
-      d: 2.2, fx: 0.45, fala: ["toc toc!", "tem alguém aí?"],
-      pose: (o, T, t) => { const k = (t % 0.45) / 0.45; o.aR = k < 0.5 ? -40 - k * 80 : -80 + (k - 0.5) * 160; o.aL = 14; o.hd = 10; o.lean = 7; o.sit = 6; o.face = "o"; },
-      tick: () => {
-        floaty("toc", "#8B5E3C");
-        if (S.on && S.on.el) (S.on.el as HTMLElement).animate([{ translate: "0 0" }, { translate: "0 2px" }, { translate: "0 0" }], { duration: 160 });
-        near3D(0.35);
-      },
-      fim: () => pick(["ninguém atende...", "acho que tá vazio!", "alô?"]),
     },
     // pega uma letra do título e brinca com ela
     letra: {
@@ -754,7 +743,7 @@ export function startPets(): PetsHandle {
     const r0 = Math.random();
     if (Pn.kind === "title" && HL && r0 < 0.3) { startTrick(Math.random() < 0.5 ? "letra" : "chuteletra"); if (S.state === "trick") return; }
     if (Pn.kind === "card" && r0 < 0.1) { startTrick("pulapula"); if (!S.on) return; }
-    if (Pn.kind === "card" && r0 > 0.9) { startTrick("bater"); if (S.state === "trick") return; }
+    // "toc toc" no card saiu (22/nov/2026): batia a toda hora e incomodava
     if (ouvindo() && Math.random() < 0.3) {
       const c = find3D();
       if (c) {
