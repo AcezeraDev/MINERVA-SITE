@@ -2,25 +2,55 @@
 
 .caderno-splash {
   background:
-    radial-gradient(ellipse 60% 55% at 50% 55%, rgb(var(--pen) / 0.1), transparent 70%),
-    radial-gradient(circle at 50% 120%, rgb(0 0 0 / 0.18), transparent 55%),
+    radial-gradient(ellipse 64% 56% at 50% 52%, rgb(var(--pen) / 0.14), transparent 72%),
+    radial-gradient(circle at 50% 118%, rgb(0 0 0 / 0.22), transparent 58%),
     rgb(var(--paper));
   perspective: 1800px;
 }
 
+/* camada 3D em Three.js atrás da mesa 2D e do caderno */
+.splash-3d-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.splash-3d-layer canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .caderno-splash-skip {
-  font-size: 1.1rem;
+  z-index: 10;
+  font-size: 1.05rem;
+}
+
+html:not(.theme-light) .caderno-splash-skip {
+  background: rgba(20, 26, 46, 0.86);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .splash-hint {
   position: absolute;
-  bottom: 1.6rem;
+  z-index: 10;
+  bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
+  padding: 0.28rem 0.9rem;
+  border-radius: 999px;
   font-family: "Gochi Hand", cursive;
-  font-size: 1.1rem;
+  font-size: 1.08rem;
   color: rgb(var(--theme-muted));
-  animation: splash-hint-pulse 1.8s ease-in-out 2.4s infinite;
+  animation: splash-hint-pulse 2s ease-in-out 2.2s infinite;
+}
+
+html:not(.theme-light) .splash-hint {
+  background: rgba(18, 24, 42, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(232, 238, 252, 0.82);
 }
 
 @keyframes splash-hint-pulse {
@@ -33,6 +63,7 @@
 .splash-desk {
   position: absolute;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
 }
 
@@ -92,7 +123,7 @@
 }
 
 .splash-note-b {
-  left: 8%;
+  left: 5.5%;
   top: 13%;
 }
 
@@ -499,12 +530,37 @@
   display: grid;
   align-content: space-between;
   padding: 12% 11% 13% 16%;
+  overflow: hidden;
   background:
-    radial-gradient(circle at 78% 18%, rgb(255 255 255 / 0.16), transparent 32%),
+    radial-gradient(circle at 78% 18%, rgb(255 255 255 / 0.18), transparent 32%),
     repeating-linear-gradient(135deg, rgb(255 255 255 / 0.05) 0 6px, transparent 6px 14px),
-    linear-gradient(160deg, #2433c9, #1a2698 70%, #141d7a);
-  box-shadow: 0 40px 70px -30px rgb(0 0 0 / 0.6), inset 12px 0 0 rgb(0 0 0 / 0.16);
+    linear-gradient(160deg, #2737d6, #1b289f 68%, #131c78);
+  box-shadow: 0 40px 70px -30px rgb(0 0 0 / 0.65), inset 12px 0 0 rgb(0 0 0 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.22);
   color: #fff;
+}
+
+/* brilho especular diagonal passando pela capa ao cair e abrir */
+.splash-cover-sheen {
+  position: absolute;
+  inset: -25% -60%;
+  background: linear-gradient(112deg, transparent 36%, rgba(255, 255, 255, 0.26) 48%, rgba(255, 255, 255, 0.06) 54%, transparent 64%);
+  transform: translateX(-65%);
+  animation: splash-cover-sheen 1.5s cubic-bezier(0.22, 1, 0.36, 1) 0.45s forwards;
+  pointer-events: none;
+}
+
+@keyframes splash-cover-sheen {
+  0% {
+    transform: translateX(-65%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(75%);
+    opacity: 0;
+  }
 }
 
 .splash-cover-back {
