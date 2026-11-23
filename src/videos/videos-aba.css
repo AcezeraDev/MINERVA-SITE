@@ -1,0 +1,188 @@
+/* Aba Vídeos (VideosView.tsx). O player usa os estilos de chat/blocos/videos.css. */
+
+.vid-aba {
+  display: grid;
+  gap: 1.25rem;
+  width: min(100%, 76rem);
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  color: rgb(var(--theme-text));
+}
+
+.vid-aba__topo {
+  display: grid;
+  gap: 0.4rem;
+}
+.vid-aba__topo h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.vid-aba__topo p:last-child {
+  max-width: 42rem;
+  margin: 0;
+  color: rgb(var(--theme-text) / 0.7);
+}
+
+.vid-aba__pedir {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.9rem;
+  border: 1px solid rgb(var(--theme-text) / 0.14);
+  border-radius: 1rem;
+  background: rgb(var(--theme-text) / 0.03);
+}
+.vid-aba__pedir:focus-within {
+  border-color: rgb(var(--mint));
+}
+.vid-aba__pedir-icone {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  color: rgb(var(--mint));
+}
+.vid-aba__pedir input {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.6rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+.vid-aba__pedir button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.6rem;
+  padding: 0 1rem;
+  border-radius: 0.75rem;
+  background: rgb(var(--mint));
+  color: #08110c;
+  font-weight: 800;
+}
+.vid-aba__pedir button:disabled {
+  opacity: 0.55;
+}
+.vid-aba__pedir button svg {
+  width: 1rem;
+  height: 1rem;
+}
+.vid-aba__giro {
+  animation: mbk-vid-giro 900ms linear infinite;
+}
+.vid-aba__aviso {
+  margin: -0.6rem 0 0;
+  color: #e5484d;
+  font-size: 0.88rem;
+}
+
+.vid-aba__grade {
+  display: grid;
+  grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
+  align-items: start;
+  gap: 1.25rem;
+}
+.vid-aba__escolha {
+  display: grid;
+  gap: 0.75rem;
+  position: sticky;
+  top: 1rem;
+}
+.vid-aba__materias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.vid-aba__materias button {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid rgb(var(--theme-text) / 0.14);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.vid-aba__materias button:hover {
+  background: rgb(var(--theme-text) / 0.05);
+}
+.vid-aba__materias button.is-on {
+  border-color: rgb(var(--mint));
+  background: rgb(var(--mint) / 0.14);
+}
+.vid-aba__topicos {
+  display: grid;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.35rem;
+  border: 1px solid rgb(var(--theme-text) / 0.1);
+  border-radius: 0.9rem;
+  list-style: none;
+}
+.vid-aba__topicos button {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.6rem;
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.vid-aba__topicos button:hover {
+  background: rgb(var(--theme-text) / 0.05);
+}
+.vid-aba__topicos button.is-on {
+  background: rgb(var(--mint) / 0.16);
+  font-weight: 800;
+}
+
+.vid-aba__player .mbk {
+  margin: 0;
+}
+.vid-aba__vazio {
+  display: grid;
+  gap: 0.4rem;
+  place-content: center;
+  min-height: 18rem;
+  padding: 2rem;
+  border: 1.5px dashed rgb(var(--theme-text) / 0.18);
+  border-radius: 1rem;
+  text-align: center;
+  color: rgb(var(--theme-text) / 0.7);
+}
+.vid-aba__vazio strong {
+  color: rgb(var(--theme-text));
+  font-size: 1.1rem;
+}
+
+@media (max-width: 860px) {
+  .vid-aba__grade {
+    grid-template-columns: 1fr;
+  }
+  .vid-aba__escolha {
+    position: static;
+  }
+  .vid-aba__materias {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .vid-aba__materias button {
+    flex: none;
+  }
+  .vid-aba__topicos {
+    display: flex;
+    max-height: none;
+    overflow-x: auto;
+    gap: 0.3rem;
+    border: 0;
+    padding: 0;
+  }
+  .vid-aba__topicos button {
+    white-space: nowrap;
+    border: 1px solid rgb(var(--theme-text) / 0.12);
+  }
+}

@@ -22,6 +22,7 @@ import { isSitePage } from "./SitePreview";
 import { ProjectCard } from "./monitor/ProjectCard";
 import { BLOCO_LANGS, BlocoInterativo } from "./blocos/Blocos";
 import { ESTUDO_LANGS, BlocoEstudo } from "./blocos/Estudo";
+import { BlocoVideos } from "./blocos/Videos";
 import { InlineRunner } from "./CodeRunner";
 import { MineChart, MineSvgFigure } from "./MineChart";
 import { emoji3dPath, splitLeadingEmoji } from "../../shared/emoji-3d.mjs";
@@ -310,6 +311,7 @@ const NOMES_CHEGANDO: Record<string, string> = {
   "avaliação": "Preparando a avaliação…",
   calculadora: "Montando a calculadora…",
   "lista-imagens": "Separando as fotos…",
+  videos: "Procurando os vídeos…",
 };
 
 /** Enquanto o JSON de um bloco de estudo chega, um aviso no lugar do código cru. */
@@ -339,6 +341,8 @@ const CodeBlock = memo(function CodeBlock({ code: raw, lang, open, streaming = f
   if (!open && BLOCO_LANGS.has(lang)) return <BlocoInterativo lang={lang} code={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
   // Flashcards, plano, números, colunas, texto, avaliação, calculadora e lista com fotos (21/nov/2026).
   if (ESTUDO_LANGS.has(lang)) return open ? <BlocoChegando lang={lang} /> : <BlocoEstudo lang={lang} code={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
+  // Série de vídeos do YouTube que tocam no próprio chat (23/nov/2026).
+  if (lang === "videos" || lang === "youtube") return open ? <BlocoChegando lang="videos" /> : <BlocoVideos code={code} fallback={<CodeBox code={code} lang="json" open={false} />} />;
   if (isSitePage(code, lang)) return <ProjectCard code={code} source="html" open={open} streaming={streaming} />;
   const runnable = !open ? runnableLanguage(lang) : null;
   if (!runnable) return <CodeBox code={code} lang={lang} open={open} />;

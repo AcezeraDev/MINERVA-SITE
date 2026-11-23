@@ -116,6 +116,7 @@ import {
   PenLine,
   Pin,
   PinOff,
+  MonitorPlay,
 } from "lucide-react";
 import "./fonts";
 import "./index.css";
@@ -271,6 +272,7 @@ const RedacaoView = React.lazy(() => import("./redacao/RedacaoView").then((m) =>
 const AtividadesView = React.lazy(() => import("./atividades/AtividadesView").then((m) => ({ default: m.AtividadesView })));
 const SalaView = React.lazy(() => import("./sala/SalaView").then((m) => ({ default: m.SalaView })));
 const CuboView = React.lazy(() => import("./cubo/CuboView").then((m) => ({ default: m.CuboView })));
+const VideosView = React.lazy(() => import("./videos/VideosView").then((m) => ({ default: m.VideosView })));
 const LaboratorioView = React.lazy(() => import("./laboratorio/LaboratorioView").then((m) => ({ default: m.LaboratorioView })));
 const LeituraView = React.lazy(() => import("./leitura/LeituraView").then((m) => ({ default: m.LeituraView })));
 const DueloView = React.lazy(() => import("./duelo/DueloView").then((m) => ({ default: m.DueloView })));
@@ -448,6 +450,7 @@ type View =
   | "sala"
   | "atelie"
   | "idiomas"
+  | "videos"
   | "search"
   | "plan"
   | "comments"
@@ -963,6 +966,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
   { view: "sala", label: "Sala de estudo", icon: Headphones },
   { view: "atelie", label: "Ateliê da Mine", icon: Palette },
   { view: "idiomas", label: "Idiomas com a Mine", icon: Languages },
+  { view: "videos", label: "Vídeos", icon: MonitorPlay },
   { view: "search", label: "Busca", icon: Search },
   { view: "plan", label: "Plano de estudos", icon: CalendarPlus },
   { view: "comments", label: "Comentários", icon: MessageCircle },
@@ -981,7 +985,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
  */
 export type NavArea = "materias" | "estudar" | "praticar" | "jogar" | "organizar" | "turma";
 const navGroups: Array<{ id: NavArea; label: string; hint: string; icon: LucideIcon; views: View[] }> = [
-  { id: "estudar", label: "Estudar", hint: "Mine, leitura, laboratório, idiomas", icon: BookOpen, views: ["mine", "leitura", "laboratorio", "idiomas", "search"] },
+  { id: "estudar", label: "Estudar", hint: "Mine, vídeos, leitura, laboratório, idiomas", icon: BookOpen, views: ["mine", "videos", "leitura", "laboratorio", "idiomas", "search"] },
   { id: "praticar", label: "Praticar", hint: "Atividades, provas, redação, duelo", icon: ClipboardCheck, views: ["atividades", "provas", "redacao", "duelo"] },
   { id: "jogar", label: "Jogar", hint: "Games, cubo mágico, ateliê", icon: Gamepad2, views: ["games", "cubo", "atelie"] },
   { id: "organizar", label: "Organizar", hint: "Agenda, plano, progresso", icon: CalendarDays, views: ["agenda", "plan", "progress", "foco"] },
@@ -2982,6 +2986,7 @@ function App() {
     if (route.view === "cubo") return <React.Suspense fallback={<PageLoading />}><CuboView user={user} /></React.Suspense>;
     if (route.view === "duelo") return <React.Suspense fallback={<PageLoading />}><DueloView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "provas") return <React.Suspense fallback={<PageLoading />}><ProvasView data={userData} user={user} update={update} /></React.Suspense>;
+    if (route.view === "videos") return <React.Suspense fallback={<PageLoading />}><VideosView /></React.Suspense>;
     if (route.view === "idiomas") return <React.Suspense fallback={<PageLoading />}><IdiomasView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "search") return <SearchView data={userData} user={user} query={query} setQuery={setQuery} update={update} notify={notify} />;
     if (route.view === "plan") return <PlanView data={userData} update={update} user={user} notify={notify} />;
@@ -12599,7 +12604,7 @@ function applyAssistantActions(data: AppData, userId: string, actions: Assistant
     }
 
     if (action.type === "navigate") {
-      const allowed: View[] = ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "duelo", "progress", "ranking", "mine", "games", "cubo", "sala", "atelie", "idiomas", "search", "plan", "comments", "suggestions", "about", "perfil"];
+      const allowed: View[] = ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "duelo", "progress", "ranking", "mine", "games", "cubo", "sala", "atelie", "idiomas", "videos", "search", "plan", "comments", "suggestions", "about", "perfil"];
       if (action.view === "subject") {
         const subject = findSubject(next.subjects.filter((item) => item.userId === userId), action);
         if (subject) route = { view: "subject", id: subject.id };

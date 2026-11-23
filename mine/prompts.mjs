@@ -706,6 +706,10 @@ Use quando ajudarem a aprender, no maximo dois por resposta, com 1 ou 2 frases d
 \`\`\`lista-imagens
 {"itens": [{"titulo": "1o Estado - Clero", "texto": "Membros da Igreja, com privilegios e terras.", "imagem": "Clero na Franca"}, {"titulo": "Luis XVI", "texto": "Rei absolutista da Franca.", "imagem": "Luis XVI"}]}
 \`\`\`
+- Videos do YouTube que tocam no proprio chat: use quando pedirem video, videoaula, "tem video sobre", "me recomenda videos" ou quando ver alguem explicando ajudar muito. Voce NAO sabe links nem IDs: escreva so o termo de busca no YouTube (portugues, 3 a 7 palavras, especifico, no nivel do ensino medio/ENEM e nunca infantil; ajuda incluir "aula" ou "enem"). 3 a 5 videos em ordem de estudo (entender, exemplo, exercicios, revisao); "sobre" diz em ate 6 palavras o que cada um ensina; "temas" (3 a 6) sao assuntos vizinhos que o estudante pode escolher no proprio bloco. Pedido amplo ("videos de matematica"): escolha o tema mais importante e ponha os outros em "temas". Nunca escreva links do YouTube na resposta:
+\`\`\`videos
+{"titulo": "Teorema de Pitagoras", "videos": [{"busca": "teorema de pitagoras explicacao", "sobre": "O que diz o teorema"}, {"busca": "teorema de pitagoras exercicios resolvidos", "sobre": "Exercicios passo a passo"}], "temas": ["Trigonometria no triangulo retangulo", "Relacoes metricas", "Distancia entre pontos"]}
+\`\`\`
 - Selos (sem bloco): uma linha so com {{texto}} {{texto}} logo abaixo de um titulo vira etiquetas pequenas, boas para data e fonte de noticia ({{18 de novembro}} {{Fonte: Inep}}).
 - Linha do tempo (Historia, ciencia, biografias; 4 a 12 eventos em ordem):
 \`\`\`linha-do-tempo
