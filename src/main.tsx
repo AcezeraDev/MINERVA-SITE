@@ -1546,6 +1546,20 @@ function App() {
   // O `send` roda depois de awaits: lê a conversa pela ref, não pela closure.
   const mineThreadRef = useRef<string | undefined>(undefined);
   mineThreadRef.current = mineThreadId;
+  // Pergunta mandada de fora do chat ("estudar com a Mine" na trilha, atalhos
+  // da matéria). Antes a página da matéria gravava a pergunta e pedia a
+  // resposta por fora, sem streaming nem indicador, numa conversa que nem
+  // sempre era a aberta: o chat abria com a pergunta e parecia não ter
+  // enviado. Agora ela espera o chat montar e sai pelo `send` dele.
+  const [pendingMinePrompt, setPendingMinePrompt] = useState<{ id: string; subjectId?: string; text: string } | null>(null);
+  const pendingMinePromptRef = useRef(pendingMinePrompt);
+  pendingMinePromptRef.current = pendingMinePrompt;
+  const askMineInChat = useCallback((text: string, subjectId?: string) => {
+    setPendingMinePrompt({ id: uid("pedido"), subjectId, text });
+    setSelectedSubjectId(subjectId);
+    setMineThreadId(uid("thread"));
+    go("mine");
+  }, []);
   // O botão do globo só aparece se o servidor disser que a busca está ligada.
   const [mineWebAvailable, setMineWebAvailable] = useState(false);
   const [navHidden, setNavHiddenState] = useState(() => readNavHidden());
@@ -1854,6 +1868,11 @@ function App() {
   const mineOpenRestored = useRef(false);
   useEffect(() => {
     if (!user) return;
+    // Uma pergunta vinda de fora já escolheu matéria e conversa nova.
+    if (pendingMinePromptRef.current && (pendingMinePromptRef.current.subjectId || undefined) === (selectedSubjectId || undefined)) {
+      mineOpenRestored.current = true;
+      return;
+    }
     let saved: { userId?: string; subjectId?: string; threadId?: string } | null = null;
     try {
       saved = JSON.parse(sessionStorage.getItem(mineOpenStorageKey) || "null");
@@ -2231,7 +2250,7 @@ function App() {
   const currentSubject = route.view === "subject" ? userData.subjects.find((item) => item.id === route.id) : undefined;
   const content = (() => {
     if (route.view === "subject" && currentSubject) {
-      return <React.Suspense fallback={<PageLoading />}><SubjectView subject={currentSubject} data={userData} setModal={setModal} update={update} notify={notify} setSelectedSubjectId={setSelectedSubjectId} /></React.Suspense>;
+      return <React.Suspense fallback={<PageLoading />}><SubjectView subject={currentSubject} data={userData} setModal={setModal} update={update} notify={notify} setSelectedSubjectId={setSelectedSubjectId} askMineInChat={askMineInChat} /></React.Suspense>;
     }
     if (route.view === "agenda") return <React.Suspense fallback={<PageLoading />}><AgendaView data={userData} user={user} setModal={setModal} update={update} notify={notify} /></React.Suspense>;
     if (route.view === "foco") return <FocusView data={userData} user={user} update={update} notify={notify} />;
@@ -2241,6 +2260,8 @@ function App() {
       return (
         <MineView
           userId={user.id}
+          pendingPrompt={pendingMinePrompt}
+          consumePendingPrompt={() => setPendingMinePrompt(null)}
           data={userData}
           input={mineInput}
           setInput={setMineInput}
@@ -6904,6 +6925,8 @@ function useDictation(input: string, setInput: (value: string) => void) {
 
 function MineView({
   userId,
+  pendingPrompt,
+  consumePendingPrompt,
   data,
   input,
   setInput,
@@ -6951,6 +6974,8 @@ function MineView({
   goHome,
 }: {
   userId: string;
+  pendingPrompt: { id: string; subjectId?: string; text: string } | null;
+  consumePendingPrompt: () => void;
   data: ReturnType<typeof useMemoUserData>;
   input: string;
   setInput: (value: string) => void;
@@ -7047,6 +7072,18 @@ function MineView({
     sendRef.current = send;
     saveResponseRef.current = saveResponse;
   }, [send, saveResponse]);
+  // Pergunta vinda de fora do chat: sai pelo envio de verdade assim que a
+  // matéria certa estiver aberta. A ref segura o efeito duplo do StrictMode.
+  const sentPromptIds = useRef(new Set<string>());
+  useEffect(() => {
+    if (!pendingPrompt || loading) return;
+    if ((pendingPrompt.subjectId || undefined) !== (selectedSubjectId || undefined)) return;
+    consumePendingPrompt();
+    if (sentPromptIds.current.has(pendingPrompt.id)) return;
+    sentPromptIds.current.add(pendingPrompt.id);
+    void sendRef.current(pendingPrompt.text, pendingPrompt.subjectId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPrompt?.id, selectedSubjectId, loading]);
   // O que os blocos de estudo (quiz, flashcards, plano) podem pedir ao chat.
   const blocoAcoes = useMemo<BlocoAcoes>(
     () => ({

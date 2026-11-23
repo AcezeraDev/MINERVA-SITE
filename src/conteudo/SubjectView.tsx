@@ -16,6 +16,7 @@ export function SubjectView({
   update,
   notify,
   setSelectedSubjectId,
+  askMineInChat,
 }: {
   subject: Subject;
   data: ReturnType<typeof useMemoUserData>;
@@ -23,6 +24,7 @@ export function SubjectView({
   update: (next: (draft: AppData) => AppData) => void;
   notify: (message: string) => void;
   setSelectedSubjectId: (id: string | undefined) => void;
+  askMineInChat: (text: string, subjectId?: string) => void;
 }) {
   const Icon = iconMap[subject.icon];
   const materials = data.materials.filter((item) => item.subjectId === subject.id);
@@ -98,37 +100,10 @@ export function SubjectView({
     return reply;
   }
 
-  async function runQuick(label: string) {
-    const fullPrompt = `${label} com base nos conteúdos que adicionei na matéria ${subject.name}. Use o que está cadastrado nesta matéria.`;
-    update((draft) => ({
-      ...draft,
-      chats: [...draft.chats, { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "user", text: fullPrompt, createdAt: Date.now() }],
-    }));
-    setSelectedSubjectId(subject.id);
-    go("mine");
-    let quickBudget = 40_000;
-    const contentLines = materials
-      .map((item) => {
-        const body = (item.content?.trim() || item.detail?.trim() || "").slice(0, Math.max(0, Math.min(4000, quickBudget)));
-        quickBudget -= body.length;
-        return `- ${item.title}${item.type === "image" ? " [imagem enviada]" : ""}: ${body || "sem detalhe"}`;
-      })
-      .join("\n");
-    const context = `Materia: ${subject.name}.\nConteudos desta materia (analise TODOS para responder):\n${contentLines || "- nenhum conteudo ainda"}`;
-    const imageAttachments = materialsToImageAttachments(materials);
-    try {
-      const assistant = await requestAssistantResponse({ prompt: fullPrompt, history: [], context, attachments: imageAttachments });
-      const reply = assistant.reply.trim() || "Não consegui analisar agora. Tente novamente em instantes.";
-      update((draft) => ({
-        ...draft,
-        chats: [...draft.chats, { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "mine", text: reply, createdAt: Date.now() + 1 }],
-      }));
-    } catch {
-      update((draft) => ({
-        ...draft,
-        chats: [...draft.chats, { id: uid("chat"), userId: subject.userId, subjectId: subject.id, role: "mine", text: "Tive um problema para responder agora. Tente de novo em instantes.", createdAt: Date.now() + 1 }],
-      }));
-    }
+  // Abre o chat numa conversa nova e manda a pergunta pelo envio do próprio
+  // chat (streaming, indicador e os conteúdos da matéria como contexto).
+  function runQuick(label: string) {
+    askMineInChat(`${label} com base nos conteúdos que adicionei na matéria ${subject.name}. Use o que está cadastrado nesta matéria.`, subject.id);
   }
 
   return (
@@ -313,7 +288,7 @@ export function SubjectView({
           selectMaterial={setDeskMaterialId}
           openMaterial={(materialId) => setModal({ type: "materialView", materialId })}
           addMaterial={() => setModal({ type: "material", subjectId: subject.id })}
-          askMine={(prompt) => void runQuick(prompt)}
+          askMine={(prompt) => runQuick(prompt)}
           askAside={askAside}
           openConversation={() => {
             setSelectedSubjectId(subject.id);
@@ -343,7 +318,7 @@ export function SubjectView({
                 subjects: draft.subjects.map((item) => (item.id === subject.id ? { ...item, extras: typeof next === "function" ? next(item.extras || {}) : next } : item)),
               }))
             }
-            perguntarMine={(prompt) => void runQuick(prompt)}
+            perguntarMine={(prompt) => runQuick(prompt)}
             notify={notify}
           />
         </Reveal>
