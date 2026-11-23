@@ -37,7 +37,7 @@ import {
 } from "../../shared/pyraminx.mjs";
 import { CuboCena, isGiroPyraminx, type Movimento } from "./CuboCena";
 import { CuboBorderBeam, CuboShimmerButton } from "./CuboFx";
-import { CuboSeletor } from "./CuboSeletor";
+import { CuboSeletor, IconeCubo } from "./CuboSeletor";
 import { perguntarMineCubo, type TurnoTutor } from "./mineTutor";
 import { AulaDaMine, FichasAlgoritmo } from "./AulaDaMine";
 import { elogio, explicarToken, instrucao, lerToken, passosAula, teclaDoToken, type PassoAula } from "./aula";
@@ -935,16 +935,29 @@ export function CuboView({ user }: { user: User }) {
         }[fase];
 
   return (
-    <div className="cubo-page">
+    <div
+      className="cubo-page"
+      style={
+        {
+          "--active-a": infoAtivo.corA,
+          "--active-b": infoAtivo.corB,
+        } as React.CSSProperties
+      }
+    >
       <PageHeader
-        eyebrow="Desafio de lógica · 9 quebra-cabeças 3D"
+        eyebrow="Desafio de lógica · 9 cubos 3D"
         title="Cubo Mágico"
-        subtitle="Arraste uma peça para girar a camada, arraste o fundo para virar. Explore clássicos, Mirror, Void, cuboides e Pyraminx."
+        subtitle="Arraste uma peça para girar a camada, arraste o fundo para virar o cubo."
         action={
-          <span className="cubo-badge-ativo" aria-live="polite">
-            <span className="cubo-badge-dot" style={{ background: infoAtivo.corA }} aria-hidden />
-            {infoAtivo.nome} · {infoAtivo.pecas} peças
-          </span>
+          <div className="cubo-badge-ativo" aria-live="polite">
+            <span className="cubo-badge-icone" style={{ color: infoAtivo.corA }}>
+              <IconeCubo tipo={infoAtivo.id} corA={infoAtivo.corA} corB={infoAtivo.corB} className="h-5 w-5" />
+            </span>
+            <span className="cubo-badge-texto">
+              <strong>{infoAtivo.nome}</strong>
+              <small>{infoAtivo.pecas} peças</small>
+            </span>
+          </div>
         }
       />
 
@@ -955,7 +968,7 @@ export function CuboView({ user }: { user: User }) {
           ref={palcoCardRef}
           className="cubo-palco-card"
           aria-label={`${infoAtivo.nome} 3D`}
-          initial={reduzido ? false : { opacity: 0, y: 16, scale: 0.985 }}
+          initial={reduzido ? false : { opacity: 0, y: 14, scale: 0.99 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={mola}
         >
@@ -972,16 +985,33 @@ export function CuboView({ user }: { user: User }) {
             <span className="cubo-legenda" aria-live="polite">{legenda}</span>
           </div>
 
-          <div className="relative">
-            <div ref={palcoRef} className={`cubo-palco ${prefs.modo === "real" ? "is-real" : ""}`} />
-            <button
-              type="button"
-              className="cubo-vista-btn"
-              onClick={() => cenaRef.current?.vistaPadrao(false)}
-              title="Centralizar ângulo do cubo"
-            >
-              <Compass className="h-3.5 w-3.5" aria-hidden /> Centralizar
-            </button>
+          <div className="cubo-palco-stage">
+            <div className="relative">
+              <div ref={palcoRef} className={`cubo-palco ${prefs.modo === "real" ? "is-real" : ""}`} />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={infoAtivo.id}
+                  className="cubo-hud-info"
+                  initial={reduzido ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduzido ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                  transition={mola}
+                >
+                  <span className="cubo-hud-dot" style={{ background: infoAtivo.corA }} aria-hidden />
+                  <span className="cubo-hud-nome">{infoAtivo.nome}</span>
+                  <span className="cubo-hud-sep" aria-hidden>·</span>
+                  <span className="cubo-hud-desc">{infoAtivo.descricao}</span>
+                </motion.div>
+              </AnimatePresence>
+              <button
+                type="button"
+                className="cubo-vista-btn"
+                onClick={() => cenaRef.current?.vistaPadrao(false)}
+                title="Centralizar ângulo do cubo"
+              >
+                <Compass className="h-3.5 w-3.5" aria-hidden /> Centralizar
+              </button>
+            </div>
             <AnimatePresence>
               {aulaViva || aoVivo ? (
                 <motion.div
@@ -1149,7 +1179,7 @@ export function CuboView({ user }: { user: User }) {
               Seus números · {infoAtivo.nome} {prefs.modo === "real" ? "de verdade" : "no site"}
             </h2>
             <dl className="cubo-stats">
-              <div><dt>melhor</dt><dd>{mostrar(resumo.melhor)}</dd></div>
+              <div className="is-destaque"><dt>melhor</dt><dd>{mostrar(resumo.melhor)}</dd></div>
               <div><dt>média de 5</dt><dd>{mostrar(resumo.ao5)}</dd></div>
               <div><dt>média de 12</dt><dd>{mostrar(resumo.ao12)}</dd></div>
               <div><dt>montagens</dt><dd>{resumo.total}</dd></div>
