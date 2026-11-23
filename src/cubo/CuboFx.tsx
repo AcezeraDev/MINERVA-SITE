@@ -124,3 +124,69 @@ export function CuboShimmerButton({
     </motion.button>
   );
 }
+
+/**
+ * Cartão interativo inspirado no Magic UI `MagicCard`:
+ * spotlight radial que acompanha o cursor + mola Awwwards no clique/hover.
+ */
+export function CuboMagicCard({
+  children,
+  active = false,
+  disabled = false,
+  colorA = "#8e9eff",
+  colorB = "#2fd483",
+  className = "",
+  onClick,
+  role,
+  "aria-checked": ariaChecked,
+  title,
+}: {
+  children: React.ReactNode;
+  active?: boolean;
+  disabled?: boolean;
+  colorA?: string;
+  colorB?: string;
+  className?: string;
+  onClick?: () => void;
+  role?: string;
+  "aria-checked"?: boolean;
+  title?: string;
+}) {
+  const reduced = useSoftMotion();
+  const ref = useRef<HTMLButtonElement | null>(null);
+
+  const handleMove = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (reduced || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const px = event.clientX - rect.left;
+    const py = event.clientY - rect.top;
+    ref.current.style.setProperty("--mx", `${px}px`);
+    ref.current.style.setProperty("--my", `${py}px`);
+  };
+
+  return (
+    <motion.button
+      ref={ref}
+      type="button"
+      role={role}
+      aria-checked={ariaChecked}
+      disabled={disabled}
+      title={title}
+      onClick={onClick}
+      onMouseMove={handleMove}
+      whileHover={reduced || disabled ? undefined : { y: -3, scale: 1.02 }}
+      whileTap={reduced || disabled ? undefined : { scale: 0.97 }}
+      transition={CUBO_SPRING}
+      className={`cubo-magic-card ${active ? "is-ativo" : ""} ${className}`}
+      style={
+        {
+          "--card-a": colorA,
+          "--card-b": colorB,
+        } as React.CSSProperties
+      }
+    >
+      <span className="cubo-magic-spotlight" aria-hidden="true" />
+      {children}
+    </motion.button>
+  );
+}

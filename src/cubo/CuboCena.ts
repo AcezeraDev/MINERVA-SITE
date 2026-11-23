@@ -1,20 +1,19 @@
 /**
- * Cena three.js do Cubo Mágico.
+ * Cena three.js unificada da aba Cubo Mágico.
  *
- * O estado lógico mora em shared/cubo.mjs; aqui só se desenha e se lê o
- * gesto. Dois estados andam juntos: `alvo` já tem todos os giros da fila
- * (é por ele que o cronômetro sabe que o cubo foi resolvido no instante do
- * gesto) e `tela` só recebe o giro quando a animação termina, e é dele que as
- * peças tiram a posição final, sem acumular erro de ponto flutuante.
+ * Suporta todos os tipos de cubos e quebra-cabeças 3D:
+ * - Clássicos N×N×N: 2×2, 3×3, 4×4, 5×5
+ * - Especiais: Mirror Cube (metálico escovado com shapeshifting real) e Void Cube (túnel vazado com anéis luminosos)
+ * - Cuboides assimétricos: Torre 2×2×3 e Dominó 3×3×2 (giros de 90°/180° por eixo)
+ * - Poliedros: Pyraminx (tetraedro 3D real com giros de 120° em 4 eixos)
  *
  * Visual & Física:
- * - materiais PBR avançados (MeshPhysicalMaterial com clearcoat UV-coated de
- *   speedcube + peças chanfradas em ExtrudeGeometry);
- * - iluminação de estúdio 3 pontos + IBL (RoomEnvironment) + luz dinâmica que
- *   acompanha o ponteiro e pulsa a cada encaixe de camada;
- * - shaders GLSL próprios: pedestal holográfico com onda a cada giro,
- *   partículas atmosféricas suaves e explosão 3D de confete ao resolver;
- * - inércia angular ao soltar o giro do cubo + micro-recuo magnético no snap.
+ * - materiais PBR avançados (MeshPhysicalMaterial UV-coated + metal escovado no Mirror);
+ * - iluminação de estúdio 3 pontos + IBL (RoomEnvironment) + luz dinâmica que acompanha o ponteiro
+ *   e muda de cor conforme o cubo selecionado;
+ * - shaders GLSL próprios: pedestal holográfico com onda a cada giro, partículas atmosféricas e
+ *   explosão 3D de confete ao resolver;
+ * - física de mola (spring overshoot) na troca de cubo, inércia angular e micro-recuo magnético.
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
@@ -24,45 +23,95 @@ import {
   aplicarGiro,
   clonarCubo,
   coresHex,
-  criarCubo,
+  criarCuboTipo,
+  dimsDoCubo,
   estaResolvido,
+  infoTipoCubo,
+  passoDoEixo,
   pecaNoGiro,
   type Cubo,
   type Eixo,
   type Face,
   type Giro,
+  type TipoCubo,
 } from "../../shared/cubo.mjs";
+import {
+  aplicarGiroPyraminx,
+  clonarPyraminx,
+  criarPyraminx,
+  estaResolvidoPyraminx,
+  pecaNoGiroPyraminx,
+  pyraminxCoresHex,
+  type EixoPyraminx,
+  type GiroPyraminx,
+  type Pyraminx,
+} from "../../shared/pyraminx.mjs";
+import { construirPecaPyraminx, pyraminxVetores, quaternionDaPerm } from "./pyraminxGeo";
 
 export type Origem = "usuario" | "embaralhar" | "volta" | "aula";
+export type Movimento = Giro | GiroPyraminx;
+
+export function isGiroPyraminx(m: Movimento): m is GiroPyraminx {
+  return typeof (m as GiroPyraminx).eixo === "number";
+}
+
 export type OpcoesCena = {
-  n: number;
+  tipo: TipoCubo;
   reduzido: boolean;
   /** Chamado quando o giro entra na fila, com o estado que ele deixa. */
-  onGiro?: (giro: Giro, info: { origem: Origem; resolvido: boolean }) => void;
+  onGiro?: (giro: Movimento, info: { origem: Origem; resolvido: boolean }) => void;
   /** Chamado quando a animação de um giro termina (a aula acende o passo do algoritmo). */
-  onAnimado?: (giro: Giro) => void;
+  onAnimado?: (giro: Movimento) => void;
   /** Fila esvaziou (fim do embaralhamento, da volta…). */
   onOcioso?: () => void;
 };
 
-type Animacao = { giro: Giro; grupos: THREE.Object3D[]; alvo: number; v: number; vel: number; rapido: boolean };
+type Animacao = {
+  giro: Movimento;
+  grupos: THREE.Object3D[];
+  eixoVec: THREE.Vector3;
+  alvo: number;
+  v: number;
+  vel: number;
+  rapido: boolean;
+};
 
 const EIXOS: Eixo[] = ["x", "y", "z"];
 const vetorEixo = (e: Eixo) => new THREE.Vector3(e === "x" ? 1 : 0, e === "y" ? 1 : 0, e === "z" ? 1 : 0);
 
-/** Ladrilho 3D chanfrado de cantos redondos (speedcube UV-coated). */
-function formaAdesivo(lado: number, raio: number) {
-  const h = lado / 2;
+/**
+ * Espessuras das 3 camadas do Mirror Cube em X, Y e Z.
+ * A camada central tem sempre 0.94 nos 3 eixos, garantindo planos de corte
+ * perfeitamente alinhados em ±0.47 para shapeshifting sem colisões.
+ */
+const MIRROR_ESPESSURAS: Record<Eixo, [number, number, number]> = {
+  x: [0.56, 0.94, 1.34],
+  y: [0.66, 0.94, 1.24],
+  z: [0.5, 0.94, 1.4],
+};
+
+function mirrorOffset(esp: [number, number, number], slot: number): number {
+  const meio = esp[1] / 2;
+  if (slot === 0) return -(meio + esp[0] / 2);
+  if (slot === 2) return meio + esp[2] / 2;
+  return 0;
+}
+
+/** Ladrilho 3D chanfrado de cantos redondos (quadrado ou retangular). */
+function formaRetangulo(larg: number, alt: number, raio: number) {
+  const hw = larg / 2;
+  const hh = alt / 2;
+  const r = Math.min(raio, hw * 0.42, hh * 0.42);
   const s = new THREE.Shape();
-  s.moveTo(-h + raio, -h);
-  s.lineTo(h - raio, -h);
-  s.quadraticCurveTo(h, -h, h, -h + raio);
-  s.lineTo(h, h - raio);
-  s.quadraticCurveTo(h, h, h - raio, h);
-  s.lineTo(-h + raio, h);
-  s.quadraticCurveTo(-h, h, -h, h - raio);
-  s.lineTo(-h, -h + raio);
-  s.quadraticCurveTo(-h, -h, -h + raio, -h);
+  s.moveTo(-hw + r, -hh);
+  s.lineTo(hw - r, -hh);
+  s.quadraticCurveTo(hw, -hh, hw, -hh + r);
+  s.lineTo(hw, hh - r);
+  s.quadraticCurveTo(hw, hh, hw - r, hh);
+  s.lineTo(-hw + r, hh);
+  s.quadraticCurveTo(-hw, hh, -hw, hh - r);
+  s.lineTo(-hw, -hh + r);
+  s.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
   return new THREE.ExtrudeGeometry(s, {
     depth: 0.012,
     bevelEnabled: true,
@@ -71,6 +120,29 @@ function formaAdesivo(lado: number, raio: number) {
     bevelSegments: 2,
     curveSegments: 5,
   });
+}
+
+function formaAdesivo(lado: number, raio: number) {
+  return formaRetangulo(lado, lado, raio);
+}
+
+/** Textura procedural de metal escovado fino para o Mirror Cube. */
+function texturaMetalEscovado() {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#d8e0ec";
+  g.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 256; y += 1) {
+    const v = 202 + Math.floor((Math.sin(y * 0.7) * 0.5 + Math.random()) * 32);
+    g.fillStyle = `rgb(${v},${v + 4},${v + 12})`;
+    g.fillRect(0, y, 256, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
 }
 
 function texturaSombra() {
@@ -118,11 +190,9 @@ function criarHaloPedestal() {
         float dist = length(vUv - vec2(0.5)) * 2.0;
         if (dist > 1.0) discard;
 
-        // anel de base sutil e anel externo respirando
         float innerRing = smoothstep(0.032, 0.0, abs(dist - 0.56)) * 0.28;
         float outerRing = smoothstep(0.022, 0.0, abs(dist - (0.76 + sin(uTime * 1.4) * 0.015))) * 0.16;
 
-        // onda que dispara a cada giro ou celebração
         float waveR = 0.22 + (1.0 - uPulse) * 0.72;
         float wave = smoothstep(0.06, 0.0, abs(dist - waveR)) * uPulse * 0.72;
 
@@ -160,6 +230,8 @@ function criarParticulasAmbiente(guardar: Palco["guardar"]) {
       uniforms: {
         uTime: { value: 0 },
         uOpacity: { value: 0.45 },
+        uColorA: { value: new THREE.Color(0x93a3ff) },
+        uColorB: { value: new THREE.Color(0x52ebad) },
       },
       vertexShader: `
         attribute float aSeed;
@@ -182,12 +254,14 @@ function criarParticulasAmbiente(guardar: Palco["guardar"]) {
       `,
       fragmentShader: `
         uniform float uOpacity;
+        uniform vec3 uColorA;
+        uniform vec3 uColorB;
         varying float vTwinkle;
         varying float vMix;
         void main() {
           float d = distance(gl_PointCoord, vec2(0.5));
           float strength = pow(clamp(1.0 - d * 2.0, 0.0, 1.0), 2.4);
-          vec3 col = mix(vec3(0.58, 0.64, 1.0), vec3(0.32, 0.92, 0.68), vMix);
+          vec3 col = mix(uColorA, uColorB, vMix);
           gl_FragColor = vec4(col, strength * vTwinkle * uOpacity);
         }
       `,
@@ -296,24 +370,32 @@ function criarExplosaoVitoria(guardar: Palco["guardar"]) {
 export class CuboCena {
   private palco: Palco;
   private opcoes: OpcoesCena;
-  private n: number;
+  private tipo: TipoCubo;
   private alvo: Cubo;
   private tela: Cubo;
+  private pyrAlvo: Pyraminx;
+  private pyrTela: Pyraminx;
   private flutua = new THREE.Group();
   private raiz = new THREE.Group();
   private pivo = new THREE.Group();
+  private decoracao: THREE.Group | null = null;
   private grupos: THREE.Group[] = [];
   private pegaveis: THREE.Object3D[] = [];
-  private fila: Array<{ giro: Giro; rapido: boolean } | { pausa: number }> = [];
+  private pecasGeos: THREE.BufferGeometry[] = [];
+  private fila: Array<{ giro: Movimento; rapido: boolean } | { pausa: number }> = [];
   private anim: Animacao | null = null;
   private alvoRaiz = new THREE.Quaternion();
   private sombra: THREE.Mesh;
   private haloMat: THREE.ShaderMaterial;
   private haloPulse = 0;
+  private alvoCorA = new THREE.Color(0x8e9eff);
+  private alvoCorB = new THREE.Color(0x2fd483);
   private accentLight: THREE.PointLight;
   private ambientParticles: { points: THREE.Points; mat: THREE.ShaderMaterial };
   private burst: ReturnType<typeof criarExplosaoVitoria>;
   private festa = { ativa: false, t: 0 };
+  private escalaBase = 1;
+  private pop = { v: 1, vel: 0 };
   private raycaster = new THREE.Raycaster();
   private hoveredId: number | null = null;
   private spinVel = { x: 0, y: 0 };
@@ -325,33 +407,39 @@ export class CuboCena {
   private corpoGeo: THREE.BufferGeometry;
   private adesivoGeo: THREE.BufferGeometry;
   private corpoMat: THREE.MeshPhysicalMaterial;
+  private mirrorCorpoMat: THREE.MeshPhysicalMaterial;
+  private mirrorTileMat: THREE.MeshPhysicalMaterial;
+  private voidRingMat: THREE.MeshPhysicalMaterial;
   private hoverMat: THREE.MeshPhysicalMaterial;
-  /** Corpo das peças da camada que a Mine pede para girar (brilha pulsando). */
   private destaqueMat: THREE.MeshPhysicalMaterial;
   private destaque: Giro | null = null;
   private destaquePecas = new Set<number>();
   private adesivoMats: THREE.MeshPhysicalMaterial[];
+  private pyrMats: THREE.MeshPhysicalMaterial[];
   /** Trava o gesto de girar camada (modo cubo de verdade, embaralhando…). */
   travado = false;
 
   constructor(host: HTMLElement, opcoes: OpcoesCena) {
     this.opcoes = opcoes;
-    this.n = opcoes.n;
-    this.alvo = criarCubo(this.n);
-    this.tela = criarCubo(this.n);
+    this.tipo = opcoes.tipo;
+    this.alvo = criarCuboTipo(this.tipo === "pyraminx" ? "3x3" : this.tipo);
+    this.tela = criarCuboTipo(this.tipo === "pyraminx" ? "3x3" : this.tipo);
+    this.pyrAlvo = criarPyraminx();
+    this.pyrTela = criarPyraminx();
+
     this.palco = criarPalco(host, (t, d) => this.tick(t, d), { fov: 30, z: 11 });
     const { scene, renderer, guardar } = this.palco;
-    renderer.toneMappingExposure = 1.14;
+    renderer.toneMappingExposure = 1.15;
 
     // IBL de estúdio com RoomEnvironment
     const pmrem = new THREE.PMREMGenerator(renderer);
     const ambiente = guardar(pmrem.fromScene(new RoomEnvironment(), 0.04).texture);
     pmrem.dispose();
     scene.environment = ambiente;
-    scene.environmentIntensity = 0.72;
+    scene.environmentIntensity = 0.78;
 
     // Iluminação 3 pontos + rim lights coloridos + luz dinâmica
-    scene.add(new THREE.HemisphereLight(0xf2f6ff, 0x252d42, 0.7));
+    scene.add(new THREE.HemisphereLight(0xf2f6ff, 0x252d42, 0.72));
     const sol = new THREE.DirectionalLight(0xfff7ec, 1.55);
     sol.position.set(4.5, 7.5, 6.5);
     scene.add(sol);
@@ -368,7 +456,7 @@ export class CuboCena {
     this.accentLight.position.set(0, 1.8, 4.2);
     scene.add(this.accentLight);
 
-    // Geometrias & Materiais PBR UV-coated (clearcoat de speedcube profissional)
+    // Geometrias & Materiais PBR UV-coated + Mirror Chrome + Void Rings
     this.corpoGeo = guardar(new RoundedBoxGeometry(0.96, 0.96, 0.96, 3, 0.095));
     this.adesivoGeo = guardar(formaAdesivo(0.77, 0.12));
     this.corpoMat = guardar(
@@ -379,6 +467,39 @@ export class CuboCena {
         clearcoat: 0.65,
         clearcoatRoughness: 0.16,
         envMapIntensity: 0.85,
+      }),
+    );
+    this.mirrorCorpoMat = guardar(
+      new THREE.MeshPhysicalMaterial({
+        color: 0x10131a,
+        roughness: 0.24,
+        metalness: 0.7,
+        clearcoat: 0.9,
+        clearcoatRoughness: 0.12,
+        envMapIntensity: 1.25,
+      }),
+    );
+    const escovado = guardar(texturaMetalEscovado());
+    this.mirrorTileMat = guardar(
+      new THREE.MeshPhysicalMaterial({
+        color: 0xeaf0fb,
+        map: escovado,
+        roughness: 0.14,
+        metalness: 0.94,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.06,
+        envMapIntensity: 1.7,
+      }),
+    );
+    this.voidRingMat = guardar(
+      new THREE.MeshPhysicalMaterial({
+        color: 0x22d3ee,
+        emissive: new THREE.Color(0x0ea5e9),
+        emissiveIntensity: 0.85,
+        roughness: 0.18,
+        metalness: 0.85,
+        clearcoat: 1.0,
+        envMapIntensity: 1.3,
       }),
     );
     this.hoverMat = guardar(
@@ -416,6 +537,18 @@ export class CuboCena {
         }),
       ),
     );
+    this.pyrMats = pyraminxCoresHex.map((cor) =>
+      guardar(
+        new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color(cor),
+          roughness: 0.16,
+          metalness: 0.02,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.08,
+          envMapIntensity: 0.82,
+        }),
+      ),
+    );
 
     // Sombra suave + Halo holográfico GLSL no pedestal
     const sombraTex = guardar(texturaSombra());
@@ -442,8 +575,9 @@ export class CuboCena {
     this.raiz.add(this.pivo);
     this.flutua.add(this.raiz);
     scene.add(this.flutua);
-    // de leve por cima e de lado: mostra três faces (U, F, R)
-    this.alvoRaiz.copy(CuboCena.vista(false));
+
+    this.atualizarTemaCor(true);
+    this.alvoRaiz.copy(CuboCena.vista(false, this.tipo === "pyraminx"));
     this.raiz.quaternion.copy(this.alvoRaiz);
     this.montarPecas();
 
@@ -457,13 +591,54 @@ export class CuboCena {
     canvas.addEventListener("pointerleave", this.aoSair);
   }
 
+  private atualizarTemaCor(imediato = false) {
+    const info = infoTipoCubo(this.tipo);
+    this.alvoCorA.set(info.corA);
+    this.alvoCorB.set(info.corB);
+    if (imediato) {
+      this.haloMat.uniforms.uColorA.value.copy(this.alvoCorA);
+      this.haloMat.uniforms.uColorB.value.copy(this.alvoCorB);
+      this.ambientParticles.mat.uniforms.uColorA.value.copy(this.alvoCorA);
+      this.ambientParticles.mat.uniforms.uColorB.value.copy(this.alvoCorB);
+      this.accentLight.color.copy(this.alvoCorA);
+    }
+  }
+
   /* ---------- montagem ---------- */
 
-  private montarPecas() {
+  private limparPecas() {
     for (const g of this.grupos) g.removeFromParent();
+    if (this.decoracao) {
+      this.decoracao.removeFromParent();
+      this.decoracao = null;
+    }
+    for (const geo of this.pecasGeos) geo.dispose();
+    this.pecasGeos = [];
     this.grupos = [];
     this.pegaveis = [];
     this.hoveredId = null;
+  }
+
+  private registrarGeo<T extends THREE.BufferGeometry>(geo: T): T {
+    this.pecasGeos.push(geo);
+    return geo;
+  }
+
+  private montarPecas() {
+    this.limparPecas();
+
+    if (this.tipo === "pyraminx") {
+      this.montarPyraminx();
+      return;
+    }
+
+    if (this.tipo === "mirror") {
+      this.montarMirror();
+      return;
+    }
+
+    const dims = dimsDoCubo(this.tela);
+    const maxDim = Math.max(...dims);
     for (const peca of this.tela.pecas) {
       const grupo = new THREE.Group();
       grupo.userData.id = peca.id;
@@ -483,14 +658,126 @@ export class CuboCena {
       this.grupos[peca.id] = grupo;
       this.sincronizar(grupo);
     }
-    // o cubo ocupa mais ou menos o mesmo espaço em qualquer tamanho
-    this.raiz.scale.setScalar(3.05 / this.n);
+
+    // Void Cube: anéis metálicos luminosos internos emoldurando os 3 túneis vazados
+    if (this.tipo === "void") {
+      const dec = new THREE.Group();
+      const ringGeo = this.registrarGeo(new THREE.TorusGeometry(0.46, 0.038, 14, 36));
+      const rZ = new THREE.Mesh(ringGeo, this.voidRingMat);
+      const rX = new THREE.Mesh(ringGeo, this.voidRingMat);
+      rX.rotation.y = Math.PI / 2;
+      const rY = new THREE.Mesh(ringGeo, this.voidRingMat);
+      rY.rotation.x = Math.PI / 2;
+      dec.add(rZ, rX, rY);
+      this.raiz.add(dec);
+      this.decoracao = dec;
+    }
+
+    this.escalaBase = maxDim >= 5 ? 3.35 / maxDim : 3.05 / maxDim;
+    this.raiz.scale.setScalar(this.escalaBase * this.pop.v);
+    this.aplicarDestaque();
+  }
+
+  private montarMirror() {
+    for (const peca of this.tela.pecas) {
+      const grupo = new THREE.Group();
+      grupo.userData.id = peca.id;
+      const init = peca.posInicial ?? peca.pos;
+      const slotX = (init[0] + 2) / 2;
+      const slotY = (init[1] + 2) / 2;
+      const slotZ = (init[2] + 2) / 2;
+
+      const sx = MIRROR_ESPESSURAS.x[slotX];
+      const sy = MIRROR_ESPESSURAS.y[slotY];
+      const sz = MIRROR_ESPESSURAS.z[slotZ];
+      const ox = mirrorOffset(MIRROR_ESPESSURAS.x, slotX);
+      const oy = mirrorOffset(MIRROR_ESPESSURAS.y, slotY);
+      const oz = mirrorOffset(MIRROR_ESPESSURAS.z, slotZ);
+
+      const gap = 0.042;
+      const raio = Math.min(0.075, Math.min(sx, sy, sz) * 0.14);
+      const geo = this.registrarGeo(new RoundedBoxGeometry(sx - gap, sy - gap, sz - gap, 3, raio));
+      const corpo = new THREE.Mesh(geo, this.mirrorCorpoMat);
+      corpo.position.set(ox, oy, oz);
+      grupo.userData.corpo = corpo;
+      grupo.add(corpo);
+      this.pegaveis.push(corpo);
+
+      for (const a of peca.adesivos) {
+        const [nx, ny, nz] = a.local;
+        let w = sx;
+        let h = sy;
+        let halfD = sz / 2;
+        if (Math.abs(nx) === 1) {
+          w = sz;
+          h = sy;
+          halfD = sx / 2;
+        } else if (Math.abs(ny) === 1) {
+          w = sx;
+          h = sz;
+          halfD = sy / 2;
+        }
+        const tileGeo = this.registrarGeo(formaRetangulo(Math.max(0.24, w - 0.14), Math.max(0.24, h - 0.14), 0.08));
+        const tile = new THREE.Mesh(tileGeo, this.mirrorTileMat);
+        const normal = new THREE.Vector3(nx, ny, nz);
+        tile.position.set(ox, oy, oz).addScaledVector(normal, halfD - gap / 2 - 0.004);
+        tile.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+        grupo.add(tile);
+        this.pegaveis.push(tile);
+      }
+
+      this.raiz.add(grupo);
+      this.grupos[peca.id] = grupo;
+      this.sincronizar(grupo);
+    }
+
+    this.escalaBase = 0.96;
+    this.raiz.scale.setScalar(this.escalaBase * this.pop.v);
+    this.aplicarDestaque();
+  }
+
+  private montarPyraminx() {
+    for (const peca of this.pyrTela.pecas) {
+      const grupo = new THREE.Group();
+      grupo.userData.id = peca.id;
+      const built = construirPecaPyraminx(peca, 2.08);
+      const corpo = new THREE.Mesh(this.registrarGeo(built.corpo), this.corpoMat);
+      grupo.userData.corpo = corpo;
+      grupo.add(corpo);
+      this.pegaveis.push(corpo);
+
+      for (const ad of built.adesivos) {
+        const m = new THREE.Mesh(this.registrarGeo(ad.geo), this.pyrMats[ad.cor]);
+        m.applyMatrix4(ad.matriz);
+        grupo.add(m);
+        this.pegaveis.push(m);
+      }
+
+      this.raiz.add(grupo);
+      this.grupos[peca.id] = grupo;
+      this.sincronizar(grupo);
+    }
+
+    this.escalaBase = 1.15;
+    this.raiz.scale.setScalar(this.escalaBase * this.pop.v);
     this.aplicarDestaque();
   }
 
   private sincronizar(grupo: THREE.Object3D) {
-    const peca = this.tela.pecas[grupo.userData.id as number];
-    grupo.position.set(peca.pos[0] / 2, peca.pos[1] / 2, peca.pos[2] / 2);
+    const id = grupo.userData.id as number;
+    if (this.tipo === "pyraminx") {
+      const peca = this.pyrTela.pecas[id];
+      grupo.position.set(0, 0, 0);
+      grupo.quaternion.copy(quaternionDaPerm(peca.perm));
+      return;
+    }
+    const peca = this.tela.pecas[id];
+    if (this.tipo === "mirror") {
+      // No Mirror Cube, o mesh já está no deslocamento (ox, oy, oz) em torno do núcleo (0,0,0)
+      grupo.position.set(0, 0, 0);
+    } else {
+      grupo.position.set(peca.pos[0] / 2, peca.pos[1] / 2, peca.pos[2] / 2);
+    }
     const m = new THREE.Matrix4().makeBasis(
       new THREE.Vector3(...peca.base[0]),
       new THREE.Vector3(...peca.base[1]),
@@ -509,32 +796,85 @@ export class CuboCena {
     return clonarCubo(this.alvo);
   }
 
-  setTamanho(n: number) {
-    this.n = n;
+  estadoPyraminx() {
+    return clonarPyraminx(this.pyrAlvo);
+  }
+
+  setTipo(tipo: TipoCubo) {
+    this.tipo = tipo;
+    this.atualizarTemaCor(false);
+    if (!this.opcoes.reduzido) {
+      this.pop.v = 0.78;
+      this.pop.vel = 0;
+      this.haloPulse = Math.max(this.haloPulse, 0.85);
+    }
+    this.alvoRaiz.copy(CuboCena.vista(false, tipo === "pyraminx"));
     this.resetar();
   }
 
-  /** Volta ao cubo resolvido sem animação. */
+  /** Compatibilidade com chamadas antigas por tamanho numérico. */
+  setTamanho(n: number) {
+    const mapa: Record<number, TipoCubo> = { 2: "2x2", 3: "3x3", 4: "4x4", 5: "5x5" };
+    this.setTipo(mapa[n] ?? "3x3");
+  }
+
+  /** Volta ao quebra-cabeça resolvido sem animação. */
   resetar() {
     this.fila = [];
     if (this.anim) for (const g of this.anim.grupos) this.raiz.attach(g);
     this.anim = null;
     this.pivo.rotation.set(0, 0, 0);
+    this.pivo.quaternion.identity();
     this.spinVel.x = 0;
     this.spinVel.y = 0;
-    this.alvo = criarCubo(this.n);
-    this.tela = criarCubo(this.n);
+    if (this.tipo === "pyraminx") {
+      this.pyrAlvo = criarPyraminx();
+      this.pyrTela = criarPyraminx();
+    } else {
+      this.alvo = criarCuboTipo(this.tipo);
+      this.tela = criarCuboTipo(this.tipo);
+    }
     this.montarPecas();
   }
 
-  girar(giro: Giro, origem: Origem = "usuario", rapido = false) {
-    aplicarGiro(this.alvo, giro);
-    this.fila.push({ giro, rapido });
-    this.opcoes.onGiro?.(giro, { origem, resolvido: estaResolvido(this.alvo) });
+  girar(giro: Movimento, origem: Origem = "usuario", rapido = false) {
+    if (this.tipo === "pyraminx" && isGiroPyraminx(giro)) {
+      aplicarGiroPyraminx(this.pyrAlvo, giro);
+      this.fila.push({ giro, rapido });
+      this.opcoes.onGiro?.(giro, { origem, resolvido: estaResolvidoPyraminx(this.pyrAlvo) });
+      return;
+    }
+    if (!isGiroPyraminx(giro)) {
+      aplicarGiro(this.alvo, giro);
+      this.fila.push({ giro, rapido });
+      this.opcoes.onGiro?.(giro, { origem, resolvido: estaResolvido(this.alvo) });
+    }
   }
 
   /** Giro pela face que a pessoa está vendo (teclado): R é sempre a da direita na tela. */
-  giroVisual(face: Face, linha: 1 | -1 | 2, camadaInterna = false): Giro {
+  giroVisual(face: Face, linha: 1 | -1 | 2, camadaInterna = false): Movimento {
+    if (this.tipo === "pyraminx") {
+      const direcoesPyr: Partial<Record<Face, THREE.Vector3>> = {
+        U: new THREE.Vector3(0, 1, 0),
+        B: new THREE.Vector3(0, -0.33, -0.94),
+        R: new THREE.Vector3(0.82, -0.33, 0.47),
+        L: new THREE.Vector3(-0.82, -0.33, 0.47),
+      };
+      const alvoDir = direcoesPyr[face] ?? new THREE.Vector3(0, 1, 0);
+      const inv = this.alvoRaiz.clone().invert();
+      const d = alvoDir.clone().applyQuaternion(inv).normalize();
+      let melhorEixo: EixoPyraminx = 0;
+      let melhorDot = -Infinity;
+      for (let k = 0; k < 4; k += 1) {
+        const dot = pyraminxVetores[k].dot(d);
+        if (dot > melhorDot) {
+          melhorDot = dot;
+          melhorEixo = k as EixoPyraminx;
+        }
+      }
+      return { eixo: melhorEixo, camada: camadaInterna ? 1 : 2, q: linha === -1 ? -1 : 1 };
+    }
+
     const direcoes: Record<Face, THREE.Vector3> = {
       U: new THREE.Vector3(0, 1, 0),
       D: new THREE.Vector3(0, -1, 0),
@@ -549,12 +889,16 @@ export class CuboCena {
     const i = comp.indexOf(Math.max(...comp));
     const eixo = EIXOS[i];
     const sinal = Math.sign([d.x, d.y, d.z][i]) || 1;
-    const max = this.n - 1;
-    const camada = sinal * (camadaInterna && this.n > 2 ? max - 2 : max);
-    return { eixo, camada, q: linha === 2 ? 2 : -sinal * linha };
+    const dims = dimsDoCubo(this.alvo);
+    const nEixo = dims[i];
+    const max = nEixo - 1;
+    const camada = sinal * (camadaInterna && nEixo > 2 ? max - 2 : max);
+    const passo = passoDoEixo(this.alvo, eixo);
+    const q = passo === 2 ? 2 : linha === 2 ? 2 : -sinal * linha;
+    return { eixo, camada, q };
   }
 
-  /** Faz brilhar as peças da camada deste giro (null apaga). Vale o estado que a pessoa vai ver. */
+  /** Faz brilhar as peças da camada deste giro (null apaga). */
   destacar(giro: Giro | null) {
     this.destaque = giro;
     this.destaquePecas.clear();
@@ -578,13 +922,22 @@ export class CuboCena {
   }
 
   private aplicarDestaque() {
+    const baseCorpo = this.tipo === "mirror" ? this.mirrorCorpoMat : this.corpoMat;
+    if (this.tipo === "pyraminx") {
+      for (const peca of this.pyrAlvo.pecas) {
+        const corpo = this.grupos[peca.id]?.userData.corpo as THREE.Mesh | undefined;
+        if (!corpo) continue;
+        corpo.material = this.hoveredId === peca.id && !this.travado ? this.hoverMat : baseCorpo;
+      }
+      return;
+    }
     for (const peca of this.alvo.pecas) {
       const corpo = this.grupos[peca.id]?.userData.corpo as THREE.Mesh | undefined;
       if (!corpo) continue;
       const brilha = this.destaque ? pecaNoGiro(peca, this.destaque) : this.destaquePecas.has(peca.id);
       if (brilha) corpo.material = this.destaqueMat;
       else if (this.hoveredId === peca.id && !this.travado) corpo.material = this.hoverMat;
-      else corpo.material = this.corpoMat;
+      else corpo.material = baseCorpo;
     }
   }
 
@@ -593,8 +946,11 @@ export class CuboCena {
     this.fila.push({ pausa: segundos });
   }
 
-  /** Orientação de partida: branco em cima, verde na frente; ou de ponta-cabeça (amarelo em cima). */
-  static vista(amareloEmCima: boolean) {
+  /** Orientação de partida: branco em cima, verde na frente; ou Pyraminx levemente inclinado. */
+  static vista(amareloEmCima: boolean, pyraminx = false) {
+    if (pyraminx) {
+      return new THREE.Quaternion().setFromEuler(new THREE.Euler(0.32, -0.35, 0, "XYZ"));
+    }
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.52, -0.68, 0, "XYZ"));
     if (amareloEmCima) q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI));
     return q;
@@ -603,7 +959,7 @@ export class CuboCena {
   vistaPadrao(amareloEmCima = false) {
     this.spinVel.x = 0;
     this.spinVel.y = 0;
-    this.alvoRaiz.copy(CuboCena.vista(amareloEmCima));
+    this.alvoRaiz.copy(CuboCena.vista(amareloEmCima, this.tipo === "pyraminx"));
     this.haloPulse = Math.max(this.haloPulse, 0.55);
   }
 
@@ -632,6 +988,7 @@ export class CuboCena {
     canvas.removeEventListener("pointerup", this.aoSoltar);
     canvas.removeEventListener("pointercancel", this.aoSoltar);
     canvas.removeEventListener("pointerleave", this.aoSair);
+    this.limparPecas();
     this.palco.destruir();
   }
 
@@ -639,7 +996,6 @@ export class CuboCena {
 
   private tick(tempo: number, delta: number) {
     const { pointer, camera } = this.palco;
-    // retrato estreito: afasta a câmera para o cubo caber na largura
     camera.position.z = 13 * Math.max(1, 1.15 / Math.max(0.5, camera.aspect));
 
     while (!this.anim && this.fila.length) {
@@ -654,6 +1010,32 @@ export class CuboCena {
       this.comecarGiro();
     }
     if (this.anim) this.passoGiro(delta);
+
+    // Mola de entrada ao trocar de tipo de cubo (overshoot Awwwards)
+    if (!this.opcoes.reduzido && (Math.abs(1 - this.pop.v) > 0.001 || Math.abs(this.pop.vel) > 0.001)) {
+      const k = 300;
+      const c = 24;
+      this.pop.vel += ((1 - this.pop.v) * k - this.pop.vel * c) * delta;
+      this.pop.v += this.pop.vel * delta;
+      this.raiz.scale.setScalar(this.escalaBase * this.pop.v);
+    } else if (this.pop.v !== 1) {
+      this.pop.v = 1;
+      this.pop.vel = 0;
+      this.raiz.scale.setScalar(this.escalaBase);
+    }
+
+    // Transição suave das cores do pedestal e partículas ao trocar de cubo
+    const corLerp = Math.min(1, delta * 5.5);
+    this.haloMat.uniforms.uColorA.value.lerp(this.alvoCorA, corLerp);
+    this.haloMat.uniforms.uColorB.value.lerp(this.alvoCorB, corLerp);
+    this.ambientParticles.mat.uniforms.uColorA.value.lerp(this.alvoCorA, corLerp);
+    this.ambientParticles.mat.uniforms.uColorB.value.lerp(this.alvoCorB, corLerp);
+    this.accentLight.color.lerp(this.alvoCorA, corLerp);
+
+    // Pulso nos anéis internos do Void Cube
+    if (this.tipo === "void") {
+      this.voidRingMat.emissiveIntensity = 0.72 + (this.opcoes.reduzido ? 0 : Math.sin(tempo * 2.8) * 0.22) + this.haloPulse * 0.65;
+    }
 
     // inércia suave ao soltar o giro do cubo inteiro
     if (!this.gesto && !this.opcoes.reduzido && (Math.abs(this.spinVel.x) > 0.0004 || Math.abs(this.spinVel.y) > 0.0004)) {
@@ -676,7 +1058,7 @@ export class CuboCena {
     this.recoil.x += this.recoil.vx * delta;
     this.recoil.y += this.recoil.vy * delta;
 
-    // respiração e paralaxe leve pelo ponteiro (desligadas no movimento reduzido)
+    // respiração e paralaxe leve pelo ponteiro
     const calmo = this.opcoes.reduzido || this.gesto !== null;
     let hop = 0;
     let celebrateGlow = 0;
@@ -724,17 +1106,35 @@ export class CuboCena {
   }
 
   private comecarGiro() {
-    const { giro, rapido } = this.fila.shift() as { giro: Giro; rapido: boolean };
+    const { giro, rapido } = this.fila.shift() as { giro: Movimento; rapido: boolean };
     const grupos: THREE.Object3D[] = [];
     this.pivo.rotation.set(0, 0, 0);
+    this.pivo.quaternion.identity();
     this.pivo.updateMatrixWorld();
-    for (const peca of this.tela.pecas) {
-      if (!pecaNoGiro(peca, giro)) continue;
-      const g = this.grupos[peca.id];
-      this.pivo.attach(g);
-      grupos.push(g);
+
+    if (this.tipo === "pyraminx" && isGiroPyraminx(giro)) {
+      for (const peca of this.pyrTela.pecas) {
+        if (!pecaNoGiroPyraminx(peca, giro)) continue;
+        const g = this.grupos[peca.id];
+        this.pivo.attach(g);
+        grupos.push(g);
+      }
+      const eixoVec = pyraminxVetores[giro.eixo].clone();
+      const alvo = (-giro.q * 2 * Math.PI) / 3;
+      this.anim = { giro, grupos, eixoVec, alvo, v: 0, vel: 0, rapido };
+      return;
     }
-    this.anim = { giro, grupos, alvo: (giro.q * Math.PI) / 2, v: 0, vel: 0, rapido };
+
+    if (!isGiroPyraminx(giro)) {
+      for (const peca of this.tela.pecas) {
+        if (!pecaNoGiro(peca, giro)) continue;
+        const g = this.grupos[peca.id];
+        this.pivo.attach(g);
+        grupos.push(g);
+      }
+      const eixoVec = vetorEixo(giro.eixo);
+      this.anim = { giro, grupos, eixoVec, alvo: (giro.q * Math.PI) / 2, v: 0, vel: 0, rapido };
+    }
   }
 
   private passoGiro(delta: number) {
@@ -743,8 +1143,6 @@ export class CuboCena {
       a.v = a.alvo;
       a.vel = 0;
     } else {
-      // mola com um tiquinho de passada (o "clique" magnético de um speedcube);
-      // o embaralhamento usa a versão criticamente amortecida e mais dura.
       const k = a.rapido ? 1500 : 580;
       const c = a.rapido ? 2 * Math.sqrt(k) : 37;
       const passos = Math.ceil(delta / 0.004);
@@ -753,26 +1151,29 @@ export class CuboCena {
         a.vel += ((a.alvo - a.v) * k - a.vel * c) * h;
         a.v += a.vel * h;
       }
-      // com fila andando, não espera o assentamento fino
       const tolerancia = this.fila.length ? 0.06 : 0.004;
       if (!(Math.abs(a.alvo - a.v) < tolerancia && Math.abs(a.vel) < (this.fila.length ? 3 : 0.08))) {
-        this.pivo.rotation[a.giro.eixo] = a.v;
+        this.pivo.setRotationFromAxisAngle(a.eixoVec, a.v);
         return;
       }
     }
-    // terminou: o estado de tela recebe o giro e as peças voltam para a raiz
-    aplicarGiro(this.tela, a.giro);
+
+    if (this.tipo === "pyraminx" && isGiroPyraminx(a.giro)) {
+      aplicarGiroPyraminx(this.pyrTela, a.giro);
+    } else if (!isGiroPyraminx(a.giro)) {
+      aplicarGiro(this.tela, a.giro);
+    }
     this.pivo.rotation.set(0, 0, 0);
+    this.pivo.quaternion.identity();
     for (const g of a.grupos) {
       this.raiz.add(g);
       this.sincronizar(g);
     }
 
-    // pulso visual + micro-recuo magnético no encaixe da camada
     if (!this.opcoes.reduzido && !a.rapido) {
       this.haloPulse = Math.max(this.haloPulse, 0.72);
-      const dir = Math.sign(a.giro.q) || 1;
-      if (a.giro.eixo === "y") this.recoil.vy += dir * 0.42;
+      const dir = Math.sign(a.alvo) || 1;
+      if (!isGiroPyraminx(a.giro) && a.giro.eixo === "y") this.recoil.vy += dir * 0.42;
       else this.recoil.vx += dir * 0.36;
     }
 
@@ -798,7 +1199,6 @@ export class CuboCena {
     this.raycaster.setFromCamera(this.ndc(event), this.palco.camera);
     const hit = this.travado ? undefined : this.raycaster.intersectObjects(this.pegaveis, false)[0];
     const grupo = hit?.object.parent;
-    // peça no meio de um giro não serve de alavanca: vira o cubo
     if (hit && hit.face && grupo && grupo.parent === this.raiz) {
       const inv = this.raiz.quaternion.clone().invert();
       const normalMundo = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
@@ -815,7 +1215,6 @@ export class CuboCena {
   private aoMover = (event: PointerEvent) => {
     const g = this.gesto;
     if (!g) {
-      // feedback de hover na peça antes de arrastar
       if (this.travado) return;
       this.raycaster.setFromCamera(this.ndc(event), this.palco.camera);
       const hit = this.raycaster.intersectObjects(this.pegaveis, false)[0];
@@ -848,7 +1247,9 @@ export class CuboCena {
     const dy = event.clientY - g.y0;
     if (Math.hypot(dx, dy) < 12) return;
     g.usado = true;
-    const giro = this.giroDoArrasto(g.grupo, g.ponto, g.normal, dx, dy);
+    const giro = this.tipo === "pyraminx"
+      ? this.giroDoArrastoPyraminx(g.grupo, g.ponto, dx, dy)
+      : this.giroDoArrasto(g.grupo, g.ponto, g.normal, dx, dy);
     if (giro) this.girar(giro, "usuario");
   };
 
@@ -888,7 +1289,45 @@ export class CuboCena {
       if (!melhor || Math.abs(nota) > Math.abs(melhor.nota)) melhor = { eixo, nota };
     }
     if (!melhor || Math.abs(melhor.nota) < 0.35) return null;
-    const camada = Math.round(grupo.position[melhor.eixo] * 2);
-    return { eixo: melhor.eixo, camada, q: melhor.nota > 0 ? 1 : -1 };
+    const id = grupo.userData.id as number;
+    const peca = this.tela.pecas[id];
+    const eixoIdx = melhor.eixo === "x" ? 0 : melhor.eixo === "y" ? 1 : 2;
+    const camada = peca ? peca.pos[eixoIdx] : Math.round(grupo.position[melhor.eixo] * 2);
+    const passo = passoDoEixo(this.alvo, melhor.eixo);
+    const q = passo === 2 ? 2 : melhor.nota > 0 ? 1 : -1;
+    return { eixo: melhor.eixo, camada, q };
+  }
+
+  /**
+   * Arrasto no Pyraminx: pontas giram a camada 1 (tip), centros e arestas giram
+   * a camada 2 em torno do vértice cuja tangente (axis × ponto) mais se alinha com o arrasto.
+   */
+  private giroDoArrastoPyraminx(grupo: THREE.Object3D, ponto: THREE.Vector3, dx: number, dy: number): GiroPyraminx | null {
+    const id = grupo.userData.id as number;
+    const peca = this.pyrTela.pecas[id];
+    if (!peca) return null;
+    const { camera, renderer } = this.palco;
+    const r = renderer.domElement.getBoundingClientRect();
+    const arrasto = new THREE.Vector2(dx, dy).normalize();
+    const tela = (v: THREE.Vector3) => {
+      const p = this.raiz.localToWorld(v.clone()).project(camera);
+      return new THREE.Vector2((p.x * r.width) / 2, (-p.y * r.height) / 2);
+    };
+    const origem = tela(ponto);
+    const camada: 1 | 2 = peca.tipo === "tip" ? 1 : 2;
+    const candidatos = peca.slot as EixoPyraminx[];
+
+    let melhor: { eixo: EixoPyraminx; nota: number } | null = null;
+    for (const eixo of candidatos) {
+      const tang = pyraminxVetores[eixo].clone().cross(ponto);
+      if (tang.lengthSq() < 1e-6) continue;
+      tang.normalize().multiplyScalar(0.28);
+      const dir = tela(ponto.clone().add(tang)).sub(origem);
+      if (dir.lengthSq() < 1e-6) continue;
+      const nota = dir.normalize().dot(arrasto);
+      if (!melhor || Math.abs(nota) > Math.abs(melhor.nota)) melhor = { eixo, nota };
+    }
+    if (!melhor || Math.abs(melhor.nota) < 0.25) return null;
+    return { eixo: melhor.eixo, camada, q: melhor.nota > 0 ? -1 : 1 };
   }
 }

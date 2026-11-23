@@ -28,7 +28,7 @@ export function AulaDaMine({
   aprendidos,
   ocupado,
   emAula,
-  n,
+  eh3x3,
   reduzido,
   onVer,
   onTreinar,
@@ -42,7 +42,7 @@ export function AulaDaMine({
   ocupado: boolean;
   /** Este passo está passando no cubo agora (demonstração ou treino). */
   emAula: "demo" | "treino" | null;
-  n: number;
+  eh3x3: boolean;
   reduzido: boolean;
   onVer: (passo: PassoAula) => void;
   onTreinar: (passo: PassoAula) => void;
@@ -65,9 +65,9 @@ export function AulaDaMine({
         </div>
       </header>
 
-      {n !== 3 ? (
+      {!eh3x3 ? (
         <div className="cubo-aula-aviso">
-          A aula é do cubo 3×3.{" "}
+          A aula é do cubo Clássico 3×3.{" "}
           <button type="button" className="cubo-link" onClick={onUsar3}>Trocar para o 3×3</button>
         </div>
       ) : null}

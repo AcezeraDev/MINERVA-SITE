@@ -23,6 +23,37 @@ const faces = {
 export const ordemFaces = ["U", "D", "F", "B", "R", "L"];
 const idx = { x: 0, y: 1, z: 2 };
 
+export const tiposDeCubo = [
+  { id: "2x2", nome: "Pocket 2×2", curto: "2×2", categoria: "classicos", dims: [2, 2, 2], pecas: 8, descricao: "Rápido e ágil para aquecer os dedos.", corA: "#38bdf8", corB: "#2fd483", dificuldade: 1 },
+  { id: "3x3", nome: "Clássico 3×3", curto: "3×3", categoria: "classicos", dims: [3, 3, 3], pecas: 26, descricao: "O cubo clássico de Rubik, com Aula da Mine.", corA: "#8e9eff", corB: "#2fd483", dificuldade: 2 },
+  { id: "4x4", nome: "Revenge 4×4", curto: "4×4", categoria: "classicos", dims: [4, 4, 4], pecas: 56, descricao: "Com camadas internas (Alt + tecla).", corA: "#818cf8", corB: "#c084fc", dificuldade: 3 },
+  { id: "5x5", nome: "Professor 5×5", curto: "5×5", categoria: "classicos", dims: [5, 5, 5], pecas: 98, descricao: "Gigante de 5 camadas e 98 peças.", corA: "#f59e0b", corB: "#fb7185", dificuldade: 4 },
+  { id: "mirror", nome: "Mirror Cube", curto: "Mirror", categoria: "especiais", dims: [3, 3, 3], pecas: 26, descricao: "Espelhado que muda de forma ao girar!", corA: "#e2e8f0", corB: "#94a3b8", dificuldade: 3 },
+  { id: "void", nome: "Void Cube", curto: "Void", categoria: "especiais", dims: [3, 3, 3], pecas: 20, descricao: "Sem centros, com túnel vazado nos 3 eixos.", corA: "#22d3ee", corB: "#34d399", dificuldade: 3 },
+  { id: "2x2x3", nome: "Torre 2×2×3", curto: "2×2×3", categoria: "cuboides", dims: [2, 3, 2], pecas: 12, descricao: "Torre vertical: 90° no topo, 180° nos lados.", corA: "#fb7185", corB: "#fbbf24", dificuldade: 2 },
+  { id: "3x3x2", nome: "Dominó 3×3×2", curto: "3×3×2", categoria: "cuboides", dims: [3, 2, 3], pecas: 18, descricao: "Clássico cubo dominó de duas camadas.", corA: "#10b981", corB: "#38bdf8", dificuldade: 2 },
+  { id: "pyraminx", nome: "Pyraminx", curto: "Pyraminx", categoria: "poliedros", dims: [3, 3, 3], pecas: 14, descricao: "Pirâmide tetraédrica com giros de 120°.", corA: "#fbbf24", corB: "#f472b6", dificuldade: 2 },
+];
+
+export function infoTipoCubo(tipo) {
+  return tiposDeCubo.find((t) => t.id === tipo) ?? tiposDeCubo[1];
+}
+
+export function dimsDoCubo(cubo) {
+  return cubo.dims ?? [cubo.n, cubo.n, cubo.n];
+}
+
+/**
+ * Quantos quartos de volta são necessários em torno de `eixo` para manter o
+ * formato do cuboide: 1 (90°) se as outras duas dimensões são iguais; 2 (180°) se diferem.
+ */
+export function passoDoEixo(cubo, eixo) {
+  const [nx, ny, nz] = dimsDoCubo(cubo);
+  if (eixo === "x") return ny === nz ? 1 : 2;
+  if (eixo === "y") return nx === nz ? 1 : 2;
+  return nx === ny ? 1 : 2;
+}
+
 /** Gira um vetor inteiro q quartos de volta em torno do eixo positivo. */
 export function girarVetor(v, eixo, q) {
   let [x, y, z] = v;
@@ -43,30 +74,46 @@ function normalDaFace(face) {
 }
 
 /** Cubo resolvido. Cada peça guarda posição, base (orientação) e adesivos. */
-export function criarCubo(n = 3) {
-  const max = n - 1;
+export function criarCubo(n = 3, opcoes = {}) {
+  const dims = opcoes.dims ?? [n, n, n];
+  const [nx, ny, nz] = dims;
+  const maxX = nx - 1;
+  const maxY = ny - 1;
+  const maxZ = nz - 1;
+  const maxEixo = { x: maxX, y: maxY, z: maxZ };
+  const tipo = opcoes.tipo ?? (nx === ny && ny === nz ? `${n}x${n}` : `${nx}x${ny}x${nz}`);
+  const semCentros = tipo === "void";
   const pecas = [];
-  for (let x = -max; x <= max; x += 2)
-    for (let y = -max; y <= max; y += 2)
-      for (let z = -max; z <= max; z += 2) {
+  for (let x = -maxX; x <= maxX; x += 2)
+    for (let y = -maxY; y <= maxY; y += 2)
+      for (let z = -maxZ; z <= maxZ; z += 2) {
         const pos = [x, y, z];
-        if (![x, y, z].some((c) => Math.abs(c) === max)) continue; // miolo não aparece
+        if (Math.abs(x) !== maxX && Math.abs(y) !== maxY && Math.abs(z) !== maxZ) continue; // miolo não aparece
         const adesivos = [];
         for (const face of ordemFaces) {
           const f = faces[face];
-          if (pos[idx[f.eixo]] === f.sinal * max) adesivos.push({ n: normalDaFace(face), cor: f.cor, local: normalDaFace(face) });
+          if (pos[idx[f.eixo]] === f.sinal * maxEixo[f.eixo]) adesivos.push({ n: normalDaFace(face), cor: f.cor, local: normalDaFace(face) });
         }
-        pecas.push({ id: pecas.length, pos, base: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], adesivos });
+        if (semCentros && adesivos.length === 1) continue; // Void Cube: sem os 6 centros
+        pecas.push({ id: pecas.length, pos, posInicial: [...pos], base: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], adesivos });
       }
-  return { n, pecas };
+  return { n: Math.max(nx, ny, nz), dims: [nx, ny, nz], tipo, pecas };
+}
+
+export function criarCuboTipo(tipo = "3x3") {
+  const info = infoTipoCubo(tipo);
+  return criarCubo(Math.max(...info.dims), { dims: info.dims, tipo: info.id });
 }
 
 export function clonarCubo(cubo) {
   return {
     n: cubo.n,
+    dims: cubo.dims ? [...cubo.dims] : [cubo.n, cubo.n, cubo.n],
+    tipo: cubo.tipo ?? `${cubo.n}x${cubo.n}`,
     pecas: cubo.pecas.map((p) => ({
       id: p.id,
       pos: [...p.pos],
+      posInicial: p.posInicial ? [...p.posInicial] : [...p.pos],
       base: p.base.map((v) => [...v]),
       adesivos: p.adesivos.map((a) => ({ n: [...a.n], cor: a.cor, local: a.local })),
     })),
@@ -182,7 +229,7 @@ export function textoDosGiros(giros, n = 3) {
   return giros.map((g) => notacao(g, n)).join(" ");
 }
 
-export const tamanhoDoEmbaralhamento = { 2: 11, 3: 20, 4: 40 };
+export const tamanhoDoEmbaralhamento = { 2: 11, 3: 20, 4: 40, 5: 60 };
 
 /**
  * Embaralhamento por giros aleatórios: nunca o mesmo eixo duas vezes seguidas
@@ -192,7 +239,7 @@ export function gerarEmbaralhamento(n = 3, aleatorio = Math.random, tamanho = ta
   const max = n - 1;
   const camadas = [];
   for (let c = -max; c <= max; c += 2) if (Math.abs(c) >= max - 2 * (Math.floor(n / 2) - 1)) camadas.push(c);
-  // no 2×2 e no 3×3 só faces; no 4×4 também as camadas de dentro
+  // no 2×2 e no 3×3 só faces; no 4×4 e 5×5 também as camadas de dentro
   const usaveis = n >= 4 ? camadas.filter((c) => c !== 0) : [-max, max];
   const eixos = ["x", "y", "z"];
   const giros = [];
@@ -208,28 +255,78 @@ export function gerarEmbaralhamento(n = 3, aleatorio = Math.random, tamanho = ta
   return giros;
 }
 
+export function gerarEmbaralhamentoTipo(tipo = "3x3", aleatorio = Math.random) {
+  const info = infoTipoCubo(tipo);
+  const [nx, ny, nz] = info.dims;
+  if (nx === ny && ny === nz) {
+    return gerarEmbaralhamento(nx, aleatorio, tamanhoDoEmbaralhamento[nx] || 20);
+  }
+  // Cuboides: eixos assimétricos giram só 180° (q = 2)
+  const cuboRef = criarCuboTipo(tipo);
+  const tamanho = 18;
+  const maxPorEixo = { x: nx - 1, y: ny - 1, z: nz - 1 };
+  const eixos = ["x", "y", "z"];
+  const giros = [];
+  let eixoAnterior = "";
+  while (giros.length < tamanho) {
+    const eixo = eixos[Math.floor(aleatorio() * 3)];
+    if (eixo === eixoAnterior) continue;
+    const max = maxPorEixo[eixo];
+    const camadas = max === 0 ? [0] : [-max, max];
+    const camada = camadas[Math.floor(aleatorio() * camadas.length)];
+    const passo = passoDoEixo(cuboRef, eixo);
+    const q = passo === 2 ? 2 : [1, -1, 2][Math.floor(aleatorio() * 3)];
+    giros.push({ eixo, camada, q });
+    eixoAnterior = eixo;
+  }
+  return giros;
+}
+
+export function notacaoTipo(giro, tipo = "3x3") {
+  const info = infoTipoCubo(tipo);
+  const [nx, ny, nz] = info.dims;
+  if (nx === ny && ny === nz) return notacao(giro, nx);
+  const nEixo = giro.eixo === "x" ? nx : giro.eixo === "y" ? ny : nz;
+  return notacao(giro, nEixo);
+}
+
+export function textoDosGirosTipo(giros, tipo = "3x3") {
+  return giros.map((g) => notacaoTipo(g, tipo)).join(" ");
+}
+
 /**
  * Planificação do cubo (para o modo "cubo de verdade" e acessibilidade):
  * { U: cor[][], D, F, B, R, L } com linhas de cima para baixo, como se cada
  * face fosse vista de frente na cruz U / L F R B / D.
  */
 export function planificar(cubo) {
-  const n = cubo.n;
-  const max = n - 1;
-  const grade = () => Array.from({ length: n }, () => Array(n).fill(-1));
-  const saida = { U: grade(), D: grade(), F: grade(), B: grade(), R: grade(), L: grade() };
-  const c = (v) => (v + max) / 2;
+  const [nx, ny, nz] = dimsDoCubo(cubo);
+  const maxX = nx - 1;
+  const maxY = ny - 1;
+  const maxZ = nz - 1;
+  const grade = (linhas, cols) => Array.from({ length: linhas }, () => Array(cols).fill(-1));
+  const saida = {
+    U: grade(nz, nx),
+    D: grade(nz, nx),
+    F: grade(ny, nx),
+    B: grade(ny, nx),
+    R: grade(ny, nz),
+    L: grade(ny, nz),
+  };
+  const cx = (v) => (v + maxX) / 2;
+  const cy = (v) => (v + maxY) / 2;
+  const cz = (v) => (v + maxZ) / 2;
   for (const peca of cubo.pecas)
     for (const a of peca.adesivos) {
       const [x, y, z] = peca.pos;
-      const [nx, ny, nz] = a.n;
+      const [nxv, nyv, nzv] = a.n;
       let face, col, lin;
-      if (ny === 1) { face = "U"; col = c(x); lin = c(z); }
-      else if (ny === -1) { face = "D"; col = c(x); lin = c(-z); }
-      else if (nz === 1) { face = "F"; col = c(x); lin = c(-y); }
-      else if (nz === -1) { face = "B"; col = c(-x); lin = c(-y); }
-      else if (nx === 1) { face = "R"; col = c(-z); lin = c(-y); }
-      else { face = "L"; col = c(z); lin = c(-y); }
+      if (nyv === 1) { face = "U"; col = cx(x); lin = cz(z); }
+      else if (nyv === -1) { face = "D"; col = cx(x); lin = cz(-z); }
+      else if (nzv === 1) { face = "F"; col = cx(x); lin = cy(-y); }
+      else if (nzv === -1) { face = "B"; col = cx(-x); lin = cy(-y); }
+      else if (nxv === 1) { face = "R"; col = cz(-z); lin = cy(-y); }
+      else { face = "L"; col = cz(z); lin = cy(-y); }
       saida[face][lin][col] = a.cor;
     }
   return saida;

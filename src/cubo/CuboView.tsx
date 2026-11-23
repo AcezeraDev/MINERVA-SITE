@@ -8,25 +8,36 @@ import { PageHeader, uid, type User } from "../main";
 import { useSoftMotion } from "../motion";
 import { celebrateFrom, mineConversa, mineSays } from "../caderno";
 import {
+  aplicarGiros,
   caminhoDeVolta,
   coresHex,
   corNomes,
+  criarCuboTipo,
   etapaDoMetodo,
-  criarCubo,
-  aplicarGiros,
   formatarTempo,
-  gerarEmbaralhamento,
+  gerarEmbaralhamentoTipo,
+  infoTipoCubo,
   inverso,
   planificar,
   resumoTempos,
-  textoDosGiros,
+  textoDosGirosTipo,
+  tiposDeCubo,
   type Face,
   type Giro,
   type Planificacao,
   type Solve,
+  type TipoCubo,
 } from "../../shared/cubo.mjs";
-import { CuboCena } from "./CuboCena";
+import {
+  caminhoDeVoltaPyraminx,
+  gerarEmbaralhamentoPyraminx,
+  inversoPyraminx,
+  textoDosGirosPyraminx,
+  type GiroPyraminx,
+} from "../../shared/pyraminx.mjs";
+import { CuboCena, isGiroPyraminx, type Movimento } from "./CuboCena";
 import { CuboBorderBeam, CuboShimmerButton } from "./CuboFx";
+import { CuboSeletor } from "./CuboSeletor";
 import { perguntarMineCubo, type TurnoTutor } from "./mineTutor";
 import { AulaDaMine, FichasAlgoritmo } from "./AulaDaMine";
 import { elogio, explicarToken, instrucao, lerToken, passosAula, teclaDoToken, type PassoAula } from "./aula";
@@ -48,7 +59,19 @@ type AulaViva = {
 type Fala = { texto: string; humor: "fala" | "ok" | "erro" | "dica" | "festa"; n: number };
 const quartos = (q: number) => ((q % 4) + 4) % 4;
 const chaveAula = (userId: string) => `minerva-cubo-aula-v1:${userId}`;
-type Prefs = { n: number; modo: Modo; inspecao: boolean };
+type Prefs = { n: number; tipo: TipoCubo; modo: Modo; inspecao: boolean };
+
+const TIPOS_VALIDOS = new Set<string>(tiposDeCubo.map((t) => t.id));
+function normalizarTipo(tipo?: string, n?: number): TipoCubo {
+  if (tipo && TIPOS_VALIDOS.has(tipo)) return tipo as TipoCubo;
+  if (n === 2) return "2x2";
+  if (n === 4) return "4x4";
+  if (n === 5) return "5x5";
+  return "3x3";
+}
+function tipoDoSolve(s: Solve): TipoCubo {
+  return normalizarTipo(s.tipo, s.n);
+}
 
 const INSPECAO_MS = 15000;
 const SEGURAR_MS = 300;
@@ -87,13 +110,23 @@ const mostrar = (ms: number | null | undefined) => (ms === Infinity ? "DNF" : fo
 
 export function CuboView({ user }: { user: User }) {
   const reduzido = useSoftMotion();
-  const [prefs, setPrefs] = useState<Prefs>(() => ler(chavePrefs, { n: 3, modo: "tela" as Modo, inspecao: false }));
+  const [prefs, setPrefs] = useState<Prefs>(() => {
+    const salvo = ler<Partial<Prefs>>(chavePrefs, { n: 3, tipo: "3x3", modo: "tela", inspecao: false });
+    const tipo = normalizarTipo(salvo.tipo, salvo.n);
+    const info = infoTipoCubo(tipo);
+    return {
+      n: Math.max(...info.dims),
+      tipo,
+      modo: salvo.modo === "real" ? "real" : "tela",
+      inspecao: !!salvo.inspecao,
+    };
+  });
   const [solves, setSolves] = useState<Solve[]>(() => lerLista(chaveTempos(user.id)));
   const [fase, setFase] = useState<Fase>("livre");
-  const [embaralhamento, setEmbaralhamento] = useState<Giro[]>([]);
+  const [embaralhamento, setEmbaralhamento] = useState<Movimento[]>([]);
   const [giros, setGiros] = useState(0);
   const [ultimo, setUltimo] = useState<{ ms: number; giros: number; recorde: boolean } | null>(null);
-  const [planif, setPlanif] = useState<Planificacao>(() => planificar(criarCubo(prefs.n)));
+  const [planif, setPlanif] = useState<Planificacao>(() => planificar(criarCuboTipo(prefs.tipo === "pyraminx" ? "3x3" : prefs.tipo)));
   const [ajuda, setAjuda] = useState(false);
   const [passoAtual, setPassoAtual] = useState(0);
   const [ficha, setFicha] = useState(-1);
@@ -184,7 +217,7 @@ export function CuboView({ user }: { user: User }) {
   const relogioRef = useRef<HTMLSpanElement>(null);
   const cenaRef = useRef<CuboCena | null>(null);
   // estado lido pelos callbacks da cena e do teclado sem recriar a cena
-  const vivo = useRef({ fase: "livre" as Fase, inicio: 0, giros: 0, historico: [] as Giro[], meus: [] as Giro[], prefs, embaralhamento: [] as Giro[] });
+  const vivo = useRef({ fase: "livre" as Fase, inicio: 0, giros: 0, historico: [] as Movimento[], meus: [] as Movimento[], prefs, embaralhamento: [] as Movimento[] });
   vivo.current.prefs = prefs;
 
   const mudarFase = useCallback((f: Fase) => {
@@ -195,7 +228,8 @@ export function CuboView({ user }: { user: User }) {
   useEffect(() => gravar(chavePrefs, prefs), [prefs]);
   useEffect(() => gravar(chaveTempos(user.id), solves), [solves, user.id]);
 
-  const doTamanho = useMemo(() => solves.filter((s) => s.n === prefs.n && s.modo === prefs.modo), [solves, prefs.n, prefs.modo]);
+  const infoAtivo = useMemo(() => infoTipoCubo(prefs.tipo), [prefs.tipo]);
+  const doTamanho = useMemo(() => solves.filter((s) => tipoDoSolve(s) === prefs.tipo && s.modo === prefs.modo), [solves, prefs.tipo, prefs.modo]);
   const resumo = useMemo(() => resumoTempos(doTamanho), [doTamanho]);
 
   /* ---------- registrar um tempo ---------- */
@@ -203,15 +237,21 @@ export function CuboView({ user }: { user: User }) {
   const registrar = useCallback(
     (ms: number, qtdGiros: number) => {
       const v = vivo.current;
-      const anteriores = solves.filter((s) => s.n === v.prefs.n && s.modo === v.prefs.modo);
+      const tipo = v.prefs.tipo;
+      const info = infoTipoCubo(tipo);
+      const anteriores = solves.filter((s) => tipoDoSolve(s) === tipo && s.modo === v.prefs.modo);
       const melhor = resumoTempos(anteriores).melhor;
       const recorde = anteriores.length > 0 && (melhor == null || ms < melhor);
-      const novo: Solve = { id: uid("cubo"), n: v.prefs.n, ms, giros: qtdGiros, em: Date.now(), modo: v.prefs.modo, embaralhamento: textoDosGiros(v.embaralhamento, v.prefs.n) };
+      const embTexto =
+        tipo === "pyraminx"
+          ? textoDosGirosPyraminx(v.embaralhamento as GiroPyraminx[])
+          : textoDosGirosTipo(v.embaralhamento as Giro[], tipo);
+      const novo: Solve = { id: uid("cubo"), n: v.prefs.n, tipo, ms, giros: qtdGiros, em: Date.now(), modo: v.prefs.modo, embaralhamento: embTexto };
       setSolves((lista) => [...lista, novo].slice(-300));
       setUltimo({ ms, giros: qtdGiros, recorde });
       if (relogioRef.current) relogioRef.current.textContent = formatarTempo(ms);
       celebrateFrom(relogioRef.current, { count: recorde ? 40 : 22 });
-      mineSays(recorde ? `Recorde! ${formatarTempo(ms)} no ${v.prefs.n}×${v.prefs.n}.` : `Montou em ${formatarTempo(ms)}!`, "wow");
+      mineSays(recorde ? `Recorde! ${formatarTempo(ms)} no ${info.nome}.` : `Montou o ${info.nome} em ${formatarTempo(ms)}!`, "wow");
     },
     [solves],
   );
@@ -224,7 +264,7 @@ export function CuboView({ user }: { user: User }) {
     const host = palcoRef.current;
     if (!host) return;
     const cena = new CuboCena(host, {
-      n: vivo.current.prefs.n,
+      tipo: vivo.current.prefs.tipo,
       reduzido,
       onGiro: (giro, { origem, resolvido }) => {
         const v = vivo.current;
@@ -233,7 +273,7 @@ export function CuboView({ user }: { user: User }) {
         v.meus.push(giro);
         if (v.fase === "treino") {
           if (resolvido) aulaOkRef.current();
-          else treinadorRef.current(giro);
+          else if (!isGiroPyraminx(giro)) treinadorRef.current(giro);
           return;
         }
         if (v.fase === "inspecao" || v.fase === "pronto") {
@@ -381,7 +421,8 @@ export function CuboView({ user }: { user: User }) {
     const cena = cenaRef.current;
     if (!a || !cena || a.idx >= a.passo.algoritmo.length) return null;
     const { face, linha } = lerToken(a.passo.algoritmo[a.idx]);
-    return cena.giroVisual(face, linha);
+    const g = cena.giroVisual(face, linha);
+    return isGiroPyraminx(g) ? null : g;
   }, []);
   const esperadoRef = useRef(esperado);
   esperadoRef.current = esperado;
@@ -475,7 +516,7 @@ export function CuboView({ user }: { user: User }) {
     const cena = cenaRef.current;
     const v = vivo.current;
     const a = aula.current;
-    const linhas: string[] = [`Cubo ${v.prefs.n}x${v.prefs.n}, notacao vista de frente (R = face da direita na tela).`];
+    const linhas: string[] = [`Quebra-cabeça: ${infoTipoCubo(v.prefs.tipo).nome}, notacao vista de frente (R = face da direita na tela).`];
     if (a) {
       const alg = a.passo.algoritmo;
       const ordem = passosAula.findIndex((p) => p.id === a.passo.id) + 1;
@@ -489,7 +530,7 @@ export function CuboView({ user }: { user: User }) {
         }
       }
     } else if (v.fase === "valendo") linhas.push("Montagem cronometrada valendo agora: seja breve e nao atrapalhe.");
-    if (cena && v.prefs.n === 3) {
+    if (cena && v.prefs.tipo === "3x3") {
       const estado = cena.estado();
       const etapa = etapaDoMetodo(estado);
       if (etapa) {
@@ -518,7 +559,7 @@ export function CuboView({ user }: { user: User }) {
   /** Peças que faltam na etapa: brilham no cubo e viram texto para a Mine. */
   const olharEtapa = useCallback(() => {
     const cena = cenaRef.current;
-    if (!cena || vivo.current.prefs.n !== 3) {
+    if (!cena || vivo.current.prefs.tipo !== "3x3") {
       setEtapaInfo(null);
       return null;
     }
@@ -532,7 +573,7 @@ export function CuboView({ user }: { user: User }) {
   const pausaGiros = useRef<number | undefined>(undefined);
   const aoVivoRef = useRef<() => void>(() => {});
   aoVivoRef.current = () => {
-    if (!aoVivo || aula.current || vivo.current.prefs.n !== 3) return;
+    if (!aoVivo || aula.current || vivo.current.prefs.tipo !== "3x3") return;
     window.clearTimeout(pausaGiros.current);
     pausaGiros.current = window.setTimeout(() => {
       const cena = cenaRef.current;
@@ -572,11 +613,11 @@ export function CuboView({ user }: { user: User }) {
       const cena = cenaRef.current;
       if (!cena) return;
       const v = vivo.current;
-      if (v.prefs.n !== 3 || v.prefs.modo !== "tela") {
-        const novo = { ...v.prefs, n: 3, modo: "tela" as Modo };
+      if (v.prefs.tipo !== "3x3" || v.prefs.modo !== "tela") {
+        const novo: Prefs = { ...v.prefs, n: 3, tipo: "3x3", modo: "tela" };
         v.prefs = novo;
         setPrefs(novo);
-        cena.setTamanho(3);
+        cena.setTipo("3x3");
       }
       cena.resetar();
       cena.vistaPadrao(passo.amareloEmCima);
@@ -653,8 +694,8 @@ export function CuboView({ user }: { user: User }) {
     setFicha(-1);
     cena.vistaPadrao(false);
     const v = vivo.current;
-    const n = v.prefs.n;
-    const seq = gerarEmbaralhamento(n);
+    const tipo = v.prefs.tipo;
+    const seq: Movimento[] = tipo === "pyraminx" ? gerarEmbaralhamentoPyraminx() : gerarEmbaralhamentoTipo(tipo);
     cena.resetar();
     v.historico = [];
     v.meus = [];
@@ -667,9 +708,11 @@ export function CuboView({ user }: { user: User }) {
     mudarFase("embaralhando");
     if (relogioRef.current) relogioRef.current.textContent = v.prefs.inspecao && v.prefs.modo === "tela" ? "15" : "0.00";
     seq.forEach((g) => cena.girar(g, "embaralhar", true));
-    etapaVista.current = etapaDoMetodo(cena.estado())?.indice ?? null;
+    etapaVista.current = tipo === "3x3" ? etapaDoMetodo(cena.estado())?.indice ?? null : null;
     if (aoVivoLigado.current) olharEtapaRef.current();
-    setPlanif(planificar(aplicarGiros(criarCubo(n), seq)));
+    if (tipo !== "pyraminx") {
+      setPlanif(planificar(aplicarGiros(criarCuboTipo(tipo), seq as Giro[])));
+    }
   }, [mudarFase]);
 
   const desfazer = useCallback(() => {
@@ -678,7 +721,7 @@ export function CuboView({ user }: { user: User }) {
     if (!cena || v.prefs.modo === "real" || v.fase === "embaralhando" || v.fase === "volta") return;
     const giro = v.meus.pop();
     if (!giro) return;
-    cena.girar(inverso(giro), "usuario");
+    cena.girar(isGiroPyraminx(giro) ? inversoPyraminx(giro) : inverso(giro), "usuario");
     v.meus.pop(); // o desfazer não conta como giro novo para desfazer de novo
   }, []);
 
@@ -686,7 +729,10 @@ export function CuboView({ user }: { user: User }) {
     const cena = cenaRef.current;
     const v = vivo.current;
     if (!cena || v.fase === "embaralhando" || v.fase === "volta") return;
-    const volta = caminhoDeVolta(v.historico);
+    const volta: Movimento[] =
+      v.prefs.tipo === "pyraminx"
+        ? caminhoDeVoltaPyraminx(v.historico as GiroPyraminx[])
+        : caminhoDeVolta(v.historico as Giro[]);
     if (!volta.length) return;
     cena.travado = true;
     mudarFase("volta");
@@ -712,18 +758,23 @@ export function CuboView({ user }: { user: User }) {
     setEmbaralhamento([]);
     setGiros(0);
     setUltimo(null);
-    setPlanif(planificar(criarCubo(v.prefs.n)));
-    etapaVista.current = v.prefs.n === 3 ? 7 : null;
+    if (v.prefs.tipo !== "pyraminx") {
+      setPlanif(planificar(criarCuboTipo(v.prefs.tipo)));
+    }
+    etapaVista.current = v.prefs.tipo === "3x3" ? 7 : null;
     if (aoVivoLigado.current) olharEtapaRef.current();
     if (relogioRef.current) relogioRef.current.textContent = "0.00";
     mudarFase("livre");
   }, [mudarFase]);
 
-  const trocarTamanho = (n: number) => {
-    if (n === prefs.n) return;
-    setPrefs((p) => ({ ...p, n }));
-    vivo.current.prefs = { ...vivo.current.prefs, n };
-    cenaRef.current?.setTamanho(n);
+  const trocarTipo = (tipo: TipoCubo) => {
+    if (tipo === prefs.tipo) return;
+    const info = infoTipoCubo(tipo);
+    const n = Math.max(...info.dims);
+    const novo: Prefs = { ...prefs, tipo, n };
+    setPrefs(novo);
+    vivo.current.prefs = novo;
+    cenaRef.current?.setTipo(tipo);
     recomecar();
   };
 
@@ -838,8 +889,8 @@ export function CuboView({ user }: { user: User }) {
     setSolves((lista) => lista.map((s) => (s.id === id ? { ...s, [campo]: !s[campo] } : s)));
   const apagar = (id: string) => setSolves((lista) => lista.filter((s) => s.id !== id));
   const limparTudo = () => {
-    if (!window.confirm(`Apagar todos os tempos do ${prefs.n}×${prefs.n} (${prefs.modo === "real" ? "cubo de verdade" : "no site"})? Não dá para desfazer.`)) return;
-    setSolves((lista) => lista.filter((s) => !(s.n === prefs.n && s.modo === prefs.modo)));
+    if (!window.confirm(`Apagar todos os tempos do ${infoAtivo.nome} (${prefs.modo === "real" ? "cubo de verdade" : "no site"})? Não dá para desfazer.`)) return;
+    setSolves((lista) => lista.filter((s) => !(tipoDoSolve(s) === prefs.tipo && s.modo === prefs.modo)));
   };
 
   const irParaAula = () => {
@@ -850,7 +901,11 @@ export function CuboView({ user }: { user: User }) {
 
   const correndo = fase === "valendo" || fase === "inspecao";
   const ocupada = fase === "embaralhando" || fase === "volta";
-  const textoEmbaralhamento = embaralhamento.length ? textoDosGiros(embaralhamento, prefs.n) : "";
+  const textoEmbaralhamento = embaralhamento.length
+    ? prefs.tipo === "pyraminx"
+      ? textoDosGirosPyraminx(embaralhamento as GiroPyraminx[])
+      : textoDosGirosTipo(embaralhamento as Giro[], prefs.tipo)
+    : "";
   const recentes = doTamanho.slice(-12).reverse();
   const legenda =
     prefs.modo === "real"
@@ -882,39 +937,29 @@ export function CuboView({ user }: { user: User }) {
   return (
     <div className="cubo-page">
       <PageHeader
-        eyebrow="Desafio de lógica"
+        eyebrow="Desafio de lógica · 9 quebra-cabeças 3D"
         title="Cubo Mágico"
-        subtitle="Arraste uma peça para girar a camada, arraste o fundo para virar o cubo. Embaralhe e bata o seu tempo."
+        subtitle="Arraste uma peça para girar a camada, arraste o fundo para virar. Explore clássicos, Mirror, Void, cuboides e Pyraminx."
         action={
-          <div className="cubo-seg" role="radiogroup" aria-label="Tamanho do cubo">
-            {[2, 3, 4].map((n) => (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={prefs.n === n}
-                className="cubo-seg-item"
-                disabled={correndo || ocupada}
-                onClick={() => trocarTamanho(n)}
-              >
-                {prefs.n === n ? <motion.span layoutId="cubo-tamanho" className="cubo-seg-grifo" transition={mola} /> : null}
-                <span className="relative">{n}×{n}</span>
-              </button>
-            ))}
-          </div>
+          <span className="cubo-badge-ativo" aria-live="polite">
+            <span className="cubo-badge-dot" style={{ background: infoAtivo.corA }} aria-hidden />
+            {infoAtivo.nome} · {infoAtivo.pecas} peças
+          </span>
         }
       />
+
+      <CuboSeletor ativo={prefs.tipo} desabilitado={correndo || ocupada} onSelecionar={trocarTipo} />
 
       <div className="cubo-grade">
         <motion.section
           ref={palcoCardRef}
           className="cubo-palco-card"
-          aria-label="Cubo 3D"
+          aria-label={`${infoAtivo.nome} 3D`}
           initial={reduzido ? false : { opacity: 0, y: 16, scale: 0.985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={mola}
         >
-          <CuboBorderBeam size={150} duration={8} colorFrom="#93a3ff" colorTo="#2fd483" borderWidth={1.5} radius="1.25rem" />
+          <CuboBorderBeam size={150} duration={8} colorFrom={infoAtivo.corA} colorTo={infoAtivo.corB} borderWidth={1.5} radius="1.25rem" />
           <div className="cubo-palco-topo">
             <div className="cubo-seg cubo-seg-modo" role="radiogroup" aria-label="Modo">
               {([["tela", "No site", Box], ["real", "Cubo de verdade", Hand]] as const).map(([id, rotulo, Icone]) => (
@@ -1007,9 +1052,9 @@ export function CuboView({ user }: { user: User }) {
             </AnimatePresence>
           </div>
 
-          {prefs.modo === "real" && embaralhamento.length ? (
+          {prefs.modo === "real" && embaralhamento.length && prefs.tipo !== "pyraminx" && prefs.tipo !== "mirror" ? (
             <div className="cubo-planif-wrap">
-              <Planificado planif={planif} n={prefs.n} />
+              <Planificado planif={planif} />
             </div>
           ) : null}
 
@@ -1101,7 +1146,7 @@ export function CuboView({ user }: { user: User }) {
 
           <section className="cubo-card">
             <h2 className="cubo-card-titulo">
-              Seus números · {prefs.n}×{prefs.n} {prefs.modo === "real" ? "de verdade" : "no site"}
+              Seus números · {infoAtivo.nome} {prefs.modo === "real" ? "de verdade" : "no site"}
             </h2>
             <dl className="cubo-stats">
               <div><dt>melhor</dt><dd>{mostrar(resumo.melhor)}</dd></div>
@@ -1152,8 +1197,8 @@ export function CuboView({ user }: { user: User }) {
                 >
                   <ul className="cubo-teclas">
                     <li><kbd>U</kbd><kbd>D</kbd><kbd>L</kbd><kbd>R</kbd><kbd>F</kbd><kbd>B</kbd> giram a face de cima, baixo, esquerda, direita, frente e trás (como você está vendo).</li>
-                    <li><kbd>Shift</kbd> + letra gira ao contrário. <kbd>Alt</kbd> + letra gira a camada de dentro (4×4).</li>
-                    <li><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>X</kbd><kbd>Y</kbd><kbd>Z</kbd> viram o cubo inteiro.</li>
+                    <li><kbd>Shift</kbd> + letra gira ao contrário. <kbd>Alt</kbd> + letra gira camada interna (4×4, 5×5) ou pontas (Pyraminx).</li>
+                    <li><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> ou <kbd>X</kbd><kbd>Y</kbd><kbd>Z</kbd> viram o quebra-cabeça inteiro.</li>
                     <li><kbd>Espaço</kbd> embaralha (no cubo de verdade: segure e solte). <kbd>Ctrl</kbd>+<kbd>Z</kbd> desfaz.</li>
                   </ul>
                 </motion.div>
@@ -1173,12 +1218,12 @@ export function CuboView({ user }: { user: User }) {
         aprendidos={aprendidos}
         ocupado={ocupada || correndo}
         emAula={aulaViva && aulaViva.passo.id === passosAula[passoAtual].id ? aulaViva.tipo : null}
-        n={prefs.n}
+        eh3x3={prefs.tipo === "3x3"}
         reduzido={reduzido}
         onVer={(p) => comecarAula(p, "demo")}
         onTreinar={(p) => comecarAula(p, "treino")}
         onPerguntar={perguntarPasso}
-        onUsar3={() => trocarTamanho(3)}
+        onUsar3={() => trocarTipo("3x3")}
       />
     </div>
   );
@@ -1191,21 +1236,28 @@ function resumoEstado(estado: Planificacao) {
     .join("; ");
 }
 
-/** Cruz U / L F R B / D com o estado embaralhado, para conferir o cubo de verdade. */
-function Planificado({ planif, n }: { planif: Planificacao; n: number }) {
+/** Cruz U / L F R B / D com o estado embaralhado (suporta cubos N×N e cuboides). */
+function Planificado({ planif }: { planif: Planificacao }) {
   const lado = 10;
-  const face = n * lado + 3;
+  const maxC = Math.max(...(Object.values(planif).map((g) => Math.max(g.length, g[0]?.length ?? 0))));
+  const face = maxC * lado + 3;
   const posicoes: Record<Face, [number, number]> = { U: [1, 0], L: [0, 1], F: [1, 1], R: [2, 1], B: [3, 1], D: [1, 2] };
   return (
     <svg className="cubo-planif" viewBox={`0 0 ${face * 4} ${face * 3}`} role="img" aria-label="Como o cubo deve ficar depois do embaralhamento (verde na frente, branco em cima)">
       {(Object.keys(posicoes) as Face[]).map((f) => {
         const [cx, cy] = posicoes[f];
+        const linhas = planif[f].length;
+        const cols = planif[f][0]?.length ?? 0;
+        const offX = ((maxC - cols) * lado) / 2;
+        const offY = ((maxC - linhas) * lado) / 2;
         return (
-          <g key={f} transform={`translate(${cx * face + 1.5} ${cy * face + 1.5})`}>
+          <g key={f} transform={`translate(${cx * face + 1.5 + offX} ${cy * face + 1.5 + offY})`}>
             {planif[f].map((linha, i) =>
-              linha.map((cor, j) => (
-                <rect key={`${i}-${j}`} x={j * lado + 0.5} y={i * lado + 0.5} width={lado - 1} height={lado - 1} rx={1.6} fill={coresHex[cor] ?? "#888"} />
-              )),
+              linha.map((cor, j) =>
+                cor < 0 ? null : (
+                  <rect key={`${i}-${j}`} x={j * lado + 0.5} y={i * lado + 0.5} width={lado - 1} height={lado - 1} rx={1.6} fill={coresHex[cor] ?? "#888"} />
+                ),
+              ),
             )}
           </g>
         );

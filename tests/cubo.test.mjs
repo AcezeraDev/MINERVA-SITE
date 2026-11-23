@@ -4,16 +4,28 @@ import {
   aplicarGiros,
   caminhoDeVolta,
   criarCubo,
+  criarCuboTipo,
   estaResolvido,
   formatarTempo,
   gerarEmbaralhamento,
+  gerarEmbaralhamentoTipo,
   giroDaNotacao,
   mediaDe,
   notacao,
+  passoDoEixo,
   planificar,
   resumoTempos,
   simplificar,
 } from "../shared/cubo.mjs";
+import {
+  aplicarGiroPyraminx,
+  aplicarGirosPyraminx,
+  caminhoDeVoltaPyraminx,
+  criarPyraminx,
+  estaResolvidoPyraminx,
+  gerarEmbaralhamentoPyraminx,
+  notacaoPyraminx,
+} from "../shared/pyraminx.mjs";
 
 const seq = (texto, n = 3) => texto.split(" ").map((t) => giroDaNotacao(t, n));
 
@@ -122,4 +134,51 @@ test("etapa aponta as peças que faltam e para onde vão", () => {
   assert.deepEqual([...aresta.cores].sort(), [0, 2]); // branco e verde
   assert.deepEqual(aresta.onde.map((n) => n.join(",")).sort(), ["0,-1,0", "0,0,1"]); // embaixo, na frente
   assert.deepEqual(aresta.destino.map((n) => n.join(",")).sort(), ["0,0,1", "0,1,0"]); // em cima, na frente
+});
+
+test("novos tipos de cubo: 5×5, Mirror, Void e cuboides (2×2×3, 3×3×2)", () => {
+  assert.equal(criarCuboTipo("5x5").pecas.length, 98);
+  assert.equal(criarCuboTipo("mirror").pecas.length, 26);
+  assert.equal(criarCuboTipo("void").pecas.length, 20);
+  assert.equal(criarCuboTipo("2x2x3").pecas.length, 12);
+  assert.equal(criarCuboTipo("3x3x2").pecas.length, 18);
+
+  // Cuboides: eixo Y gira 90° (passo 1), X e Z giram 180° (passo 2)
+  const torre = criarCuboTipo("2x2x3");
+  assert.equal(passoDoEixo(torre, "y"), 1);
+  assert.equal(passoDoEixo(torre, "x"), 2);
+  assert.equal(passoDoEixo(torre, "z"), 2);
+
+  for (const tipo of ["5x5", "mirror", "void", "2x2x3", "3x3x2"]) {
+    const giros = gerarEmbaralhamentoTipo(tipo, semente(42));
+    const cubo = aplicarGiros(criarCuboTipo(tipo), giros);
+    assert.ok(!estaResolvido(cubo), `${tipo} embaralhou`);
+    aplicarGiros(cubo, caminhoDeVolta(giros));
+    assert.ok(estaResolvido(cubo), `${tipo} voltou`);
+  }
+});
+
+test("Pyraminx: 14 peças, 3 giros de 120° voltam ao início, embaralhamento + volta resolve", () => {
+  const p = criarPyraminx();
+  assert.equal(p.pecas.length, 14);
+  assert.ok(estaResolvidoPyraminx(p));
+
+  // 3 giros de 120° no mesmo eixo voltam ao resolvido
+  for (let i = 0; i < 3; i += 1) aplicarGiroPyraminx(p, { eixo: 0, camada: 2, q: 1 });
+  assert.ok(estaResolvidoPyraminx(p));
+
+  // 1 giro desarruma e inverso arruma
+  aplicarGiroPyraminx(p, { eixo: 2, camada: 2, q: 1 });
+  assert.ok(!estaResolvidoPyraminx(p));
+  aplicarGiroPyraminx(p, { eixo: 2, camada: 2, q: -1 });
+  assert.ok(estaResolvidoPyraminx(p));
+
+  // Embaralhamento e volta
+  const giros = gerarEmbaralhamentoPyraminx(semente(99));
+  const emb = aplicarGirosPyraminx(criarPyraminx(), giros);
+  assert.ok(!estaResolvidoPyraminx(emb));
+  aplicarGirosPyraminx(emb, caminhoDeVoltaPyraminx(giros));
+  assert.ok(estaResolvidoPyraminx(emb));
+  assert.equal(notacaoPyraminx({ eixo: 0, camada: 2, q: 1 }), "U");
+  assert.equal(notacaoPyraminx({ eixo: 2, camada: 1, q: -1 }), "r'");
 });
