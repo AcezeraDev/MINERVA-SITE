@@ -53,6 +53,14 @@ export function circuito({ tensao, r1, r2, ligacao }: Circuito) {
 
 /* ---------------- titulação ácido-base ---------------- */
 
+/**
+ * Béquer sem nenhum reagente. Não existe pH de recipiente vazio: a tela
+ * mostrava "pH 7, neutra, roxa" com 0 mL (auditoria de 22/nov/2026).
+ */
+export function semSolucao(acidoMl: number, baseMl: number) {
+  return acidoMl + baseMl <= 0;
+}
+
 /** HCl e NaOH a 0,1 mol/L, ácido forte com base forte. Volumes em mL. */
 export function ph(acidoMl: number, baseMl: number, conc = 0.1) {
   const total = (acidoMl + baseMl) / 1000;

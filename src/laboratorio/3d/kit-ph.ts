@@ -6,7 +6,7 @@
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { classificaPh, corRepolho, fmt, ph } from "../simulacoes";
+import { classificaPh, corRepolho, fmt, ph, semSolucao } from "../simulacoes";
 import type { EstadoLab } from "../tipos";
 import type { Emitir, Kit } from "./kit";
 import { comSombra, criarEtiqueta, materialVidro, suave, type CtxKit } from "./pecas";
@@ -172,7 +172,7 @@ export function criarKitPh(ctx: CtxKit, emitir: Emitir): Kit {
   medidor.add(caixa);
   grupo.add(medidor);
   let telaDesenhada = "";
-  const desenharTela = (valor: number, cor: string) => {
+  const desenharTela = (valor: number, cor: string, vazio = false) => {
     const chave = `${fmt(valor, 2)}|${cor}`;
     if (chave === telaDesenhada) return;
     telaDesenhada = chave;
@@ -184,13 +184,15 @@ export function criarKitPh(ctx: CtxKit, emitir: Emitir): Kit {
     c.fillText("pH", 18, 38);
     c.font = "800 84px ui-monospace, monospace";
     c.textAlign = "right";
-    c.fillText(fmt(valor, 2), 240, 128);
+    c.fillText(vazio ? "--" : fmt(valor, 2), 240, 128);
     c.textAlign = "left";
-    c.fillStyle = cor;
-    c.fillRect(18, 150, 220, 18);
+    if (!vazio) {
+      c.fillStyle = cor;
+      c.fillRect(18, 150, 220, 18);
+    }
     c.fillStyle = "#9df5c4";
     c.font = "700 20px system-ui, sans-serif";
-    c.fillText(classificaPh(valor), 120, 38);
+    c.fillText(vazio ? "vazio" : classificaPh(valor), 120, 38);
     texTela.needsUpdate = true;
   };
   // sonda e cabo
@@ -252,8 +254,10 @@ export function criarKitPh(ctx: CtxKit, emitir: Emitir): Kit {
     valorPh = ph(v.acido, v.base);
     const indicador = corRepolho(valorPh);
     corAlvo.set(indicador.cor);
-    desenharTela(valorPh, indicador.cor);
-    rotPh.definir(`pH ${fmt(valorPh, 2)} · ${indicador.nome}`);
+    const vazio = semSolucao(v.acido, v.base);
+    desenharTela(valorPh, indicador.cor, vazio);
+    rotPh.definir(vazio ? "Sem solução" : `pH ${fmt(valorPh, 2)} · ${indicador.nome}`);
+    marcador.visible = !vazio;
     for (const [bureta, ml, nome] of [[hcl, v.acido, "HCl"], [naoh, v.base, "NaOH"]] as const) {
       // subiu: as gotas caem (no máximo 10 por vez)
       if (!primeira && ml > bureta.ml) bureta.fila = Math.min(10, bureta.fila + Math.ceil(ml - bureta.ml));

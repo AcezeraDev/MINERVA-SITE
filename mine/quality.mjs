@@ -177,7 +177,13 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
   // A redacao vem no prompt: os trechos grifados precisam existir nela.
   if (cleanTask === "redacao") return lerCorrecao(text, prompt) ? "" : "correcao de redacao fora do formato";
   // O texto lido vem no prompt: as palavras grifadas precisam existir nele.
-  if (cleanTask === "leitura") return lerLeitura(text, prompt) ? "" : "leitura fora do formato ou com menos de 3 perguntas";
+  if (cleanTask === "leitura") {
+    const leitura = lerLeitura(text, prompt);
+    if (!leitura) return "leitura fora do formato ou com menos de 3 perguntas coerentes";
+    // Gabarito que contradiz a propria explicacao: melhor pedir de novo.
+    const ruins = leitura.perguntas.filter((item) => item.inconsistente).length;
+    return ruins > 1 ? `gabarito contraditorio em ${ruins} perguntas` : "";
+  }
   if (cleanTask === "atividade") return lerAtividade(text) ? "" : "atividade incompleta ou fora do formato";
   if (cleanTask === "atividade-correcao") return lerCorrecaoDissertativa(text) ? "" : "correcao da dissertativa fora do formato";
   if (cleanTask === "prova-estudo") {

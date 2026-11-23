@@ -81,7 +81,9 @@ export function anotarErros(caderno, erros, meta) {
     const existente = lista.findIndex((item) => chaveQuestao(item.questao) === chave);
     if (existente >= 0) {
       const antigo = lista[existente];
-      lista[existente] = { ...antigo, marcada: erro.marcada, status: "pendente", vezes: (antigo.vezes || 1) + 1, atualizadoEm: agora, estudo: antigo.estudo };
+      // O estudo explica a alternativa marcada: outra marcação pede outro estudo.
+      const mesmaMarcacao = (antigo.marcada ?? null) === (erro.marcada ?? null);
+      lista[existente] = { ...antigo, marcada: erro.marcada, status: "pendente", vezes: (antigo.vezes || 1) + 1, atualizadoEm: agora, estudo: mesmaMarcacao ? antigo.estudo : undefined };
       return;
     }
     lista.unshift({

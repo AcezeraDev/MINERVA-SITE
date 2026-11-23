@@ -1,5 +1,5 @@
 export type PalavraDificil = { palavra: string; significado: string };
-export type PerguntaLeitura = { pergunta: string; alternativas: string[]; correta: number; explicacao: string; trecho: string };
+export type PerguntaLeitura = { pergunta: string; alternativas: string[]; correta: number; explicacao: string; trecho: string; inconsistente?: boolean };
 export type Leitura = {
   titulo: string;
   genero: string;
@@ -14,6 +14,8 @@ export const leituraMinPalavras: number;
 export function contarPalavrasLeitura(texto: string): number;
 export function minutosLeitura(texto: string): number;
 export function limparTextoLeitura(texto: string): string;
+export function conferirGabarito(pergunta: { alternativas: string[]; correta: number; explicacao?: string; trecho?: string; resposta?: string }): { correta: number; inconsistente: boolean };
+export function placarLeitura(perguntas: PerguntaLeitura[], respostas: number[], reportadas?: number[]): { acertos: number; total: number };
 export function lerLeitura(resposta: unknown, texto?: string): Leitura | null;
 export function marcarPalavras(texto: string, palavras: PalavraDificil[]): Array<{ texto: string; marca: number }>;
 export function contextoLeitura(input?: { titulo?: string; objetivo?: string }): string;

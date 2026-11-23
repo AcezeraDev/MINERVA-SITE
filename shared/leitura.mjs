@@ -43,10 +43,118 @@ function normalizar(valor) {
   return String(valor || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+const palavrasVazias = new Set(
+  "a o as os um uma uns umas de do da dos das em no na nos nas por pelo pela pelos pelas para pra com sem que se nao sim e ou mas como mais menos muito muita muitos muitas ja ainda isso esse essa esses essas este esta estes estas aquele aquela aqueles aquelas ele ela eles elas seu sua seus suas lhe lhes era eram foi foram ser sao esta estao tem tinha texto trecho autor alternativa alternativas resposta correta certa errada porque pois quando onde sobre entre ate apenas outro outra outros outras mesmo mesma todo toda todos todas".split(" "),
+);
+
+/** Radicais das palavras de conteúdo: "descreve" e "descritivo" caem em "descr". */
+function radicais(valor) {
+  const fora = new Set();
+  for (const palavra of normalizar(valor).match(/[a-z0-9]+/g) || []) {
+    if (palavrasVazias.has(palavra)) continue;
+    if (/^\d+$/.test(palavra)) {
+      fora.add(palavra);
+      continue;
+    }
+    if (palavra.length < 4) continue;
+    fora.add(palavra.slice(0, 5));
+  }
+  return fora;
+}
+
+function semelhanca(a, b) {
+  const ra = radicais(a);
+  const rb = radicais(b);
+  if (!ra.size || !rb.size) return normalizar(a).trim() === normalizar(b).trim() && normalizar(a).trim() ? 1 : 0;
+  let comuns = 0;
+  for (const r of ra) if (rb.has(r)) comuns++;
+  return comuns / Math.max(ra.size, rb.size);
+}
+
+/** Índice da alternativa que é cópia (ou quase) de `resposta`, ou -1. */
+function alternativaDoTexto(alternativas, resposta) {
+  const alvo = normalizar(resposta).replace(/\s+/g, " ").trim();
+  if (!alvo) return -1;
+  const exata = alternativas.findIndex((alt) => normalizar(alt).replace(/\s+/g, " ").trim() === alvo);
+  if (exata >= 0) return exata;
+  let melhor = -1;
+  let nota = 0;
+  alternativas.forEach((alt, j) => {
+    const s = semelhanca(alt, resposta);
+    if (s > nota) {
+      nota = s;
+      melhor = j;
+    }
+  });
+  return nota >= 0.75 ? melhor : -1;
+}
+
+/**
+ * Quantas palavras de conteúdo que só a alternativa j tem aparecem na
+ * explicação e no trecho. Serve para ver de qual alternativa a explicação
+ * realmente fala.
+ */
+function apoioDaExplicacao(alternativas, explicacao, trecho) {
+  const base = radicais(`${explicacao} ${trecho}`);
+  const conjuntos = alternativas.map((alt) => radicais(alt));
+  return conjuntos.map((proprios, j) => {
+    let pontos = 0;
+    for (const r of proprios) {
+      if (!base.has(r)) continue;
+      if (conjuntos.some((outro, k) => k !== j && outro.has(r))) continue;
+      pontos++;
+    }
+    return pontos;
+  });
+}
+
+/**
+ * Confere o gabarito de uma pergunta (P1 da auditoria de 22/nov/2026: a Mine
+ * marcava A e explicava B). O texto copiado em `resposta` vale mais que o
+ * índice, porque o modelo erra o número com mais frequência que o texto. Se a
+ * explicação e o trecho apontam claramente para outra alternativa, a questão
+ * fica `inconsistente` e sai da nota.
+ */
+export function conferirGabarito(pergunta) {
+  const alternativas = Array.isArray(pergunta?.alternativas) ? pergunta.alternativas : [];
+  let correta = Math.floor(Number(pergunta?.correta));
+  const peloTexto = alternativaDoTexto(alternativas, pergunta?.resposta);
+  const apoio = apoioDaExplicacao(alternativas, pergunta?.explicacao || "", pergunta?.trecho || "");
+  let inconsistente = false;
+  if (peloTexto >= 0 && peloTexto !== correta) {
+    // Índice e texto discordam: desempata a explicação.
+    if (apoio[peloTexto] > (apoio[correta] ?? 0)) correta = peloTexto;
+    else if (apoio[peloTexto] === (apoio[correta] ?? 0)) {
+      correta = peloTexto;
+      inconsistente = true;
+    }
+  } else if (pergunta?.resposta && peloTexto < 0) {
+    inconsistente = true;
+  }
+  if (!(correta >= 0 && correta < alternativas.length)) return { correta: 0, inconsistente: true };
+  const melhor = Math.max(...apoio);
+  const outras = apoio.filter((pontos, j) => j !== correta && pontos === melhor).length;
+  // A explicação e o trecho falam de outra alternativa e nada da escolhida.
+  if (melhor >= 1 && apoio[correta] === 0 && outras > 0) inconsistente = true;
+  return { correta, inconsistente };
+}
+
+/** Acertos e total que contam na nota: questões inconsistentes ou reportadas ficam fora. */
+export function placarLeitura(perguntas, respostas, reportadas = []) {
+  let acertos = 0;
+  let total = 0;
+  (perguntas || []).forEach((pergunta, i) => {
+    if (pergunta.inconsistente || reportadas.includes(i)) return;
+    total++;
+    if (respostas?.[i] === pergunta.correta) acertos++;
+  });
+  return { acertos, total };
+}
+
 /**
  * Lê a resposta da Mine. `texto` é o original: só ficam as palavras que
  * aparecem nele, para o grifo cair no lugar certo. Devolve null quando falta
- * o resumo ou quando sobram menos de 3 perguntas inteiras.
+ * o resumo ou quando sobram menos de 3 perguntas com gabarito coerente.
  */
 export function lerLeitura(resposta, texto = "") {
   const json = typeof resposta === "string" ? extrairJson(resposta) : resposta;
@@ -72,10 +180,12 @@ export function lerLeitura(resposta, texto = "") {
       correta: Math.floor(Number(item?.correta)),
       explicacao: frase(item?.explicacao, 400),
       trecho: frase(item?.trecho, 300),
+      resposta: frase(item?.resposta, 240),
     }))
     .filter((item) => item.pergunta.length >= 8 && item.alternativas.length === 4 && item.correta >= 0 && item.correta <= 3 && item.explicacao.length >= 8)
+    .map(({ resposta, ...item }) => ({ ...item, ...conferirGabarito({ ...item, resposta }) }))
     .slice(0, 6);
-  if (perguntas.length < 3) return null;
+  if (perguntas.filter((item) => !item.inconsistente).length < 3) return null;
   const ideias = (Array.isArray(json.ideias) ? json.ideias : []).map((item) => frase(item, 260)).filter((item) => item.length >= 8).slice(0, 6);
   return {
     titulo: frase(json.titulo, 120) || "Texto sem título",

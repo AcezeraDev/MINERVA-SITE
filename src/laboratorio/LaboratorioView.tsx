@@ -17,6 +17,7 @@ import {
   ph,
   plano,
   posicaoNoTempo,
+  semSolucao,
   type Circuito,
   type Lancamento,
   type Plano,
@@ -456,6 +457,7 @@ function desenhoCircuito(v: Circuito, reduzido: boolean): Desenho {
 function desenhoPh(acido: number, base: number, reduzido: boolean): Desenho {
   const valor = ph(acido, base);
   const { cor } = corRepolho(valor);
+  const vazio = semSolucao(acido, base);
   return (ctx, w, h, t, c) => {
     const bw = Math.min(200, w * 0.4);
     const bh = h - 110;
@@ -466,7 +468,7 @@ function desenhoPh(acido: number, base: number, reduzido: boolean): Desenho {
     const ly = by + bh - bh * 0.92 * nivel;
     // líquido
     ctx.fillStyle = cor;
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = vazio ? 0 : 0.85;
     ctx.beginPath();
     ctx.moveTo(bx + 4, ly);
     for (let x = 0; x <= bw - 8; x += 6) ctx.lineTo(bx + 4 + x, ly + (reduzido ? 0 : Math.sin(x / 18 + t * 2.4) * 2.2));
@@ -521,6 +523,13 @@ function desenhoPh(acido: number, base: number, reduzido: boolean): Desenho {
     ctx.fillStyle = c.texto;
     ctx.font = "700 11px system-ui, sans-serif";
     for (let i = 0; i <= 14; i += 2) ctx.fillText(String(i), sx + (sw * i) / 14 - 3, sy + 30);
+    if (vazio) {
+      ctx.font = "800 13px system-ui, sans-serif";
+      ctx.fillText("Sem solução: pingue ácido ou base", sx, sy - 12);
+      ctx.font = "700 15px system-ui, sans-serif";
+      ctx.fillText("béquer vazio", bx + bw / 2 - 44, by + bh - 20);
+      return;
+    }
     const mx = sx + (sw * valor) / 14;
     ctx.beginPath();
     ctx.moveTo(mx, sy - 2);
@@ -823,6 +832,25 @@ export function LaboratorioView({ user, update }: { data: ReturnType<typeof useM
       const v = valores.ph;
       const valor = ph(v.acido, v.base);
       const indicador = corRepolho(valor);
+      if (semSolucao(v.acido, v.base)) {
+        return {
+          desenho: desenhoPh(v.acido, v.base, reduced),
+          destaque: ["béquer vazio", "Sem solução"] as [string, string],
+          leituras: [
+            ["pH", "—", "sem líquido não há pH"],
+            ["A solução está", "sem solução", "pingue HCl, NaOH ou os dois"],
+            ["Cor do repolho roxo", "—"],
+            ["Volume total", "0,0 mL"],
+          ] as Array<[string, string, string?]>,
+          pergunta: "No laboratório do Minerva vou misturar HCl 0,1 mol/L com NaOH 0,1 mol/L. Me explica o que acontece com o pH conforme eu pingo cada um?",
+          controles: (
+            <>
+              <Controle rotulo="Ácido clorídrico (HCl 0,1 mol/L)" valor={v.acido} unidade="mL" min={0} max={50} passo={0.5} onChange={(n) => mudar("ph", { acido: n })} />
+              <Controle rotulo="Hidróxido de sódio (NaOH 0,1 mol/L)" valor={v.base} unidade="mL" min={0} max={50} passo={0.5} onChange={(n) => mudar("ph", { base: n })} />
+            </>
+          ),
+        };
+      }
       return {
         desenho: desenhoPh(v.acido, v.base, reduced),
         destaque: [`solução ${classificaPh(valor)}`, `pH ${fmt(valor, 2)}`] as [string, string],

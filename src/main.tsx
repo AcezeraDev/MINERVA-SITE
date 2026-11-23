@@ -1026,6 +1026,26 @@ function formatFileSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/**
+ * Endereço de um conteúdo do tipo link, já com https:// quando faltar, ou ""
+ * se o texto não forma um endereço (espaço no meio, sem domínio, outro
+ * protocolo). Antes "isso não é um link" virava https://isso não é um link.
+ */
+export function normalizeMaterialLink(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw || /\s/.test(raw)) return "";
+  const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw.replace(/^\/+/, "")}`;
+  try {
+    const url = new URL(withProtocol);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    const host = url.hostname;
+    if (host !== "localhost" && !/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(host) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1352,6 +1372,25 @@ function withSession(data: AppData, session: SessionState): AppData {
   };
 }
 
+/**
+ * A Vercel recusa corpo de função acima de 4,5 MB (413) e o estado inteiro
+ * viaja num PUT só. Acima deste teto nem tenta: avisa em vez de falhar calado.
+ */
+const maxSyncBodyChars = 4_300_000;
+
+type ConfirmarGravacao = (pronto?: (data: AppData) => boolean) => Promise<{ ok: boolean; motivo?: "cheio" | "offline" | "sem-conta" }>;
+let confirmarGravacaoAtual: ConfirmarGravacao | null = null;
+
+/**
+ * Espera o estado (já com a mudança que `pronto` reconhece) chegar ao
+ * servidor. Usado onde perder a gravação custa caro, como anexos de matéria:
+ * a auditoria de 22/nov/2026 viu uma imagem sumir depois de "Conteúdo
+ * adicionado" porque o PUT falhou sem aviso.
+ */
+export function confirmarGravacao(pronto?: (data: AppData) => boolean) {
+  return confirmarGravacaoAtual ? confirmarGravacaoAtual(pronto) : Promise.resolve({ ok: false, motivo: "offline" as const });
+}
+
 function dataForServer(data: AppData): AppData {
   return {
     ...data,
@@ -1508,6 +1547,17 @@ function App() {
   const [navHidden, setNavHiddenState] = useState(() => readNavHidden());
   const saveReadyRef = useRef(false);
   const skipNextSaveRef = useRef(false);
+  const modalRef = useRef<Modal | null>(null);
+  const modalOpenedAtRef = useRef(0);
+  if (modal && !modalRef.current) modalOpenedAtRef.current = Date.now();
+  modalRef.current = modal;
+  // Fila de gravação: um PUT por vez, sempre com o estado mais novo. Dois PUTs
+  // em paralelo podiam chegar fora de ordem e o mais velho apagar o mais novo.
+  const latestDataRef = useRef(data);
+  latestDataRef.current = data;
+  const saveTimerRef = useRef<number | undefined>(undefined);
+  const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
+  const savePendingRef = useRef(false);
   // Controla a geração em curso: o botão parar aborta por aqui.
   const mineAbortRef = useRef<AbortController | null>(null);
   // O texto parcial precisa de ref porque o handler de erro lê o valor mais
@@ -1566,7 +1616,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const onHash = () => setRoute(routeFromHash());
+    const onHash = () => {
+      setRoute(routeFromHash());
+      // Janela aberta numa tela não pode cobrir a próxima (o detalhe da
+      // anotação ficava por cima da Leitura). A folga de 400 ms preserva os
+      // fluxos que trocam de tela e abrem uma janela de propósito.
+      if (modalRef.current && Date.now() - modalOpenedAtRef.current > 400) setModal(null);
+    };
     window.addEventListener("hashchange", onHash);
     if (!window.location.hash) go("home");
     return () => window.removeEventListener("hashchange", onHash);
@@ -1626,21 +1682,64 @@ function App() {
 
     if (!saveReadyRef.current || !nextSession.token) return;
     setSyncStatus("salvando");
-    const timer = window.setTimeout(() => {
-      apiJson<{ data: AppData; database: string }>("/api/data", {
-        method: "PUT",
-        headers: { authorization: `Bearer ${nextSession.token}` },
-        body: JSON.stringify({ data: dataForServer(data) }),
-      })
-        .then((response) => {
-          setDatabaseMode(response.database);
-          setSyncStatus("online");
-        })
-        .catch(() => setSyncStatus("offline"));
-    }, 650);
-
-    return () => window.clearTimeout(timer);
+    savePendingRef.current = true;
+    window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => void gravarNoServidor(), 650);
   }, [data]);
+
+  function gravarNoServidor(): Promise<{ ok: boolean; motivo?: "cheio" | "offline" | "sem-conta" }> {
+    window.clearTimeout(saveTimerRef.current);
+    savePendingRef.current = true;
+    const vez = saveChainRef.current.catch(() => undefined).then(async () => {
+      const token = readSession().token;
+      if (!token) return { ok: false, motivo: "sem-conta" as const };
+      const body = JSON.stringify({ data: dataForServer(latestDataRef.current) });
+      if (body.length > maxSyncBodyChars) {
+        setSyncStatus("offline");
+        return { ok: false, motivo: "cheio" as const };
+      }
+      setSyncStatus("salvando");
+      try {
+        const response = await apiJson<{ data: AppData; database: string }>("/api/data", {
+          method: "PUT",
+          headers: { authorization: `Bearer ${token}` },
+          body,
+        });
+        setDatabaseMode(response.database);
+        setSyncStatus("online");
+        return { ok: true };
+      } catch {
+        setSyncStatus("offline");
+        return { ok: false, motivo: "offline" as const };
+      }
+    });
+    saveChainRef.current = vez;
+    void vez.then(() => {
+      if (saveChainRef.current === vez) savePendingRef.current = false;
+    });
+    return vez;
+  }
+
+  useEffect(() => {
+    confirmarGravacaoAtual = async (pronto) => {
+      // O update() acabou de ser chamado: espera o React aplicar a mudança.
+      for (let i = 0; pronto && i < 40 && !pronto(latestDataRef.current); i++) {
+        await new Promise((resolve) => window.setTimeout(resolve, 25));
+      }
+      return gravarNoServidor();
+    };
+    // Recarregar com gravação pendente perde a mudança: o navegador pergunta antes.
+    const avisarSaida = (event: BeforeUnloadEvent) => {
+      if (!savePendingRef.current || !readSession().token) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisarSaida);
+    return () => {
+      confirmarGravacaoAtual = null;
+      window.removeEventListener("beforeunload", avisarSaida);
+    };
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -10174,6 +10273,19 @@ export function fallbackUser(): User {
   };
 }
 
+function modalTitulo(modal: Modal) {
+  const nomes: Partial<Record<Modal["type"], string>> = {
+    subject: "Nova matéria",
+    material: "Adicionar conteúdo",
+    materialView: "Detalhe do conteúdo",
+    task: "Tarefa",
+    quiz: "Prova",
+    mindmap: "Mapa mental",
+    confirm: "Confirmação",
+  };
+  return nomes[modal.type] || "Janela";
+}
+
 function ModalHost({
   modal,
   setModal,
@@ -10189,14 +10301,59 @@ function ModalHost({
   update: (next: (draft: AppData) => AppData) => void;
   notify: (message: string) => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const aberto = Boolean(modal);
   useEffect(() => {
     if (!modal) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setModal(null);
+    const editavel = (alvo: EventTarget | null) => alvo instanceof HTMLElement && Boolean(alvo.closest("input, textarea, select, [contenteditable='true']"));
+    // Fora de campos de texto o Escape é tratado na captura: nenhum atalho da
+    // tela de baixo consegue engolir. Num campo, espera a bolha para o campo
+    // poder usar o Escape antes (cancelar uma edição, por exemplo).
+    const naCaptura = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || editavel(event.target)) return;
+      event.stopPropagation();
+      setModal(null);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const naBolha = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !editavel(event.target) || event.defaultPrevented) return;
+      setModal(null);
+    };
+    window.addEventListener("keydown", naCaptura, true);
+    window.addEventListener("keydown", naBolha);
+    return () => {
+      window.removeEventListener("keydown", naCaptura, true);
+      window.removeEventListener("keydown", naBolha);
+    };
   }, [modal, setModal]);
+
+  // Foco entra na janela ao abrir e volta para quem a abriu ao fechar.
+  useEffect(() => {
+    if (!aberto) return;
+    const anterior = document.activeElement as HTMLElement | null;
+    const timer = window.setTimeout(() => {
+      if (!dialogRef.current?.contains(document.activeElement)) dialogRef.current?.focus();
+    }, 30);
+    return () => {
+      window.clearTimeout(timer);
+      if (anterior && document.contains(anterior)) anterior.focus();
+    };
+  }, [aberto]);
+
+  // Tab fica dentro da janela enquanto ela está aberta.
+  const prenderFoco = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab" || !dialogRef.current) return;
+    const focaveis = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex='-1'])")).filter((item) => item.offsetParent !== null || item.classList.contains("sr-only"));
+    if (!focaveis.length) return;
+    const primeiro = focaveis[0];
+    const ultimo = focaveis[focaveis.length - 1];
+    if (event.shiftKey && (document.activeElement === primeiro || document.activeElement === dialogRef.current)) {
+      event.preventDefault();
+      ultimo.focus();
+    } else if (!event.shiftKey && document.activeElement === ultimo) {
+      event.preventDefault();
+      primeiro.focus();
+    }
+  };
 
   // Trava o scroll do fundo enquanto um modal está aberto.
   useEffect(() => {
@@ -10220,8 +10377,12 @@ function ModalHost({
         onClick={() => setModal(null)}
       >
         <motion.div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
+          aria-label={modalTitulo(modal)}
+          tabIndex={-1}
+          onKeyDown={prenderFoco}
           initial={{ opacity: 0, y: 34, scale: 0.94, filter: "blur(12px)" }}
           animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
           exit={{ opacity: 0, y: 22, scale: 0.95, filter: "blur(8px)" }}
@@ -10229,6 +10390,14 @@ function ModalHost({
           className={`glass-deep relative w-full shrink-0 ${modal.type === "mindmap" ? "my-0 max-w-[90rem] sm:my-auto" : `my-auto ${modal.type === "quiz" ? "max-w-5xl" : modal.type === "subject" ? "max-w-4xl" : "max-w-xl"}`} overflow-hidden rounded-lg p-5 sm:p-6`}
           onClick={(event) => event.stopPropagation()}
         >
+          <button
+            type="button"
+            onClick={() => setModal(null)}
+            aria-label="Fechar"
+            className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          >
+            <X className="h-5 w-5" />
+          </button>
           {modal.type === "subject" && (
             <SubjectModal
               user={user}
@@ -10549,6 +10718,9 @@ function MaterialModal({ user, subjectId, initialType, update, close, notify }: 
   const [content, setContent] = useState<string | undefined>(undefined);
   const [fileName, setFileName] = useState("");
   const [reading, setReading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const savedIdRef = useRef<string | null>(null);
   const typeLabels: Record<Material["type"], string> = {
     note: "Anotação",
     file: "Arquivo",
@@ -10588,15 +10760,46 @@ function MaterialModal({ user, subjectId, initialType, update, close, notify }: 
 
   return (
     <form
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
-        if (!title.trim()) return;
-        update((draft) => ({
-          ...draft,
-          materials: [...draft.materials, { id: uid("material"), userId: user.id, subjectId, title: title.trim(), detail: detail.trim() || (isFileType ? fileName : ""), dataUrl, content, type, folder: "Geral", studied: false, favorite: false, createdAt: Date.now() }],
-        }));
-        notify("Conteúdo adicionado.");
-        close();
+        if (!title.trim() || saving || reading) return;
+        if (type === "link" && !normalizeMaterialLink(detail)) {
+          setSaveError("Esse endereço não é um link válido. Use algo como https://site.com/pagina.");
+          return;
+        }
+        // Numa nova tentativa o item já está no caderno: só grava de novo.
+        let id = savedIdRef.current;
+        if (!id) {
+          id = uid("material");
+          savedIdRef.current = id;
+          const novoId = id;
+          const linkDetail = type === "link" ? normalizeMaterialLink(detail) : "";
+          update((draft) => ({
+            ...draft,
+            materials: [...draft.materials, { id: novoId, userId: user.id, subjectId, title: title.trim(), detail: linkDetail || detail.trim() || (isFileType ? fileName : ""), dataUrl, content, type, folder: "Geral", studied: false, favorite: false, createdAt: Date.now() }],
+          }));
+        }
+        if (!dataUrl) {
+          notify("Conteúdo adicionado.");
+          close();
+          return;
+        }
+        // Anexo pesa e é o que some se o PUT falhar: espera o servidor confirmar.
+        setSaving(true);
+        setSaveError("");
+        const idSalvo = id;
+        const resultado = await confirmarGravacao((estado) => estado.materials.some((item) => item.id === idSalvo));
+        setSaving(false);
+        if (resultado.ok || resultado.motivo === "sem-conta") {
+          notify(type === "image" ? "Imagem salva no caderno." : "Arquivo salvo no caderno.");
+          close();
+          return;
+        }
+        setSaveError(
+          resultado.motivo === "cheio"
+            ? "O caderno ficou pesado demais para salvar este anexo no servidor. Ele aparece agora, mas pode sumir ao recarregar: apague anexos antigos ou use um arquivo menor e tente de novo."
+            : "Não consegui salvar no servidor. O anexo aparece agora, mas pode sumir ao recarregar. Confira a conexão e tente de novo.",
+        );
       }}
       className="space-y-5"
     >
@@ -10623,14 +10826,19 @@ function MaterialModal({ user, subjectId, initialType, update, close, notify }: 
       {isFileType ? (
         <div>
           <span className="mb-2 block text-sm font-black text-white/72">{type === "image" ? "Imagem" : "Arquivo (PDF, Word, PowerPoint, texto, imagem...)"}</span>
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-white/20 bg-white/[0.04] px-4 py-4 text-sm font-black text-white/72 transition hover:border-mint/40 hover:bg-mint/10">
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-white/20 bg-white/[0.04] px-4 py-4 text-sm font-black text-white/72 transition focus-within:border-mint focus-within:ring-2 focus-within:ring-mint/60 hover:border-mint/40 hover:bg-mint/10">
             <Paperclip className="h-5 w-5" />
             {reading ? "Lendo arquivo..." : fileName ? `Trocar (${fileName})` : "Escolher arquivo"}
+            {/* sr-only em vez de hidden: o campo continua alcançável pelo Tab. */}
             <input
               type="file"
-              className="hidden"
+              className="sr-only"
               accept={type === "image" ? "image/*" : "image/*,.pdf,.txt,.md,.csv,.doc,.docx,.ppt,.pptx,.xls,.xlsx"}
-              onChange={(event) => handleFile(event.target.files?.[0])}
+              onChange={(event) => {
+                void handleFile(event.target.files?.[0]);
+                // Deixa escolher o mesmo arquivo de novo.
+                event.target.value = "";
+              }}
             />
           </label>
           {content ? <p className="mt-2 text-xs font-bold text-mint">Texto extraído ({content.length.toLocaleString("pt-BR")} caracteres) — a Mine vai analisar este conteúdo.</p> : null}
@@ -10638,9 +10846,24 @@ function MaterialModal({ user, subjectId, initialType, update, close, notify }: 
           {!content && dataUrl && !dataUrl.startsWith("data:image/") ? <p className="mt-2 text-xs text-white/50">Arquivo salvo, mas sem texto extraído. A Mine analisa melhor PDF, Word, PowerPoint, textos e imagens.</p> : null}
         </div>
       ) : (
-        <Input label="Detalhes" value={detail} onChange={setDetail} placeholder={type === "link" ? "Cole o link (YouTube, site...)" : "Escreva a anotação — a Mine vai analisar"} />
+        <Input
+          label="Detalhes"
+          value={detail}
+          onChange={(value) => {
+            setDetail(value);
+            if (saveError) setSaveError("");
+          }}
+          placeholder={type === "link" ? "Cole o link (YouTube, site...)" : "Escreva a anotação — a Mine vai analisar"}
+        />
       )}
-      <PrimaryButton icon={Plus}>Adicionar</PrimaryButton>
+      {saveError ? (
+        <p role="alert" className="rounded-2xl border border-roseGlow/40 bg-roseGlow/10 px-4 py-3 text-sm font-bold text-white/85">
+          {saveError}
+        </p>
+      ) : null}
+      <PrimaryButton icon={Plus} disabled={saving || reading}>
+        {saving ? "Salvando no servidor..." : savedIdRef.current ? "Tentar salvar de novo" : "Adicionar"}
+      </PrimaryButton>
     </form>
   );
 }
@@ -12063,6 +12286,8 @@ function MaterialViewModal({
   const [draftTitle, setDraftTitle] = useState(material.title);
   const [draftDetail, setDraftDetail] = useState(material.detail || "");
   const [draftText, setDraftText] = useState(material.content || "");
+  const [editError, setEditError] = useState("");
+  const linkHref = material.type === "link" ? normalizeMaterialLink(material.detail || "") : "";
 
   function toggle(patch: Partial<Material>) {
     update((draft) => ({
@@ -12074,7 +12299,16 @@ function MaterialViewModal({
   function saveEdits() {
     const title = draftTitle.trim();
     if (!title) return;
-    toggle({ title, detail: draftDetail.trim() || undefined, content: draftText.trim() || undefined });
+    let detail = draftDetail.trim();
+    if (material.type === "link") {
+      detail = normalizeMaterialLink(detail);
+      if (!detail) {
+        setEditError("Esse endereço não é um link válido. Use algo como https://site.com/pagina.");
+        return;
+      }
+    }
+    setEditError("");
+    toggle({ title, detail: detail || undefined, content: draftText.trim() || undefined });
     setEditing(false);
     notify("Conteúdo atualizado.");
   }
@@ -12123,7 +12357,11 @@ function MaterialViewModal({
             <span className="text-sm font-black text-white/62">{material.type === "link" ? "Endereço" : "Descrição"}</span>
             <input
               value={draftDetail}
-              onChange={(event) => setDraftDetail(event.target.value)}
+              onChange={(event) => {
+                setDraftDetail(event.target.value);
+                if (editError) setEditError("");
+              }}
+              aria-invalid={Boolean(editError)}
               placeholder={material.type === "link" ? "https://..." : "Uma linha sobre este conteúdo"}
               className="mt-2 h-12 w-full rounded-xl border border-white/12 bg-white/[0.06] px-4 text-white outline-none transition placeholder:text-white/35 focus:border-mint/60"
             />
@@ -12141,6 +12379,11 @@ function MaterialViewModal({
           <p className="text-[12px] font-bold text-white/40">
             O que estiver aqui é o que a Mine lê ao responder sobre esta matéria.
           </p>
+          {editError ? (
+            <p role="alert" className="text-sm font-bold text-red-200">
+              {editError}
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <PrimaryButton icon={Check} onClick={saveEdits}>
               Salvar alterações
@@ -12155,9 +12398,14 @@ function MaterialViewModal({
       {isImage && material.dataUrl ? (
         <img src={material.dataUrl} alt={material.title} className="max-h-[46vh] w-full rounded-2xl border border-white/10 object-contain" />
       ) : null}
-      {!editing && material.type === "link" && material.detail ? (
+      {!editing && material.type === "link" && material.detail && !linkHref ? (
+        <p className="rounded-2xl border border-roseGlow/40 bg-roseGlow/10 p-4 text-sm font-bold text-white/80">
+          “{material.detail}” não é um endereço válido. Toque em editar e cole o link completo.
+        </p>
+      ) : null}
+      {!editing && linkHref ? (
         <a
-          href={/^https?:\/\//i.test(material.detail) ? material.detail : `https://${material.detail}`}
+          href={linkHref}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4 font-bold text-mint transition hover:border-mint/40"

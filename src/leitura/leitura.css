@@ -522,6 +522,25 @@
   background: rgb(var(--hl-pink) / 0.14);
 }
 
+/* Gabarito em dúvida: nem verde nem rosa, para não julgar a resposta. */
+.lei-explica.is-revisao {
+  border-left-color: rgb(var(--theme-text) / 0.45);
+  background: rgb(var(--theme-text) / 0.06);
+}
+
+.lei-explica-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.lei-reportada {
+  font-size: 0.82rem;
+  color: rgb(var(--theme-text) / 0.6);
+}
+
 .lei-fim {
   display: flex;
   flex-wrap: wrap;

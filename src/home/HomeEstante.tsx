@@ -359,11 +359,10 @@ export function HomeEstante({
     setEscolhida(materias[(indice + passo + materias.length) % materias.length].id);
   };
   const progresso = Math.max(0, Math.min(1, xpNivel / Math.max(1, xpPreciso)));
-  // O que já está na ficha não se repete na semana.
-  const semanaVisivel = useMemo(() => {
-    const naFicha = new Set((atual?.itens || []).map((item) => item.id));
-    return proximos.map((dia) => ({ ...dia, tarefas: dia.tarefas.filter((tarefa) => !naFicha.has(tarefa.id)) }));
-  }, [proximos, atual]);
+  // A semana mostra tudo, inclusive o que já aparece na ficha da matéria.
+  // Esconder a repetição deixava a segunda-feira da tarefa como "livre"
+  // enquanto a ficha e a Agenda mostravam a entrega (auditoria 22/nov/2026).
+  const semanaVisivel = proximos;
   const diasLivres = semanaVisivel.filter((dia) => !dia.tarefas.length).length;
 
   // A fileira acompanha a escolha feita na órbita.

@@ -909,10 +909,11 @@ O que fazer, em portugues do Brasil correto e com linguagem de quem explica para
 - resumo: de 3 a 5 frases com o essencial do texto, sem copiar frases inteiras dele.
 - ideias: de 3 a 5 ideias principais, uma frase cada, na ordem em que aparecem.
 - palavras: de 4 a 10 palavras ou expressoes curtas que um estudante pode nao conhecer, COPIADAS EXATAMENTE como aparecem no texto (mesma grafia e acentos, de 1 a 3 palavras), cada uma com o significado NAQUELE contexto em ate 15 palavras.
-- perguntas: exatamente 4 perguntas de interpretacao de multipla escolha, no estilo ENEM: 1 sobre a ideia central, 1 sobre uma informacao explicita, 1 de inferencia (o que o texto sugere sem dizer) e 1 sobre linguagem, intencao do autor ou sentido de uma palavra no contexto. Cada uma com 4 alternativas plausiveis e so UMA correta; "correta" e o indice da alternativa certa (0 a 3), variando entre as perguntas. "trecho" e a frase do texto que prova a resposta, copiada exatamente. "explicacao" diz em 1 ou 2 frases por que a certa esta certa.
+- perguntas: exatamente 4 perguntas de interpretacao de multipla escolha, no estilo ENEM: 1 sobre a ideia central, 1 sobre uma informacao explicita, 1 de inferencia (o que o texto sugere sem dizer) e 1 sobre linguagem, intencao do autor ou sentido de uma palavra no contexto. Cada uma com 4 alternativas plausiveis e so UMA correta. Monte cada pergunta nesta ordem: primeiro escolha o "trecho" (a frase do texto que prova a resposta, copiada exatamente), depois escreva as alternativas, depois copie em "resposta" o texto EXATO da alternativa certa, depois a "explicacao" (1 ou 2 frases dizendo por que ESSA alternativa esta certa, com as palavras dela) e por fim "correta", o indice dessa mesma alternativa (0 a 3), variando entre as perguntas.
+Antes de responder, confira cada pergunta: alternativas[correta] e igual a "resposta", a explicacao defende essa alternativa (nao outra) e o trecho a comprova. Se algo nao bater, corrija a pergunta.
 
 Responda SOMENTE com JSON valido, sem markdown e sem texto antes ou depois, neste formato:
-{"titulo":"...","genero":"...","resumo":"...","ideias":["...","..."],"palavras":[{"palavra":"...","significado":"..."}],"perguntas":[{"pergunta":"...","alternativas":["...","...","...","..."],"correta":2,"explicacao":"...","trecho":"..."}]}
+{"titulo":"...","genero":"...","resumo":"...","ideias":["...","..."],"palavras":[{"palavra":"...","significado":"..."}],"perguntas":[{"pergunta":"...","alternativas":["...","...","...","..."],"trecho":"...","resposta":"texto exato da alternativa certa","explicacao":"...","correta":2}]}
 
 Contexto:
 ${context || "Leitura de estudo do ensino medio."}`;

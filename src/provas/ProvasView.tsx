@@ -317,7 +317,15 @@ export function ProvasView({ data, user, update }: { data: Dados; user: User; up
   };
 
   // o rascunho atrasado de uma prova já entregue não pode ressuscitá-la
-  const salvarProva = (prova: ProvaAtual) => setGuardado((atual) => (atual.atual?.id === prova.id ? { ...atual, atual: prova } : atual));
+  // Grava no navegador já no updater (idempotente): se a aba inteira sair de
+  // cena junto com a folha, o efeito de gravação não chegaria a rodar.
+  const salvarProva = (prova: ProvaAtual) =>
+    setGuardado((atual) => {
+      if (atual.atual?.id !== prova.id) return atual;
+      const proximo = { ...atual, atual: prova };
+      gravar(chave, proximo);
+      return proximo;
+    });
 
   let tela: React.ReactNode;
   if (fase === "prova" && guardado.atual) {
@@ -624,11 +632,17 @@ function FolhaProva({
   const feitas = prova.respostas.filter((item) => item !== null).length;
   const brancos = total - feitas;
 
+  // A resposta marcada vai para o rascunho na hora. Antes havia uma espera de
+  // 300 ms e "sair (fica salva)" logo depois de marcar voltava com 0 respondidas.
+  const provaRef = useRef(prova);
+  const salvarRef = useRef(onSalvar);
+  salvarRef.current = onSalvar;
   useEffect(() => {
-    const timer = window.setTimeout(() => onSalvar(prova), 300);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    provaRef.current = prova;
+    salvarRef.current(prova);
   }, [prova]);
+  // Ao sair pela navegação do site (sem o botão), grava o último estado.
+  useEffect(() => () => salvarRef.current(provaRef.current), []);
   useEffect(() => {
     const timer = window.setInterval(() => setSegundos(Math.floor((Date.now() - prova.inicio) / 1000)), 1000);
     return () => window.clearInterval(timer);
@@ -664,7 +678,14 @@ function FolhaProva({
   return (
     <div className="prv-folha-prova">
       <div className="prv-barra">
-        <button type="button" className="prv-link" onClick={onSair}>
+        <button
+          type="button"
+          className="prv-link"
+          onClick={() => {
+            salvarRef.current(provaRef.current);
+            onSair();
+          }}
+        >
           <ArrowLeft className="h-4 w-4" /> sair (fica salva)
         </button>
         <span className="prv-barra-assunto">{prova.assunto}</span>
@@ -850,9 +871,16 @@ function Resultado({ prova, xp, erro, podeEstudar, onEstudar, onVoltar }: { prov
             <span className="is-certa">
               <Check className="h-4 w-4" /> {nota.acertos} acertos
             </span>
-            <span className="is-errada">
-              <X className="h-4 w-4" /> {nota.erros.length} erros
-            </span>
+            {nota.erros.some((item) => item.marcada !== null) ? (
+              <span className="is-errada">
+                <X className="h-4 w-4" /> {nota.erros.filter((item) => item.marcada !== null).length} erradas
+              </span>
+            ) : null}
+            {nota.erros.some((item) => item.marcada === null) ? (
+              <span className="is-errada">
+                <X className="h-4 w-4" /> {nota.erros.filter((item) => item.marcada === null).length} em branco
+              </span>
+            ) : null}
             {comDuvida ? (
               <span className="is-duvida">
                 <Flag className="h-4 w-4" /> {comDuvida} certas no chute
@@ -1057,7 +1085,17 @@ function Estudo({
                 <Check className="h-4 w-4" /> {letrasProva[item.questao.correct]}) {item.questao.options[item.questao.correct]}
               </p>
             </div>
-            {estudo.porque ? (
+            {/* Em branco não houve armadilha: o "por que você caiu" pronto (ou
+                guardado de outra tentativa) descreve uma alternativa que o aluno
+                nem marcou. Aqui o bloco só aponta o conceito a revisar. */}
+            {item.marcada === null ? (
+              <motion.div className="prv-bloco prv-porque" initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...mola, delay: 0.1 }}>
+                <b>Você deixou em branco</b>
+                <p>
+                  Sem resposta não tem erro para explicar, então vamos direto ao conceito: a certa é “{item.questao.options[item.questao.correct]}”. Leia a mini-aula e tente a questão-irmã.
+                </p>
+              </motion.div>
+            ) : estudo.porque ? (
               <motion.div className="prv-bloco prv-porque" initial={reduced ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...mola, delay: 0.1 }}>
                 <b>Por que você caiu</b>
                 <p>{estudo.porque}</p>

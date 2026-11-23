@@ -11,6 +11,7 @@ import { askMineTask } from "../mineTask";
 import { usePreset } from "../chat/presets";
 import { leituraXp, leiturasPorDia } from "../../shared/xp.mjs";
 import {
+  conferirGabarito,
   contarPalavrasLeitura,
   contextoLeitura,
   leituraMaxChars,
@@ -19,12 +20,28 @@ import {
   limparTextoLeitura,
   marcarPalavras,
   minutosLeitura,
+  placarLeitura,
   textosExemplo,
   type Leitura,
 } from "../../shared/leitura.mjs";
 import "./leitura.css";
 
-type Guardada = { id: string; createdAt: number; texto: string; leitura: Leitura; respostas: number[]; terminada: boolean };
+type Guardada = { id: string; createdAt: number; texto: string; leitura: Leitura; respostas: number[]; terminada: boolean; reportadas?: number[] };
+
+/**
+ * Leituras guardadas antes da conferência do gabarito (22/nov/2026) passam
+ * pela mesma checagem ao abrir: a questão que se contradiz sai da nota.
+ */
+function perguntasConferidas(leitura: Leitura) {
+  return leitura.perguntas.map((pergunta) => {
+    const conferida = conferirGabarito(pergunta);
+    return { ...pergunta, inconsistente: Boolean(pergunta.inconsistente || conferida.inconsistente) };
+  });
+}
+
+function placarDe(item: Guardada) {
+  return placarLeitura(perguntasConferidas(item.leitura), item.respostas, item.reportadas || []);
+}
 
 const etapas = ["Lendo o texto com calma…", "Sublinhando as ideias principais…", "Caçando palavras difíceis…", "Montando perguntas no estilo ENEM…", "Conferindo as respostas…"];
 
@@ -209,7 +226,34 @@ export function LeituraView({ user, update }: { data: ReturnType<typeof useMemoU
               setAtual(item);
               guardar(item);
             }}
-            onTerminar={(item, acertos, alvo) => {
+            onReportar={(item, indice) => {
+              const pergunta = item.leitura.perguntas[indice];
+              const marcada = pergunta?.alternativas[pergunta.correta] || "";
+              const escolhida = item.respostas[indice] >= 0 ? pergunta?.alternativas[item.respostas[indice]] : "(em branco)";
+              const texto = [
+                `[Leitura · gabarito] ${item.leitura.titulo}`,
+                `Pergunta ${indice + 1}: ${pergunta?.pergunta}`,
+                `Gabarito do site: ${String.fromCharCode(65 + (pergunta?.correta ?? 0))}) ${marcada}`,
+                `Resposta do aluno: ${escolhida}`,
+                `Explicação: ${pergunta?.explicacao}`,
+                pergunta?.trecho ? `Trecho: ${pergunta.trecho}` : "",
+              ]
+                .filter(Boolean)
+                .join(String.fromCharCode(10))
+                .slice(0, 700);
+              update((draft) => ({
+                ...draft,
+                suggestions: [
+                  ...draft.suggestions,
+                  { id: uid("suggestion"), userId: user.id, name: user.settings.displayName || user.name, category: "erro", text: texto, status: "nova", createdAt: Date.now() },
+                ],
+              }));
+              const novo = { ...item, reportadas: [...new Set([...(item.reportadas || []), indice])] };
+              setAtual(novo);
+              guardar(novo);
+              mineSays("Valeu! Essa pergunta saiu da nota e foi para revisão.", "happy");
+            }}
+            onTerminar={(item, acertos, total, alvo) => {
               const ja = item.terminada;
               const novo = { ...item, terminada: true };
               setAtual(novo);
@@ -225,14 +269,14 @@ export function LeituraView({ user, update }: { data: ReturnType<typeof useMemoU
                 createdAt: Date.now(),
                 xpEarned: xp,
                 correctAnswers: acertos,
-                questionsAnswered: item.leitura.perguntas.length,
+                questionsAnswered: total,
               };
               update((draft) => ({ ...draft, sessions: [...draft.sessions, session] }));
               window.setTimeout(() => {
                 floatXp(`+${xp} XP`, alvo);
-                if (acertos === item.leitura.perguntas.length) celebrateFrom(alvo, { count: 36 });
+                if (total > 0 && acertos === total) celebrateFrom(alvo, { count: 36 });
               }, 60);
-              mineSays(acertos === item.leitura.perguntas.length ? "Gabaritou a interpretação!" : `${acertos} de ${item.leitura.perguntas.length}! Olha as explicações.`, acertos === item.leitura.perguntas.length ? "wow" : "happy");
+              mineSays(total > 0 && acertos === total ? "Gabaritou a interpretação!" : `${acertos} de ${total}! Olha as explicações.`, total > 0 && acertos === total ? "wow" : "happy");
             }}
           />
         </motion.div>
@@ -311,7 +355,7 @@ export function LeituraView({ user, update }: { data: ReturnType<typeof useMemoU
                       <button type="button" onClick={() => reabrir(item)}>
                         <strong>{item.leitura.titulo}</strong>
                         <span>
-                          {new Date(item.createdAt).toLocaleDateString("pt-BR")} · {item.terminada ? `${item.respostas.filter((r, i) => r === item.leitura.perguntas[i]?.correta).length}/${item.leitura.perguntas.length} certas` : "perguntas abertas"}
+                          {new Date(item.createdAt).toLocaleDateString("pt-BR")} · {item.terminada ? `${placarDe(item).acertos}/${placarDe(item).total} certas` : "perguntas abertas"}
                         </span>
                       </button>
                     </li>
@@ -360,12 +404,15 @@ function Resultado({
   item,
   onMudar,
   onTerminar,
+  onReportar,
 }: {
   item: Guardada;
   onMudar: (item: Guardada) => void;
-  onTerminar: (item: Guardada, acertos: number, alvo: Element | null) => void;
+  onTerminar: (item: Guardada, acertos: number, total: number, alvo: Element | null) => void;
+  onReportar: (item: Guardada, indice: number) => void;
 }) {
-  const { leitura } = item;
+  const leitura = useMemo(() => ({ ...item.leitura, perguntas: perguntasConferidas(item.leitura) }), [item.leitura]);
+  const reportadas = item.reportadas || [];
   const [aberta, setAberta] = useState<number | null>(null);
   const [fonte, setFonte] = useState(1);
   const [prova, setProva] = useState<string>("");
@@ -373,7 +420,7 @@ function Resultado({
   const placarRef = useRef<HTMLDivElement>(null);
   const partes = useMemo(() => marcarPalavras(item.texto, leitura.palavras), [item.texto, leitura.palavras]);
   const respondidas = item.respostas.filter((r) => r >= 0).length;
-  const acertos = item.respostas.filter((r, i) => r === leitura.perguntas[i].correta).length;
+  const { acertos, total } = placarLeitura(leitura.perguntas, item.respostas, reportadas);
 
   // Grifa no texto o trecho que prova a resposta e rola até ele.
   useEffect(() => {
@@ -512,13 +559,14 @@ function Resultado({
         <div className="lei-perguntas-top">
           <h3>Perguntas de interpretação</h3>
           <div ref={placarRef} className="lei-placar" aria-live="polite">
-            {item.terminada ? `${acertos}/${leitura.perguntas.length} certas` : `${respondidas}/${leitura.perguntas.length} respondidas`}
+            {item.terminada ? `${acertos}/${total} certas` : `${respondidas}/${leitura.perguntas.length} respondidas`}
           </div>
         </div>
         <ol className="lei-lista-perguntas">
           {leitura.perguntas.map((pergunta, i) => {
             const escolha = item.respostas[i];
             const respondida = escolha >= 0;
+            const foraDaNota = Boolean(pergunta.inconsistente || reportadas.includes(i));
             return (
               <li key={i} className="lei-pergunta">
                 <p className="lei-enunciado">
@@ -526,8 +574,9 @@ function Resultado({
                 </p>
                 <div className="lei-alternativas" role="radiogroup" aria-label={`Pergunta ${i + 1}`}>
                   {pergunta.alternativas.map((alt, j) => {
-                    const certa = respondida && j === pergunta.correta;
-                    const errada = respondida && j === escolha && j !== pergunta.correta;
+                    // Gabarito em dúvida: mostra só a escolha, sem julgar certo ou errado.
+                    const certa = respondida && !foraDaNota && j === pergunta.correta;
+                    const errada = respondida && !foraDaNota && j === escolha && j !== pergunta.correta;
                     return (
                       <button
                         key={j}
@@ -540,7 +589,7 @@ function Resultado({
                           const respostas = [...item.respostas];
                           respostas[i] = j;
                           onMudar({ ...item, respostas });
-                          if (j !== pergunta.correta && pergunta.trecho) setProva(pergunta.trecho);
+                          if ((foraDaNota || j !== pergunta.correta) && pergunta.trecho) setProva(pergunta.trecho);
                         }}
                       >
                         <span className="lei-letra">{String.fromCharCode(65 + j)}</span>
@@ -552,15 +601,30 @@ function Resultado({
                   })}
                 </div>
                 {respondida ? (
-                  <div className={`lei-explica ${escolha === pergunta.correta ? "is-certa" : "is-errada"}`}>
-                    <p>
-                      <strong>{escolha === pergunta.correta ? "Isso!" : "Quase."}</strong> {pergunta.explicacao}
-                    </p>
-                    {pergunta.trecho && item.texto.includes(pergunta.trecho) ? (
-                      <button type="button" className="lei-link" onClick={() => setProva(pergunta.trecho)}>
-                        mostrar no texto onde está a resposta
-                      </button>
-                    ) : null}
+                  <div className={`lei-explica ${foraDaNota ? "is-revisao" : escolha === pergunta.correta ? "is-certa" : "is-errada"}`}>
+                    {foraDaNota ? (
+                      <p>
+                        <strong>Gabarito em revisão.</strong> {reportadas.includes(i) ? "Você reportou esta pergunta" : "A explicação desta pergunta não bate com a alternativa marcada como certa"}, então ela não conta na sua nota. Decida pelo texto: {pergunta.explicacao}
+                      </p>
+                    ) : (
+                      <p>
+                        <strong>{escolha === pergunta.correta ? "Isso!" : "Quase."}</strong> {pergunta.explicacao}
+                      </p>
+                    )}
+                    <div className="lei-explica-acoes">
+                      {pergunta.trecho && item.texto.includes(pergunta.trecho) ? (
+                        <button type="button" className="lei-link" onClick={() => setProva(pergunta.trecho)}>
+                          mostrar no texto onde está a resposta
+                        </button>
+                      ) : null}
+                      {reportadas.includes(i) ? (
+                        <span className="lei-reportada">gabarito reportado</span>
+                      ) : (
+                        <button type="button" className="lei-link" onClick={() => onReportar(item, i)}>
+                          reportar gabarito
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : null}
               </li>
@@ -570,10 +634,11 @@ function Resultado({
         <div className="lei-fim">
           {item.terminada ? (
             <p className="lei-fim-texto">
-              Leitura concluída com {acertos} de {leitura.perguntas.length}. {acertos < leitura.perguntas.length ? "Releia os trechos marcados e tente explicar com suas palavras." : "Interpretação afiada!"}
+              Leitura concluída com {acertos} de {total}
+              {total < leitura.perguntas.length ? ` (${leitura.perguntas.length - total} em revisão, fora da nota)` : ""}. {acertos < total ? "Releia os trechos marcados e tente explicar com suas palavras." : "Interpretação afiada!"}
             </p>
           ) : (
-            <button type="button" className="lei-btn caderno-btn-pen" disabled={respondidas < leitura.perguntas.length} onClick={() => onTerminar(item, acertos, placarRef.current)}>
+            <button type="button" className="lei-btn caderno-btn-pen" disabled={respondidas < leitura.perguntas.length} onClick={() => onTerminar(item, acertos, total, placarRef.current)}>
               <CheckCircle2 className="h-4 w-4" /> Terminar leitura
             </button>
           )}
