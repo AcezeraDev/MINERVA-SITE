@@ -15,7 +15,7 @@
 */
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { criarAmbienteEstudio } from "../cena3d/estudio";
 import { Compass, RotateCcw } from "lucide-react";
 import { buildLandmark } from "./predios";
 import { aoCutucar } from "../pets/bus";
@@ -430,14 +430,10 @@ export default function CidadePopUp({
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(dark ? 0x111625 : 0xeef3fa, dark ? 0.024 : 0.014);
 
-    // IBL procedural com RoomEnvironment (sem download externo, dá brilho real em vidro e metal)
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const roomEnv = new RoomEnvironment();
-    const envTarget = pmrem.fromScene(roomEnv, 0.04);
-    scene.environment = envTarget.texture;
-    scene.environmentIntensity = dark ? 0.42 : 0.65;
-    roomEnv.dispose();
-    pmrem.dispose();
+    // IBL de estúdio HDR procedural (dá brilho real em vidro e metal dos prédios)
+    const envTarget = criarAmbienteEstudio(renderer, { acento: 0x7ca2ff, modo: dark ? "escuro" : "claro", sigma: 0.024 });
+    scene.environment = envTarget;
+    scene.environmentIntensity = dark ? 0.68 : 0.82;
 
     const camera = new THREE.PerspectiveCamera(32, 2, 0.1, 100);
     const baseCamPos = new THREE.Vector3(0, 7.8, 11.4);

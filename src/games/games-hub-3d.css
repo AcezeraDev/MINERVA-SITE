@@ -540,7 +540,7 @@ html:not(.theme-light) .nexus-hud span {
   border-radius: 1.15rem;
   overflow: hidden;
   background:
-    radial-gradient(60% 55% at 50% 45%, rgb(var(--hl-yellow) / 0.28), transparent 72%),
+    radial-gradient(62% 58% at 50% 44%, color-mix(in srgb, var(--league, rgb(var(--hl-yellow))) 28%, transparent), transparent 72%),
     repeating-linear-gradient(to bottom, transparent 0 21px, rgb(var(--rule) / 0.55) 21px 22px),
     rgb(var(--sheet));
   box-shadow: 0 0 0 1px rgb(var(--line));

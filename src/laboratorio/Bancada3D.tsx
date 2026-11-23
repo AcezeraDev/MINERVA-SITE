@@ -13,7 +13,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { criarAmbienteEstudio } from "../cena3d/estudio";
 import { corDoToken, criarPalco, type Palco } from "../cena3d/palco";
 import { criarMine3D } from "../cena3d/mine3d";
 import type { AcaoLab, EstadoLab, ExpId } from "./tipos";
@@ -140,18 +140,10 @@ export default function Bancada3D({ estado, onAcao, onMine }: { estado: EstadoLa
     renderer.toneMappingExposure = 1;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const sala = new RoomEnvironment();
-    scene.environment = guardar(pmrem.fromScene(sala, 0.04).texture);
-    sala.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        m.geometry.dispose();
-        (m.material as THREE.Material).dispose();
-      }
-    });
-    pmrem.dispose();
-    scene.environmentIntensity = escuro ? 0.55 : 0.7;
+    scene.environment = guardar(
+      criarAmbienteEstudio(renderer, { acento: 0x39f59a, modo: escuro ? "escuro" : "claro", sigma: 0.02 }),
+    );
+    scene.environmentIntensity = escuro ? 0.82 : 0.9;
 
     scene.add(new THREE.HemisphereLight(0xffffff, escuro ? 0x26304a : 0xc3c8da, escuro ? 0.75 : 0.95));
     const sol = new THREE.DirectionalLight(0xfff4e2, 2.2);

@@ -10,8 +10,8 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { criarAmbienteEstudio } from "../cena3d/estudio";
 import { corDoToken, criarPalco, mola, type Palco } from "../cena3d/palco";
 import { aoCutucar } from "../pets/bus";
 import { criarMine3D } from "../cena3d/mine3d";
@@ -385,20 +385,11 @@ export default function Sistema3D({
     // de luz própria (que achatava o volume dos cadernos)
     renderer.toneMapping = THREE.NeutralToneMapping;
     renderer.toneMappingExposure = 1;
-    // reflexo de estúdio (gerado uma vez): dá brilho à espiral e à capa plastificada
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const sala = new RoomEnvironment();
-    const ambiente = guardar(pmrem.fromScene(sala, 0.04).texture);
-    sala.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        m.geometry.dispose();
-        (m.material as THREE.Material).dispose();
-      }
-    });
-    pmrem.dispose();
-    scene.environment = ambiente;
-    scene.environmentIntensity = escuro ? 0.55 : 0.75;
+    // reflexo de estúdio HDR procedural: dá brilho real à espiral metálica e à capa plastificada
+    scene.environment = guardar(
+      criarAmbienteEstudio(renderer, { acento: MENTA, modo: escuro ? "escuro" : "claro", sigma: 0.022 }),
+    );
+    scene.environmentIntensity = escuro ? 0.78 : 0.88;
 
     scene.add(new THREE.HemisphereLight(0xffffff, escuro ? 0x2a3050 : 0xb9bfd6, escuro ? 0.9 : 1.1));
     const sol = new THREE.DirectionalLight(0xfff6e8, 2.1);

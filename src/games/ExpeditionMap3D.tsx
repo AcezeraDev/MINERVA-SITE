@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { criarAmbienteEstudio, texturaSombraContato } from "../cena3d/estudio";
 import { corDoToken, criarPalco } from "../cena3d/palco";
 
 export type ExpeditionNode = {
@@ -33,7 +33,7 @@ type NodeRig = {
   piece: THREE.Group;
   pieceMat: THREE.MeshPhysicalMaterial;
   halo: THREE.Mesh;
-  haloMat: THREE.MeshBasicMaterial;
+  haloMat: THREE.ShaderMaterial;
   from: THREE.Vector3;
   base: THREE.Vector3;
   lift: number;
@@ -60,53 +60,47 @@ const LAYOUT_NARROW: Array<[number, number, number]> = [
   [-1.55, -0.78, 0.2],
 ];
 
-function texturaSombra(guardar: Guardar) {
-  const c = document.createElement("canvas");
-  c.width = c.height = 64;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 31);
-  g.addColorStop(0, "rgba(0,0,0,0.55)");
-  g.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 64, 64);
-  const tex = guardar(new THREE.CanvasTexture(c));
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
 /** A peça de cada jogo. `contorno` desenha as arestas a caneta nas peças facetadas. */
-function criarPeca(id: string, mat: THREE.Material, tinta: THREE.LineBasicMaterial, guardar: Guardar) {
+function criarPeca(id: string, mat: THREE.Material, metalDetalhe: THREE.Material, tinta: THREE.LineBasicMaterial, guardar: Guardar) {
   const g = new THREE.Group();
   const comContorno = (geo: THREE.BufferGeometry, mesh: THREE.Mesh) => {
     const linhas = new THREE.LineSegments(guardar(new THREE.EdgesGeometry(geo, 25)), tinta);
     linhas.position.copy(mesh.position);
     linhas.rotation.copy(mesh.rotation);
-    linhas.scale.copy(mesh.scale).multiplyScalar(1.005);
+    linhas.scale.copy(mesh.scale).multiplyScalar(1.006);
     g.add(mesh, linhas);
   };
   if (id === "nexo") {
     const geo = guardar(new THREE.OctahedronGeometry(0.36, 0));
     comContorno(geo, new THREE.Mesh(geo, mat));
-    const orbita = new THREE.Mesh(guardar(new THREE.TorusGeometry(0.5, 0.022, 8, 48)), tinta.userData.solid as THREE.Material);
-    orbita.rotation.x = Math.PI * 0.4;
-    g.add(orbita);
+    const orbita = new THREE.Mesh(guardar(new THREE.TorusGeometry(0.5, 0.026, 12, 64)), metalDetalhe);
+    orbita.rotation.x = Math.PI * 0.38;
+    const orbita2 = new THREE.Mesh(guardar(new THREE.TorusGeometry(0.5, 0.014, 10, 64)), tinta.userData.solid as THREE.Material);
+    orbita2.rotation.set(Math.PI * 0.42, 0.7, 0);
+    g.add(orbita, orbita2);
   } else if (id === "sequencia") {
-    // quatro degraus: as etapas da sequência
-    const geo = guardar(new RoundedBoxGeometry(0.2, 0.2, 0.2, 2, 0.04));
+    // quatro degraus: as etapas da sequência sobre uma base metálica
+    const geo = guardar(new RoundedBoxGeometry(0.2, 0.2, 0.2, 3, 0.04));
     for (let i = 0; i < 4; i += 1) {
       const m = new THREE.Mesh(geo, mat);
       m.position.set(-0.3 + i * 0.2, -0.12 + i * 0.12, 0);
       comContorno(geo, m);
     }
+    const pino = new THREE.Mesh(guardar(new THREE.OctahedronGeometry(0.08, 0)), metalDetalhe);
+    pino.position.set(0.3, 0.44, 0);
+    g.add(pino);
   } else if (id === "corrida") {
-    const geo = guardar(new THREE.ConeGeometry(0.3, 0.66, 6));
+    const geo = guardar(new THREE.ConeGeometry(0.3, 0.66, 8));
     comContorno(geo, new THREE.Mesh(geo, mat));
-    const bandeira = new THREE.Mesh(guardar(new THREE.SphereGeometry(0.09, 16, 12)), tinta.userData.solid as THREE.Material);
+    const colar = new THREE.Mesh(guardar(new THREE.TorusGeometry(0.22, 0.025, 10, 32)), metalDetalhe);
+    colar.rotation.x = Math.PI / 2;
+    colar.position.y = -0.12;
+    const bandeira = new THREE.Mesh(guardar(new THREE.SphereGeometry(0.095, 20, 14)), metalDetalhe);
     bandeira.position.y = 0.42;
-    g.add(bandeira);
+    g.add(colar, bandeira);
   } else if (id === "memoria") {
-    // duas cartas viradas, uma encostada na outra
-    const geo = guardar(new RoundedBoxGeometry(0.38, 0.52, 0.05, 2, 0.02));
+    // duas cartas viradas, uma encostada na outra, com selo metálico
+    const geo = guardar(new RoundedBoxGeometry(0.38, 0.52, 0.055, 3, 0.022));
     const a = new THREE.Mesh(geo, mat);
     a.rotation.set(0, 0.5, 0.16);
     a.position.x = -0.1;
@@ -115,15 +109,25 @@ function criarPeca(id: string, mat: THREE.Material, tinta: THREE.LineBasicMateri
     b.position.set(0.14, -0.02, 0.06);
     comContorno(geo, a);
     comContorno(geo, b);
+    const selo = new THREE.Mesh(guardar(new THREE.OctahedronGeometry(0.075, 0)), metalDetalhe);
+    selo.position.set(0.16, 0.04, 0.11);
+    g.add(selo);
   } else if (id === "forca") {
-    const geo = guardar(new THREE.CylinderGeometry(0.2, 0.3, 0.62, 6));
+    const geo = guardar(new THREE.CylinderGeometry(0.2, 0.3, 0.62, 8));
     comContorno(geo, new THREE.Mesh(geo, mat));
-    const topo = new THREE.Mesh(guardar(new THREE.ConeGeometry(0.26, 0.24, 6)), mat);
+    const anel = new THREE.Mesh(guardar(new THREE.TorusGeometry(0.21, 0.022, 10, 32)), metalDetalhe);
+    anel.rotation.x = Math.PI / 2;
+    anel.position.y = 0.3;
+    const topo = new THREE.Mesh(guardar(new THREE.ConeGeometry(0.26, 0.24, 8)), mat);
     topo.position.y = 0.43;
     comContorno(topo.geometry, topo);
+    g.add(anel);
   } else {
     const geo = guardar(new THREE.IcosahedronGeometry(0.36, 0));
     comContorno(geo, new THREE.Mesh(geo, mat));
+    const anel = new THREE.Mesh(guardar(new THREE.TorusGeometry(0.46, 0.018, 10, 48)), metalDetalhe);
+    anel.rotation.x = Math.PI * 0.45;
+    g.add(anel);
   }
   return g;
 }
@@ -214,11 +218,12 @@ export default function ExpeditionMap3D({
           rig.piece.rotation.y += delta * (isHov ? 1.6 : isSel ? 0.8 : 0.32);
 
           rig.sel += ((isSel ? 1 : 0) - rig.sel) * Math.min(1, delta * 7);
-          // marca-texto: o círculo "pinta" de 0 a 1 quando seleciona
-          rig.halo.scale.setScalar(0.55 + rig.sel * 0.5);
-          rig.halo.rotation.z += delta * 0.4;
-          rig.haloMat.opacity = rig.sel * 0.85;
-          const brilho = isSel ? 0.32 : isHov ? 0.24 : 0.06;
+          // marca-texto luminoso em shader: o anel "acende" e varre ao selecionar
+          rig.halo.scale.setScalar(0.58 + rig.sel * 0.48);
+          rig.halo.rotation.z += delta * 0.45;
+          rig.haloMat.uniforms.uOpacity.value = rig.sel * 0.92;
+          rig.haloMat.uniforms.uTime.value = tempo;
+          const brilho = isSel ? 0.36 : isHov ? 0.26 : 0.08;
           rig.pieceMat.emissiveIntensity += (brilho - rig.pieceMat.emissiveIntensity) * Math.min(1, delta * 8);
         }
 
@@ -239,18 +244,23 @@ export default function ExpeditionMap3D({
     );
 
     const { scene, renderer, guardar } = palco;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-    renderer.toneMappingExposure = 1.08;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 1.06;
 
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = guardar(pmrem.fromScene(new RoomEnvironment(), 0.04).texture);
-    pmrem.dispose();
-    scene.environmentIntensity = 0.6;
+    const escuro = () => !document.documentElement.classList.contains("theme-light");
+    scene.environment = guardar(
+      criarAmbienteEstudio(renderer, { modo: escuro() ? "escuro" : "claro", sigma: 0.024 }),
+    );
+    scene.environmentIntensity = 0.92;
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x8890a0, 1.1));
-    const key = new THREE.DirectionalLight(0xfff6ea, 1.6);
-    key.position.set(3, 7, 6);
+    scene.add(new THREE.HemisphereLight(0xf6f8ff, 0x626b80, 0.95));
+    const key = new THREE.DirectionalLight(0xfff4e4, 1.85);
+    key.position.set(3.5, 7.5, 6);
     scene.add(key);
+    const rim = new THREE.DirectionalLight(0x9ec5ff, 0.95);
+    rim.position.set(-5, 3, -5);
+    scene.add(rim);
 
     // ── cores do caderno ──
     const cores = {
@@ -270,14 +280,24 @@ export default function ExpeditionMap3D({
       cores.text.copy(corDoToken("--theme-text", "#16181d"));
     };
     lerCores();
-    const escuro = () => !document.documentElement.classList.contains("theme-light");
 
-    const papelMat = guardar(new THREE.MeshStandardMaterial({ roughness: 0.92, metalness: 0 }));
-    const papelBaixoMat = guardar(new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0 }));
+    const papelMat = guardar(new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0 }));
+    const papelBaixoMat = guardar(new THREE.MeshStandardMaterial({ roughness: 0.94, metalness: 0 }));
     const tinta = guardar(new THREE.LineBasicMaterial({ transparent: true, opacity: 0.9 }));
     const tintaSolida = guardar(new THREE.MeshBasicMaterial());
     tinta.userData.solid = tintaSolida;
-    const sombraMat = guardar(new THREE.MeshBasicMaterial({ map: texturaSombra(guardar), transparent: true, depthWrite: false }));
+    const metalDetalhe = guardar(
+      new THREE.MeshPhysicalMaterial({
+        color: 0xe6ecf5,
+        metalness: 0.95,
+        roughness: 0.16,
+        clearcoat: 1,
+        clearcoatRoughness: 0.08,
+        envMapIntensity: 1.35,
+      }),
+    );
+    const sombraTex = guardar(texturaSombraContato(128));
+    const sombraMat = guardar(new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: sombraTex, transparent: true, depthWrite: false }));
     const orbMat = guardar(new THREE.MeshBasicMaterial());
 
     const trilhaMat = guardar(
@@ -339,20 +359,19 @@ export default function ExpeditionMap3D({
       papelBaixoMat.color.copy(cores.sheet).lerp(cores.rule, dark ? 0.5 : 0.35);
       tinta.color.copy(cores.pen);
       tintaSolida.color.copy(cores.pen);
-      sombraMat.opacity = dark ? 0.9 : 0.45;
+      sombraMat.opacity = dark ? 0.62 : 0.34;
       orbMat.color.copy(cores.hlMint);
       trilhaMat.uniforms.uColor.value.copy(cores.pen);
-      trilhaMat.uniforms.uOpacity.value = dark ? 0.75 : 0.7;
+      trilhaMat.uniforms.uOpacity.value = dark ? 0.78 : 0.72;
       poeiraMat.uniforms.uColor.value.copy(cores.pen);
-      rigs.forEach((rig) => rig.haloMat.color.copy(cores.hlYellow));
-      renderer.toneMappingExposure = dark ? 1.15 : 1.02;
+      rigs.forEach((rig) => rig.haloMat.uniforms.uColor.value.copy(cores.hlYellow));
+      renderer.toneMappingExposure = dark ? 1.12 : 1.04;
     };
 
     // ── ilhas ──
     const folhaGeo = guardar(new THREE.CylinderGeometry(0.62, 0.62, 0.05, 6, 1));
     const aroGeo = guardar(new THREE.EdgesGeometry(folhaGeo, 30));
     const sombraGeo = guardar(new THREE.PlaneGeometry(1.9, 1.9));
-    const haloGeo = guardar(new THREE.RingGeometry(0.72, 0.86, 48, 1, 0.3, Math.PI * 1.85));
     const hitGeo = guardar(new THREE.SphereGeometry(0.72, 10, 8));
     const hitMat = guardar(new THREE.MeshBasicMaterial({ visible: false }));
 
@@ -376,8 +395,32 @@ export default function ExpeditionMap3D({
       sombra.position.y = -0.16;
       group.add(sombra);
 
-      const haloMat = guardar(new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
-      const halo = new THREE.Mesh(haloGeo, haloMat);
+      const haloMat = guardar(
+        new THREE.ShaderMaterial({
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          uniforms: {
+            uTime: { value: 0 },
+            uColor: { value: cores.hlYellow.clone() },
+            uOpacity: { value: 0 },
+          },
+          vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+          fragmentShader: `
+            uniform float uTime; uniform vec3 uColor; uniform float uOpacity; varying vec2 vUv;
+            void main(){
+              vec2 c = vUv - 0.5;
+              float r = length(c) * 2.0;
+              float ang = atan(c.y, c.x);
+              float faixa = smoothstep(0.68, 0.76, r) * (1.0 - smoothstep(0.9, 0.99, r));
+              float varredura = 0.65 + 0.35 * sin(ang * 2.0 - uTime * 3.0);
+              float a = faixa * varredura * uOpacity;
+              if (a < 0.01) discard;
+              gl_FragColor = vec4(uColor * (0.9 + 0.25 * varredura), a);
+            }`,
+        }),
+      );
+      const halo = new THREE.Mesh(guardar(new THREE.PlaneGeometry(1.82, 1.82)), haloMat);
       halo.rotation.x = -Math.PI / 2;
       halo.position.y = 0.04;
       group.add(halo);
@@ -385,23 +428,39 @@ export default function ExpeditionMap3D({
       const accent = new THREE.Color(node.accent);
       const pieceMat = guardar(
         new THREE.MeshPhysicalMaterial({
-          color: node.visited ? accent : accent.clone().lerp(new THREE.Color(0xb9c0cc), 0.3),
+          color: node.visited ? accent : accent.clone().lerp(new THREE.Color(0xb9c0cc), 0.25),
           emissive: accent,
-          emissiveIntensity: 0.06,
-          roughness: 0.38,
-          metalness: 0.05,
-          clearcoat: 0.7,
-          clearcoatRoughness: 0.25,
+          emissiveIntensity: 0.08,
+          roughness: 0.22,
+          metalness: 0.16,
+          clearcoat: 1,
+          clearcoatRoughness: 0.1,
+          iridescence: node.visited ? 0.35 : 0,
+          iridescenceIOR: 1.4,
+          envMapIntensity: 1.35,
         }),
       );
-      const piece = criarPeca(node.id, pieceMat, tinta, guardar);
+      const piece = criarPeca(node.id, pieceMat, metalDetalhe, tinta, guardar);
       piece.position.y = 0.36;
       group.add(piece);
 
       if (node.visited) {
-        // visto: um "✓" de caneta espetado na beira da folha
-        const check = new THREE.Mesh(guardar(new THREE.SphereGeometry(0.075, 12, 10)), orbMat);
-        check.position.set(0.5, 0.05, 0.28);
+        // gema de visto na beira da ilha
+        const check = new THREE.Mesh(
+          guardar(new THREE.OctahedronGeometry(0.085, 0)),
+          guardar(
+            new THREE.MeshPhysicalMaterial({
+              color: cores.hlMint,
+              emissive: cores.hlMint,
+              emissiveIntensity: 0.35,
+              metalness: 0.2,
+              roughness: 0.12,
+              clearcoat: 1,
+              flatShading: true,
+            }),
+          ),
+        );
+        check.position.set(0.5, 0.07, 0.28);
         group.add(check);
       }
 

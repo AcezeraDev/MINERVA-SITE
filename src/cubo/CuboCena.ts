@@ -17,7 +17,7 @@
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { criarAmbienteEstudio } from "../cena3d/estudio";
 import { criarPalco, type Palco } from "../cena3d/palco";
 import {
   aplicarGiro,
@@ -429,14 +429,15 @@ export class CuboCena {
 
     this.palco = criarPalco(host, (t, d) => this.tick(t, d), { fov: 30, z: 11 });
     const { scene, renderer, guardar } = this.palco;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 1.08;
 
-    // IBL de estúdio com RoomEnvironment
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const ambiente = guardar(pmrem.fromScene(new RoomEnvironment(), 0.04).texture);
-    pmrem.dispose();
-    scene.environment = ambiente;
-    scene.environmentIntensity = 0.78;
+    // IBL de estúdio HDR procedural (especulares nítidos nos adesivos, plástico e Mirror Cube)
+    const claro = document.documentElement.classList.contains("theme-light");
+    scene.environment = guardar(
+      criarAmbienteEstudio(renderer, { acento: 0x8e9eff, modo: claro ? "claro" : "escuro", sigma: 0.018 }),
+    );
+    scene.environmentIntensity = 0.92;
 
     // Iluminação 3 pontos + rim lights coloridos + luz dinâmica
     scene.add(new THREE.HemisphereLight(0xf2f6ff, 0x252d42, 0.72));
