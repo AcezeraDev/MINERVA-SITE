@@ -16,12 +16,19 @@ const MENTA = 0x39f59a;
 
 type Guardar = <T extends { dispose: () => void }>(item: T) => T;
 
+/**
+ * Expressões que quem usa a Mine pode pedir (tela de entrada, nov/2026), de 0 a 1:
+ * `feliz` soma ao hover, `fechar` fecha os olhos (senha sendo digitada),
+ * `espiar` deixa um olho aberto e `duvida` inclina a cabeça com a boca torta.
+ */
+export type Humor3D = { feliz?: number; fechar?: number; espiar?: number; duvida?: number };
+
 export type Mine3D = {
   grupo: THREE.Group;
   /** Malha invisível usada só no raycast (o rosto inteiro é clicável). */
   alvo: THREE.Mesh;
   /** Faz a Mine olhar para um ponto do mundo e reagir ao estado do quadro. */
-  atualizar: (tempo: number, delta: number, olhar: THREE.Vector3, estado: { hover: boolean }) => void;
+  atualizar: (tempo: number, delta: number, olhar: THREE.Vector3, estado: { hover: boolean; humor?: Humor3D }) => void;
   /** Pulinho de alegria (matéria nova, clique). */
   pular: (forca?: number) => void;
   /** Susto curto (a Mine dos pets cutucou a cena). */
@@ -170,6 +177,9 @@ export function criarMine3D(guardar: Guardar, opcoes: { escuro?: boolean; aura?:
   let sustoAlvo = 0;
   const olhoX = { v: 0, vel: 0 };
   const olhoY = { v: 0, vel: 0 };
+  const fecha = { v: 0, vel: 0 };
+  const espia = { v: 0, vel: 0 };
+  const duvida = { v: 0, vel: 0 };
   let proximaPiscada = 1.5;
   let piscando = 0;
   const pivo = new THREE.Object3D();
@@ -205,17 +215,25 @@ export function criarMine3D(guardar: Guardar, opcoes: { escuro?: boolean; aura?:
     piscando = Math.max(0, piscando - delta);
     const fechado = piscando > 0 ? Math.sin((piscando / 0.14) * Math.PI) : 0;
 
-    const feliz = mola(contente, estado.hover ? 1 : 0, delta, 200, 18);
+    const humor = estado.humor;
+    const feliz = mola(contente, Math.max(estado.hover ? 1 : 0, humor?.feliz ?? 0), delta, 200, 18);
+    const fechar = mola(fecha, humor?.fechar ?? 0, delta, 220, 20);
+    const espiar = mola(espia, humor?.espiar ?? 0, delta, 220, 20);
+    const emDuvida = mola(duvida, humor?.duvida ?? 0, delta, 160, 14);
     sustoAlvo = Math.max(0, sustoAlvo - delta * 1.6);
     const assustada = mola(susto, sustoAlvo, delta, 320, 16);
     for (const olho of olhos) {
       olho.grupo.position.x = olho.x + ox;
       olho.grupo.position.y = 0.06 + oy;
-      const abre = Math.max(0.08, 1 - fechado) * (1 + assustada * 0.35);
+      // espiando, o olho direito (da Mine) abre um pouco; na dúvida um aperta
+      const tampa = olho.x > 0 ? Math.max(0, fechar - espiar * 0.85) : fechar;
+      const aperta = olho.x < 0 ? emDuvida * 0.45 : -emDuvida * 0.15;
+      const abre = Math.max(0.08, 1 - fechado - tampa - aperta) * (1 + assustada * 0.35);
       // contente, o olho vira um arquinho (achata e sobe)
       olho.grupo.scale.set(1 + assustada * 0.25, abre * (1 - feliz * 0.35), 1);
     }
-    boca.scale.set(1 + feliz * 0.35 - assustada * 0.4, 1 + feliz * 0.9 - assustada * 1.6, 1);
+    boca.scale.set(1 + feliz * 0.35 - assustada * 0.4 - emDuvida * 0.3, 1 + feliz * 0.9 - assustada * 1.6 - emDuvida * 1.3, 1);
+    boca.rotation.z = emDuvida * 0.35;
     matBochecha.opacity = Math.min(0.85, feliz * 0.85);
     for (const b of bochechas) b.scale.x = 1 + feliz * 0.2;
 
@@ -223,7 +241,7 @@ export function criarMine3D(guardar: Guardar, opcoes: { escuro?: boolean; aura?:
     const y = mola(salto, 0, delta, 120, 9);
     const volta = mola(giro, giroAlvo, delta, 90, 14);
     corpo.position.y = Math.sin(tempo * 1.2) * 0.08 + y;
-    corpo.rotation.z = Math.sin(tempo * 0.8) * 0.05 + feliz * Math.sin(tempo * 9) * 0.04;
+    corpo.rotation.z = Math.sin(tempo * 0.8) * 0.05 + feliz * Math.sin(tempo * 9) * 0.04 + emDuvida * 0.18;
     corpo.rotation.y = volta;
     const estica = THREE.MathUtils.clamp(salto.vel * 0.04, -0.12, 0.12);
     corpo.scale.set(1 - estica * 0.5 + feliz * 0.04, 1 + estica + feliz * 0.04, 1 - estica * 0.5 + feliz * 0.04);

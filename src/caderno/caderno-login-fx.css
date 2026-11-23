@@ -510,3 +510,47 @@
 .no-motion .login-desk .login-arrow text {
   opacity: 1;
 }
+
+/* Mine 3D na entrada (nov/2026): a mesma cabeça da Home, no lugar da desenhada.
+   A caixa guarda o tamanho da desenhada; o palco sai dela para a antena e o
+   pulo não serem cortados (mine-retrato.css). */
+.login-mine-3d {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 200 / 210;
+}
+.login-mine-3d > .login-mine {
+  position: absolute;
+  inset: 0;
+}
+.login-mine-3d-capelo,
+.login-mine-3d-duvida {
+  position: absolute;
+  pointer-events: none;
+  animation: login-mine-3d-entra 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.login-mine-3d-capelo {
+  top: -2%;
+  left: 50%;
+  font-size: clamp(2.2rem, 9vw, 3.2rem);
+  transform: translateX(-50%) rotate(-8deg);
+}
+.login-mine-3d-duvida {
+  top: 2%;
+  right: 4%;
+  font-family: "Gochi Hand", cursive;
+  font-size: clamp(2.4rem, 9vw, 3.4rem);
+  color: rgb(var(--margin-line));
+}
+@keyframes login-mine-3d-entra {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-mine-3d-capelo,
+  .login-mine-3d-duvida {
+    animation: none;
+  }
+}

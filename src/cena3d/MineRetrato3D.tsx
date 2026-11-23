@@ -7,11 +7,22 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { corDoToken, criarPalco } from "./palco";
-import { criarMine3D } from "./mine3d";
+import { criarMine3D, type Humor3D } from "./mine3d";
 import "./mine-retrato.css";
 
-export default function MineRetrato3D({ className = "" }: { className?: string }) {
+export default function MineRetrato3D({ className = "", humor, pulo = 0, susto = 0 }: { className?: string; humor?: Humor3D; pulo?: number; susto?: number }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  // humor muda a cada tecla na tela de entrada: vai por ref, sem refazer o palco
+  const humorRef = useRef<Humor3D | undefined>(humor);
+  humorRef.current = humor;
+  const mineRef = useRef<ReturnType<typeof criarMine3D> | null>(null);
+  // `pulo` e `susto` são contadores: cada aumento dispara o gesto uma vez
+  useEffect(() => {
+    if (pulo) mineRef.current?.pular(0.7);
+  }, [pulo]);
+  useEffect(() => {
+    if (susto) mineRef.current?.assustar();
+  }, [susto]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -27,7 +38,7 @@ export default function MineRetrato3D({ className = "" }: { className?: string }
       suave.x += (alvo.x - suave.x) * Math.min(1, delta * 5);
       suave.y += (alvo.y - suave.y) * Math.min(1, delta * 5);
       olhar.set(p.x + suave.x * 5, p.y + suave.y * 3.5, p.z);
-      mine.atualizar(tempo, delta, olhar, { hover });
+      mine.atualizar(tempo, delta, olhar, { hover, humor: humorRef.current });
     };
 
     const palco = criarPalco(host, tick, { fov: 30, z: 6.4 });
@@ -41,6 +52,7 @@ export default function MineRetrato3D({ className = "" }: { className?: string }
     const texto = corDoToken("--theme-text", "#1d2440");
     const mine = criarMine3D(guardar, { escuro: texto.getHSL({ h: 0, s: 0, l: 0 }).l > 0.5, aura: false });
     scene.add(mine.grupo);
+    mineRef.current = mine;
 
     let rect = host.getBoundingClientRect();
     let medido = 0;
@@ -69,6 +81,7 @@ export default function MineRetrato3D({ className = "" }: { className?: string }
       host.removeEventListener("pointerenter", onEnter);
       host.removeEventListener("pointerleave", onLeave);
       host.removeEventListener("click", onClick);
+      mineRef.current = null;
       palco.destruir();
     };
   }, []);

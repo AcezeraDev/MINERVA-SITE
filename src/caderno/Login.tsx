@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Doodle, celebrate } from "./index";
-import { CenaLogin } from "../cena3d/Cena3D";
+import { CenaLogin, useCena3D } from "../cena3d/Cena3D";
+import type { Humor3D } from "../cena3d/mine3d";
 import "./caderno-login.css";
 import "./caderno-login-fx.css";
 
@@ -72,6 +73,58 @@ export type LoginPayload = {
 };
 
 type Mood = "idle" | "hello" | "shy" | "peek" | "thinking" | "confused" | "teacher";
+
+const MineRetrato3D = React.lazy(() => import("../cena3d/MineRetrato3D"));
+
+/** Se o WebGL cair no meio, volta para a Mine desenhada. */
+class GuardaMine3D extends React.Component<{ fallback: React.ReactNode; children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/** O que cada humor da tela de entrada vira no rosto da Mine 3D. */
+const HUMOR_3D: Record<Mood, Humor3D> = {
+  idle: {},
+  hello: { feliz: 1 },
+  shy: { fechar: 1 },
+  peek: { fechar: 1, espiar: 1 },
+  thinking: { feliz: 0.3 },
+  confused: { duvida: 1 },
+  teacher: { feliz: 0.6 },
+};
+
+/**
+ * A Mine 3D (a mesma da Home) na tela de entrada, com as reações da desenhada:
+ * fecha os olhos na senha, espia com ela à mostra, fica em dúvida no erro e
+ * pula quando a pessoa diz o nome.
+ */
+function LoginMine3D({ mood, fallback }: { mood: Mood; fallback: React.ReactNode }) {
+  const [pulo, setPulo] = useState(0);
+  const [susto, setSusto] = useState(0);
+  const anterior = useRef<Mood>(mood);
+  useEffect(() => {
+    if (mood === anterior.current) return;
+    if (mood === "hello" && anterior.current === "idle") setPulo((valor) => valor + 1);
+    if (mood === "confused") setSusto((valor) => valor + 1);
+    anterior.current = mood;
+  }, [mood]);
+  return (
+    <div className={`login-mine-3d mood-${mood}`} aria-hidden>
+      <GuardaMine3D fallback={fallback}>
+        <React.Suspense fallback={fallback}>
+          <MineRetrato3D className="login-mine-3d-palco" humor={HUMOR_3D[mood]} pulo={pulo} susto={susto} />
+        </React.Suspense>
+      </GuardaMine3D>
+      {mood === "teacher" ? <span className="login-mine-3d-capelo">🎓</span> : null}
+      {mood === "confused" ? <span className="login-mine-3d-duvida">?</span> : null}
+    </div>
+  );
+}
 
 /**
  * A Mine da tela de entrada. Tem mãos (para tapar os olhos quando a senha
@@ -201,6 +254,7 @@ export function LoginScreen({
   const cardRef = useRef<HTMLDivElement | null>(null);
   useInclinacao(tiltRef, reduced, 6);
   useInclinacao(cardRef, reduced, 22);
+  const em3d = useCena3D();
   const bilhete = BILHETES[Math.floor(Date.now() / 86_400_000) % BILHETES.length];
 
   const first = name.trim().split(/\s+/)[0] || "";
@@ -327,7 +381,7 @@ export function LoginScreen({
               animate={{ y: 0, opacity: 1, scale: 1 }}
               transition={{ type: "spring", stiffness: 180, damping: 14, delay: 0.2 }}
             >
-              <LoginMine mood={mood} reduced={reduced} />
+              {em3d ? <LoginMine3D mood={mood} fallback={<LoginMine mood={mood} reduced={reduced} />} /> : <LoginMine mood={mood} reduced={reduced} />}
             </motion.div>
             <span className="login-mine-shadow" aria-hidden />
           </div>
