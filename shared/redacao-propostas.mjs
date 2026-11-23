@@ -450,3 +450,80 @@ export function elementosIntervencao(texto) {
     detalhamento: /\b(como|ou seja|isto e|por exemplo|especialmente|sobretudo|tais como)\b/.test(ultimo) || /,\s*(que|o qual|a qual)\b/.test(ultimo),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Propostas criadas pela Mine a partir do tema digitado (nov/2026)
+
+const CORES_CRIADAS = ["#0EA5E9", "#F97316", "#8B5CF6", "#10B981", "#EC4899", "#EAB308", "#14B8A6", "#EF4444"];
+
+const limpo = (valor, max) => String(valor ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+const listaLimpa = (valor, max, quantos) =>
+  (Array.isArray(valor) ? valor : [])
+    .map((item) => limpo(item, max))
+    .filter(Boolean)
+    .slice(0, quantos);
+
+// O pedido à Mine vai sem acento; o eixo volta igual e precisa do acento de volta.
+const EIXOS = { educacao: "Educação", saude: "Saúde", tecnologia: "Tecnologia", sociedade: "Sociedade", "meio ambiente": "Meio ambiente", cultura: "Cultura", cidadania: "Cidadania", economia: "Economia" };
+const comAcento = (eixo) => EIXOS[eixo.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")] || eixo;
+
+function textoMotivador(bruto) {
+  if (!bruto || typeof bruto !== "object") return null;
+  const tipo = String(bruto.tipo || "texto").toLowerCase();
+  const titulo = limpo(bruto.titulo, 160);
+  const fonte = limpo(bruto.fonte, 200) || "Elaborado para o Minerva.";
+  if (tipo === "tabela") {
+    const colunas = listaLimpa(bruto.colunas, 60, 4);
+    const linhas = (Array.isArray(bruto.linhas) ? bruto.linhas : [])
+      .map((linha) => listaLimpa(linha, 200, colunas.length || 4))
+      .filter((linha) => colunas.length && linha.length === colunas.length)
+      .slice(0, 8);
+    return colunas.length >= 2 && linhas.length ? { tipo: "tabela", titulo: titulo || "Quadro", colunas, linhas, fonte } : null;
+  }
+  if (tipo === "lista") {
+    const itens = listaLimpa(bruto.itens, 220, 8);
+    return itens.length >= 2 ? { tipo: "lista", titulo: titulo || "Pontos do debate", itens, fonte } : null;
+  }
+  const corpo = listaLimpa(bruto.corpo, 900, 4);
+  if (!corpo.length) return null;
+  if (tipo === "lei" && titulo) return { tipo: "lei", titulo, corpo, fonte };
+  return { tipo: "texto", ...(titulo ? { titulo } : {}), corpo, fonte: tipo === "lei" ? fonte : limpo(bruto.fonte, 200) || "Texto elaborado para o Minerva." };
+}
+
+/**
+ * Lê a resposta da Mine (JSON, às vezes com cerca ou texto em volta) e devolve
+ * uma proposta no formato das prontas, ou null se faltar o essencial.
+ */
+export function montarPropostaCriada(resposta, { temaDigitado = "", id, numero = 0, criadaEm = Date.now() } = {}) {
+  let dados = resposta;
+  if (typeof resposta === "string") {
+    const texto = resposta.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+    const inicio = texto.indexOf("{");
+    const fim = texto.lastIndexOf("}");
+    if (inicio < 0 || fim <= inicio) return null;
+    try {
+      dados = JSON.parse(texto.slice(inicio, fim + 1));
+    } catch {
+      return null;
+    }
+  }
+  if (!dados || typeof dados !== "object") return null;
+  const titulo = limpo(dados.titulo, 180) || limpo(temaDigitado, 180);
+  const textos = (Array.isArray(dados.textos) ? dados.textos : []).map(textoMotivador).filter(Boolean).slice(0, 5);
+  if (!titulo || textos.length < 2) return null;
+  const repertorio = listaLimpa(dados.repertorio, 200, 5);
+  return {
+    id: id || `criada-${criadaEm.toString(36)}`,
+    numero,
+    titulo,
+    eixo: comAcento(limpo(dados.eixo, 24)) || "Tema livre",
+    cor: CORES_CRIADAS[Math.abs(numero) % CORES_CRIADAS.length],
+    textos,
+    repertorio,
+    genero: GENERO_ENEM,
+    enunciado: ENUNCIADO(titulo),
+    criada: true,
+    temaDigitado: limpo(temaDigitado, 200),
+    criadaEm,
+  };
+}

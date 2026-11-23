@@ -15,11 +15,13 @@ import {
   History,
   Lightbulb,
   ListChecks,
+  Loader2,
   NotebookPen,
   PenLine,
   RotateCcw,
   Shuffle,
   Sparkles,
+  Trash2,
   Trophy,
 } from "lucide-react";
 import { PageHeader, uid, type Session, type User, type useMemoUserData, type AppData } from "../main";
@@ -38,7 +40,7 @@ import {
   temasRedacao,
   type Correcao,
 } from "../../shared/redacao.mjs";
-import { apoioDaProposta, elementosIntervencao, propostasRedacao, type PropostaRedacao, type TextoMotivador } from "../../shared/redacao-propostas.mjs";
+import { apoioDaProposta, elementosIntervencao, montarPropostaCriada, propostasRedacao, type PropostaRedacao, type TextoMotivador } from "../../shared/redacao-propostas.mjs";
 import { redacaoPropostaXp, redacaoPropostaXpMax, redacaoXp, redacaoXpMax } from "../../shared/xp.mjs";
 import { askMineTask } from "../mineTask";
 import { usePreset } from "../chat/presets";
@@ -92,6 +94,7 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
   const chaveRascunho = `minerva:redacao:${user.id}`;
   const chavePropostas = `minerva:redacao-propostas:${user.id}`;
   const chaveGuardadas = `minerva:redacoes:${user.id}`;
+  const chaveCriadas = `minerva:redacao-criadas:${user.id}`;
   // "quero treinar uma redação sobre X" no chat abre o tema livre já escrito
   const preset = usePreset("redacao");
   const [tela, setTela] = useState<Tela>(() => (preset?.tema ? { tipo: "livre" } : { tipo: "mural" }));
@@ -100,6 +103,11 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
     return preset?.tema ? { ...guardado, temaId: "livre", temaLivre: preset.tema } : guardado;
   });
   const [rascunhos, setRascunhos] = useState<Record<string, RascunhoProposta>>(() => lerLocal(chavePropostas, {}));
+  // Propostas que a Mine montou a partir do tema digitado (ficam neste aparelho).
+  const [criadas, setCriadas] = useState<PropostaRedacao[]>(() => lerLocal<PropostaRedacao[]>(chaveCriadas, []).filter((item) => item?.criada && Array.isArray(item.textos)));
+  const [criando, setCriando] = useState(false);
+  const [erroCriar, setErroCriar] = useState("");
+  const criarRef = useRef<AbortController | null>(null);
   const [fase, setFase] = useState<"escrever" | "corrigindo" | "resultado">("escrever");
   const [resultado, setResultado] = useState<Guardada | null>(null);
   const [erro, setErro] = useState("");
@@ -109,7 +117,14 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
 
   useEffect(() => gravarLocal(chaveRascunho, rascunho), [chaveRascunho, rascunho]);
   useEffect(() => gravarLocal(chavePropostas, rascunhos), [chavePropostas, rascunhos]);
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => gravarLocal(chaveCriadas, criadas), [chaveCriadas, criadas]);
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      criarRef.current?.abort();
+    },
+    [],
+  );
   useEffect(() => {
     if (fase !== "corrigindo") return;
     const timer = window.setInterval(() => setPasso((valor) => (valor + 1) % lendo.length), 2600);
@@ -124,13 +139,18 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
   const entregasPorProposta = useMemo(() => {
     const mapa = new Map<string, Session[]>();
     for (const item of historico) {
-      if (!item.propostaId) continue;
-      mapa.set(item.propostaId, [...(mapa.get(item.propostaId) || []), item]);
+      const chave = item.propostaId || item.propostaCriadaId;
+      if (!chave) continue;
+      mapa.set(chave, [...(mapa.get(chave) || []), item]);
     }
     return mapa;
   }, [historico]);
 
-  const proposta = tela.tipo === "proposta" ? propostasRedacao.find((item) => item.id === tela.id) : undefined;
+  const todasPropostas = useMemo(() => [...propostasRedacao, ...criadas], [criadas]);
+  const proposta = tela.tipo === "proposta" ? todasPropostas.find((item) => item.id === tela.id) : undefined;
+  // Proposta criada vale o XP do tema livre: o servidor não tem como conferir
+  // um texto que nasceu no aparelho, então ela não leva o bônus da primeira entrega.
+  const propostaPronta = proposta && !proposta.criada ? proposta : undefined;
   const temaLivre = temasRedacao.find((item) => item.id === rascunho.temaId);
   const temaTexto = proposta ? proposta.titulo : rascunho.temaId === "livre" ? rascunho.temaLivre.trim() : temaLivre?.titulo || "";
   const folhaAtual = proposta ? rascunhos[proposta.id] || { titulo: "", texto: "", atualizado: 0 } : { titulo: rascunho.titulo, texto: rascunho.texto, atualizado: 0 };
@@ -169,7 +189,7 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
       if (!correcao) throw new Error("A correção veio incompleta. Tente de novo.");
       const guardada: Guardada = { id: uid("redacao"), createdAt: Date.now(), tema: temaTexto, titulo, texto, correcao, propostaId: proposta?.id };
       // Proposta pronta vale mais só na primeira entrega (o servidor confere).
-      const primeira = proposta && !entregasPorProposta.has(proposta.id);
+      const primeira = propostaPronta && !entregasPorProposta.has(propostaPronta.id);
       const xp = primeira ? redacaoPropostaXp(correcao.total) : redacaoXp(correcao.total);
       const session: Session = {
         id: guardada.id,
@@ -181,7 +201,7 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
         xpEarned: xp,
         tema: temaTexto,
         notas: correcao.notas.map((item) => item.nota),
-        ...(proposta ? { propostaId: proposta.id } : {}),
+        ...(propostaPronta ? { propostaId: propostaPronta.id } : proposta ? { propostaCriadaId: proposta.id } : {}),
       };
       update((draft) => ({ ...draft, sessions: [...draft.sessions, session] }));
       gravarLocal(chaveGuardadas, [guardada, ...lerLocal<Guardada[]>(chaveGuardadas, [])].slice(0, 30));
@@ -200,6 +220,43 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
     }
   };
 
+  const criarProposta = async (tema: string) => {
+    const pedido = tema.trim();
+    if (pedido.length < 4 || criando) return;
+    setErroCriar("");
+    setCriando(true);
+    criarRef.current?.abort();
+    const controller = new AbortController();
+    criarRef.current = controller;
+    try {
+      const resposta = await askMineTask(
+        { task: "redacao-proposta", prompt: `Monte uma proposta de redação modelo ENEM sobre este tema: ${pedido}`, context: "", outputTokens: 2200 },
+        { signal: controller.signal, timeoutMs: 120_000 },
+      );
+      const numero = propostasRedacao.length + criadas.length + 1;
+      const nova = montarPropostaCriada(resposta, { temaDigitado: pedido, id: uid("criada"), numero });
+      if (!nova) throw new Error("A Mine não conseguiu montar a proposta. Tente de novo ou escreva o tema de outro jeito.");
+      setCriadas((atual) => [...atual, nova]);
+      mineSays("Proposta pronta! Lê os textos antes de escrever.", "happy");
+      abrir({ tipo: "proposta", id: nova.id });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setErroCriar(error instanceof Error ? error.message : "A Mine não conseguiu montar a proposta agora.");
+    } finally {
+      if (criarRef.current === controller) setCriando(false);
+    }
+  };
+
+  const apagarCriada = (id: string) => {
+    setCriadas((atual) => atual.filter((item) => item.id !== id));
+    setRascunhos((atual) => {
+      const resto = { ...atual };
+      delete resto[id];
+      return resto;
+    });
+    abrir({ tipo: "mural" });
+  };
+
   const reabrir = (item: Guardada) => {
     setTela(item.propostaId ? { tipo: "proposta", id: item.propostaId } : { tipo: "livre" });
     setResultado(item);
@@ -213,7 +270,7 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
       titulo={folhaAtual.titulo}
       texto={folhaAtual.texto}
       cor={proposta?.cor}
-      xpMax={proposta && !entregasPorProposta.has(proposta.id) ? redacaoPropostaXpMax : redacaoXpMax}
+      xpMax={propostaPronta && !entregasPorProposta.has(propostaPronta.id) ? redacaoPropostaXpMax : redacaoXpMax}
       corrigindo={fase === "corrigindo"}
       erro={erro}
       onMudar={mudarFolha}
@@ -235,7 +292,18 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
             <ArrowLeft className="h-4 w-4" /> Redação
           </button>
           <span aria-hidden>/</span>
-          <span>{proposta ? `Proposta ${String(proposta.numero).padStart(2, "0")}` : "Tema livre"}</span>
+          <span>{proposta ? `${proposta.criada ? "Sua proposta" : "Proposta"} ${String(proposta.numero).padStart(2, "0")}` : "Tema livre"}</span>
+          {proposta?.criada && fase !== "resultado" ? (
+            <button
+              type="button"
+              className="red-link rdm-trilha-acao"
+              onClick={() => {
+                if (window.confirm("Apagar esta proposta? O rascunho dela também sai.")) apagarCriada(proposta.id);
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> apagar proposta
+            </button>
+          ) : null}
           {fase === "resultado" ? (
             <button
               type="button"
@@ -268,7 +336,11 @@ export function RedacaoView({ data, user, update }: { data: ReturnType<typeof us
           historico={historico}
           guardadas={guardadas}
           rascunhos={rascunhos}
+          criadas={criadas}
           entregas={entregasPorProposta}
+          criando={criando}
+          erroCriar={erroCriar}
+          onCriar={criarProposta}
           onAbrir={(id) => abrir({ tipo: "proposta", id })}
           onLivre={() => abrir({ tipo: "livre" })}
           onReabrir={reabrir}
@@ -379,7 +451,11 @@ function Mural({
   historico,
   guardadas,
   rascunhos,
+  criadas,
   entregas,
+  criando,
+  erroCriar,
+  onCriar,
   onAbrir,
   onLivre,
   onReabrir,
@@ -387,14 +463,19 @@ function Mural({
   historico: Session[];
   guardadas: Guardada[];
   rascunhos: Record<string, RascunhoProposta>;
+  criadas: PropostaRedacao[];
   entregas: Map<string, Session[]>;
+  criando: boolean;
+  erroCriar: string;
+  onCriar: (tema: string) => void;
   onAbrir: (id: string) => void;
   onLivre: () => void;
   onReabrir: (item: Guardada) => void;
 }) {
   const [filtro, setFiltro] = useState<Filtro>("todas");
   const estado = (id: string) => (entregas.has(id) ? "entregue" : rascunhos[id]?.texto?.trim() ? "rascunho" : "fazer");
-  const lista = propostasRedacao.filter((item) => {
+  const [temaNovo, setTemaNovo] = useState("");
+  const lista = [...propostasRedacao, ...criadas].filter((item) => {
     const atual = estado(item.id);
     return filtro === "todas" || (filtro === "fazer" && atual === "fazer") || (filtro === "rascunho" && atual === "rascunho") || (filtro === "entregues" && atual === "entregue");
   });
@@ -462,22 +543,61 @@ function Mural({
           <CartaoProposta key={item.id} proposta={item} indice={indice} estado={estado(item.id)} entregas={entregas.get(item.id) || []} rascunho={rascunhos[item.id]} onAbrir={() => onAbrir(item.id)} />
         ))}
         {filtro === "todas" || filtro === "fazer" ? (
-          <motion.button
-            type="button"
-            className="rdm-cartao rdm-cartao-livre"
-            onClick={onLivre}
+          <motion.form
+            className="rdm-cartao rdm-cartao-livre rdm-cartao-criar"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onCriar(temaNovo);
+            }}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...molaSolta, delay: Math.min(0.5, lista.length * 0.04) }}
+            aria-busy={criando}
           >
             <NotebookPen className="rdm-livre-icone" aria-hidden />
-            <span className="rdm-cartao-titulo">Tema livre ou treino rápido</span>
-            <span className="rdm-cartao-texto">O tema que a professora passou, ou um dos temas curtos da Mine para aquecer.</span>
+            <span className="rdm-cartao-titulo">Crie sua proposta</span>
+            <span className="rdm-cartao-texto">Digite o tema (o que a professora passou, por exemplo) e a Mine monta a coletânea igual às outras.</span>
+            <label className="sr-only" htmlFor="rdm-tema-novo">
+              Tema da proposta
+            </label>
+            <textarea
+              id="rdm-tema-novo"
+              className="rdm-criar-campo"
+              value={temaNovo}
+              onChange={(event) => setTemaNovo(event.target.value.slice(0, 200))}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  onCriar(temaNovo);
+                }
+              }}
+              placeholder="Ex.: o uso do celular nas escolas"
+              rows={2}
+              disabled={criando}
+            />
+            {erroCriar ? (
+              <span className="rdm-criar-erro" role="alert">
+                {erroCriar}
+              </span>
+            ) : null}
             <span className="rdm-cartao-rodape">
               <span className="rdm-xp is-livre">até {redacaoXpMax} XP</span>
-              <ChevronRight className="h-4 w-4" aria-hidden />
+              <button type="submit" className="red-btn caderno-btn-pen rdm-criar-btn" disabled={criando || temaNovo.trim().length < 4}>
+                {criando ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> montando…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" /> Criar proposta
+                  </>
+                )}
+              </button>
             </span>
-          </motion.button>
+            <button type="button" className="red-link rdm-criar-treino" onClick={onLivre} disabled={criando}>
+              ou treino rápido, sem textos motivadores
+            </button>
+          </motion.form>
         ) : null}
         {!lista.length ? <p className="rdm-vazio">Nenhuma proposta aqui ainda. Que tal começar uma?</p> : null}
       </div>
@@ -541,7 +661,9 @@ function CartaoProposta({
         <span className="rdm-eixo">{proposta.eixo}</span>
         <span className={`rdm-status is-${estado}`}>{estado === "entregue" ? `Nota ${melhor}` : estado === "rascunho" ? "Rascunho" : "A fazer"}</span>
       </span>
-      <span className="rdm-cartao-num">Proposta {String(proposta.numero).padStart(2, "0")}</span>
+      <span className="rdm-cartao-num">
+        {proposta.criada ? "Sua proposta" : "Proposta"} {String(proposta.numero).padStart(2, "0")}
+      </span>
       <span className="rdm-cartao-titulo">{proposta.titulo}</span>
       <span className="rdm-cartao-textos" aria-hidden>
         {proposta.textos.map((texto, posicao) => (
@@ -557,7 +679,7 @@ function CartaoProposta({
             <Check className="h-3.5 w-3.5" /> XP garantido
           </span>
         ) : (
-          <span className="rdm-xp">até {redacaoPropostaXpMax} XP</span>
+          <span className="rdm-xp">até {proposta.criada ? redacaoXpMax : redacaoPropostaXpMax} XP</span>
         )}
         {estado === "rascunho" ? <span className="rdm-palavras">{palavras} palavras</span> : null}
         <ChevronRight className="h-4 w-4" aria-hidden />
@@ -590,7 +712,10 @@ function Coletanea({ proposta, entregas, folha }: { proposta: PropostaRedacao; e
       <div className="rdm-coletanea-grade" data-aba={aba}>
         <article className="rdm-textos" style={{ "--rdm-cor": proposta.cor } as React.CSSProperties}>
           <header className="rdm-cabeca">
-            <span className="rdm-cabeca-num">Proposta {String(proposta.numero).padStart(2, "0")} · {proposta.eixo}</span>
+            <span className="rdm-cabeca-num">
+              {proposta.criada ? "Sua proposta" : "Proposta"} {String(proposta.numero).padStart(2, "0")} · {proposta.eixo}
+            </span>
+            {proposta.criada && proposta.temaDigitado ? <span className="rdm-cabeca-pedido">criada pela Mine a partir de “{proposta.temaDigitado}”</span> : null}
             <h2>{proposta.titulo}</h2>
             {melhor ? (
               <span className="rdm-cabeca-feito">

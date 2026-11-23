@@ -145,13 +145,13 @@ export function replyQualityIssue({ task = "", reply = "", prompt = "", finishRe
   }
 
   const minimum = expectedCount(cleanTask, prompt);
-  if (cleanTask === "materia-extra") {
+  if (cleanTask === "materia-extra" || cleanTask === "redacao-proposta") {
     const json = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
     try {
       JSON.parse(json.slice(json.search(/[[{]/)));
       return "";
     } catch {
-      return "extras da materia fora do JSON";
+      return cleanTask === "redacao-proposta" ? "proposta de redacao fora do JSON" : "extras da materia fora do JSON";
     }
   }
   if (cleanTask === "vf") return validateTrueFalse(text, minimum);

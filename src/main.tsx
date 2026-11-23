@@ -782,6 +782,8 @@ export type Session = {
   notas?: number[];
   /** Proposta pronta de redação (shared/redacao-propostas.mjs): a primeira entrega vale mais XP. */
   propostaId?: string;
+  /** Proposta que a Mine criou do tema digitado: vale o XP do tema livre (sem propostaId de propósito). */
+  propostaCriadaId?: string;
   /** Aba Atividades: componente e pontos da tarefa. */
   materia?: string;
   pontos?: number;

@@ -294,6 +294,69 @@
   box-shadow: none;
   background: transparent;
 }
+/* "Crie sua proposta": o aluno digita o tema e a Mine monta a coletânea. */
+.rdm-cartao-criar {
+  cursor: default;
+  border-style: dashed;
+  border-color: rgb(var(--hl-lilac) / 0.7);
+}
+.rdm-cartao-criar:focus-within {
+  border-style: solid;
+}
+.rdm-criar-campo {
+  width: 100%;
+  resize: none;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.7rem;
+  background: rgb(var(--sheet));
+  color: rgb(var(--theme-text));
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+  transition: box-shadow 140ms ease;
+}
+.rdm-criar-campo::placeholder {
+  color: rgb(var(--theme-muted) / 0.8);
+}
+.rdm-criar-campo:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgb(var(--pen) / 0.75);
+}
+.rdm-criar-campo:disabled {
+  opacity: 0.6;
+}
+.rdm-criar-erro {
+  color: rgb(var(--margin-line));
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.rdm-cartao-criar .rdm-cartao-rodape {
+  margin-top: auto;
+}
+.rdm-criar-btn {
+  margin-left: auto;
+  min-height: 2.4rem;
+  padding: 0 0.9rem;
+  font-size: 0.88rem;
+}
+.rdm-criar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.rdm-criar-treino {
+  align-self: flex-start;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgb(var(--theme-muted));
+}
+.rdm-cabeca-pedido {
+  display: block;
+  margin-top: 0.2rem;
+  color: rgb(var(--theme-muted));
+  font-family: "Gochi Hand", cursive;
+  font-size: 1.05rem;
+}
 .rdm-livre-icone {
   width: 2.6rem;
   height: 2.6rem;

@@ -1074,7 +1074,30 @@ Regras:
 ${context ? `\nLivro: ${context}` : ""}`;
 }
 
+/**
+ * Proposta de redação criada a partir do tema que o aluno digitou (nov/2026),
+ * no mesmo formato das propostas prontas (shared/redacao-propostas.mjs).
+ */
+function buildEssayProposalInstruction() {
+  return `Voce e a Mine e monta propostas de redacao no modelo ENEM para alunos brasileiros do ensino medio, a partir do tema que o estudante digitou.
+Responda SOMENTE com JSON valido: sem markdown, sem cercas de codigo, sem texto antes ou depois. Formato:
+{"titulo":"tema no estilo ENEM, ex.: Desafios para ... no Brasil","eixo":"uma palavra: Sociedade, Tecnologia, Educacao, Saude, Meio ambiente, Cultura, Cidadania ou Economia","textos":[ ... de 3 a 4 textos motivadores ... ],"repertorio":["3 sugestoes curtas de repertorio"]}
+Cada texto motivador e um destes objetos:
+- {"tipo":"texto","titulo":"opcional","corpo":["paragrafo","paragrafo"],"fonte":"Texto elaborado para o Minerva."}
+- {"tipo":"lei","titulo":"Lei n. X/AAAA — nome (trecho adaptado)","corpo":["sentido do artigo, com suas palavras"],"fonte":"BRASIL. Lei n. X, de ... Adaptado."}
+- {"tipo":"tabela","titulo":"...","colunas":["...","..."],"linhas":[["...","..."]],"fonte":"Elaborado para o Minerva."}
+- {"tipo":"lista","titulo":"...","itens":["...","..."],"fonte":"Elaborado para o Minerva."}
+Regras:
+- Varie os tipos: pelo menos um "texto" e pelo menos um que seja "tabela", "lista" ou "lei".
+- NUNCA invente numeros, pesquisas, porcentagens, datas ou citacoes. Tabelas e listas trazem informacao qualitativa.
+- So use "lei" para leis brasileiras que existem de fato e cujo conteudo voce conhece bem; na duvida, nao use.
+- Os textos dao pontos de vista diferentes sobre o problema, sem entregar a redacao pronta.
+- Se o tema digitado for vago, curto ou informal, transforme-o num recorte claro de problema social brasileiro. Se for impossivel ou ofensivo, use um tema proximo e adequado para a escola.
+- Portugues do Brasil correto, linguagem de prova, paragrafos de 2 a 4 frases.`;
+}
+
 const TASK_PROMPTS = {
+  "redacao-proposta": buildEssayProposalInstruction,
   "materia-extra": buildSubjectExtraInstruction,
   traducao: buildTranslationInstruction,
   "prova-estudo": buildMistakeStudyInstruction,
