@@ -1,0 +1,684 @@
+/*
+  Games com a Mine — hub, mapa da expedição e biblioteca (nov/2026).
+  Tudo nos tokens do caderno (src/caderno.css): folha, pauta, caneta e
+  marca-texto. Sem backdrop-filter: o caderno é papel, não vidro, e o vidro
+  recalculava por quadro sobre os fundos animados (ver motion-e-custo-visual).
+*/
+
+/* ───────── Navegação: uma régua de abas ───────── */
+
+.games-hub-bar {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+
+.games-hub-bar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .games-hub-bar {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
+.games-hub-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 0.9rem;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 10px 22px -18px rgb(0 0 0 / 0.5);
+}
+
+.games-hub-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-height: 40px;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.65rem;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: rgb(var(--theme-text) / 0.62);
+  white-space: nowrap;
+  transition: color 140ms ease;
+}
+
+.games-hub-pill:hover,
+.games-hub-pill.is-active {
+  color: rgb(var(--theme-text));
+}
+
+.games-hub-pill:focus-visible,
+.games-view-pill:focus-visible,
+.game-magic-dossier:focus-visible,
+.games-map3d-stop:focus-visible {
+  outline: 3px solid rgb(var(--pen));
+  outline-offset: 2px;
+}
+
+/* a aba ativa é um grifo de marca-texto, não um botão cheio */
+.games-hub-pill-bg {
+  position: absolute;
+  inset: 5px 2px;
+  border-radius: 0.35rem 0.6rem 0.4rem 0.55rem;
+  background: rgb(var(--hl-yellow) / 0.55);
+  mix-blend-mode: var(--hl-blend);
+}
+
+html:not(.theme-light) .games-hub-pill-bg {
+  background: rgb(var(--hl-yellow) / 0.24);
+  box-shadow: inset 0 -2px 0 rgb(var(--hl-yellow) / 0.8);
+}
+
+.games-hub-badge {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: rgb(var(--margin-line));
+}
+
+/* ───────── Mapa da expedição ───────── */
+
+.games-hero-3d {
+  position: relative;
+  overflow: hidden;
+}
+
+/* O mapa preenche todo o vão entre o título e a missão; antes era uma caixa
+   de 250px solta no meio do painel. */
+html .workspace-shell .games-expedition-canvas.is-stage {
+  inset: 6.4rem 0 5.15rem;
+}
+
+.games-map3d-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.games-map3d-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* mancha de marca-texto embaixo das ilhas: dá chão para o 3D */
+.games-map3d-wrap.is-3d .games-map3d-stage::before {
+  content: "";
+  position: absolute;
+  inset: 10% 8% 6%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--hl-mint) / 0.12), transparent);
+  pointer-events: none;
+}
+
+html.theme-light .games-map3d-wrap.is-3d .games-map3d-stage::before {
+  background: radial-gradient(closest-side, rgb(var(--hl-yellow) / 0.3), transparent);
+}
+
+.games-map3d-canvas,
+.games-map3d-stage > .study-expedition-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.games-map3d-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+}
+
+/* régua de destinos: botões de verdade (teclado, leitor de tela, toque) */
+.games-map3d-route {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.35rem 1rem 0.6rem;
+  scrollbar-width: none;
+}
+
+.games-map3d-route::-webkit-scrollbar {
+  display: none;
+}
+
+.games-map3d-route > :first-child { margin-left: auto; }
+.games-map3d-route > :last-child { margin-right: auto; }
+
+.games-map3d-stop {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  padding: 0.2rem 0.7rem 0.2rem 0.25rem;
+  border-radius: 999px;
+  color: rgb(var(--theme-text) / 0.7);
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+  font-size: 12.5px;
+  font-weight: 800;
+  transition: color 140ms ease, box-shadow 140ms ease, transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.games-map3d-stop__n {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-family: "DM Mono", monospace;
+  font-size: 10.5px;
+  color: rgb(var(--theme-text));
+  background: color-mix(in srgb, var(--stop-accent) 24%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--stop-accent);
+}
+
+.games-map3d-stop:hover,
+.games-map3d-stop.is-hover {
+  color: rgb(var(--theme-text));
+  transform: translateY(-2px);
+}
+
+.games-map3d-stop.is-active {
+  color: rgb(var(--pen));
+  box-shadow: 0 0 0 2px rgb(var(--pen));
+}
+
+.games-map3d-stop.is-active .games-map3d-stop__n {
+  color: #111;
+  background: var(--stop-accent);
+}
+
+/* ───────── Toggle Grade / Baralho ───────── */
+
+.games-view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 0.8rem;
+  background: rgb(var(--sheet));
+  box-shadow: inset 0 0 0 1px rgb(var(--line));
+}
+
+.games-view-pill {
+  position: relative;
+  min-height: 34px;
+  padding: 0.32rem 0.85rem;
+  border-radius: 0.6rem;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: rgb(var(--theme-text) / 0.62);
+  transition: color 140ms ease;
+}
+
+.games-view-pill.is-active,
+.games-view-pill:hover {
+  color: rgb(var(--theme-text));
+}
+
+.games-view-pill-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(var(--panel));
+  box-shadow: 0 2px 8px -4px rgb(0 0 0 / 0.35), inset 0 0 0 1px rgb(var(--line));
+}
+
+/* ───────── Biblioteca: fichas coladas no caderno ───────── */
+
+.games-magic-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 640px) {
+  .games-magic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .games-magic-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.15rem;
+  }
+}
+
+html .workspace-shell .game-magic-dossier {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0.45rem;
+  text-align: left;
+  background: rgb(var(--panel));
+  box-shadow: 0 0 0 1px rgb(var(--line)), 0 14px 24px -20px rgb(0 0 0 / 0.55);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease, rotate 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* fichas levemente tortas, como coladas à mão; endireitam no hover */
+html .workspace-shell .games-magic-grid > :nth-child(3n + 1) .game-magic-dossier { rotate: -0.6deg; }
+html .workspace-shell .games-magic-grid > :nth-child(3n + 2) .game-magic-dossier { rotate: 0.5deg; }
+html .workspace-shell .games-magic-grid > :nth-child(3n) .game-magic-dossier { rotate: -0.3deg; }
+
+html .workspace-shell .games-magic-grid .game-magic-dossier:hover {
+  rotate: 0deg;
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--dossier-accent) 70%, transparent), 0 24px 36px -24px rgb(0 0 0 / 0.55);
+}
+
+html .workspace-shell .game-magic-dossier.is-selected {
+  box-shadow: 0 0 0 2px rgb(var(--pen)), 0 14px 24px -20px rgb(0 0 0 / 0.55);
+}
+
+.game-magic-spotlight {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  background: radial-gradient(
+    220px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in srgb, var(--dossier-accent, #8e9eff) 18%, transparent),
+    transparent 68%
+  );
+  transition: opacity 220ms ease;
+}
+
+@media (hover: hover) {
+  .game-magic-dossier:hover .game-magic-spotlight {
+    opacity: 1;
+  }
+}
+
+.game-magic-visited {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 3;
+  padding: 0.05rem 0.55rem;
+  border-radius: 0.3rem;
+  rotate: 5deg;
+  font-family: "Kalam", cursive;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111;
+  background: rgb(var(--hl-mint) / 0.9);
+}
+
+.game-dossier__tagline {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: rgb(var(--theme-text) / 0.66);
+}
+
+.game-dossier__footer {
+  margin-top: auto;
+  padding-top: 0.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-top: 1px dashed rgb(var(--line));
+}
+
+/* celular: ficha deitada (arte à esquerda). Seis fichas em pé davam quatro
+   telas de rolagem só para ver a biblioteca. */
+@media (max-width: 639px) {
+  html .workspace-shell .game-magic-dossier {
+    flex-direction: row;
+    min-height: 0;
+  }
+
+  html .workspace-shell .game-magic-dossier .game-dossier__media {
+    flex: 0 0 36%;
+    aspect-ratio: auto;
+    min-height: 8.5rem;
+    border-bottom: 0;
+  }
+
+  html .workspace-shell .game-magic-dossier .game-dossier__body {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 0.7rem 0.8rem 0.65rem;
+  }
+
+  html .workspace-shell .game-magic-dossier .game-dossier__meta {
+    display: none;
+  }
+
+  html .workspace-shell .games-magic-grid .game-magic-dossier {
+    rotate: 0deg;
+  }
+
+  html .workspace-shell .games-expedition-canvas.is-stage {
+    inset: 7.6rem 0 9.4rem;
+  }
+
+  html .workspace-shell .games-expedition-panel {
+    min-height: 30rem;
+  }
+}
+
+/* movimento reduzido / tier baixo: sem spotlight nem molas */
+:is(.no-motion, .low-fx) .game-magic-spotlight {
+  display: none;
+}
+
+:is(.no-motion, .low-fx) .games-map3d-stop,
+:is(.no-motion, .low-fx) .workspace-shell .game-magic-dossier {
+  transition: none;
+}
+
+/* ───────── Fase 2: Game Feel (Fever, Beams, Reorder, 3D Flip, Troféu 3D) ───────── */
+
+.game-fever-badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.68rem;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1c1002;
+  background: linear-gradient(135deg, #fbbf24, #fb7185);
+  box-shadow: 0 8px 20px -6px rgba(251, 113, 133, 0.65);
+}
+
+/* Nexo Vivo: feixes SVG animados + modo escuro limpo no HUD */
+.nexus-beams {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.nexus-beam-base {
+  fill: none;
+  stroke: rgb(var(--pen) / 0.22);
+  stroke-width: 0.55;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.nexus-beam-base.is-wrong {
+  stroke: rgb(var(--margin-line) / 0.45);
+  stroke-dasharray: 1 2.5;
+}
+
+.nexus-beam-live {
+  fill: none;
+  stroke: #2fd483;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(47, 212, 131, 0.75));
+  vector-effect: non-scaling-stroke;
+}
+
+html:not(.theme-light) .nexus-hud span {
+  background: rgb(var(--panel)) !important;
+  box-shadow: inset 0 0 0 1px rgb(var(--line)), 0 8px 18px -12px rgb(0 0 0 / 0.7);
+}
+
+/* Forja de Sequências: alça de arraste Reorder */
+.forge-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.forge-step {
+  cursor: grab;
+  user-select: none;
+}
+
+.forge-step:active {
+  cursor: grabbing;
+}
+
+.forge-grip {
+  display: inline-flex;
+  align-items: center;
+  color: rgb(var(--theme-text) / 0.38);
+  transition: color 150ms ease;
+}
+
+.forge-step:hover .forge-grip {
+  color: rgb(var(--pen));
+}
+
+/* Corrida do Conhecimento: delta +3s / -5s + alerta progressivo */
+.games-time-delta {
+  position: absolute;
+  right: 0.25rem;
+  top: 0;
+  z-index: 4;
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.games-time-delta.is-plus {
+  color: #052e16;
+  background: #4ade80;
+  box-shadow: 0 6px 14px -4px rgba(74, 222, 128, 0.7);
+}
+
+.games-time-delta.is-minus {
+  color: #fff;
+  background: #f43f5e;
+  box-shadow: 0 6px 14px -4px rgba(244, 63, 94, 0.7);
+}
+
+.caderno-timer-fill.is-warn {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24) !important;
+}
+
+/* Arquivo da Memória: brilho metálico ao fechar par no flip 3D */
+.games-memo-3d-grid .caderno-memo.is-done .caderno-memo-face.is-front::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 25%, rgba(255, 255, 255, 0.45) 50%, transparent 75%);
+  animation: memo-glint 0.7s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes memo-glint {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(120%); }
+}
+
+/* Troféu 3D da Liga (Aba Liga + Tela de Resultado) */
+.league-trophy-3d {
+  position: relative;
+  border-radius: 1.15rem;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 55% at 50% 45%, rgb(var(--hl-yellow) / 0.28), transparent 72%),
+    repeating-linear-gradient(to bottom, transparent 0 21px, rgb(var(--rule) / 0.55) 21px 22px),
+    rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+  touch-action: pan-y;
+}
+
+/* emblema desenhado: tier baixo, movimento reduzido ou sem WebGL */
+.league-trophy-flat {
+  display: grid;
+  flex: none;
+  place-items: center;
+  border-radius: 1.15rem;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 21px, rgb(var(--rule) / 0.55) 21px 22px),
+    rgb(var(--sheet));
+  box-shadow: 0 0 0 1px rgb(var(--line));
+}
+
+.league-trophy-flat.is-sm { width: 118px; height: 118px; }
+.league-trophy-flat.is-md { width: 196px; height: 196px; }
+
+.league-trophy-flat > span {
+  display: grid;
+  place-items: center;
+  width: 62%;
+  height: 62%;
+  rotate: -6deg;
+  border-radius: 50%;
+  color: #111;
+  background: color-mix(in srgb, var(--league) 72%, white);
+  box-shadow: inset 0 0 0 3px rgb(var(--pen)), 0 0 0 6px rgb(var(--sheet)), 0 0 0 7.5px color-mix(in srgb, var(--league) 80%, black);
+}
+
+.league-trophy-3d.is-sm {
+  width: 118px;
+  height: 118px;
+}
+
+.league-trophy-3d.is-md {
+  width: 196px;
+  height: 196px;
+}
+
+.league-trophy-3d canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.games-season-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  align-items: center;
+}
+
+@media (min-width: 720px) {
+  .games-season-hero {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.games-season-trophy-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+}
+
+.games-season-trophy-hint {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.55;
+}
+
+.games-season-meter {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.95rem;
+  background: rgb(var(--sheet));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.7);
+}
+
+.games-result-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  margin-bottom: 0.4rem;
+}
+
+.games-result-trophy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.games-result-league-tag {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.games-result-league-bar {
+  width: min(100%, 24rem);
+  margin: 0.75rem auto 0.25rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.games-result-league-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.games-result-league-track {
+  height: 7px;
+  border-radius: 999px;
+  background: rgb(var(--line) / 0.55);
+  overflow: hidden;
+}
+
+.games-result-league-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .games-memo-3d-grid .caderno-memo.is-done .caderno-memo-face.is-front::after {
+    animation: none;
+  }
+}

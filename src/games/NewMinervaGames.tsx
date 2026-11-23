@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, Reorder } from "framer-motion";
 import {
   ArrowDown,
   ArrowRight,
@@ -7,6 +7,8 @@ import {
   Check,
   CheckCircle2,
   CircleDot,
+  Flame,
+  GripVertical,
   Link2,
   Orbit,
   RotateCcw,
@@ -24,6 +26,7 @@ import {
 import type { GameAnswer } from "../../shared/game-meta.mjs";
 import { useSoftMotion } from "../motion";
 import { celebrateFrom } from "../caderno";
+import { CuboBorderBeam } from "../cubo/CuboFx";
 import "./new-games.css";
 
 export type ConceptPair = { term: string; definition: string };
@@ -143,8 +146,50 @@ export function NexusGame({ pairs, onFinish }: { pairs: ConceptPair[]; onFinish:
         <NexusHud score={score} energy={energy} streak={streak} progress={`${index + (resolved ? 1 : 0)}/${usablePairs.length}`} />
       </header>
 
-      <div className="nexus-stage">
+      <div className={`nexus-stage ${streak >= 2 ? "is-fever" : ""}`}>
+        {streak >= 2 ? <CuboBorderBeam size={140} duration={3.4} colorFrom="#e5487f" colorTo="#2fd483" borderWidth={2} radius="0.5rem" /> : null}
         <div className="nexus-grid" aria-hidden />
+        <svg className="nexus-beams" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          {options.map((option, optionIndex) => {
+            const anchors: Array<[number, number]> = [
+              [18, 22],
+              [82, 22],
+              [50, 82],
+            ];
+            const [tx, ty] = anchors[optionIndex] ?? [50, 82];
+            const isWrong = wrong.includes(option.definition);
+            const isCorrect = resolved && option.term === current.term;
+            const pathD = `M 50 50 Q ${(50 + tx) / 2} ${optionIndex === 2 ? 68 : 34} ${tx} ${ty}`;
+            return (
+              <g key={`beam-${current.term}-${optionIndex}`}>
+                <path d={pathD} className={`nexus-beam-base ${isWrong ? "is-wrong" : ""}`} />
+                {isCorrect ? (
+                  <motion.path
+                    d={pathD}
+                    className="nexus-beam-live"
+                    initial={reduced ? false : { pathLength: 0, opacity: 0.4 }}
+                    animate={{ pathLength: 1, opacity: 1 }}
+                    transition={{ duration: 0.45, ease: "easeOut" }}
+                  />
+                ) : null}
+              </g>
+            );
+          })}
+        </svg>
+        <AnimatePresence>
+          {streak >= 2 ? (
+            <motion.span
+              key={streak}
+              className="game-fever-badge"
+              initial={reduced ? false : { scale: 0.65, opacity: 0, y: -8 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 360, damping: 22 }}
+            >
+              <Flame className="h-3.5 w-3.5" aria-hidden /> Pulso {streak}x
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
         <motion.div
           className={`nexus-core ${resolved ? "is-linked" : ""}`}
           animate={reduced ? undefined : resolved ? { scale: [1, 1.12, 1], rotate: [0, -6, 4, 0] } : { y: [0, -5, 0], rotate: [0, 1.5, 0] }}
@@ -207,8 +252,7 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
   const [solved, setSolved] = useState(false);
   const [eligibleForXp, setEligibleForXp] = useState(true);
   const [correctAnswers, setCorrectAnswers] = useState(0);
-  const [feedback, setFeedback] = useState("Mova as etapas e acione o núcleo quando o processo fizer sentido.");
-  const dragIndex = useRef<number | null>(null);
+  const [feedback, setFeedback] = useState("Arraste ou mova as etapas e acione o núcleo quando o processo fizer sentido.");
   const finished = useRef(false);
   const answersRef = useRef<GameAnswer[]>([]);
 
@@ -279,29 +323,36 @@ export function SequenceForgeGame({ puzzles, onFinish }: { puzzles: SequencePuzz
           <div className="forge-metrics"><span><strong>{moves}</strong>movimentos</span><span><strong>{attempts}</strong>testes</span></div>
         </aside>
 
-        <div className="forge-track" aria-label="Etapas do processo em ordem ajustável">
-          <AnimatePresence initial={false}>
-            {order.map((step, index) => (
-              <motion.article
-                layout
-                key={step}
-                className={`forge-step ${solved ? "is-solved" : ""}`}
-                draggable={!solved}
-                onDragStart={() => { dragIndex.current = index; }}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => { if (dragIndex.current !== null) move(dragIndex.current, index); dragIndex.current = null; }}
-                transition={{ layout: reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 } }}
-              >
-                <span className="forge-number">{index + 1}</span>
-                <p>{step}</p>
-                <div className="forge-controls">
-                  <button type="button" onClick={() => move(index, index - 1)} disabled={solved || index === 0} aria-label={`Mover “${step}” para cima`}><ArrowUp aria-hidden /></button>
-                  <button type="button" onClick={() => move(index, index + 1)} disabled={solved || index === order.length - 1} aria-label={`Mover “${step}” para baixo`}><ArrowDown aria-hidden /></button>
-                </div>
-              </motion.article>
-            ))}
-          </AnimatePresence>
-        </div>
+        <Reorder.Group
+          axis="y"
+          values={order}
+          onReorder={(next) => {
+            if (solved) return;
+            setOrder(next);
+            setMoves((value) => value + 1);
+          }}
+          className="forge-track"
+          aria-label="Etapas do processo em ordem ajustável"
+        >
+          {order.map((step, index) => (
+            <Reorder.Item
+              key={step}
+              value={step}
+              dragListener={!solved}
+              className={`forge-step ${solved ? "is-solved" : ""}`}
+              whileDrag={reduced ? undefined : { scale: 1.025, boxShadow: "0 18px 36px -14px rgba(0, 0, 0, 0.45)", zIndex: 10 }}
+              transition={{ layout: reduced ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 30 } }}
+            >
+              <span className="forge-grip" aria-hidden="true"><GripVertical className="h-4 w-4" /></span>
+              <span className="forge-number">{index + 1}</span>
+              <p>{step}</p>
+              <div className="forge-controls">
+                <button type="button" onClick={() => move(index, index - 1)} disabled={solved || index === 0} aria-label={`Mover “${step}” para cima`}><ArrowUp aria-hidden /></button>
+                <button type="button" onClick={() => move(index, index + 1)} disabled={solved || index === order.length - 1} aria-label={`Mover “${step}” para baixo`}><ArrowDown aria-hidden /></button>
+              </div>
+            </Reorder.Item>
+          ))}
+        </Reorder.Group>
       </div>
 
       <div className={`forge-feedback ${solved ? "is-success" : ""}`} role="status" aria-live="polite">

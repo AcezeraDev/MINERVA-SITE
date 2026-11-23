@@ -126,7 +126,11 @@ import {
   useSoftMotion,
 } from "../motion";
 import { NexusGame, SequenceForgeGame } from "../games/NewMinervaGames";
-import { GameArtwork, StudyExpeditionMap } from "../games/GameArtwork";
+import { GameArtwork } from "../games/GameArtwork";
+import { ExpeditionStage, LeagueTrophy } from "../games/Games3D";
+import { useCena3D } from "../cena3d/Cena3D";
+import { CuboBorderBeam } from "../cubo/CuboFx";
+import "./games-hub-3d.css";
 import { MAX_CHAT_PROMPT_CHARS } from "../../shared/chat-limits.mjs";
 import { mergeSeen, noveltyKey, parseSequencePuzzles, pickUnseen, type SequencePuzzle } from "../../shared/game-core.mjs";
 import {
@@ -516,20 +520,51 @@ export function SpeedRunGame({
 
       <StoryJourney game="corrida" successes={indice} goal={items.length} />
 
-      {/* o relógio é um lápis que vai sendo gasto */}
-      <div className="caderno-timer" aria-hidden>
-        <motion.div
-          className={`caderno-timer-fill ${segundos <= 10 ? "is-low" : ""}`}
-          animate={{ width: `${fracao * 100}%` }}
-          transition={{ duration: 0.1, ease: "linear" }}
-        />
+      {/* o relógio é um lápis que vai sendo gasto + pulso de +3s/-5s */}
+      <div className="relative">
+        <div className="caderno-timer" aria-hidden>
+          <motion.div
+            className={`caderno-timer-fill ${segundos <= 10 ? "is-low" : segundos <= 18 ? "is-warn" : ""}`}
+            animate={{ width: `${fracao * 100}%` }}
+            transition={{ duration: 0.1, ease: "linear" }}
+          />
+        </div>
+        <AnimatePresence>
+          {flash ? (
+            <motion.span
+              key={`${indice}-${flash}`}
+              className={`games-time-delta ${flash === "acerto" ? "is-plus" : "is-minus"}`}
+              initial={{ opacity: 0, y: 6, scale: 0.85 }}
+              animate={{ opacity: 1, y: -18, scale: 1 }}
+              exit={{ opacity: 0, y: -28 }}
+              transition={spring.snappy}
+            >
+              {flash === "acerto" ? "+3s" : `−${CASTIGO_ERRO / 1000}s`}
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
       </div>
 
       <motion.div
         animate={flash === "acerto" ? { scale: [1, 1.015, 1] } : flash === "erro" ? { x: [0, -9, 9, -5, 0] } : {}}
         transition={{ duration: 0.3 }}
-        className={`caderno-tf-card ${flash === "acerto" ? "is-right" : flash === "erro" ? "is-wrong" : ""}`}
+        className={`caderno-tf-card relative overflow-hidden ${combo >= 3 ? "is-fever" : ""} ${flash === "acerto" ? "is-right" : flash === "erro" ? "is-wrong" : ""}`}
       >
+        {combo >= 3 ? <CuboBorderBeam size={140} duration={2.8} colorFrom="#fbbf24" colorTo="#f472b6" borderWidth={2} radius="1rem" /> : null}
+        <AnimatePresence>
+          {combo >= 3 ? (
+            <motion.span
+              key={combo}
+              className="game-fever-badge"
+              initial={{ scale: 0.65, opacity: 0, y: -6 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={spring.snappy}
+            >
+              <Flame className="h-3.5 w-3.5" aria-hidden /> Febre x{multiplicador}
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
         <p className="caderno-tf-count">afirmação {indice + 1}/{items.length}</p>
         <p className="caderno-tf-statement">{atual?.statement}</p>
         {flash ? (
@@ -611,9 +646,11 @@ export function MemoryGame({
   const [viradas, setViradas] = useState<string[]>([]);
   const [feitos, setFeitos] = useState<number[]>([]);
   const [jogadas, setJogadas] = useState(0);
+  const [combo, setCombo] = useState(0);
   const [erroPar, setErroPar] = useState<string[]>([]);
   const [inicio] = useState(() => Date.now());
   const [segundos, setSegundos] = useState(0);
+  const gridRef = useRef<HTMLDivElement | null>(null);
   const encerrado = useRef(false);
   const failedPairsRef = useRef<Set<number>>(new Set());
 
@@ -655,9 +692,12 @@ export function MemoryGame({
     const [a, b] = viradas.map((id) => baralho.find((item) => item.id === id)!);
     if (a.parId === b.parId) {
       setFeitos((atual) => (atual.includes(a.parId) ? atual : [...atual, a.parId]));
+      setCombo((c) => c + 1);
       setViradas([]);
+      celebrateFrom(gridRef.current, { count: 16 });
       return;
     }
+    setCombo(0);
     failedPairsRef.current.add(a.parId);
     failedPairsRef.current.add(b.parId);
     setErroPar(viradas);
@@ -673,12 +713,13 @@ export function MemoryGame({
       <GameHud
         items={[
           { label: "Pares", value: `${feitos.length}/${pairs.length}`, tone: "bom" },
+          { label: "Sequência", value: combo >= 2 ? `${combo}x 🔥` : String(combo), tone: combo >= 2 ? "bom" : "normal" },
           { label: "Jogadas", value: String(jogadas) },
           { label: "Tempo", value: `${segundos}s` },
         ]}
       />
       <StoryJourney game="memoria" successes={feitos.length} goal={pairs.length} />
-      <div className="caderno-memo-grid">
+      <div ref={gridRef} className="caderno-memo-grid games-memo-3d-grid">
         {baralho.map((carta, cartaIndex) => {
           const feito = feitos.includes(carta.parId);
           const aberta = feito || viradas.includes(carta.id);
@@ -1397,6 +1438,7 @@ export function GameResultSheet({
   recordeAnterior,
   jogo,
   materia,
+  league,
   onAgain,
   onExit,
 }: {
@@ -1408,11 +1450,14 @@ export function GameResultSheet({
   recordeAnterior: number;
   jogo: string;
   materia: string;
+  league?: ReturnType<typeof leagueFromPoints>;
   onAgain: () => void;
   onExit: () => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const reduced = useSoftMotion();
   const aproveitamento = total ? acertos / total : 0;
+  const perfeito = total > 0 && acertos === total;
   const recado = aproveitamento >= 0.9 ? "Perfeito! Tirou de letra." : aproveitamento >= 0.6 ? "Mandou bem! Mais uma?" : "Quase! Bora treinar de novo?";
 
   useEffect(() => {
@@ -1425,19 +1470,64 @@ export function GameResultSheet({
   }, []);
 
   return (
-    <div className="caderno-result">
+    <div className="caderno-result relative overflow-hidden">
+      {recorde || perfeito ? (
+        <CuboBorderBeam size={150} duration={4.5} colorFrom={league?.color || "#fbbf24"} colorTo="#2fd483" borderWidth={2} radius="1.15rem" />
+      ) : null}
       <span className="caderno-result-tape" aria-hidden />
-      <div ref={ref} className="caderno-result-grade">
-        <Doodle kind="circle" className="caderno-result-ring" duration={900} delay={200} strokeWidth={2.6} stretch />
-        <span className="caderno-result-points tabular">{pontos}</span>
-        <span className="caderno-result-unit">pontos</span>
+      <div className="games-result-hero">
+        {league ? (
+          <div className="games-result-trophy">
+            <LeagueTrophy leagueId={league.id} color={league.color} name={league.name} size="sm" />
+            <span className="games-result-league-tag" style={{ color: league.color }}>Liga {league.name}</span>
+          </div>
+        ) : null}
+        <div ref={ref} className="caderno-result-grade">
+          <Doodle kind="circle" className="caderno-result-ring" duration={900} delay={200} strokeWidth={2.6} stretch />
+          <span className="caderno-result-points tabular"><CountUp value={pontos} /></span>
+          <span className="caderno-result-unit">pontos</span>
+        </div>
       </div>
-      {recorde ? <p className="caderno-result-stamp">novo recorde!</p> : null}
+      {recorde ? (
+        <motion.p
+          className="caderno-result-stamp"
+          initial={reduced ? false : { scale: 1.7, opacity: 0, rotate: -14 }}
+          animate={{ scale: 1, opacity: 1, rotate: -4 }}
+          transition={spring.snappy}
+        >
+          novo recorde!
+        </motion.p>
+      ) : perfeito ? (
+        <motion.p
+          className="caderno-result-stamp"
+          initial={reduced ? false : { scale: 1.5, opacity: 0, rotate: -10 }}
+          animate={{ scale: 1, opacity: 1, rotate: -3 }}
+          transition={spring.snappy}
+        >
+          100% perfeito!
+        </motion.p>
+      ) : null}
       <p className="caderno-result-meta">{jogo}{materia ? ` · ${materia}` : ""}</p>
       <p className="caderno-result-xp">
         <Zap className="h-4 w-4" />
-        <mark>+{xp} XP</mark> · {acertos}/{total} acertos
+        <mark>+<CountUp value={xp} /> XP</mark> · {acertos}/{total} acertos
       </p>
+      {league ? (
+        <div className="games-result-league-bar">
+          <div className="games-result-league-head">
+            <span>Temporada · {league.points} pts</span>
+            <span>{league.next ? `Faltam ${Math.max(0, league.next.min - league.points)} pts para ${league.next.name}` : "Liga máxima!"}</span>
+          </div>
+          <div className="games-result-league-track">
+            <motion.span
+              initial={reduced ? false : { width: 0 }}
+              animate={{ width: `${Math.round(league.progress * 100)}%` }}
+              transition={{ duration: 0.9, ease: "easeOut" }}
+              style={{ backgroundColor: league.color }}
+            />
+          </div>
+        </div>
+      ) : null}
       <div className="caderno-result-bubbles" aria-hidden>
         {Array.from({ length: Math.max(total, 0) }).map((_, index) => (
           <span key={index} className={index < acertos ? "is-on" : ""} style={{ animationDelay: `${0.4 + index * 0.08}s` }} />
@@ -1739,50 +1829,35 @@ export const gamesHubTabs: Array<{ id: GamesHubTab; label: string; hint: string;
 
 export function GamesHubNav({ active, onChange, errorCount }: { active: GamesHubTab; onChange: (tab: GamesHubTab) => void; errorCount: number }) {
   const reduced = useSoftMotion();
-  const tones = ["yellow", "pink", "lilac", "mint", "blue", "orange"];
   return (
-    // Divisórias de fichário: cada área é uma aba colorida; a ativa ganha o
-    // risco de marca-texto que desliza entre elas.
-    <nav aria-label="Áreas dos jogos" className="caderno-gnav">
-      <div className="caderno-gnav-head">
-        <div>
-          <p className="caderno-note">central dos jogos</p>
-          <p className="caderno-gnav-title">Escolha onde continuar</p>
-        </div>
-        <span className="caderno-gnav-saved">✓ progresso salvo</span>
-      </div>
-      <div className="caderno-gnav-scroll">
-        <div className="caderno-gnav-grid">
-          {gamesHubTabs.map((tab, index) => {
-            const activeTab = tab.id === active;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                aria-current={activeTab ? "page" : undefined}
-                onClick={() => onChange(tab.id)}
-                className={`caderno-gtab group ${activeTab ? "is-active" : ""}`}
-                data-tone={tones[index % tones.length]}
-              >
-                {activeTab ? (
-                  reduced ? (
-                    <span aria-hidden className="caderno-gtab-mark" />
-                  ) : (
-                    <motion.span layoutId="games-hub-active" aria-hidden className="caderno-gtab-mark" transition={spring.snappy} />
-                  )
-                ) : null}
-                <span className="caderno-gtab-icon">
-                  <tab.icon className="h-5 w-5" />
-                </span>
-                <span className="relative min-w-0 flex-1">
-                  <span className="caderno-gtab-label">{tab.label}</span>
-                  <span className="caderno-gtab-hint">{tab.hint}</span>
-                </span>
-                {tab.id === "erros" && errorCount > 0 ? <span className="caderno-gtab-count">{errorCount}</span> : null}
-              </button>
-            );
-          })}
-        </div>
+    <nav aria-label="Áreas dos jogos" className="games-hub-bar">
+      <div className="games-hub-pills" role="tablist">
+        {gamesHubTabs.map((tab) => {
+          const activeTab = tab.id === active;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab}
+              aria-current={activeTab ? "page" : undefined}
+              title={tab.hint}
+              onClick={() => onChange(tab.id)}
+              className={`games-hub-pill ${activeTab ? "is-active" : ""}`}
+            >
+              {activeTab ? (
+                reduced ? (
+                  <span aria-hidden className="games-hub-pill-bg" />
+                ) : (
+                  <motion.span layoutId="games-hub-active" aria-hidden className="games-hub-pill-bg" transition={spring.snappy} />
+                )
+              ) : null}
+              <tab.icon className="relative z-10 h-4 w-4 shrink-0" aria-hidden />
+              <span className="relative z-10">{tab.label}</span>
+              {tab.id === "erros" && errorCount > 0 ? <span className="games-hub-badge">{errorCount}</span> : null}
+            </button>
+          );
+        })}
       </div>
     </nav>
   );
@@ -1941,9 +2016,37 @@ export function GameSeasonPanel({ sessions }: { sessions: Session[] }) {
   const league = leagueFromPoints(points);
   const unlocked = unlockedGameAchievementIds(sessions);
   const remainingDays = Math.max(1, Math.ceil((season.endAt - Date.now()) / 86_400_000));
+  const trofeu3D = useCena3D();
   return <div className="grid gap-4">
-    <HeroCard><div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="caderno-note">{season.name} · {remainingDays} dias restantes</p><h2 className="mt-1 font-display text-4xl font-black" style={{ color: league.color }}>Liga {league.name}</h2><p className="mt-2 max-w-xl text-sm font-bold text-white/48">Acertos valem 10 pontos de temporada, partidas perfeitas dão +20 e missões concluídas somam recompensas. O XP continua separado.</p></div><div className="min-w-[14rem] rounded-2xl border border-white/10 bg-black/25 p-4"><div className="flex items-end justify-between"><p className="font-display text-3xl font-black">{points}</p><p className="text-[10px] font-black uppercase text-white/35">PTS</p></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full" style={{ width: `${league.progress * 100}%`, backgroundColor: league.color }} /></div><p className="mt-2 text-[11px] font-bold text-white/38">{league.next ? `${Math.max(0, league.next.min - points)} pts para ${league.next.name}` : "Liga máxima alcançada"}</p></div></div></HeroCard>
-    <GlassCard><SectionTitle icon={Award} title={`Conquistas dos jogos (${unlocked.size}/${gameAchievementRules.length})`} hint="marcos permanentes" /><div className="mt-4 grid gap-2 sm:grid-cols-2">{gameAchievementRules.map((achievement) => { const done = unlocked.has(achievement.id); return <div key={achievement.id} className={`flex gap-3 rounded-xl border p-3 ${done ? "border-mint/28 bg-mint/[0.07]" : "border-white/8 bg-black/20 opacity-55"}`}><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${done ? "bg-mint text-black" : "bg-white/8 text-white/35"}`}>{done ? <Trophy className="h-5 w-5" /> : <Lock className="h-4 w-4" />}</span><div><p className="font-display text-sm font-black">{achievement.name}</p><p className="mt-0.5 text-[11px] font-bold leading-relaxed text-white/42">{achievement.description}</p></div></div>; })}</div></GlassCard>
+    <HeroCard>
+      <div className="games-season-hero">
+        <div className="games-season-trophy-box">
+          <LeagueTrophy leagueId={league.id} color={league.color} name={league.name} size="md" />
+          {trofeu3D ? <span className="games-season-trophy-hint">Arraste para girar</span> : null}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="caderno-note">{season.name} · {remainingDays} dias restantes</p>
+          <h2 className="mt-1 font-display text-4xl font-black" style={{ color: league.color }}>Liga {league.name}</h2>
+          <p className="mt-2 max-w-xl text-sm font-bold opacity-70">Acertos valem 10 pontos de temporada, partidas perfeitas dão +20 e missões concluídas somam recompensas. O XP continua separado.</p>
+          <div className="games-season-meter">
+            <div className="flex items-end justify-between">
+              <p className="font-display text-3xl font-black"><CountUp value={points} /> <span className="text-xs font-black uppercase opacity-50">PTS</span></p>
+              <p className="text-xs font-bold opacity-65">{league.next ? `${Math.max(0, league.next.min - points)} pts para ${league.next.name}` : "Liga máxima alcançada"}</p>
+            </div>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-black/15 dark:bg-white/10">
+              <motion.div
+                className="h-full rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.round(league.progress * 100)}%` }}
+                transition={{ duration: 0.9, ease: "easeOut" }}
+                style={{ backgroundColor: league.color }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </HeroCard>
+    <GlassCard><SectionTitle icon={Award} title={`Conquistas dos jogos (${unlocked.size}/${gameAchievementRules.length})`} hint="marcos permanentes" /><div className="mt-4 grid gap-2 sm:grid-cols-2">{gameAchievementRules.map((achievement) => { const done = unlocked.has(achievement.id); return <div key={achievement.id} className={`flex gap-3 rounded-xl border p-3 ${done ? "border-mint/28 bg-mint/[0.07]" : "border-white/8 bg-black/20 opacity-55"}`}><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${done ? "bg-mint text-black" : "bg-white/8 text-white/35"}`}>{done ? <Trophy className="h-5 w-5" /> : <Lock className="h-4 w-4" />}</span><div><p className="font-display text-sm font-black">{achievement.name}</p><p className="mt-0.5 text-[11px] font-bold leading-relaxed opacity-65">{achievement.description}</p></div></div>; })}</div></GlassCard>
   </div>;
 }
 
@@ -2228,14 +2331,30 @@ export function GamesView({ data, user, update, tabInicial }: { data: ReturnType
     setResultado(null);
   }
 
+  const [viewMode, setViewMode] = useState<"grade" | "baralho">("grade");
+  const [selectedMapGameId, setSelectedMapGameId] = useState<string | null>(null);
+
   const jogoAtual = gameCatalog.find((item) => item.id === game);
   const subjectGameSessions = data.sessions.filter((session) => session.kind === "Games" && session.subjectId === subjectId && !session.dailyChallenge);
   const visitedGameIds = new Set(subjectGameSessions.map((session) => session.gameId).filter(Boolean));
   const latestGameSession = [...subjectGameSessions].sort((a, b) => b.createdAt - a.createdAt)[0];
-  const featuredGame = gameCatalog.find((item) => item.id === latestGameSession?.gameId) || gameCatalog.find((item) => item.featured) || gameCatalog[0];
+  const defaultFeatured = gameCatalog.find((item) => item.id === latestGameSession?.gameId) || gameCatalog.find((item) => item.featured) || gameCatalog[0];
+  const featuredGame = gameCatalog.find((item) => item.id === selectedMapGameId) || defaultFeatured;
   const dailySession = data.sessions.find((session) => session.kind === "Games" && session.dailyChallenge && session.dailyKey === dailyChallengeKey());
   const dailyCorrect = Number(dailySession?.correctAnswers || 0);
   const gameGamification = gamificationOf(data);
+
+  // Spotlight dos cartões: o rect é medido na entrada (não a cada movimento) e a
+  // posição vai direto para o nó em CSS vars — nada passa pelo React.
+  const spotRect = useRef<DOMRect | null>(null);
+  const handleCardEnter = (event: React.PointerEvent<HTMLButtonElement>) => {
+    spotRect.current = event.currentTarget.getBoundingClientRect();
+  };
+  const handleCardSpotlight = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (reducedGames || event.pointerType !== "mouse" || !spotRect.current) return;
+    event.currentTarget.style.setProperty("--mx", `${event.clientX - spotRect.current.left}px`);
+    event.currentTarget.style.setProperty("--my", `${event.clientY - spotRect.current.top}px`);
+  };
 
   return (
     <>
@@ -2284,34 +2403,48 @@ export function GamesView({ data, user, update, tabInicial }: { data: ReturnType
 
           <div className="games-expedition-layout">
             <Reveal delay={0.07}>
-              <section className="games-expedition-panel">
+              <section className="games-expedition-panel games-hero-3d">
+                <CuboBorderBeam size={140} duration={9} colorFrom={featuredGame.accent} colorTo="#2fd483" borderWidth={1.5} radius="1.2rem" />
                 <div className="games-expedition-copy">
                   <div>
                     <p>Expedição · {subject?.name || "Estudos"}</p>
-                    <h2>Mapa de estudos</h2>
-                    <span>Cada modo visitado abre uma nova forma de aprender o mesmo conteúdo.</span>
+                    <h2>Mapa da expedição</h2>
+                    <span>Escolha um destino no mapa ou na régua abaixo; tocar de novo abre o jogo.</span>
                   </div>
-                  <span className="games-expedition-coordinate">{visitedGameIds.size}/6 destinos</span>
+                  <span className="games-expedition-coordinate">{visitedGameIds.size}/6 explorados</span>
                 </div>
-                <div className="games-expedition-canvas">
-                  <StudyExpeditionMap completedCount={visitedGameIds.size} label={subject?.name || "seus estudos"} />
+                <div className="games-expedition-canvas is-stage">
+                  <ExpeditionStage
+                    nodes={gameCatalog.map((item) => ({
+                      id: item.id,
+                      name: item.name,
+                      short: item.name.replace(/^(A|O|Os|As) /, "").split(" ")[0],
+                      accent: item.accent,
+                      visited: visitedGameIds.has(item.id),
+                    }))}
+                    label={subject?.name || "seus estudos"}
+                    selectedId={featuredGame.id}
+                    onSelect={(id) => setSelectedMapGameId(id)}
+                    onLaunch={(id) => abrirJogo(id as GameId)}
+                  />
                 </div>
                 <div className="games-current-mission">
                   <span className="games-current-mission__icon" style={{ backgroundColor: featuredGame.accent }}><featuredGame.icon className="h-5 w-5" /></span>
                   <span className="min-w-0 flex-1">
-                    <small>{latestGameSession ? "Continuar expedição" : "Primeiro destino"}</small>
+                    <small>{visitedGameIds.has(featuredGame.id) ? "Continuar destino" : "Destino selecionado"}</small>
                     <strong>{featuredGame.name}</strong>
-                    <em>{featuredGame.duration} · {featuredGame.difficulty}</em>
+                    <em>{featuredGame.duration} · {featuredGame.difficulty} · Recorde: {recordes[`${featuredGame.id}:${subjectId}`] || "—"}</em>
                   </span>
                   <button type="button" onClick={() => abrirJogo(featuredGame.id)}>
-                    {latestGameSession ? "Continuar" : "Começar"}<ArrowRight className="h-4 w-4" />
+                    Jogar agora<ArrowRight className="h-4 w-4" />
                   </button>
                 </div>
               </section>
             </Reveal>
 
             <Reveal delay={0.1}>
-              <aside className="games-daily-card">
+              <aside className="games-daily-card relative overflow-hidden">
+                <CuboBorderBeam size={110} duration={7} colorFrom="#fbbf24" colorTo="#f472b6" borderWidth={1.5} radius="1.2rem" />
                 <div className="games-daily-card__topline"><CalendarCheck className="h-4 w-4" /><span>Desafio do dia</span><small>5 perguntas</small></div>
                 <div className="games-daily-card__emblem"><Zap className="h-8 w-8" /></div>
                 <p>{dailySession ? "Desafio concluído" : "Impulso de conhecimento"}</p>
@@ -2331,48 +2464,84 @@ export function GamesView({ data, user, update, tabInicial }: { data: ReturnType
 
           {subject && !materials.length ? <p className="games-context-note">A Mine usará conhecimento geral sobre <strong>{subject.name}</strong> até você anexar conteúdos à matéria.</p> : null}
 
-          <section className="caderno-games-hand" aria-labelledby="games-hand-title">
-            <div className="games-library-heading">
-              <div><p className="caderno-note">escolha uma carta</p><h2 id="games-hand-title">Sua mão de jogos</h2></div>
-              <span>Passe o mouse para abrir o leque · clique para virar</span>
-            </div>
-            <GameHand
-              games={gameCatalog.map((item) => ({ id: item.id, name: item.name, tagline: item.tagline, goal: item.goal, howTo: item.howTo, accent: item.accent, icon: item.icon }))}
-              onPlay={(id) => abrirJogo(id as GameId)}
-              reduced={Boolean(reducedGames)}
-            />
-          </section>
-
           <section className="games-mission-library" aria-labelledby="mission-library-title">
             <div className="games-library-heading">
-              <div><p>Biblioteca de missões</p><h2 id="mission-library-title">Escolha seu próximo destino</h2></div>
-              <span>{gameCatalog.length} modos · +{xpPerAction.game} XP por acerto</span>
+              <div>
+                <p>Biblioteca de jogos</p>
+                <h2 id="mission-library-title">Todos os 6 modos · +{xpPerAction.game} XP por acerto</h2>
+              </div>
+              <div className="games-view-toggle" role="radiogroup" aria-label="Visualização dos jogos">
+                {(["grade", "baralho"] as const).map((mode) => {
+                  const activeMode = viewMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={activeMode}
+                      className={`games-view-pill ${activeMode ? "is-active" : ""}`}
+                      onClick={() => setViewMode(mode)}
+                    >
+                      {activeMode ? (reducedGames ? <span className="games-view-pill-bg" aria-hidden /> : <motion.span layoutId="games-view-bg" className="games-view-pill-bg" transition={spring.snappy} aria-hidden />) : null}
+                      <span className="relative z-10">{mode === "grade" ? "Grade" : "Baralho"}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="games-dossier-scroll">
-              <Stagger className="games-dossier-grid" gap={0.045}>
-                {gameCatalog.filter((item) => item.id !== featuredGame.id).map((item, index) => {
+
+            {viewMode === "baralho" ? (
+              <div className="caderno-games-hand">
+                <GameHand
+                  games={gameCatalog.map((item) => ({ id: item.id, name: item.name, tagline: item.tagline, goal: item.goal, howTo: item.howTo, accent: item.accent, icon: item.icon }))}
+                  onPlay={(id) => abrirJogo(id as GameId)}
+                  reduced={Boolean(reducedGames)}
+                />
+              </div>
+            ) : (
+              <div className="games-magic-grid">
+                {gameCatalog.map((item, index) => {
                   const recorde = recordes[`${item.id}:${subjectId}`] || 0;
                   const played = visitedGameIds.has(item.id);
+                  const isSel = item.id === featuredGame.id;
                   return (
-                    <StaggerItem key={item.id} className="h-full">
-                      <button type="button" onClick={() => abrirJogo(item.id)} className="game-dossier group" style={{ "--dossier-accent": item.accent } as React.CSSProperties}>
+                    <motion.div
+                      key={item.id}
+                      className="h-full"
+                      initial={reducedGames ? false : { opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ ...spring.snappy, delay: reducedGames ? 0 : index * 0.035 }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => abrirJogo(item.id)}
+                        onPointerEnter={handleCardEnter}
+                        onPointerMove={handleCardSpotlight}
+                        className={`game-dossier game-magic-dossier group ${isSel ? "is-selected" : ""}`}
+                        style={{ "--dossier-accent": item.accent } as React.CSSProperties}
+                      >
+                        <span className="game-magic-spotlight" aria-hidden="true" />
                         <span className="game-dossier__media">
                           <GameArtwork game={item.id} accent={item.accent} decorative />
                           <span className="game-dossier__index">{String(index + 1).padStart(2, "0")}</span>
+                          {played ? <span className="game-magic-visited">Explorado</span> : null}
                           <span className="game-dossier__icon"><item.icon className="h-5 w-5" /></span>
                         </span>
                         <span className="game-dossier__body">
                           <strong>{item.name}</strong>
+                          <span className="game-dossier__tagline">{item.tagline}</span>
                           <span className="game-dossier__meta"><em><Timer className="h-3.5 w-3.5" />{item.duration}</em><em><Activity className="h-3.5 w-3.5" />{item.difficulty}</em></span>
-                          <span className="game-dossier__record"><Trophy className="h-3.5 w-3.5" />Recorde: {recorde || "—"}</span>
-                          <span className="game-dossier__status">{played ? "Continuar" : item.badge || "Explorar"}<ArrowRight className="h-3.5 w-3.5" /></span>
+                          <span className="game-dossier__footer">
+                            <span className="game-dossier__record"><Trophy className="h-3.5 w-3.5" />{recorde || "—"}</span>
+                            <span className="game-dossier__status">{played ? "Jogar de novo" : "Explorar"}<ArrowRight className="h-3.5 w-3.5" /></span>
+                          </span>
                         </span>
                       </button>
-                    </StaggerItem>
+                    </motion.div>
                   );
                 })}
-              </Stagger>
-            </div>
+              </div>
+            )}
           </section>
           </>
           )}
@@ -2438,6 +2607,7 @@ export function GamesView({ data, user, update, tabInicial }: { data: ReturnType
             recordeAnterior={recordes[recordKey] || 0}
             jogo={jogoAtual?.name || "Jogo"}
             materia={subject?.name || ""}
+            league={leagueFromPoints(seasonPoints(data.sessions))}
             onAgain={() => game && iniciar(game)}
             onExit={sair}
           />
