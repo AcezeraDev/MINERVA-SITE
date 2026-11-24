@@ -46,6 +46,7 @@ import { pageForPanel } from "./mine/page-reader.mjs";
 import { questoesEnem } from "./mine/tools.mjs";
 import { searchWeb, webSearchEnabled } from "./mine/web.mjs";
 import { buscarLivro, buscarVideos, textoDoLivro } from "./mine/estante.mjs";
+import { readYoutubeVideo, youtubeId } from "./mine/video.mjs";
 import { ATELIE_DAILY_LIMIT, AtelieError, coloringPageFromPhoto } from "./atelie-ia.mjs";
 import { MINE_IMAGE_DAILY_LIMIT, MineImageError, generateMineImage } from "./mine/image-gen.mjs";
 import { MINE_VOICE_DAILY_LIMIT, MineVoiceError, synthesizeVoice } from "./mine/voice.mjs";
@@ -1675,14 +1676,45 @@ export async function handleDataRequest(req, res) {
       return true;
     }
 
-    // Prévias da página da matéria: vídeos do YouTube (com miniatura, tocam no
-    // player embutido) e capa/leitor legal de livros. Ver mine/estante.mjs.
+    // Prévias da página da matéria e estúdio da aba Vídeos: busca do YouTube
+    // (miniatura + player embutido) e leitura de metadados/legenda de um vídeo
+    // específico (mine/video.mjs) para resumo com minutagem e quiz da Mine.
     if (url.pathname === "/api/videos" && req.method === "POST") {
       const session = await requireSession(req, res);
       if (!session) return true;
       const body = await readJson(req);
+      const rawAlvo = typeof body.url === "string" && body.url.trim()
+        ? body.url.trim()
+        : typeof body.videoId === "string" && body.videoId.trim()
+          ? `https://www.youtube.com/watch?v=${body.videoId.trim()}`
+          : "";
+      if (rawAlvo) {
+        const id = youtubeId(rawAlvo);
+        if (!id) {
+          sendError(req, res, 400, "Link do YouTube inválido.");
+          return true;
+        }
+        const cacheKey = id;
+        const now = Date.now();
+        globalThis.__minervaVideoCache ||= new Map();
+        const videoCache = globalThis.__minervaVideoCache;
+        const cached = videoCache.get(cacheKey);
+        if (cached && cached.ate > now) {
+          sendJson(req, res, 200, { video: cached.valor });
+          return true;
+        }
+        try {
+          const info = await readYoutubeVideo(`https://www.youtube.com/watch?v=${id}`);
+          if (videoCache.size > 150) videoCache.delete(videoCache.keys().next().value);
+          videoCache.set(cacheKey, { valor: info, ate: now + 6 * 60 * 60 * 1000 });
+          sendJson(req, res, 200, { video: info });
+        } catch {
+          sendError(req, res, 502, "Não consegui ler os detalhes deste vídeo agora.");
+        }
+        return true;
+      }
       try {
-        sendJson(req, res, 200, { videos: await buscarVideos(typeof body.q === "string" ? body.q : "", { max: 6 }) });
+        sendJson(req, res, 200, { videos: await buscarVideos(typeof body.q === "string" ? body.q : "", { max: 8 }) });
       } catch {
         sendError(req, res, 502, "Não consegui buscar vídeos agora.");
       }

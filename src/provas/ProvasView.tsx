@@ -1,7 +1,7 @@
 // Carregado sob demanda (React.lazy): a aba Provas — fazer a prova, ver o que errou e estudar aquilo.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, BookOpenCheck, ClipboardList, Swords, Check, Flag, Layers, Lightbulb, Loader2, NotebookTabs, RotateCcw, Send, Sparkles, Target, Wand2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpenCheck, ClipboardList, MonitorPlay, Swords, Check, Flag, Layers, Lightbulb, Loader2, NotebookTabs, RotateCcw, Send, Sparkles, Target, Wand2, X } from "lucide-react";
 import { PageHeader, go, subjectContentContext, uid, type AppData, type Flashcard, type Session, type User, type useMemoUserData } from "../main";
 import { useSoftMotion } from "../motion";
 import { celebrateFrom, floatXp, mineSays } from "../caderno";
@@ -1246,6 +1246,15 @@ function CadernoErros({
                     }}
                   >
                     <ClipboardList className="h-4 w-4" /> Atividade
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deixarPreset("videos", { tema: resumo.assuntos[0].assunto });
+                      go("videos");
+                    }}
+                  >
+                    <MonitorPlay className="h-4 w-4" /> Videoaulas
                   </button>
                 </div>
               </div>

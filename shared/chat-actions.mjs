@@ -125,6 +125,12 @@ export function chatActionFromPrompt(value) {
   const leitura = re(`${LEAD}(?:(?:quero|queria|vou|bora|vamos)\\s+)?(?:leva|leve|levar|manda|mande|mandar|joga|jogue|coloca|coloque|abre|abra|abrir|passa|passe|usa|use|treina|treinar|pratica|praticar)\\b[^.?!]{0,40}?\\b(?:aba\\s+(?:de\\s+|da\\s+)?)?leitura\\b(.*)$`).exec(text);
   if (leitura) return { kind: "leitura", topic: "", refersBack: refersBack || !grupo(leitura, 1).trim() };
 
+  // ── vídeos: abrir a aba Vídeos com o tema (pedidos normais de vídeo ficam no chat) ─
+  const videos =
+    re(`${LEAD}(?:(?:quero|queria|vou|bora|vamos)\\s+)?(?:leva|leve|levar|manda|mande|mandar|joga|jogue|abre|abra|abrir|passa|passe|ver|assistir)\\b[^.?!]{0,36}?\\baba\\s+(?:de\\s+|dos\\s+)?(?:videos?|videoaulas?)\\b(.*)$`).exec(text) ||
+    re(`${LEAD}(?:abre|abra|abrir)\\s+(?:os\\s+|as\\s+|a\\s+aba\\s+de\\s+)?(?:videos?|videoaulas?)\\b(.*)$`).exec(text);
+  if (videos) return { kind: "videos", topic: cleanTopic(grupo(videos, 1)), refersBack };
+
   return null;
 }
 

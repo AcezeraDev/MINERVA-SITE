@@ -30,6 +30,9 @@ test("duelo, atividade, redação e leitura", () => {
   assert.equal(kind("abre a redação"), "redacao");
   assert.deepEqual(chatActionFromPrompt("manda esse texto pra leitura"), { kind: "leitura", topic: "", refersBack: true });
   assert.equal(kind("quero treinar leitura com isso"), "leitura");
+  assert.deepEqual(chatActionFromPrompt("abre a aba de vídeos sobre Revolução Francesa"), { kind: "videos", topic: "Revolução Francesa", refersBack: false });
+  assert.deepEqual(chatActionFromPrompt("leva isso pra aba de vídeos"), { kind: "videos", topic: "", refersBack: true });
+  assert.equal(chatActionFromPrompt("abre videoaulas sobre logaritmo")?.topic, "Logaritmo");
 });
 
 test("conversa normal continua conversa", () => {
@@ -45,6 +48,8 @@ test("conversa normal continua conversa", () => {
     "faz uma atividade física comigo",
     "explica a atividade 3 da lição",
     "tenho que salvar o planeta?",
+    "me recomenda vídeos sobre fotossíntese",
+    "quais vídeos do youtube explicam matrizes?",
   ]) {
     assert.equal(chatActionFromPrompt(frase), null, frase);
   }

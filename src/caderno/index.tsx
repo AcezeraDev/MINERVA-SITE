@@ -426,6 +426,7 @@ const routeTips: Record<string, string[]> = {
   games: ["Escolhe uma carta!", "Cada acerto vale XP."],
   atelie: ["Manda uma foto que eu contorno!", "O balde para nas linhas."],
   idiomas: ["Let's go to London!", "Errou? Eu grifo pra revisar.", "Fala comigo em inglês!"],
+  videos: ["Pede que eu resumo com os minutos!", "Faz o quiz da aula pra ganhar XP!"],
   search: ["Procura que eu grifo.", "Busco até dentro dos PDFs."],
   plan: ["Me diz a data da prova.", "Eu espalho as revisões pra você."],
   comments: ["Cola um bilhete no mural!", "Conta o que funcionou pra você."],

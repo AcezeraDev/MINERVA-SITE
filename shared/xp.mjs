@@ -54,6 +54,8 @@ export const leituraXpMax = 30;
 export const leiturasPorDia = 4;
 export const dueloXpMax = 30;
 export const duelosPorDia = 6;
+export const videoXpMax = 25;
+export const videosPorDia = 4;
 
 /** Desafio do Laboratório cumprido: 10 XP fixos. */
 export function labXp() {
@@ -63,6 +65,11 @@ export function labXp() {
 /** 10 XP por ler até o fim e 4 por pergunta de interpretação certa. */
 export function leituraXp(acertos) {
   return Math.min(leituraXpMax, 10 + Math.max(0, Math.floor(Number(acertos) || 0)) * 4);
+}
+
+/** 10 XP por concluir o estudo ativo da videoaula e 5 por questão certa no quiz. */
+export function videoXp(acertos) {
+  return Math.min(videoXpMax, 10 + Math.max(0, Math.floor(Number(acertos) || 0)) * 5);
 }
 
 /** 10 XP por jogar o duelo até o fim, mais 20 pela vitória ou 10 pelo empate. */
@@ -130,6 +137,7 @@ export const xpActions = [
   [`Cumprir um desafio do Laboratório (até ${labPorDia} por dia)`, labXpMax],
   [`Terminar uma leitura e responder as perguntas (até ${leiturasPorDia} por dia)`, leituraXpMax],
   [`Vencer um duelo (até ${duelosPorDia} duelos por dia)`, dueloXpMax],
+  [`Estudar uma videoaula e responder o quiz (até ${videosPorDia} por dia)`, videoXpMax],
 ];
 
 export const levelTitles = [
@@ -186,6 +194,8 @@ export const achievementList = [
   { id: "leitura-10", title: "Rato de biblioteca", text: "Termine 10 leituras.", xp: 80, target: 10, stat: "leituras" },
   { id: "duelo-1", title: "Primeiro duelo", text: "Jogue um duelo até o fim.", xp: 20, target: 1, stat: "duelos" },
   { id: "duelo-10", title: "Duelista", text: "Jogue 10 duelos.", xp: 80, target: 10, stat: "duelos" },
+  { id: "video-1", title: "Primeira videoaula", text: "Estude uma videoaula e responda o quiz da Mine.", xp: 20, target: 1, stat: "videos" },
+  { id: "video-10", title: "Sala de projeção", text: "Conclua o estudo de 10 videoaulas.", xp: 80, target: 10, stat: "videos" },
   { id: "arte-10", title: "Artista da Minerva", text: "Guarde 10 desenhos pintados no Ateliê.", xp: 60, target: 10, stat: "drawings" },
 ];
 
@@ -275,6 +285,8 @@ export function gamificationStats(scope, now = Date.now()) {
     leituraXp: cappedKindXp(sessions, "Leitura", leituraXpMax, leiturasPorDia),
     duelos: sessions.filter((item) => item.kind === "Duelo").length,
     dueloXp: cappedKindXp(sessions, "Duelo", dueloXpMax, duelosPorDia),
+    videos: sessions.filter((item) => item.kind === "Videoaula").length,
+    videoXp: cappedKindXp(sessions, "Videoaula", videoXpMax, videosPorDia),
     mineMessages: list(scope?.chats).filter((item) => item.role === "user").length,
     cardReviews: flashcards.reduce((sum, card) => sum + (Number(card.reps) || 0), 0),
     mastered: flashcards.filter((card) => (Number(card.level) || 0) >= 4).length,
@@ -302,6 +314,7 @@ export function totalXp(stats) {
     (Number(stats.labXp) || 0) +
     (Number(stats.leituraXp) || 0) +
     (Number(stats.dueloXp) || 0) +
+    (Number(stats.videoXp) || 0) +
     stats.mineMessages * xpPerAction.mineMessage +
     stats.cardReviews * xpPerAction.cardReview +
     (Number(stats.drawings) || 0) * xpPerAction.drawing;
@@ -353,6 +366,7 @@ export function xpSince(scope, since) {
     cappedKindXp(sessions, "Laboratório", labXpMax, labPorDia, from) +
     cappedKindXp(sessions, "Leitura", leituraXpMax, leiturasPorDia, from) +
     cappedKindXp(sessions, "Duelo", dueloXpMax, duelosPorDia, from) +
+    cappedKindXp(sessions, "Videoaula", videoXpMax, videosPorDia, from) +
     list(scope?.chats).filter((item) => item.role === "user" && after(item.createdAt)).length * xpPerAction.mineMessage +
     list(scope?.flashcards).filter((item) => after(item.lastReviewedAt)).length * xpPerAction.cardReview +
     countedDrawings(sessions, from) * xpPerAction.drawing

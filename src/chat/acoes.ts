@@ -246,6 +246,12 @@ export function planejarAcao(pedido: ChatActionRequest, ctx: Contexto): PlanoAca
       : abrirAba("redacao", "redacao", {}, "Abri a Redação. Escolha um tema ou escreva o seu.", "Redação", "escolha o tema", "Abrir redação");
   }
 
+  if (pedido.kind === "videos") {
+    return tema
+      ? abrirAba("videos", "videos", { tema }, `Abri a aba Vídeos com uma trilha sobre “${tema}”. Você pode assistir, resumir por minutagem e fazer o quiz lá.`, `Vídeos: ${tema}`, "trilha pronta", "Abrir vídeos")
+      : abrirAba("videos", "videos", {}, "Abri a aba Vídeos. Escolha uma matéria, peça uma trilha ou cole um link do YouTube.", "Vídeos", "escolha um tema", "Abrir vídeos");
+  }
+
   // leitura: a última resposta da Mine vira o texto
   const resposta = ultimaResposta(ctx.conversa);
   const texto = resposta ? plainTextFromReply(resposta.text) : "";

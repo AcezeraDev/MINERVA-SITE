@@ -1,4 +1,4 @@
-export type ChatActionKind = "salvar" | "agenda" | "duelo" | "atividade" | "redacao" | "leitura" | "fotos-zip";
+export type ChatActionKind = "salvar" | "agenda" | "duelo" | "atividade" | "redacao" | "leitura" | "videos" | "fotos-zip";
 
 export type ChatActionRequest = {
   kind: ChatActionKind;

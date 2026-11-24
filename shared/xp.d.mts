@@ -20,6 +20,8 @@ export type XpStatKey =
   | "leituraXp"
   | "duelos"
   | "dueloXp"
+  | "videos"
+  | "videoXp"
   | "mineMessages"
   | "cardReviews"
   | "mastered"
@@ -67,8 +69,11 @@ export const leituraXpMax: number;
 export const leiturasPorDia: number;
 export const dueloXpMax: number;
 export const duelosPorDia: number;
+export const videoXpMax: number;
+export const videosPorDia: number;
 export function labXp(): number;
 export function leituraXp(acertos: number): number;
+export function videoXp(acertos: number): number;
 export function dueloXp(resultado: "vitoria" | "empate" | "derrota"): number;
 export function atividadeXp(acertos: number): number;
 export const xpActions: Array<[string, number]>;

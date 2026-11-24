@@ -126,6 +126,13 @@ export const ABAS: Record<string, Aba> = {
     clique: ["hello, friend!", "what's up?", "thank you!"],
     truque: "hello",
   },
+  videos: {
+    chegada: ["hora da videoaula!", "prepara o caderno!"],
+    falas: ["eu leio a legenda e resumo!", "anota com suas palavras!", "faz o quiz da aula que vale XP!", "clica no minuto pra pular!"],
+    acts: { read: 2.5, write: 2, coffee: 1.4, sleep: 0.1 },
+    clique: ["quer que eu resuma a aula?", "pausa e anota!", "testa com o quiz!"],
+    truque: "mostrar",
+  },
   search: {
     chegada: ["procurando algo?", "eu acho pra você!"],
     falas: ["digita ali em cima!", "hmm, onde está?", "achei? não..."],

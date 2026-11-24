@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
  * num efeito, depois de montar.
  */
 
-export type PresetView = "duelo" | "atividades" | "redacao" | "leitura";
+export type PresetView = "duelo" | "atividades" | "redacao" | "leitura" | "videos";
 
 type Guardado = { view: PresetView; dados: Record<string, string>; em: number };
 

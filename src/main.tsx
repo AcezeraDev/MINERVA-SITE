@@ -3009,7 +3009,7 @@ function App() {
     if (route.view === "cubo") return <React.Suspense fallback={<PageLoading />}><CuboView user={user} /></React.Suspense>;
     if (route.view === "duelo") return <React.Suspense fallback={<PageLoading />}><DueloView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "provas") return <React.Suspense fallback={<PageLoading />}><ProvasView data={userData} user={user} update={update} /></React.Suspense>;
-    if (route.view === "videos") return <React.Suspense fallback={<PageLoading />}><VideosView /></React.Suspense>;
+    if (route.view === "videos") return <React.Suspense fallback={<PageLoading />}><VideosView data={userData} user={user} update={update} notify={notify} /></React.Suspense>;
     if (route.view === "idiomas") return <React.Suspense fallback={<PageLoading />}><IdiomasView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "search") return <SearchView data={userData} user={user} query={query} setQuery={setQuery} update={update} notify={notify} />;
     if (route.view === "plan") return <PlanView data={userData} update={update} user={user} notify={notify} />;
@@ -5601,6 +5601,8 @@ export const achievementIcons: Record<string, LucideIcon> = {
   "leitura-10": Brain,
   "duelo-1": Swords,
   "duelo-10": Trophy,
+  "video-1": MonitorPlay,
+  "video-10": Clapperboard,
 };
 
 function buildAchievements(stats: XpStats): Achievement[] {
@@ -6097,6 +6099,7 @@ const actionLooks: Record<ChatAction["kind"], { icon: typeof BookOpen; color: st
   atividade: { icon: ClipboardList, color: "#FBBF24" },
   redacao: { icon: PenLine, color: "#A78BFA" },
   leitura: { icon: BookOpen, color: "#38BDF8" },
+  videos: { icon: MonitorPlay, color: "#5CE1E6" },
   "fotos-zip": { icon: Download, color: "#2FD483" },
 };
 

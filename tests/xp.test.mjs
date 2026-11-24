@@ -45,3 +45,21 @@ test("desenhos do Ateliê valem XP com teto diário", async () => {
   assert.equal(totalXp(stats) - 20, (drawingsPerDay + 1) * xpPerAction.drawing);
   assert.equal(xpSince({ sessions }, outroDia), xpPerAction.drawing);
 });
+
+test("videoaulas valem XP pelo quiz com teto diário e conquista", async () => {
+  const { videoXp, videoXpMax, videosPorDia } = await import("../shared/xp.mjs");
+  assert.equal(videoXp(0), 10);
+  assert.equal(videoXp(2), 20);
+  assert.equal(videoXp(3), videoXpMax);
+  const dia = new Date(2026, 10, 24, 14).getTime();
+  const sessions = Array.from({ length: videosPorDia + 2 }, (_, i) => ({
+    kind: "Videoaula",
+    createdAt: dia + i * 1000,
+    xpEarned: videoXp(3),
+  }));
+  const stats = gamificationStats({ sessions }, dia);
+  assert.equal(stats.videos, videosPorDia + 2);
+  assert.equal(stats.videoXp, videosPorDia * videoXpMax);
+  // Conquista "video-1" (+20 XP) desbloqueada.
+  assert.equal(totalXp(stats), videosPorDia * videoXpMax + 20);
+});
