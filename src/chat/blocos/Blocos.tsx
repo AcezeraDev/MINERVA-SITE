@@ -3,6 +3,8 @@ import { Check, ChevronLeft, ChevronRight, Headphones, Lightbulb, MapPin, Pause,
 import { MineInline } from "../MineRichText";
 import { compile, tidyNumber } from "../../../shared/calc.mjs";
 import { prettyFormula } from "./formula";
+import { askMineTask } from "../../mineTask";
+import { lerCorrecaoDissertativa } from "../../../shared/atividades.mjs";
 import "./blocos.css";
 
 /*
@@ -75,7 +77,27 @@ type Pergunta = {
   porques: string[];
   dica: string;
 };
-type Resposta = { certa: boolean; escolha?: number; escolhas?: number[]; texto?: string } | null;
+/** Correção da Mine numa resposta "curta" (mesma task das Atividades). */
+type CorrecaoCurta = { nota: number; comentario: string; faltou: string };
+type Resposta = { certa: boolean; escolha?: number; escolhas?: number[]; texto?: string; correcao?: CorrecaoCurta } | null;
+
+/** A Mine corrige a resposta escrita: nota de 0 a 10, o que ficou bom e o que faltou. */
+async function corrigirComAMine(titulo: string, p: { pergunta: string; esperado: string; explicacao?: string }, texto: string): Promise<CorrecaoCurta> {
+  const resposta = await askMineTask(
+    {
+      task: "atividade-correcao",
+      prompt: texto,
+      context: [`Quiz: ${titulo}`, `Pergunta: ${p.pergunta.replace(/\$/g, "")}`, `Uma boa resposta precisa: ${p.esperado.replace(/\$/g, "")}`, p.explicacao ? `Explicacao do gabarito: ${p.explicacao.replace(/\$/g, "")}` : ""].filter(Boolean).join(" | "),
+      outputTokens: 600,
+    },
+    { timeoutMs: 60_000 },
+  );
+  const correcao = lerCorrecaoDissertativa(resposta);
+  if (!correcao) throw new Error("A correção veio incompleta.");
+  return { nota: correcao.nota, comentario: correcao.comentario, faltou: correcao.faltou };
+}
+
+const notaBr = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 
 /**
  * O quiz escreve fórmula com KaTeX ($...$); o que vier em LaTeX solto, sem
@@ -174,6 +196,8 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
   const [marcadas, setMarcadas] = useState<number[]>([]);
   const [digitado, setDigitado] = useState("");
   const [vendoGabarito, setVendoGabarito] = useState(false);
+  const [corrigindo, setCorrigindo] = useState(false);
+  const [erroCorrecao, setErroCorrecao] = useState("");
   const avisarResultado = useContext(QuizResultadoContext);
   const acoes = useContext(BlocoAcoesContext);
   const atual = perguntas[index];
@@ -197,7 +221,24 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
     const alvo = semAcentoQuiz(digitado);
     responder({ certa: atual.respostas.some((r) => quaseIgual(semAcentoQuiz(r), alvo)), texto: digitado.trim() });
   };
+  // Resposta escrita: a Mine dá a nota; 6 ou mais conta como acerto.
+  const corrigirCurta = async () => {
+    const texto = digitado.trim();
+    if (!texto || corrigindo) return;
+    setCorrigindo(true);
+    setErroCorrecao("");
+    try {
+      const correcao = await corrigirComAMine(titulo, atual, texto);
+      responder({ certa: correcao.nota >= 6, texto, correcao });
+    } catch (error) {
+      setErroCorrecao(error instanceof Error ? error.message : "A Mine não conseguiu corrigir agora.");
+      setVendoGabarito(true);
+    } finally {
+      setCorrigindo(false);
+    }
+  };
   const proxima = () => {
+    setErroCorrecao("");
     setDicaAberta(false);
     setMarcadas([]);
     setDigitado("");
@@ -339,7 +380,7 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
               className={resposta ? (resposta.certa ? "is-certa" : "is-errada") : ""}
             />
           ) : (
-            <textarea value={resposta?.texto ?? digitado} onChange={(event) => setDigitado(event.target.value)} disabled={Boolean(resposta) || vendoGabarito} rows={3} placeholder="Escreva sua resposta em 1 ou 2 frases" aria-label="Sua resposta" />
+            <textarea value={resposta?.texto ?? digitado} onChange={(event) => setDigitado(event.target.value)} disabled={Boolean(resposta) || vendoGabarito || corrigindo} rows={3} placeholder="Escreva sua resposta em 1 ou 2 frases" aria-label="Sua resposta" />
           )}
           {!resposta && atual.tipo === "lacuna" ? (
             <button type="button" className="mbk-btn" onClick={conferirLacuna} disabled={!digitado.trim()}>
@@ -347,10 +388,26 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
             </button>
           ) : null}
           {!resposta && atual.tipo === "curta" && !vendoGabarito ? (
-            <button type="button" className="mbk-btn" onClick={() => setVendoGabarito(true)} disabled={!digitado.trim()}>
-              Comparar com a resposta esperada
-            </button>
+            <div className="mbk-row">
+              <button type="button" className="mbk-btn" onClick={() => void corrigirCurta()} disabled={!digitado.trim() || corrigindo} aria-busy={corrigindo}>
+                {corrigindo ? (
+                  <>
+                    <span className="mbk-quiz__lendo" aria-hidden /> A Mine está lendo sua resposta…
+                  </>
+                ) : (
+                  <>
+                    <Check aria-hidden /> Corrigir com a Mine
+                  </>
+                )}
+              </button>
+              {!corrigindo ? (
+                <button type="button" className="mbk-link" onClick={() => setVendoGabarito(true)} disabled={!digitado.trim()}>
+                  Comparar sozinho
+                </button>
+              ) : null}
+            </div>
           ) : null}
+          {erroCorrecao && !resposta ? <p className="mbk-muted">{erroCorrecao} Compare com a resposta esperada abaixo.</p> : null}
           {atual.tipo === "curta" && vendoGabarito && !resposta ? (
             <div className="mbk-quiz__esperado">
               <p>
@@ -363,15 +420,6 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
                 <button type="button" className="mbk-btn is-ghost" onClick={() => responder({ certa: false, texto: digitado.trim() })}>
                   <X aria-hidden /> Errei ou faltou algo
                 </button>
-                {acoes?.enviar ? (
-                  <button
-                    type="button"
-                    className="mbk-link"
-                    onClick={() => acoes.enviar?.(`Corrige minha resposta. Pergunta: "${atual.pergunta.replace(/\$/g, "")}". Minha resposta: "${digitado.trim()}". Diga o que está certo, o que faltou e dê uma nota de 0 a 10.`)}
-                  >
-                    Pedir a correção da Mine
-                  </button>
-                ) : null}
               </div>
             </div>
           ) : null}
@@ -419,7 +467,29 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
       ) : null}
       {resposta ? (
         <div className={`mbk-quiz__feedback ${resposta.certa ? "is-certa" : "is-errada"}`} role="status">
-          <strong>{resposta.certa ? "Certa!" : atual.tipo === "multipla" || atual.tipo === "vf" ? `A certa é a ${letra(atual.correta)}.` : atual.tipo === "lacuna" ? `Resposta: ${atual.respostas[0]}.` : atual.tipo === "varias" ? `Certas: ${atual.corretas.map(letra).join(", ")}.` : "Anotado."}</strong>
+          {resposta.correcao ? (
+            <div className="mbk-quiz__correcao">
+              <p className="mbk-quiz__nota-mine">
+                <span>
+                  {notaBr(resposta.correcao.nota)}
+                  <small>/10</small>
+                </span>
+                <b>{resposta.correcao.nota >= 9 ? "Excelente!" : resposta.correcao.nota >= 6 ? "Boa resposta!" : resposta.correcao.nota >= 3 ? "Quase lá" : "Vamos rever"}</b>
+              </p>
+              <p>
+                <MineInline text={resposta.correcao.comentario} />
+              </p>
+              {resposta.correcao.faltou ? (
+                <p className="mbk-quiz__faltou">
+                  <b>Faltou:</b> <MineInline text={resposta.correcao.faltou} />
+                </p>
+              ) : null}
+              <p className="mbk-muted">
+                <b>Resposta esperada:</b> <MineInline text={atual.esperado} />
+              </p>
+            </div>
+          ) : null}
+          <strong>{resposta.correcao ? "" : resposta.certa ? "Certa!" : atual.tipo === "multipla" || atual.tipo === "vf" ? `A certa é a ${letra(atual.correta)}.` : atual.tipo === "lacuna" ? `Resposta: ${atual.respostas[0]}.` : atual.tipo === "varias" ? `Certas: ${atual.corretas.map(letra).join(", ")}.` : "Anotado."}</strong>
           {atual.explicacao && !atual.porques[atual.correta] ? (
             <span>
               {" "}

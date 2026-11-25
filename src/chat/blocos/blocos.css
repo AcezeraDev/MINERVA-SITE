@@ -718,3 +718,44 @@
   border-color: var(--mbk-accent);
   background: var(--mbk-good-bg);
 }
+
+/* correção da Mine na resposta escrita do quiz */
+.mbk-quiz__correcao {
+  display: grid;
+  gap: 0.45rem;
+  width: 100%;
+  margin-bottom: 0.4rem;
+}
+.mbk-quiz__correcao p { margin: 0; }
+.mbk-quiz__nota-mine {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.mbk-quiz__nota-mine span {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0.15rem 0.6rem;
+  border-radius: 0.6rem;
+  background: var(--mbk-raise);
+  font-size: 1.5rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.mbk-quiz__nota-mine small {
+  margin-left: 0.1rem;
+  color: var(--mbk-muted);
+  font-size: 0.8rem;
+}
+.mbk-quiz__faltou b { color: var(--mbk-bad); }
+.is-certa .mbk-quiz__faltou b { color: #f5c451; }
+.mbk-quiz__lendo {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: mbk-gira 0.8s linear infinite;
+}
+@keyframes mbk-gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mbk-quiz__lendo { animation: none; } }

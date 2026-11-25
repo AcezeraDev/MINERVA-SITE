@@ -180,7 +180,7 @@ import { MineMonitor, useMonitorOpen } from "./chat/monitor/MineMonitor";
 import { extractGlossary, markGlossary } from "../shared/chat-glossary.mjs";
 import { colchetesParaBlocos } from "../shared/chat-blocos-colchete.mjs";
 import { DossieProgresso } from "./chat/DossieProgresso";
-import { FORMATOS_CHAT, formatoChat, pedidoComFormato, type FormatoChat } from "./chat/formatosChat";
+import { FORMATOS_CHAT, formatoChat, normalizarComando, pedidoComFormato, type FormatoChat } from "./chat/formatosChat";
 import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
 import { searchConversations } from "../shared/chat-search.mjs";
 import { chatActionFromPrompt, planejarAcao, type ChatAction } from "./chat/acoes";
@@ -7234,6 +7234,9 @@ function MineView({
   // Menções com @ no campo de mensagem.
   const [mencao, setMencao] = useState<{ inicio: number; busca: string } | null>(null);
   const [mencaoAtiva, setMencaoAtiva] = useState(0);
+  // Comandos com barra: "/" no começo da caixa abre a lista de ferramentas.
+  const [barra, setBarra] = useState<string | null>(null);
+  const [barraAtiva, setBarraAtiva] = useState(0);
   // "Rabisco vira imagem": o desenho anexado já chega com o pedido escrito.
   const rabiscoParaImagem = useRef(false);
   // Aula por voz com a Mine (MineChamada).
@@ -7318,6 +7321,15 @@ function MineView({
     ];
     return todas.filter((item) => !busca || normalizeText(item.rotulo).includes(busca)).slice(0, 6);
   }, [mencao, data.subjects]);
+  // Tudo o que dá para chamar com "/": os formatos e os três modos da barra.
+  const comandosBarra = [
+    ...FORMATOS_CHAT.map((f) => ({ comando: f.comando, label: f.label, dica: f.dica, icon: f.icon, aplicar: () => formato !== f.id && toggleFormato(f.id) })),
+    ...(webSearchAvailable ? [{ comando: "pesquisa", label: "Pesquisa aprofundada", dica: "Busca a fundo na web e entrega um dossiê em PDF", icon: Telescope, aplicar: () => !profundo && toggleModo("profundo") }] : []),
+    ...(tutorTravado ? [] : [{ comando: "tutor", label: "Modo tutor", dica: "Dicas e perguntas em vez da resposta pronta", icon: Lightbulb, aplicar: () => !tutor && toggleModo("tutor") }]),
+    { comando: "imagem", label: "Criar imagem", dica: "Descreva e a Mine cria a imagem com IA", icon: ImagePlus, aplicar: () => !criarImagem && toggleModo("imagem") },
+  ];
+  const buscaBarra = barra === null ? "" : normalizarComando(barra);
+  const opcoesBarra = barra === null ? [] : comandosBarra.filter((c) => !buscaBarra || c.comando.startsWith(buscaBarra) || normalizarComando(c.label).includes(buscaBarra));
   // Sugestões da última resposta; as do App ficam para os atalhos de artefato
   // (mapa, prova, baralho), que não passam pelo chat de texto. Elas valem só
   // para a mensagem que estava no fim quando chegaram: trocar de conversa não
@@ -7499,6 +7511,15 @@ function MineView({
 
   // Monitor de código aberto: o chat abre uma terceira coluna para ele.
   const monitorOpen = useMonitorOpen();
+  /** Liga a ferramenta escolhida e tira o "/comando" da caixa. */
+  function escolherComando(comando: string) {
+    const item = comandosBarra.find((c) => c.comando === comando);
+    if (!item) return;
+    item.aplicar();
+    setInput(input.replace(/^\/\S*\s?/, ""));
+    setBarra(null);
+    window.requestAnimationFrame(() => textareaRef.current?.focus());
+  }
   function escolherMencao(rotulo: string) {
     if (!mencao) return;
     const antes = input.slice(0, mencao.inicio);
@@ -7551,7 +7572,11 @@ function MineView({
     }
     dictation.stop();
     launchPlane(document.querySelector('[aria-label="Enviar mensagem"]'));
-    const digitado = input.trim();
+    // "/quiz fotossíntese" digitado direto: liga o formato e usa o resto como assunto.
+    const comandoDigitado = input.trim().match(/^\/(\S+)\s*([\s\S]*)$/);
+    const formatoDoComando = comandoDigitado ? FORMATOS_CHAT.find((f) => f.comando === normalizarComando(comandoDigitado[1])) : undefined;
+    const digitado = formatoDoComando ? (comandoDigitado?.[2] || "").trim() : input.trim();
+    const formatoUsado = formatoDoComando?.id ?? formato;
     // @matéria / @agenda viram uma dica no fim do pedido para a Mine usar os dados certos.
     const dicas = Array.from(digitado.matchAll(/@([^@\n,.;!?]{2,40})/g))
       .map((m) => normalizeText(m[1].trim()))
@@ -7567,7 +7592,7 @@ function MineView({
     const comMencoes = dicas.length ? `${digitado}\n\n(${Array.from(new Set(dicas)).join("; ")})` : digitado;
     const texto = trecho ? `Sobre este trecho da sua resposta: "${trecho}"\n\n${comMencoes || "Explica melhor esse trecho."}` : comMencoes;
     if (!tutor && !licaoDispensada.current && pareceLicao(digitado, attachments.some((item) => item.kind === "image"))) setAvisoLicao(true);
-    const pedido = formato ? pedidoComFormato(formato, texto, messages.length > 0) : texto;
+    const pedido = formatoUsado ? pedidoComFormato(formatoUsado, texto, messages.length > 0) : texto;
     if (formato) setFormato(null);
     send(criarImagem && pedido && !asksToGenerateImage(pedido) ? `Cria uma imagem: ${pedido}` : pedido, selectedSubjectId, attachments);
     setTrecho("");
@@ -8095,8 +8120,20 @@ function MineView({
                 const achado = ate.match(/(?:^|\s)@([^\s@]{0,30})$/);
                 setMencao(achado ? { inicio: ate.length - achado[1].length - 1, busca: achado[1] } : null);
                 setMencaoAtiva(0);
+                // "/" no começo, ainda sem espaço: abre a lista de ferramentas.
+                const comando = event.target.value.match(/^\/(\S{0,24})$/);
+                setBarra(comando ? comando[1] : null);
+                setBarraAtiva(0);
               }}
               onKeyDown={(event) => {
+                if (barra !== null && opcoesBarra.length && (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter" || event.key === "Tab" || event.key === "Escape")) {
+                  event.preventDefault();
+                  if (event.key === "Escape") return setBarra(null);
+                  if (event.key === "ArrowDown") return setBarraAtiva((i) => (i + 1) % opcoesBarra.length);
+                  if (event.key === "ArrowUp") return setBarraAtiva((i) => (i - 1 + opcoesBarra.length) % opcoesBarra.length);
+                  escolherComando((opcoesBarra[barraAtiva] || opcoesBarra[0]).comando);
+                  return;
+                }
                 if (mencao && opcoesMencao.length && (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter" || event.key === "Tab" || event.key === "Escape")) {
                   event.preventDefault();
                   if (event.key === "Escape") return setMencao(null);
@@ -8130,7 +8167,7 @@ function MineView({
                       ? "Mande o exercício ou a dúvida..."
                       : selectedSubject
                         ? `Pergunte sobre ${selectedSubject.name}...`
-                        : "Pergunte qualquer coisa"
+                        : "Pergunte qualquer coisa  ·  digite / para ver as ferramentas"
               }
               aria-label="Mensagem para a Mine"
               className="max-h-48 min-h-11 w-full min-w-0 basis-full resize-none bg-transparent px-3 pb-1 pt-2.5 text-[15px] leading-6 text-white outline-none placeholder:text-white/38"
@@ -8152,25 +8189,32 @@ function MineView({
                 ))}
               </div>
             ) : null}
-            {/* Formatos da Mine (vídeo-resumo, podcast, laboratório...): uma fileira
-                própria, para não sumirem na rolagem dos modos. */}
-            <div className="mine-formatos minerva-scroll" role="group" aria-label="Criar com a Mine">
-              <span className="mine-formatos__label">Criar</span>
-              {FORMATOS_CHAT.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  className={`mine-formato mine-formato--${f.id}`}
-                  aria-pressed={formato === f.id}
-                  onClick={() => toggleFormato(f.id)}
-                  disabled={loading}
-                  title={f.dica}
-                >
-                  <f.icon aria-hidden className="h-3.5 w-3.5" />
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            {barra !== null ? (
+              <div className="mine-mencoes mine-barra" role="listbox" aria-label="Ferramentas da Mine">
+                <p className="mine-barra__titulo">Ferramentas · escolha ou continue digitando</p>
+                {opcoesBarra.length ? (
+                  opcoesBarra.map((c, i) => (
+                    <button
+                      key={c.comando}
+                      type="button"
+                      role="option"
+                      aria-selected={i === barraAtiva}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseEnter={() => setBarraAtiva(i)}
+                      onClick={() => escolherComando(c.comando)}
+                    >
+                      <c.icon aria-hidden className="mine-barra__icon" />
+                      <b>/{c.comando}</b>
+                      <span>
+                        {c.label} · {c.dica}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="mine-barra__vazio">Nenhuma ferramenta com “/{barra}”.</p>
+                )}
+              </div>
+            ) : null}
             <div className="flex w-full min-w-0 items-center gap-1">
               <div ref={toolsMenuRef} className="relative shrink-0">
                 <motion.button
@@ -8358,6 +8402,22 @@ function MineView({
               {/* Os três modos ficam sempre à mão na barra; os outros ligados no
                   "+" aparecem como pílulas, cada uma com o seu "x". */}
               <div className="minerva-scroll flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+                {formato ? (
+                  <span className="mine-tool-pill is-formato">
+                    {(() => {
+                      const f = formatoChat(formato)!;
+                      return (
+                        <>
+                          <f.icon aria-hidden className="h-3.5 w-3.5" />
+                          {f.label}
+                        </>
+                      );
+                    })()}
+                    <button type="button" className="mine-tool-pill__off" onClick={() => setFormato(null)} aria-label="Desligar formato" disabled={loading}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ) : null}
                 {webSearchAvailable ? (
                   <button type="button" className="mine-modo mine-modo--deep" aria-pressed={profundo} onClick={() => toggleModo("profundo")} disabled={loading} title="Busca ampla na web e entrega um dossiê em PDF">
                     <Telescope aria-hidden className="h-4 w-4" />

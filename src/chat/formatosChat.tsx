@@ -5,6 +5,9 @@
  * pessoa escreve sai como pedido daquele formato — as frases batem com os
  * gatilhos de mine/prompts.mjs (GATILHOS_BLOCOS), que mandam o formato certo
  * para o modelo. Um formato por vez, e ele desliga depois de enviar.
+ *
+ * Ficam atrás da barra "/" na caixa de mensagem (ideia do usuário, 25/nov):
+ * "/" abre a lista, "/quiz fotossíntese" + Enter já sai como quiz.
  */
 import { BookOpenCheck, Clapperboard, FlaskConical, Headphones, Layers, ListChecks, Map as MapIcon, SplitSquareHorizontal } from "lucide-react";
 
@@ -12,6 +15,8 @@ export type FormatoChat = "slides" | "podcast" | "simulacao" | "passos" | "dois-
 
 export const FORMATOS_CHAT: Array<{
   id: FormatoChat;
+  /** Digitado depois da barra: /quiz, /video-resumo... */
+  comando: string;
   label: string;
   icon: typeof Clapperboard;
   dica: string;
@@ -20,6 +25,7 @@ export const FORMATOS_CHAT: Array<{
 }> = [
   {
     id: "slides",
+    comando: "video-resumo",
     label: "Vídeo-resumo",
     icon: Clapperboard,
     dica: "Slides narrados pela voz da Mine",
@@ -28,6 +34,7 @@ export const FORMATOS_CHAT: Array<{
   },
   {
     id: "podcast",
+    comando: "podcast",
     label: "Podcast 4 min",
     icon: Headphones,
     dica: "Conversa de uns 4 minutos entre a Mine e o Leo, para ouvir",
@@ -36,6 +43,7 @@ export const FORMATOS_CHAT: Array<{
   },
   {
     id: "simulacao",
+    comando: "laboratorio",
     label: "Laboratório",
     icon: FlaskConical,
     dica: "Simulação com controles para mexer e ver o gráfico mudar",
@@ -44,6 +52,7 @@ export const FORMATOS_CHAT: Array<{
   },
   {
     id: "passos",
+    comando: "passo-a-passo",
     label: "Passo a passo",
     icon: ListChecks,
     dica: "Resolução que se revela um passo de cada vez",
@@ -52,6 +61,7 @@ export const FORMATOS_CHAT: Array<{
   },
   {
     id: "dois-jeitos",
+    comando: "dois-jeitos",
     label: "Dois jeitos",
     icon: SplitSquareHorizontal,
     dica: "Duas explicações lado a lado: analogia e técnica",
@@ -60,6 +70,7 @@ export const FORMATOS_CHAT: Array<{
   },
   {
     id: "quiz",
+    comando: "quiz",
     label: "Quiz",
     icon: BookOpenCheck,
     dica: "Perguntas para treinar agora, com explicação de cada alternativa",
@@ -68,6 +79,7 @@ export const FORMATOS_CHAT: Array<{
   },
   {
     id: "flashcards",
+    comando: "flashcards",
     label: "Flashcards",
     icon: Layers,
     dica: "Cartões de frente e verso para memorizar",
@@ -76,6 +88,7 @@ export const FORMATOS_CHAT: Array<{
   },
   {
     id: "roteiro",
+    comando: "roteiro",
     label: "Roteiro",
     icon: MapIcon,
     dica: "Roteiro de seminário ou trabalho em grupo, em cartões",
@@ -94,4 +107,9 @@ export function pedidoComFormato(id: FormatoChat | null, texto: string, temConve
   if (!f) return texto;
   const assunto = texto.trim() || (temConversa ? "o assunto da nossa conversa até aqui" : "");
   return assunto ? f.pedido(assunto) : texto;
+}
+
+/** Tira acento e caixa para comparar o que foi digitado depois da barra. */
+export function normalizarComando(texto: string) {
+  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
