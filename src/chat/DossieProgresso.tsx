@@ -171,8 +171,8 @@ export function DossieProgresso({
                 {p.id === "ler" && abertas.length && st === "agora" ? (
                   <ul className="dsp__sites">
                     {abertas.map((s, i) => {
-                      const visto = st === "feito" || i < lendo;
-                      const agora = st === "agora" && i === lendo;
+                      const visto = i < lendo;
+                      const agora = i === lendo;
                       return (
                         <motion.li
                           key={s.url}
