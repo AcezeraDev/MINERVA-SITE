@@ -35,6 +35,72 @@
   font-size: 1rem;
   font-weight: 700;
 }
+.mch-titulo strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.mch-titulo .mch-beta {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: rgb(var(--hl-mint) / 0.35);
+  color: rgb(var(--theme-text));
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* Aviso de beta: flutua no topo, sem empurrar a bola. */
+.mch-aviso-beta {
+  position: absolute;
+  top: max(4.2rem, calc(env(safe-area-inset-top, 0px) + 3.6rem));
+  left: 50%;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: min(calc(100% - 2rem), 30rem);
+  padding: 0.7rem 0.6rem 0.7rem 1rem;
+  border-radius: 1rem;
+  background: rgb(var(--theme-text));
+  color: rgb(var(--paper));
+  font-size: 0.86rem;
+  line-height: 1.4;
+  box-shadow: 0 12px 30px -12px rgb(0 0 0 / 0.35);
+  transform: translateX(-50%);
+  animation: mch-beta-entra 320ms ease-out both;
+}
+.mch-aviso-beta p {
+  margin: 0;
+  flex: 1;
+}
+.mch-aviso-beta button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.mch-aviso-beta button:hover {
+  opacity: 1;
+  background: rgb(var(--paper) / 0.12);
+}
+.mch-aviso-beta button svg {
+  width: 1rem;
+  height: 1rem;
+}
+@keyframes mch-beta-entra {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
 .mch-titulo span {
   font-size: 0.8rem;
   color: rgb(var(--theme-text) / 0.55);

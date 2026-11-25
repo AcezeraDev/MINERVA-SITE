@@ -69,6 +69,8 @@ test("português vai para a Camila, o Leo para o Arthur, e 'Mine' é falado como
 
     await synthesizeVoice({ text: "Oi, sou a Mine na chamada.", lang: "pt", chamada: true, fetchImpl });
     assert.notEqual(calls[2].model, "bytedance/seed-tts-3.0", "a chamada usa a voz rápida");
+    assert.equal(calls[2].voice, "Sarah");
+    assert.equal(calls[2].stream, true, "ElevenLabs com stream não entra na fila");
     calls.splice(2, 1);
 
     await synthesizeVoice({ text: "This book is mine.", fetchImpl });
@@ -97,5 +99,28 @@ test("erro do provedor vira MineVoiceError, e sem chave responde 503", async () 
     if (previous === undefined) delete process.env.NANOGPT_API_KEY;
     else process.env.NANOGPT_API_KEY = previous;
     if (previousList !== undefined) process.env.NANOGPT_API_KEYS = previousList;
+  }
+});
+
+test("Sarah na chamada: se vier tíquete da fila, a voz espera e busca o áudio", async () => {
+  const previous = process.env.NANOGPT_API_KEY;
+  process.env.NANOGPT_API_KEY = "teste";
+  clearVoiceCache();
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(String(url));
+    if (String(url).endsWith("/audio/speech")) return new Response(JSON.stringify({ status: "pending", runId: "r1", model: "Elevenlabs-Turbo-V2.5" }), { status: 200, headers: { "content-type": "application/json" } });
+    if (String(url).includes("/tts/status")) return new Response(JSON.stringify({ status: "completed", audioUrl: "https://cdn.exemplo/audio.mp3" }), { status: 200, headers: { "content-type": "application/json" } });
+    return audioResponse(900);
+  };
+  try {
+    const { audio } = await synthesizeVoice({ text: "Boa pergunta!", lang: "pt", chamada: true, fetchImpl });
+    assert.equal(audio.length, 900);
+    assert.ok(urls[1].includes("/api/tts/status?runId=r1"));
+    assert.ok(!urls[1].includes("/v1/"));
+  } finally {
+    if (previous === undefined) delete process.env.NANOGPT_API_KEY;
+    else process.env.NANOGPT_API_KEY = previous;
+    clearVoiceCache();
   }
 });

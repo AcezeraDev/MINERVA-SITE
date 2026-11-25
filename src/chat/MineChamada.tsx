@@ -28,9 +28,9 @@ import "./chamada.css";
  *   a si mesma (testado em 25/nov/2026). Para interromper, toca-se na bola
  *   (ou Espaço). Com "Estou de fone" ligado não há eco, então o microfone
  *   continua aberto e dá para interromper falando por cima, como no ChatGPT.
- * - Enquanto o aluno fala, a Mine solta um "uhum" numa pausa longa; assim que
- *   ele termina, toca um "hum…" pronto, e a resposta é falada frase por frase
- *   enquanto ainda chega (`criarFalaEmFluxo`). As legendas mostram a frase que
+ * - Enquanto o aluno fala, a Mine solta um "uhum" numa pausa longa. Depois que
+ *   ele termina não toca nada pronto ("hum…", "tá" saíram em 25/nov/2026 a
+ *   pedido do Davi): a resposta é falada frase por frase enquanto ainda chega (`criarFalaEmFluxo`). As legendas mostram a frase que
  *   está tocando, não o texto que ainda nem foi falado.
  */
 
@@ -66,12 +66,6 @@ const CLIPES = {
   escuta: [
     { arquivo: "uhum", texto: "Uhum." },
     { arquivo: "aham", texto: "Aham." },
-  ],
-  pensando: [
-    { arquivo: "hum", texto: "Hum…" },
-    { arquivo: "entendi", texto: "Entendi." },
-    { arquivo: "deixa-eu-ver", texto: "Deixa eu ver…" },
-    { arquivo: "ta", texto: "Tá." },
   ],
 };
 type Clipe = { arquivo: string; texto: string };
@@ -186,6 +180,12 @@ export function MineChamada({
   const [falaAtual, setFalaAtual] = useState("");
   const [respostas, setRespostas] = useState(0);
   const [saindo, setSaindo] = useState(false);
+  // Aviso de beta: aparece toda vez que a chamada abre e some sozinho.
+  const [avisoBeta, setAvisoBeta] = useState(true);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAvisoBeta(false), 7000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [fone, setFone] = useState(() => {
     try {
       return localStorage.getItem(CHAVE_FONE) === "1";
@@ -269,13 +269,6 @@ export function MineChamada({
       setFalaAtual("");
       const meu = novaFala();
       fluxo.current = meu;
-      // "Hum…" logo depois que ele termina, se a resposta ainda não começou.
-      window.setTimeout(() => {
-        if (fluxo.current !== meu || falado.current) return;
-        void urlDoClipe(sortear(CLIPES.pensando)).then((url) => {
-          if (url && fluxo.current === meu && !falado.current) meu.adicionarClipe(url);
-        });
-      }, 350);
       void meu.terminou.then((terminou) => {
         if (fluxo.current !== meu) return;
         fluxo.current = null;
@@ -489,7 +482,7 @@ export function MineChamada({
     ligarMedidorDeSaida();
     bipe("entra");
     void ligarMedidorDoMicrofone();
-    for (const clipe of [...CLIPES.escuta, ...CLIPES.pensando]) void urlDoClipe(clipe);
+    for (const clipe of CLIPES.escuta) void urlDoClipe(clipe);
     void (async () => {
       const url = await urlDoClipe(CLIPES.oi);
       if (!aberta.current) return;
@@ -700,7 +693,9 @@ export function MineChamada({
     >
       <header className="mch-topo">
         <div className="mch-titulo">
-          <strong>Mine</strong>
+          <strong>
+            Mine <span className="mch-beta">Beta</span>
+          </strong>
           <span>Aula por voz</span>
         </div>
         <div className="mch-topo-botoes">
@@ -716,6 +711,17 @@ export function MineChamada({
           </button>
         </div>
       </header>
+
+      {avisoBeta ? (
+        <div className="mch-aviso-beta" role="status">
+          <p>
+            <strong>A aula por voz está em beta.</strong> Ela ainda está sendo melhorada, então pode demorar um pouco ou entender errado de vez em quando.
+          </p>
+          <button type="button" onClick={() => setAvisoBeta(false)} aria-label="Fechar o aviso">
+            <X aria-hidden />
+          </button>
+        </div>
+      ) : null}
 
       <div className="mch-palco">
         <div className="mch-orbe">

@@ -57,12 +57,39 @@ export function voiceNamePt() {
 // letras. A Sarah do ElevenLabs soa bem, mas pela NanoGPT o Turbo 2.5 vem
 // em fila (3,4 s numa frase curta) e o v4 leva ~8 s.
 // Podcast e slides baixam antes, então lá a demora da Camila não aparece.
+// 25/nov/2026 (tarde): o Davi trocou para a Sarah. Pedida com `stream: true`
+// na rota /audio/speech, ela NÃO entra na fila: o áudio volta direto em
+// ~1,4 a 1,8 s (curta ou longa), contra 3,4 a 9 s pela fila. Se mesmo assim
+// vier um tíquete da fila, `esperarFila` busca o áudio.
 export function voiceModelCall() {
-  return String(process.env.MINE_TTS_MODEL_CHAMADA || "inworld-tts-1.5-max").trim();
+  return String(process.env.MINE_TTS_MODEL_CHAMADA || "Elevenlabs-Turbo-V2.5").trim();
 }
 
 export function voiceNameCall() {
-  return String(process.env.MINE_TTS_VOICE_CHAMADA || "Maitê").trim();
+  return String(process.env.MINE_TTS_VOICE_CHAMADA || "Sarah").trim();
+}
+
+/** ElevenLabs pela NanoGPT: sem `stream` o pedido vai para uma fila assíncrona. */
+function modelUsesQueue(model) {
+  return /elevenlabs/i.test(model);
+}
+
+/** Tíquete da fila ({ runId, status: "pending" }): consulta até o áudio ficar pronto. */
+async function esperarFila({ ticket, model, apiKey, fetchImpl, ate }) {
+  const raiz = nanogptBaseUrl().replace(/\/v1$/, "");
+  while (Date.now() < ate) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const url = `${raiz}/tts/status?runId=${encodeURIComponent(ticket.runId)}&model=${encodeURIComponent(model)}`;
+    const resposta = await fetchImpl(url, { headers: { "x-api-key": apiKey, authorization: `Bearer ${apiKey}` } });
+    const estado = await resposta.json().catch(() => ({}));
+    if (estado.status === "error") break;
+    if (estado.status === "completed" && estado.audioUrl) {
+      const audio = await fetchImpl(estado.audioUrl);
+      if (!audio.ok) break;
+      return { audio: Buffer.from(await audio.arrayBuffer()), type: String(audio.headers.get("content-type") || "audio/mpeg") };
+    }
+  }
+  throw new MineVoiceError("A voz da Mine demorou demais.", 504);
 }
 
 /** Voz do Leo, o colega do podcast: outra voz para dar para distinguir. */
@@ -158,6 +185,7 @@ export async function synthesizeVoice({ text, slow = false, lang = "en", quem = 
         input,
         ...(modelAcceptsInstructions(model) ? { instructions: voiceInstructions(slow, idioma, pessoa) } : {}),
         ...(idioma === "pt" && /^bytedance\//i.test(model) ? { language: "pt-BR" } : {}),
+        ...(modelUsesQueue(model) ? { stream: true } : {}),
         response_format: "mp3",
       }),
       signal: controller.signal,
@@ -168,12 +196,23 @@ export async function synthesizeVoice({ text, slow = false, lang = "en", quem = 
     clearTimeout(timer);
   }
   const type = String(response.headers.get("content-type") || "");
+  if (response.ok && type.includes("json") && modelUsesQueue(model)) {
+    const ticket = await response.json().catch(() => ({}));
+    if (ticket?.runId) {
+      const pronto = await esperarFila({ ticket, model, apiKey, fetchImpl, ate: Date.now() + 15_000 });
+      return guardar(key, pronto.audio, pronto.type);
+    }
+    throw new MineVoiceError("A voz da Mine falhou agora.", 502);
+  }
   if (!response.ok || type.includes("json")) {
     const detail = await response.text().catch(() => "");
     console.error("[mine-voz]", response.status, detail.slice(0, 300));
     throw new MineVoiceError("A voz da Mine falhou agora.", response.status === 429 ? 429 : 502);
   }
-  const audio = Buffer.from(await response.arrayBuffer());
+  return guardar(key, Buffer.from(await response.arrayBuffer()), type);
+}
+
+function guardar(key, audio, type) {
   if (audio.length < 200) throw new MineVoiceError("A voz da Mine veio vazia.", 502);
   const entry = { audio, type: type.startsWith("audio/") ? type : "audio/mpeg" };
   cache.set(key, entry);
