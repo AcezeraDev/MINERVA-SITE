@@ -751,6 +751,8 @@ export function scoreStyledImage(image, asked, query, style) {
 const WATERMARK_HOSTS = /(?:^|\.)(?:shutterstock\.com|alamy\.[a-z.]+|dreamstime\.com|istockphoto\.com|gettyimages\.[a-z.]+|depositphotos\.com|123rf\.com|stock\.adobe\.com|bigstockphoto\.com|canstockphoto\.[a-z.]+|vectorstock\.com|agefotostock\.com|pond5\.com|stockfresh\.com|colourbox\.com|fotosearch\.[a-z.]+|superstock\.com|mediastorehouse\.com|lookandlearn\.com)$/i;
 const TRUSTED_IMAGE_HOSTS = /(?:^|\.)(?:wikimedia\.org|wikipedia\.org|nasa\.gov|esa\.int|britannica\.com|nationalgeographic\.com|si\.edu|nhm\.ac\.uk|metmuseum\.org|louvre\.fr|unsplash\.com|pexels\.com|flickr\.com|staticflickr\.com|noaa\.gov|usgs\.gov|ibge\.gov\.br|gov\.br|embrapa\.br|fiocruz\.br|usp\.br|unicamp\.br|edu|ac\.uk)$/i;
 
+const BR_EDU_HOSTS = /(?:^|\.)(?:brasilescola\.uol\.com\.br|mundoeducacao\.uol\.com\.br|todamateria\.com\.br|infoescola\.com|educamaisbrasil\.com\.br|sobiologia\.com\.br|preparaenem\.com|biologianet\.com|manualdaquimica\.com|alunosonline\.uol\.com\.br|escolakids\.uol\.com\.br|novaescola\.org\.br|nossaescola\.com\.br|stoodi\.com\.br|descomplica\.com\.br)$/i;
+
 /** O arquivo ou a página vêm de um banco de imagem com marca d'água? */
 export function isWatermarkedImage(image) {
   return WATERMARK_HOSTS.test(hostOfUrl(image.pageUrl)) || WATERMARK_HOSTS.test(hostOfUrl(image.full)) || /\b(?:shutterstock|alamy|dreamstime|istock|getty ?images|depositphotos|123rf)\b/i.test(`${image.source || ""} ${image.title || ""}`);
@@ -769,6 +771,10 @@ export function imageQualityBonus(image) {
   if (ratio > 3 || ratio < 0.33) bonus -= 2;
   if (TRUSTED_IMAGE_HOSTS.test(hostOfUrl(image.pageUrl)) || TRUSTED_IMAGE_HOSTS.test(hostOfUrl(image.full))) bonus += 2;
   if (SOCIAL_HOSTS.test(hostOfUrl(image.pageUrl))) bonus -= 1;
+  // Nov/2026 (25): esquema com texto em português vale mais para o aluno
+  // brasileiro (o Gemini trouxe o do Brasil Escola; a Mine, um em inglês).
+  if (BR_EDU_HOSTS.test(hostOfUrl(image.pageUrl))) bonus += 2;
+  else if (/\.br$/i.test(hostOfUrl(image.pageUrl))) bonus += 1;
   return bonus;
 }
 

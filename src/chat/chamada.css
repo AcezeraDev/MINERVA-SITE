@@ -1,0 +1,454 @@
+/* Aula por voz com a Mine (MineChamada.tsx), no jeito do modo de voz do
+ * ChatGPT: tela inteira, a bola da Mine no meio com nuvens que andam e
+ * crescem com o volume real da voz, título e legendas em cima, microfone e
+ * encerrar (vermelho) embaixo. */
+.mch {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  justify-items: center;
+  gap: 0.9rem;
+  padding: max(0.9rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1.6rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  background: rgb(var(--paper));
+  color: rgb(var(--theme-text));
+  animation: mch-entra 260ms ease-out both;
+}
+.mch.is-saindo {
+  animation: mch-sai 180ms ease-in both;
+}
+
+/* ---- topo ---------------------------------------------------------------- */
+.mch-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+.mch-titulo {
+  display: grid;
+  line-height: 1.15;
+}
+.mch-titulo strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.mch-titulo span {
+  font-size: 0.8rem;
+  color: rgb(var(--theme-text) / 0.55);
+}
+.mch-topo-botoes {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.mch-icone,
+.mch-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(var(--theme-text) / 0.06);
+  color: rgb(var(--theme-text) / 0.8);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.mch-icone {
+  width: 2.5rem;
+}
+.mch-chip {
+  padding: 0 0.85rem;
+}
+.mch-icone svg,
+.mch-chip svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.mch-icone:hover,
+.mch-chip:hover {
+  background: rgb(var(--theme-text) / 0.08);
+  color: rgb(var(--theme-text));
+}
+.mch-icone.is-on,
+.mch-chip.is-on {
+  background: rgb(var(--theme-text));
+  color: rgb(var(--paper));
+}
+.mch-chip-curto {
+  display: none;
+}
+
+/* ---- palco e bola -------------------------------------------------------- */
+.mch-palco {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1.1rem;
+  min-height: 0;
+  width: 100%;
+}
+.mch-orbe {
+  display: grid;
+  place-items: center;
+  /* espaço para a bola crescer até 20% com a voz sem encostar no texto */
+  padding: 1.6rem;
+  animation: mch-orbe-entra 520ms cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+}
+.mch.com-legendas .mch-bola {
+  width: min(52vw, 13.5rem, 30dvh);
+}
+
+/* A bola: um céu (azul da caneta embaixo, menta e branco em cima) com nuvens
+ * brancas que atravessam devagar. --nivel (0 a 1) é o volume da voz agora. */
+.mch-bola {
+  --nivel: 0;
+  position: relative;
+  width: min(64vw, 17.5rem, 40dvh);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  isolation: isolate;
+  cursor: default;
+  transform: scale(calc(1 + var(--nivel) * 0.2));
+  transition: width 300ms ease, filter 400ms ease;
+  will-change: transform;
+  background: rgb(var(--pen));
+  box-shadow: 0 0 90px -18px rgb(var(--pen) / 0.45);
+}
+.mch-ceu {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #ffffff 0%, rgb(var(--hl-mint)) 38%, transparent 70%),
+    linear-gradient(180deg, rgb(var(--hl-mint)) 0%, #6fb7ff 48%, rgb(var(--pen)) 100%);
+}
+.mch-nuvem {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 255 255 / 0.95), rgb(255 255 255 / 0.55) 55%, rgb(255 255 255 / 0));
+  filter: blur(5px);
+}
+.mch-nuvem-a {
+  width: 70%;
+  height: 34%;
+  top: 22%;
+  left: -10%;
+}
+.mch-nuvem-b {
+  width: 55%;
+  height: 26%;
+  top: 48%;
+  left: 40%;
+  opacity: 0.8;
+}
+.mch-nuvem-c {
+  width: 45%;
+  height: 22%;
+  top: 66%;
+  left: -5%;
+  opacity: 0.55;
+}
+.mch-nuvem-d {
+  width: 60%;
+  height: 28%;
+  top: 5%;
+  left: 45%;
+  opacity: 0.7;
+}
+/* Brilho e borda que dão volume de esfera. */
+.mch-brilho {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 26%, rgb(255 255 255 / 0.45), transparent 42%), radial-gradient(circle at 50% 50%, transparent 62%, rgb(var(--pen) / 0.28) 100%);
+  pointer-events: none;
+}
+.mch.is-falando .mch-bola,
+.mch.is-pensando .mch-bola {
+  cursor: pointer;
+}
+.mch.is-mudo:not(.sem-microfone) .mch-bola {
+  filter: saturate(0.45);
+  opacity: 0.7;
+}
+.mch-bola:focus-visible {
+  outline: 3px solid rgb(var(--pen));
+  outline-offset: 6px;
+}
+
+/* ---- dica e o que está sendo ouvido -------------------------------------- */
+.mch-dica {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgb(var(--theme-text) / 0.6);
+  text-align: center;
+  transition: opacity 250ms ease;
+}
+.mch-dica.is-vazia {
+  opacity: 0;
+}
+.mch-ouvindo {
+  margin: 0;
+  max-width: min(100%, 34rem);
+  text-align: center;
+  font-size: 1.05rem;
+  color: rgb(var(--theme-text) / 0.5);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* ---- legendas ------------------------------------------------------------ */
+.mch-legendas {
+  display: grid;
+  gap: 0.5rem;
+  width: min(100%, 38rem);
+  margin-top: 0.4rem;
+  max-height: 30dvh;
+  overflow: hidden;
+  text-align: center;
+}
+.mch-legendas p {
+  margin: 0;
+  line-height: 1.4;
+}
+.mch-voce {
+  color: rgb(var(--theme-text) / 0.5);
+  font-size: 1rem;
+}
+.mch-mine {
+  font-size: clamp(1.1rem, 2.2vw, 1.3rem);
+  font-weight: 400;
+  color: rgb(var(--theme-text) / 0.88);
+}
+
+/* ---- aviso e campo de texto ---------------------------------------------- */
+.mch-aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(100%, 34rem);
+  padding: 0.6rem 0.65rem 0.6rem 1rem;
+  border-radius: 1rem;
+  background: rgb(var(--theme-text) / 0.07);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+.mch-aviso p {
+  margin: 0;
+  flex: 1 1 14rem;
+}
+.mch-aviso button {
+  flex-shrink: 0;
+  padding: 0.5rem 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(var(--theme-text));
+  color: rgb(var(--paper));
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mch-texto {
+  display: flex;
+  gap: 0.4rem;
+  width: min(100%, 34rem);
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: rgb(var(--theme-text) / 0.07);
+}
+.mch-texto input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+.mch-texto button {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 0;
+  background: rgb(var(--theme-text));
+  color: rgb(var(--paper));
+  cursor: pointer;
+}
+.mch-texto button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.mch-texto:focus-within {
+  box-shadow: 0 0 0 2px rgb(var(--pen) / 0.6);
+}
+
+/* ---- botões de baixo ----------------------------------------------------- */
+.mch-botoes {
+  display: flex;
+  justify-content: center;
+  gap: 1.4rem;
+  margin-top: 0.6rem;
+}
+.mch-btn {
+  display: grid;
+  place-items: center;
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 50%;
+  border: 0;
+  background: rgb(var(--theme-text) / 0.08);
+  color: rgb(var(--theme-text));
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 120ms ease;
+}
+.mch-btn:hover {
+  background: rgb(var(--theme-text) / 0.14);
+}
+.mch-btn:active {
+  transform: scale(0.94);
+}
+.mch-btn svg,
+.mch-texto button svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+.mch-texto button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.mch-btn.is-on {
+  background: rgb(var(--theme-text) / 0.16);
+}
+/* Microfone desligado: ícone riscado em vermelho sobre fundo claro, sem
+ * competir com o botão de encerrar. */
+.mch-btn.is-off {
+  background: rgb(229 72 77 / 0.14);
+  color: #e5484d;
+}
+.mch-btn.is-desligar {
+  background: #e5484d;
+  color: #fff;
+}
+.mch-btn.is-desligar:hover {
+  background: #d63c42;
+}
+.mch-btn:focus-visible,
+.mch-texto button:focus-visible,
+.mch-icone:focus-visible,
+.mch-chip:focus-visible,
+.mch-aviso button:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 3px;
+}
+
+@media (max-width: 520px) {
+  .mch-chip-longo {
+    display: none;
+  }
+  .mch-chip-curto {
+    display: inline;
+  }
+}
+
+/* ---- movimento ----------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .mch-nuvem-a {
+    animation: mch-vento-a 14s ease-in-out infinite alternate;
+  }
+  .mch-nuvem-b {
+    animation: mch-vento-b 11s ease-in-out infinite alternate;
+  }
+  .mch-nuvem-c {
+    animation: mch-vento-a 17s ease-in-out infinite alternate-reverse;
+  }
+  .mch-nuvem-d {
+    animation: mch-vento-b 19s ease-in-out infinite alternate-reverse;
+  }
+  /* Pensando: a bola encolhe um pouco e respira, as nuvens correm. */
+  .mch.is-pensando .mch-orbe {
+    animation: mch-respira 1.2s ease-in-out infinite alternate;
+  }
+  /* Ouvindo sem ninguém falar: respiração bem leve. */
+  .mch.is-ouvindo .mch-orbe,
+  .mch.is-comecando .mch-orbe {
+    animation: mch-orbe-entra 520ms cubic-bezier(0.2, 0.9, 0.25, 1.15) both, mch-calmo 3.2s ease-in-out 520ms infinite alternate;
+  }
+  /* Falando: quem mexe é o volume (--nivel), não a respiração. */
+  .mch.is-falando .mch-orbe {
+    animation: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mch-orbe,
+  .mch,
+  .mch.is-saindo {
+    animation: none;
+  }
+}
+@keyframes mch-entra {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes mch-sai {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes mch-orbe-entra {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes mch-vento-a {
+  from {
+    transform: translate(-12%, 4%) scale(1);
+  }
+  to {
+    transform: translate(48%, -6%) scale(1.15);
+  }
+}
+@keyframes mch-vento-b {
+  from {
+    transform: translate(10%, -4%) scale(1.1);
+  }
+  to {
+    transform: translate(-60%, 8%) scale(0.95);
+  }
+}
+@keyframes mch-respira {
+  from {
+    transform: scale(0.9);
+  }
+  to {
+    transform: scale(0.97);
+  }
+}
+@keyframes mch-calmo {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.025);
+  }
+}

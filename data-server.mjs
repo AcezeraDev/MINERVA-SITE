@@ -596,7 +596,7 @@ async function handleMineVoice(req, res) {
     return;
   }
   try {
-    const result = await synthesizeVoice({ text: body.text, slow: body.slow === true });
+    const result = await synthesizeVoice({ text: body.text, slow: body.slow === true, lang: body.lang === "pt" ? "pt" : "en", quem: body.quem === "leo" ? "leo" : "mine", chamada: body.chamada === true });
     if (result.cached) await giveBackQuota(session.userId, "mine-voz").catch(() => undefined);
     const origin = process.env.PUBLIC_APP_ORIGIN || req.headers.origin || "*";
     res.writeHead(200, {

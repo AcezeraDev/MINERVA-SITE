@@ -1,6 +1,6 @@
 import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL, effortFor } from "./models.mjs";
 import { buildMessages } from "./messages.mjs";
-import { buildCodeInstruction, buildDeepResearchInstruction, buildFileInstruction, buildToolsInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
+import { buildCodeInstruction, buildDeepResearchInstruction, buildFileInstruction, buildToolsInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildProfileInstruction, buildStudySheetInstruction, buildVoiceCallInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
 import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, editsAttachedImage, extractSuggestions, imageFormatFrom, imageStyleFrom, previousGalleryStyle, withImageRequest, withImageStyle } from "../shared/chat-media.mjs";
 import { asksForFile, asksForStudySheet, ensureDeepResearchFile } from "../shared/chat-files.mjs";
 import { asksForCode } from "../shared/code-intent.mjs";
@@ -446,6 +446,11 @@ export async function runMineRequest({
   // "Pesquisa aprofundada" e "Pensar com calma" do "+" do chat (21/nov/2026).
   profundo = false,
   caprichar = false,
+  // Seletor de esforço da barra (nov/2026): "rapida" usa o modelo rápido,
+  // "caprichada" é o antigo "Pensar com calma".
+  esforco = "",
+  // Aula por voz: resposta curta e sem formatação, porque vira fala.
+  voz = false,
 }) {
   const cleanTask = String(task || "").trim();
   const deep = Boolean(profundo) && !String(task || "").trim() && !controle;
@@ -471,11 +476,18 @@ export async function runMineRequest({
   // principal assume. Controle Mine e tarefas seguem como antes.
   const codeKind = cleanTask || control ? "" : asksForCode(prompt, history);
   // Pensar com calma / pesquisa aprofundada: o mesmo modelo com raciocinio alto.
-  const thoughtful = (Boolean(caprichar) || deep) && !cleanTask && !codeKind;
+  const thoughtful = (Boolean(caprichar) || esforco === "caprichada" || deep) && !cleanTask && !codeKind;
+  const quick = esforco === "rapida" && !thoughtful && !cleanTask && !codeKind && !control;
+  // Aula por voz (25/nov/2026): raciocínio curto. Com "medium" a primeira
+  // palavra saía em ~3 s; com "low", em ~2 s — numa conversa falada cada
+  // segundo de silêncio pesa.
+  const callTurn = Boolean(voz) && !cleanTask && !thoughtful && !control;
   const chatModel = thoughtful
     ? { ...MINE_MODEL, providerModel: MINE_MODEL.providerModel, providerParams: { reasoning_effort: effortFor(MINE_MODEL.providerModel, "high") } }
-    : MINE_MODEL;
-  const principal = cleanTask ? MINE_TASK_MODEL : codeKind ? MINE_CODE_MODEL : chatModel;
+    : callTurn
+      ? { ...MINE_MODEL, providerModel: MINE_MODEL.providerModel, providerParams: { reasoning_effort: effortFor(MINE_MODEL.providerModel, "low") } }
+      : MINE_MODEL;
+  const principal = cleanTask ? MINE_TASK_MODEL : codeKind ? MINE_CODE_MODEL : quick ? MINE_FAST_MODEL : chatModel;
   const candidates = gameTask
     ? [MINE_FAST_MODEL, MINE_TASK_MODEL]
     : codeKind
@@ -511,7 +523,9 @@ export async function runMineRequest({
   // Ferramentas da Mine (mine/tools.mjs): dados do aluno (quando o navegador
   // mandou o retrato dele) e contas/dados exatos. Ate 3 rodadas por pedido.
   const alunoData = cleanTask || control ? null : sanitizeAluno(aluno);
-  let extraTools = cleanTask || control || codeKind || !toolsSupported() ? [] : [...(alunoData ? STUDENT_TOOLS : []), ...KNOWLEDGE_TOOLS];
+  // Na aula por voz as ferramentas ficam de fora: cada rodada de ferramenta
+  // é mais uma ida e volta ao modelo com o aluno esperando em silêncio.
+  let extraTools = cleanTask || control || codeKind || callTurn || !toolsSupported() ? [] : [...(alunoData ? STUDENT_TOOLS : []), ...KNOWLEDGE_TOOLS];
   const toolResults = [];
   const actions = [];
   let toolRounds = 0;
@@ -553,7 +567,7 @@ export async function runMineRequest({
     ...(studySheet ? [buildStudySheetInstruction()] : fileKind && (!deep || fileKind === "excel") ? [buildFileInstruction(fileKind)] : []),
     ...(codeKind && !wantsFile && !wantsGeneration && !deep ? [buildCodeInstruction(codeKind)] : []),
     // Glossário só no chat livre e fora dos arquivos/dossiês (o arquivo tem o próprio texto).
-    ...(cleanTask || wantsFile || deep ? [] : [buildGlossaryInstruction()]),
+    ...(cleanTask || wantsFile || deep || callTurn ? [] : [buildGlossaryInstruction()]),
     // Modo fotos e do chat livre: uma task (simulado, mapa, jogo) ou dossiê PDF tem formato
     // proprio, e um marcador de imagem no meio dela quebraria o documento.
     ...(cleanTask || wantsGeneration || wantsFile || deep ? [] : photos ? [buildPhotoModeInstruction()] : asksForImage(prompt) || previousGallery ? [buildImageRequestInstruction()] : []),
@@ -565,8 +579,11 @@ export async function runMineRequest({
     ...(cleanTask ? [] : tutor && !deep ? [buildTutorInstruction()] : []),
     ...(deep ? [buildDeepResearchInstruction()] : []),
     ...(control ? [CONTROL_INSTRUCTION, ...controlLinks.extraSystem] : []),
-    ...(cleanTask ? [] : [buildSuggestionsInstruction({ tutor: Boolean(tutor && !deep) })]),
-    ...(extraTools.length || (!cleanTask && !codeKind && !control && !deep) ? [buildToolsInstruction({ ferramentas: extraTools.length > 0, aluno: Boolean(alunoData) && extraTools.length > 0 })] : []),
+    ...(cleanTask || !buildProfileInstruction(alunoData?.perfil) ? [] : [buildProfileInstruction(alunoData?.perfil)]),
+    ...(cleanTask || voz ? [] : [buildSuggestionsInstruction({ tutor: Boolean(tutor && !deep) })]),
+    ...(extraTools.length || (!cleanTask && !codeKind && !control && !deep) ? [buildToolsInstruction({ ferramentas: extraTools.length > 0, aluno: Boolean(alunoData) && extraTools.length > 0, semBlocos: Boolean(voz), pedido: `${prompt}\n${String((history || []).slice(-1)[0]?.text || (history || []).slice(-1)[0]?.content || "").slice(-800)}`, anexoImagem: hasImageAttachment })] : []),
+    // Aula por voz vai por último: é a regra que mais pesa (a resposta vira fala).
+    ...(cleanTask || !voz ? [] : [buildVoiceCallInstruction()]),
   ];
 
   let lastError = null;

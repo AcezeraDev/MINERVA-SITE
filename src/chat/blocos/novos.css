@@ -1,0 +1,417 @@
+/*
+  Blocos novos do chat (Novos.tsx, 25/nov/2026): laboratório, passos,
+  roteiro, dois jeitos, correção na foto, podcast e slides. Herdam as cores
+  de .mbk (blocos.css).
+*/
+
+/* ── laboratório ── */
+.mbk-lab__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  touch-action: pan-y;
+}
+.mbk-lab__guia {
+  stroke: var(--mbk-accent);
+  stroke-dasharray: 4 4;
+  opacity: 0.6;
+}
+.mbk-lab__eixos {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: -0.5rem 0 0;
+  color: var(--mbk-muted);
+  font-size: 0.78rem;
+}
+.mbk-lab__leituras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.5rem;
+}
+.mbk-lab__leituras div {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.7rem;
+  background: var(--mbk-raise);
+  border: 1px solid var(--mbk-line);
+}
+.mbk-lab__leituras span {
+  color: var(--mbk-muted);
+  font-size: 0.76rem;
+}
+.mbk-lab__leituras b {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--mbk-accent-text);
+}
+.mbk-lab__leituras small {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--mbk-muted);
+}
+.mbk-lab__nota {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 3px solid var(--mbk-accent);
+  background: var(--mbk-good-bg);
+  border-radius: 0 0.6rem 0.6rem 0;
+  font-size: 0.9rem;
+}
+
+/* ── passos ── */
+.mbk-passos__lista {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mbk-passos__lista li {
+  display: grid;
+  grid-template-columns: 1.8rem 1fr;
+  gap: 0.7rem;
+  align-items: start;
+}
+.mbk-passos__lista li > div {
+  min-width: 0;
+  overflow-x: auto;
+}
+.mbk-passos__lista li.is-novo {
+  animation: mbk-entra 380ms var(--mbk-ease);
+}
+.mbk-passos__expr {
+  margin: 0.1rem 0 0.15rem;
+  font-size: 1.12rem;
+}
+.mbk-passos__lista p {
+  margin: 0;
+}
+.mbk-passos__tentar {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.7rem;
+  border: 1px dashed var(--mbk-line-strong);
+}
+.mbk-passos__tentar p {
+  margin: 0;
+}
+@keyframes mbk-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ── roteiro ── */
+.mbk-roteiro__capa {
+  display: grid;
+  gap: 0.2rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--mbk-line);
+}
+.mbk-roteiro__capa strong {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.mbk-roteiro__capa span:not(.mbk-meta) {
+  color: var(--mbk-muted);
+}
+.mbk-roteiro__grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.7rem;
+}
+.mbk-roteiro__cartao {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.8rem;
+  background: var(--mbk-raise);
+  border: 1px solid var(--mbk-line);
+  transition: border-color 180ms var(--mbk-ease);
+}
+.mbk-roteiro__cartao:hover,
+.mbk-roteiro__cartao.is-aberto {
+  border-color: var(--mbk-line-strong);
+}
+.mbk-roteiro__cartao p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.mbk-roteiro__topo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.mbk-roteiro__topo b {
+  display: block;
+  font-weight: 800;
+}
+.mbk-roteiro__topo small {
+  color: var(--mbk-muted);
+  font-size: 0.76rem;
+}
+.mbk-roteiro__icone {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  flex: none;
+  border-radius: 0.6rem;
+  background: var(--mbk-surface);
+  font-size: 1.15rem;
+}
+.mbk-roteiro__itens {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.88rem;
+}
+.mbk-roteiro__itens label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.mbk-roteiro__itens input {
+  margin-top: 0.25rem;
+  accent-color: var(--mbk-accent);
+}
+.mbk-roteiro__itens .is-feito {
+  text-decoration: line-through;
+  color: var(--mbk-muted);
+}
+
+/* ── dois jeitos ── */
+.mbk-jeitos__colunas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.7rem;
+}
+.mbk-jeitos__colunas article {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.8rem;
+  background: var(--mbk-raise);
+  border: 1px solid var(--mbk-line);
+  transition: opacity 200ms var(--mbk-ease), border-color 200ms var(--mbk-ease);
+}
+.mbk-jeitos__colunas article p {
+  margin: 0;
+  font-size: 0.93rem;
+}
+.mbk-jeitos__colunas article.is-escolhido {
+  border-color: var(--mbk-accent);
+}
+.mbk-jeitos__colunas article.is-outro {
+  opacity: 0.6;
+}
+.mbk-jeitos__colunas .mbk-btn {
+  justify-self: start;
+}
+.mbk-jeitos__estilo {
+  justify-self: start;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: var(--mbk-good-bg);
+  color: var(--mbk-accent-text);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── correção na foto ── */
+.mbk-correcao__foto {
+  position: relative;
+  border-radius: 0.8rem;
+  overflow: hidden;
+  border: 1px solid var(--mbk-line);
+  max-width: 100%;
+}
+.mbk-correcao__foto img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.mbk-correcao__marca {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 1.6rem;
+  border-radius: 50%;
+  border: 3px solid #e5484d;
+  background: rgba(229, 72, 77, 0.12);
+  padding: 0;
+  transition: transform 160ms var(--mbk-ease), box-shadow 160ms var(--mbk-ease);
+}
+.mbk-correcao__marca span {
+  position: absolute;
+  top: -0.7rem;
+  right: -0.7rem;
+  display: grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: #e5484d;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.mbk-correcao__marca.is-acerto {
+  border-color: #13955a;
+  background: rgba(19, 149, 90, 0.12);
+}
+.mbk-correcao__marca.is-acerto span {
+  background: #13955a;
+}
+.mbk-correcao__marca.is-dica {
+  border-color: #d29922;
+  background: rgba(210, 153, 34, 0.14);
+}
+.mbk-correcao__marca.is-dica span {
+  background: #b7791f;
+}
+.mbk-correcao__marca.is-ativa,
+.mbk-correcao__marca:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5);
+}
+.mbk-correcao__lista {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.92rem;
+}
+.mbk-correcao__lista li {
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.6rem;
+  border-left: 3px solid #e5484d;
+  background: var(--mbk-bad-bg);
+}
+.mbk-correcao__lista li.is-acerto {
+  border-left-color: var(--mbk-good);
+  background: var(--mbk-good-bg);
+}
+.mbk-correcao__lista li.is-dica {
+  border-left-color: #d29922;
+  background: rgba(210, 153, 34, 0.1);
+}
+.mbk-correcao__lista li.is-ativa {
+  outline: 2px solid var(--mbk-line-strong);
+}
+
+/* ── podcast ── */
+.mbk-podcast__vel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  color: var(--mbk-muted);
+  font-size: 0.8rem;
+}
+.mbk-podcast__vel select {
+  font: inherit;
+  color: var(--mbk-text);
+  background: var(--mbk-raise);
+  border: 1px solid var(--mbk-line);
+  border-radius: 0.5rem;
+  padding: 0.15rem 0.35rem;
+}
+.mbk-podcast__falas {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0 0.2rem 0 0;
+  list-style: none;
+}
+.mbk-podcast__falas li {
+  display: grid;
+  grid-template-columns: 4.2rem 1fr;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.6rem;
+  font-size: 0.92rem;
+  transition: background-color 200ms var(--mbk-ease);
+}
+.mbk-podcast__falas li button {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.mbk-podcast__falas li.is-a b {
+  color: var(--mbk-accent-text);
+}
+.mbk-podcast__falas li.is-b b {
+  color: #9b8cf2;
+}
+.mbk-podcast__falas li.is-atual {
+  background: var(--mbk-good-bg);
+}
+
+/* ── slides ── */
+.mbk-slides__tela {
+  position: relative;
+  display: grid;
+  gap: 0.6rem;
+  min-height: 15rem;
+  padding: 1.3rem 1.4rem 1rem;
+  border-radius: 0.9rem;
+  background: var(--mbk-raise);
+  border: 1px solid var(--mbk-line);
+  overflow: hidden;
+}
+.mbk-slides__num {
+  position: absolute;
+  right: 1rem;
+  top: 0.4rem;
+  font-size: 3.2rem;
+  font-weight: 800;
+  color: var(--mbk-line-strong);
+  line-height: 1;
+}
+.mbk-slides__tela h4 {
+  margin: 0;
+  max-width: 85%;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.mbk-slides__tela ul {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.mbk-slides__legenda {
+  margin: auto 0 0;
+  color: var(--mbk-muted);
+  font-size: 0.86rem;
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mbk-passos__lista li.is-novo {
+    animation: none;
+  }
+}

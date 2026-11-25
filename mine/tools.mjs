@@ -121,6 +121,18 @@ export function sanitizeAluno(raw) {
       vezes: Number(item?.vezes) || 1,
     })),
     provas: list(raw.provas, 12).map((item) => ({ assunto: text(item?.assunto, 120), nota: Number(item?.nota) || 0, acertos: Number(item?.acertos) || 0, total: Number(item?.total) || 0, quando: text(item?.quando, 10) })),
+    perfil: raw.perfil && typeof raw.perfil === "object"
+      ? {
+          nome: text(raw.perfil.nome, 60),
+          serie: text(raw.perfil.serie, 60),
+          aprendo: text(raw.perfil.aprendo, 200),
+          dificeis: text(raw.perfil.dificeis, 200),
+          fortes: text(raw.perfil.fortes, 200),
+          objetivo: text(raw.perfil.objetivo, 200),
+          sobre: text(raw.perfil.sobre, 500),
+          preferencias: list(raw.perfil.preferencias, 8).map((item) => text(item, 120)).filter(Boolean),
+        }
+      : null,
     progresso: raw.progresso && typeof raw.progresso === "object"
       ? Object.fromEntries(Object.entries(raw.progresso).slice(0, 12).map(([key, value]) => [text(key, 30), typeof value === "number" ? value : text(value, 60)]))
       : {},

@@ -669,3 +669,52 @@
 .mbk .katex {
   font-size: 1.05em;
 }
+
+/* ── tipos novos do quiz (25/nov/2026) ── */
+.mbk-quiz__tipo {
+  margin: 0 0 -0.4rem;
+  color: var(--mbk-accent-text);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.mbk-quiz__escrever {
+  display: grid;
+  gap: 0.6rem;
+}
+.mbk-quiz__escrever :is(input, textarea) {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--mbk-line-strong);
+  background: var(--mbk-raise);
+  color: var(--mbk-text);
+  font: inherit;
+  resize: vertical;
+}
+.mbk-quiz__escrever input.is-certa {
+  border-color: var(--mbk-good);
+  background: var(--mbk-good-bg);
+}
+.mbk-quiz__escrever input.is-errada {
+  border-color: var(--mbk-bad);
+  background: var(--mbk-bad-bg);
+}
+.mbk-quiz__escrever .mbk-btn {
+  justify-self: start;
+}
+.mbk-quiz__esperado {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.7rem;
+  background: var(--mbk-good-bg);
+}
+.mbk-quiz__esperado p {
+  margin: 0;
+}
+.mbk-quiz__opcoes button.is-marcada {
+  border-color: var(--mbk-accent);
+  background: var(--mbk-good-bg);
+}

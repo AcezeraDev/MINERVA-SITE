@@ -1,5 +1,6 @@
 import { gamificationStats, levelFromXp, totalXp } from "../../shared/xp.mjs";
 import type { AppData } from "../main";
+import { perfilParaEnviar } from "./ficha";
 
 /*
  * Retrato do estudante que vai junto com cada pergunta à Mine, para as
@@ -97,6 +98,8 @@ export function buildAlunoSnapshot(scope: Scope, userId: string, now = Date.now(
   const level = levelFromXp(xp);
 
   return {
+    // Ficha "O que a Mine sabe de mim" (src/chat/ficha.ts).
+    perfil: perfilParaEnviar(userId),
     hoje: isoDay(now),
     tarefas,
     materias,

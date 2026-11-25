@@ -43,6 +43,10 @@ export type BlocoAcoes = {
   enviar?: (texto: string) => void;
   salvarFlashcards?: (baralho: { titulo: string; cartoes: { frente: string; verso: string }[] }) => void;
   levarParaAgenda?: (plano: { titulo: string; materia: string; dias: { titulo: string; texto: string; dia: number }[] }) => void;
+  /** "Entendi melhor esse" do bloco dois-jeitos: vai para a ficha do aluno. */
+  anotarPreferencia?: (preferencia: string) => void;
+  /** Erro de quiz no chat: entra no caderno de erros da aba Provas. */
+  registrarErro?: (erro: { assunto: string; pergunta: string; opcoes: string[]; correta: number; marcada: number }) => void;
 };
 export const BlocoAcoesContext = createContext<BlocoAcoes | null>(null);
 
@@ -53,7 +57,25 @@ export const QuizResultadoContext = createContext<((r: { titulo: string; acertos
 // seu "porquê" (aparece debaixo da marcada e da certa), a lâmpada mostra uma
 // dica antes de responder, fórmula sai desenhada (KaTeX) e o fim lista cada
 // questão com ✓/✗, o que a pessoa marcou e a explicação.
-type Pergunta = { pergunta: string; opcoes: string[]; correta: number; explicacao: string; porques: string[]; dica: string };
+// Nov/2026 (25): tipos novos, como no NotebookLM — verdadeiro ou falso
+// ("vf"), várias certas ("varias"), completar a lacuna ("lacuna") e resposta
+// curta ("curta", que o próprio estudante confere com o gabarito ou pede a
+// correção da Mine). Errou: "Por que errei?" pergunta à Mine e o erro entra
+// no caderno de erros da aba Provas.
+type TipoPergunta = "multipla" | "vf" | "varias" | "lacuna" | "curta";
+type Pergunta = {
+  tipo: TipoPergunta;
+  pergunta: string;
+  opcoes: string[];
+  correta: number;
+  corretas: number[];
+  respostas: string[];
+  esperado: string;
+  explicacao: string;
+  porques: string[];
+  dica: string;
+};
+type Resposta = { certa: boolean; escolha?: number; escolhas?: number[]; texto?: string } | null;
 
 /**
  * O quiz escreve fórmula com KaTeX ($...$); o que vier em LaTeX solto, sem
@@ -66,43 +88,120 @@ function comFormula(texto: string) {
 
 function lerQuiz(data: Record<string, unknown>) {
   const perguntas = (Array.isArray(data.perguntas) ? data.perguntas : [])
-    .map((item) => {
+    .map((item): Pergunta => {
       const raw = item as Record<string, unknown>;
+      const tipoBruto = str(raw.tipo, 20).toLowerCase();
       // Alternativa pode vir como texto ou como {texto, porque}.
       const brutas = Array.isArray(raw.opcoes) ? raw.opcoes : [];
-      const opcoes = brutas.map((op) => comFormula(str(typeof op === "object" && op ? (op as Record<string, unknown>).texto : op, 240))).slice(0, 5);
+      let opcoes = brutas.map((op) => comFormula(str(typeof op === "object" && op ? (op as Record<string, unknown>).texto : op, 240))).slice(0, 6);
+      const respostas = (Array.isArray(raw.respostas) ? raw.respostas : typeof raw.resposta === "string" ? [raw.resposta] : []).map((r) => str(r, 80)).filter(Boolean).slice(0, 6);
+      const corretas = (Array.isArray(raw.corretas) ? raw.corretas : []).map((n) => Math.round(num(n, -1))).filter((n) => n >= 0 && n < opcoes.length);
+      const tipo: TipoPergunta =
+        tipoBruto === "lacuna" && respostas.length
+          ? "lacuna"
+          : tipoBruto === "curta"
+            ? "curta"
+            : (tipoBruto === "varias" || tipoBruto === "várias") && corretas.length
+              ? "varias"
+              : tipoBruto === "vf" || tipoBruto === "verdadeiro-falso"
+                ? "vf"
+                : "multipla";
+      if (tipo === "vf" && opcoes.length < 2) opcoes = ["Verdadeiro", "Falso"];
       const porquesSoltos = Array.isArray(raw.porques) ? raw.porques : [];
       const porques = opcoes.map((_, i) => {
         const op = brutas[i];
         const dentro = typeof op === "object" && op ? str((op as Record<string, unknown>).porque, 400) : "";
         return comFormula(dentro || str(porquesSoltos[i], 400));
       });
-      const correta = Math.round(num(raw.correta, -1));
-      return { pergunta: comFormula(str(raw.pergunta, 700)), opcoes, correta, explicacao: comFormula(str(raw.explicacao, 600)), porques, dica: comFormula(str(raw.dica, 300)) };
+      return {
+        tipo,
+        pergunta: comFormula(str(raw.pergunta, 700)),
+        opcoes: tipo === "lacuna" || tipo === "curta" ? [] : opcoes,
+        correta: Math.round(num(raw.correta, -1)),
+        corretas,
+        respostas,
+        esperado: comFormula(str(raw.esperado ?? raw.explicacao, 600)),
+        explicacao: comFormula(str(raw.explicacao, 600)),
+        porques,
+        dica: comFormula(str(raw.dica, 300)),
+      };
     })
-    .filter((item) => item.pergunta && item.opcoes.length >= 2 && item.opcoes.every(Boolean) && item.correta >= 0 && item.correta < item.opcoes.length)
+    .filter((item) => {
+      if (!item.pergunta) return false;
+      if (item.tipo === "lacuna") return item.respostas.length > 0;
+      if (item.tipo === "curta") return Boolean(item.esperado);
+      if (item.tipo === "varias") return item.opcoes.length >= 2 && item.corretas.length > 0;
+      return item.opcoes.length >= 2 && item.opcoes.every(Boolean) && item.correta >= 0 && item.correta < item.opcoes.length;
+    })
     .slice(0, 10);
   return perguntas.length ? { titulo: str(data.titulo, 120) || "Quiz rápido", perguntas } : null;
 }
 
 const letra = (i: number) => String.fromCharCode(65 + i);
 
+function semAcentoQuiz(value: string) {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/** Uma letra trocada passa ("fotosintese"); mais que isso, não. */
+function quaseIgual(a: string, b: string) {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1 || Math.min(a.length, b.length) < 5) return false;
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i += 1;
+  return a.slice(i + 1) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i) || a.slice(i) === b.slice(i + 1);
+}
+
+function textoCerto(p: Pergunta) {
+  if (p.tipo === "lacuna") return p.respostas[0];
+  if (p.tipo === "curta") return p.esperado;
+  if (p.tipo === "varias") return p.corretas.map((i) => `${letra(i)}) ${p.opcoes[i]}`).join("; ");
+  return `${letra(p.correta)}) ${p.opcoes[p.correta]}`;
+}
+
+function textoMarcado(p: Pergunta, r: Resposta) {
+  if (!r) return "";
+  if (r.texto !== undefined) return r.texto;
+  if (r.escolhas) return r.escolhas.map((i) => `${letra(i)}) ${p.opcoes[i]}`).join("; ");
+  return r.escolha !== undefined ? `${letra(r.escolha)}) ${p.opcoes[r.escolha]}` : "";
+}
+
 function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) {
   const [index, setIndex] = useState(0);
-  const [respostas, setRespostas] = useState<(number | null)[]>(() => perguntas.map(() => null));
+  const [respostas, setRespostas] = useState<Resposta[]>(() => perguntas.map(() => null));
   const [dicaAberta, setDicaAberta] = useState(false);
   const [fim, setFim] = useState(false);
+  const [marcadas, setMarcadas] = useState<number[]>([]);
+  const [digitado, setDigitado] = useState("");
+  const [vendoGabarito, setVendoGabarito] = useState(false);
   const avisarResultado = useContext(QuizResultadoContext);
   const acoes = useContext(BlocoAcoesContext);
   const atual = perguntas[index];
-  const escolha = respostas[index];
-  const acertos = respostas.filter((r, i) => r === perguntas[i].correta).length;
-  const responder = (op: number) => {
-    if (escolha !== null) return;
-    setRespostas((lista) => lista.map((r, i) => (i === index ? op : r)));
+  const resposta = respostas[index];
+  const acertos = respostas.filter((r) => r?.certa).length;
+
+  const responder = (r: NonNullable<Resposta>) => {
+    if (resposta) return;
+    setRespostas((lista) => lista.map((item, i) => (i === index ? r : item)));
+    // Erro de alternativa vai para o caderno de erros (aba Provas).
+    if (!r.certa && atual.opcoes.length && acoes?.registrarErro) {
+      const marcada = r.escolha ?? r.escolhas?.find((i) => !atual.corretas.includes(i)) ?? 0;
+      acoes.registrarErro({ assunto: titulo, pergunta: atual.pergunta.replace(/\$/g, ""), opcoes: atual.opcoes.map((o) => o.replace(/\$/g, "")), correta: atual.tipo === "varias" ? atual.corretas[0] : atual.correta, marcada });
+    }
+  };
+  const conferirVarias = () => {
+    const certas = [...atual.corretas].sort().join(",");
+    responder({ certa: [...marcadas].sort().join(",") === certas, escolhas: marcadas });
+  };
+  const conferirLacuna = () => {
+    const alvo = semAcentoQuiz(digitado);
+    responder({ certa: atual.respostas.some((r) => quaseIgual(semAcentoQuiz(r), alvo)), texto: digitado.trim() });
   };
   const proxima = () => {
     setDicaAberta(false);
+    setMarcadas([]);
+    setDigitado("");
+    setVendoGabarito(false);
     if (index + 1 >= perguntas.length) {
       setFim(true);
       avisarResultado?.({ titulo, acertos, total: perguntas.length });
@@ -112,9 +211,16 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
     setIndex(0);
     setRespostas(perguntas.map(() => null));
     setDicaAberta(false);
+    setMarcadas([]);
+    setDigitado("");
+    setVendoGabarito(false);
     setFim(false);
   };
-  const errados = perguntas.filter((p, i) => respostas[i] !== null && respostas[i] !== p.correta);
+  const porQueErrei = (p: Pergunta, r: Resposta) =>
+    acoes?.enviar?.(
+      `No quiz "${titulo}", na pergunta "${p.pergunta.replace(/\$/g, "").slice(0, 300)}", eu respondi "${textoMarcado(p, r).replace(/\$/g, "")}" e a certa era "${textoCerto(p).replace(/\$/g, "")}". Me explica por que eu errei (qual raciocínio me levou a isso) e me dá uma questão parecida para eu tentar de novo.`,
+    );
+  const errados = perguntas.filter((_, i) => respostas[i] && !respostas[i]?.certa);
 
   if (fim) {
     const frase = acertos === perguntas.length ? "Gabaritou! Pode subir o nível." : acertos >= perguntas.length / 2 ? "Mandou bem. Revise o que errou abaixo." : "Vale rever o assunto. Errar aqui é treino.";
@@ -132,8 +238,8 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
         </div>
         <ol className="mbk-quiz__revisao">
           {perguntas.map((p, i) => {
-            const certa = respostas[i] === p.correta;
-            const marcada = respostas[i];
+            const r = respostas[i];
+            const certa = Boolean(r?.certa);
             return (
               <li key={i} className={certa ? "is-certa" : "is-errada"}>
                 <span className="mbk-letra" aria-label={certa ? "Acertou" : "Errou"}>
@@ -143,18 +249,23 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
                   <p className="mbk-quiz__rev-pergunta">
                     <MineInline text={p.pergunta} />
                   </p>
-                  {!certa && marcada !== null ? (
+                  {!certa && r ? (
                     <p className="mbk-quiz__rev-sua">
-                      Você marcou {letra(marcada)}: <MineInline text={p.opcoes[marcada]} />
+                      Você respondeu: <MineInline text={textoMarcado(p, r)} />
                     </p>
                   ) : null}
                   <p className="mbk-quiz__rev-certa">
-                    Resposta: {letra(p.correta)}) <MineInline text={p.opcoes[p.correta]} />
+                    Resposta: <MineInline text={textoCerto(p)} />
                   </p>
                   {p.explicacao || p.porques[p.correta] ? (
                     <p className="mbk-muted">
                       <MineInline text={p.explicacao || p.porques[p.correta]} />
                     </p>
+                  ) : null}
+                  {!certa && acoes?.enviar ? (
+                    <button type="button" className="mbk-link" onClick={() => porQueErrei(p, r)}>
+                      Por que errei?
+                    </button>
                   ) : null}
                 </div>
               </li>
@@ -185,6 +296,7 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
     );
   }
 
+  const escolhaUnica = resposta?.escolha;
   return (
     <section className="mbk mbk-quiz" aria-label={`Quiz: ${titulo}`}>
       <header className="mbk-head">
@@ -201,8 +313,9 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
         </span>
       </header>
       <div className="mbk-progress" aria-hidden>
-        <i style={{ width: `${((index + (escolha !== null ? 1 : 0)) / perguntas.length) * 100}%` }} />
+        <i style={{ width: `${((index + (resposta ? 1 : 0)) / perguntas.length) * 100}%` }} />
       </div>
+      {atual.tipo === "varias" ? <p className="mbk-quiz__tipo">Marque todas as corretas</p> : atual.tipo === "lacuna" ? <p className="mbk-quiz__tipo">Complete a lacuna</p> : atual.tipo === "curta" ? <p className="mbk-quiz__tipo">Responda com suas palavras</p> : atual.tipo === "vf" ? <p className="mbk-quiz__tipo">Verdadeiro ou falso?</p> : null}
       <p className="mbk-quiz__pergunta">
         <MineInline text={atual.pergunta} />
       </p>
@@ -211,37 +324,112 @@ function Quiz({ titulo, perguntas }: { titulo: string; perguntas: Pergunta[] }) 
           <Lightbulb aria-hidden /> <MineInline text={atual.dica} />
         </p>
       ) : null}
-      <ol className="mbk-quiz__opcoes">
-        {atual.opcoes.map((op, i) => {
-          const estado = escolha === null ? "" : i === atual.correta ? "is-certa" : i === escolha ? "is-errada" : "is-apagada";
-          const porque = escolha !== null && (i === escolha || i === atual.correta) ? atual.porques[i] : "";
-          return (
-            <li key={i}>
-              <button type="button" className={estado} onClick={() => responder(i)} disabled={escolha !== null} aria-pressed={escolha === i}>
-                <span className="mbk-letra" aria-hidden>
-                  {estado === "is-certa" ? <Check /> : estado === "is-errada" ? <X /> : letra(i)}
-                </span>
-                <span className="mbk-quiz__op">
-                  <MineInline text={op} />
-                  {porque ? (
-                    <small className="mbk-quiz__porque">
-                      <MineInline text={porque} />
-                    </small>
-                  ) : null}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-      {escolha !== null ? (
-        <div className={`mbk-quiz__feedback ${escolha === atual.correta ? "is-certa" : "is-errada"}`} role="status">
-          <strong>{escolha === atual.correta ? "Certa!" : `A certa é a ${letra(atual.correta)}.`}</strong>
+
+      {atual.tipo === "lacuna" || atual.tipo === "curta" ? (
+        <div className="mbk-quiz__escrever">
+          {atual.tipo === "lacuna" ? (
+            <input
+              type="text"
+              value={resposta?.texto ?? digitado}
+              onChange={(event) => setDigitado(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && digitado.trim() && !resposta && conferirLacuna()}
+              disabled={Boolean(resposta)}
+              placeholder="Escreva a palavra que falta"
+              aria-label="Sua resposta"
+              className={resposta ? (resposta.certa ? "is-certa" : "is-errada") : ""}
+            />
+          ) : (
+            <textarea value={resposta?.texto ?? digitado} onChange={(event) => setDigitado(event.target.value)} disabled={Boolean(resposta) || vendoGabarito} rows={3} placeholder="Escreva sua resposta em 1 ou 2 frases" aria-label="Sua resposta" />
+          )}
+          {!resposta && atual.tipo === "lacuna" ? (
+            <button type="button" className="mbk-btn" onClick={conferirLacuna} disabled={!digitado.trim()}>
+              Conferir
+            </button>
+          ) : null}
+          {!resposta && atual.tipo === "curta" && !vendoGabarito ? (
+            <button type="button" className="mbk-btn" onClick={() => setVendoGabarito(true)} disabled={!digitado.trim()}>
+              Comparar com a resposta esperada
+            </button>
+          ) : null}
+          {atual.tipo === "curta" && vendoGabarito && !resposta ? (
+            <div className="mbk-quiz__esperado">
+              <p>
+                <b>Uma boa resposta tem:</b> <MineInline text={atual.esperado} />
+              </p>
+              <div className="mbk-row">
+                <button type="button" className="mbk-btn" onClick={() => responder({ certa: true, texto: digitado.trim() })}>
+                  <Check aria-hidden /> Acertei
+                </button>
+                <button type="button" className="mbk-btn is-ghost" onClick={() => responder({ certa: false, texto: digitado.trim() })}>
+                  <X aria-hidden /> Errei ou faltou algo
+                </button>
+                {acoes?.enviar ? (
+                  <button
+                    type="button"
+                    className="mbk-link"
+                    onClick={() => acoes.enviar?.(`Corrige minha resposta. Pergunta: "${atual.pergunta.replace(/\$/g, "")}". Minha resposta: "${digitado.trim()}". Diga o que está certo, o que faltou e dê uma nota de 0 a 10.`)}
+                  >
+                    Pedir a correção da Mine
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <ol className="mbk-quiz__opcoes">
+          {atual.opcoes.map((op, i) => {
+            const varias = atual.tipo === "varias";
+            const ehCerta = varias ? atual.corretas.includes(i) : i === atual.correta;
+            const marcou = varias ? (resposta?.escolhas || marcadas).includes(i) : escolhaUnica === i;
+            const estado = !resposta ? (varias && marcou ? "is-marcada" : "") : ehCerta ? "is-certa" : marcou ? "is-errada" : "is-apagada";
+            const porque = resposta && (marcou || ehCerta) ? atual.porques[i] : "";
+            return (
+              <li key={i}>
+                <button
+                  type="button"
+                  className={estado}
+                  onClick={() => (varias ? setMarcadas((lista) => (lista.includes(i) ? lista.filter((n) => n !== i) : [...lista, i])) : responder({ certa: i === atual.correta, escolha: i }))}
+                  disabled={Boolean(resposta)}
+                  aria-pressed={marcou}
+                >
+                  <span className="mbk-letra" aria-hidden>
+                    {estado === "is-certa" ? <Check /> : estado === "is-errada" ? <X /> : letra(i)}
+                  </span>
+                  <span className="mbk-quiz__op">
+                    <MineInline text={op} />
+                    {porque ? (
+                      <small className="mbk-quiz__porque">
+                        <MineInline text={porque} />
+                      </small>
+                    ) : null}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {atual.tipo === "varias" && !resposta ? (
+        <div className="mbk-row">
+          <button type="button" className="mbk-btn" onClick={conferirVarias} disabled={!marcadas.length}>
+            Conferir
+          </button>
+        </div>
+      ) : null}
+      {resposta ? (
+        <div className={`mbk-quiz__feedback ${resposta.certa ? "is-certa" : "is-errada"}`} role="status">
+          <strong>{resposta.certa ? "Certa!" : atual.tipo === "multipla" || atual.tipo === "vf" ? `A certa é a ${letra(atual.correta)}.` : atual.tipo === "lacuna" ? `Resposta: ${atual.respostas[0]}.` : atual.tipo === "varias" ? `Certas: ${atual.corretas.map(letra).join(", ")}.` : "Anotado."}</strong>
           {atual.explicacao && !atual.porques[atual.correta] ? (
             <span>
               {" "}
               <MineInline text={atual.explicacao} />
             </span>
+          ) : null}
+          {!resposta.certa && acoes?.enviar ? (
+            <button type="button" className="mbk-link" onClick={() => porQueErrei(atual, resposta)}>
+              Por que errei?
+            </button>
           ) : null}
           <button type="button" className="mbk-btn" onClick={proxima}>
             {index + 1 >= perguntas.length ? "Ver resultado" : "Próxima"} <ChevronRight aria-hidden />

@@ -400,13 +400,16 @@ export function MineWorking({
   const reasoning = visibleReasoning(rawReasoning);
   const seconds = useElapsed(true);
   const [showReasoning, setShowReasoning] = useState(false);
+  // Nov/2026 (25): diz QUAIS sites está lendo, como o ChatGPT e o Claude.
+  const sites = Array.from(new Set((status?.sources || []).map((source) => siteLabel(source)))).slice(0, 3);
+  const quais = sites.length ? `: ${sites.join(", ")}${(status?.sources?.length || 0) > sites.length ? "…" : ""}` : "";
   const label =
     status?.stage === "tool"
       ? status.label || "Usando uma ferramenta"
       : status?.stage === "reading"
         ? deep
-          ? `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"} para o dossiê`
-          : `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"}`
+          ? `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"} para o dossiê${quais}`
+          : `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"}${quais}`
         : status?.stage === "searching"
           ? deep
             ? "Pesquisando a fundo na web"

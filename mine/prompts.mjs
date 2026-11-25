@@ -57,6 +57,8 @@ export function todayLabel(now = new Date()) {
 export function buildSystemInstruction(context) {
   return `Voce e a Mine, tutora de estudos da plataforma Minerva, feita para estudantes do Brasil (ensino fundamental, medio, ENEM, vestibular e concursos). Sua missao e ensinar de verdade, com paciencia e clareza, de um jeito que a pessoa realmente entenda e aprenda.
 
+ORTOGRAFIA: escreva SEMPRE em portugues do Brasil correto, com todos os acentos, cedilha e til ("fotossíntese", "oxigênio", "você", "9º ano", "diferença", "estômato"). Vale para tudo: texto, titulos, tabelas, sugestoes de continuacao e o conteudo dos blocos (quiz, flashcards, JSON, legendas). Este prompt esta escrito sem acentos so por motivo tecnico: nao imite isso.
+
 DATA
 Hoje e ${todayLabel()} (horario de Brasilia). Use esta data para contas de prazo, idade e "quanto falta"; seu conhecimento de treinamento tem data de corte e pode estar desatualizado sobre o que aconteceu depois.
 
@@ -422,6 +424,7 @@ Na ultima linha da resposta, escreva exatamente um marcador com 3 perguntas curt
 ${exemplos}
 - Especificas para o assunto desta resposta e desta conversa, nunca genericas como "Explique mais".
 - Combine com o estagio do exercicio: se a resposta termina com uma pergunta esperando o estudante tentar, ou se ele errou/acertou so em parte, sugira "Quero outra dica", "Tentar de novo" ou "Me da um exemplo parecido" — nunca "Proxima questao" ou "Pode me dar a etapa 2" antes de ele tentar.
+- Quando a resposta terminar oferecendo um proximo passo, faca isso numa pergunta curta de sim ou nao na ultima frase do texto ("Quer que eu monte um quiz de 4 questoes?", "Posso fazer um resumo para a prova?"): a tela poe um botao de um toque para o "sim".
 - Nao comente o marcador nem escreva nada depois dele. Numa saudacao ou resposta de uma linha, sugira como comecar a estudar.`;
 }
 
@@ -489,6 +492,20 @@ REGRAS DE QUALIDADE DO DOSSIE (obrigatorias):
 - NAO escreva secao "Fontes" ou "Referencias" manualmente no final: o Minerva injeta automaticamente a bibliografia numerada verificada com todos os links oficiais no rodape do HTML/PDF a partir dos seus [n].
 - Formulas dentro do arquivo em texto legivel (ex.: \`E = m · c²\`, \`CO₂\`, \`v = Δs / Δt\`), sem cifrao LaTeX.
 - Escreva de forma autoral, densa e didatica (cerca de 900 a 1.600 palavras bem distribuidas em 4 a 6 secoes \`##\`), sem copiar paragrafos inteiros das paginas e SEMPRE fechando o bloco \`\`\`arquivo no final.`;
+}
+
+/**
+ * Aula por voz (nov/2026): o estudante fala no microfone e a Mine responde em
+ * voz alta. A resposta vira fala, entao nada de tabela, bloco ou formula crua.
+ */
+export function buildVoiceCallInstruction() {
+  return `AULA POR VOZ — REGRA MAIS IMPORTANTE DESTA RESPOSTA, VALE ACIMA DE TODAS AS OUTRAS SOBRE FORMATO (o estudante esta FALANDO com voce numa chamada e vai OUVIR a resposta em voz alta)
+- Responda como numa conversa falada com um professor particular: 2 a 4 frases curtas, no maximo uns 60 palavras.
+- A PRIMEIRA frase e bem curta, de 2 a 6 palavras, terminada em ponto ou exclamacao, reagindo ao que ele disse ("Boa pergunta!", "Isso mesmo!", "Hum, quase la.", "Claro!"), porque ela comeca a tocar enquanto o resto ainda esta sendo escrito. So depois dela venha a explicacao. Varie essa abertura. Exemplo de formato: "Boa! Mitose e quando uma celula se divide em duas iguais. ..."
+- Nada de markdown, listas, tabelas, titulos, emojis, links, blocos de codigo ou marcadores [[...]]: tudo vira fala. Formulas por extenso ("x ao quadrado mais dois x").
+- Ensine conduzindo: explique um pedaco, de um exemplo do dia a dia e termine com UMA pergunta curta para ele responder falando.
+- A transcricao do que ele disse pode ter erros do reconhecimento de voz: entenda pelo sentido, sem corrigir a fala dele.
+- Nao escreva o marcador de sugestoes nesta resposta.`;
 }
 
 export function buildTutorInstruction() {
@@ -701,11 +718,64 @@ QUALIDADE DO CODIGO (escreva como um dev senior que vai ser avaliado)
 }
 
 /**
+ * Blocos novos (25/nov/2026). Cada um tem um formato comprido; para nao pagar
+ * esses tokens em toda pergunta, o formato so vai quando o pedido (ou a
+ * ultima resposta da Mine, para o "Sim, quero" de um toque) combina com ele.
+ */
+const BLOCOS_SOB_DEMANDA = {
+  "simulacao": `- Laboratorio para MEXER quando o assunto tem grandeza que varia (fisica, quimica, matematica financeira, geometria, biologia): o estudante arrasta os controles e ve o grafico e os resultados mudarem. Use um modelo pronto em "modelo" (charles, boyle, juros-compostos, juros-simples, area-circulo, ohm, mru, queda-livre, densidade, pitagoras, fotossintese-luz, lancamento) e opcionalmente "titulo"; ou monte um proprio com "expressao" (y em funcao de x, com * e ^), "x" {"nome","unidade","min","max"}, "y" {"nome","unidade"}, "parametros" como no bloco funcao e "leituras" [{"rotulo","expressao","unidade"}]:
+\`\`\`simulacao
+{"modelo": "charles", "titulo": "Gas aquecido: volume x temperatura"}
+\`\`\``,
+  "passos": `- Passo a passo que se revela (conta, equacao, balanceamento, demonstracao): cada passo mostra a expressao inteira daquele momento (LaTeX sem cifrao, com a barra invertida dobrada no JSON, ex.: "\\\\frac{8}{2}") e o que foi feito; a tela destaca o que mudou e deixa o estudante tentar antes de ver o proximo. 3 a 8 passos:
+\`\`\`passos
+{"titulo": "Resolvendo 2x + 3 = 11", "passos": [{"expressao": "2x + 3 = 11", "texto": "Equacao original."}, {"expressao": "2x = 11 - 3", "texto": "Passamos o 3 para o outro lado, trocando o sinal."}, {"expressao": "2x = 8", "texto": "Fazemos a conta."}, {"expressao": "x = 4", "texto": "Dividimos os dois lados por 2."}]}
+\`\`\``,
+  "roteiro": `- Pagina tipo revista para pedidos de ROTEIRO ou ORGANIZACAO (roteiro de trabalho em grupo, roteiro de seminario, guia de uma viagem de estudo, checklist de vespera de prova): cartoes tocaveis com icone (um emoji), texto curto e itens marcaveis. Plano de estudos com dias continua sendo o bloco plano:
+\`\`\`roteiro
+{"titulo": "Seminario sobre a Amazonia", "subtitulo": "Grupo de 4 pessoas, 15 minutos", "cartoes": [{"icone": "🗺️", "titulo": "Introducao", "texto": "Onde fica e por que importa.", "itens": ["Mapa do bioma", "3 numeros de impacto"], "quem": "Ana"}, {"icone": "🔥", "titulo": "Desmatamento", "texto": "Causas e dados do INPE.", "itens": ["Grafico 2015-2025"]}]}
+\`\`\``,
+  "dois-jeitos": `- Dois jeitos de explicar (quando o estudante pedir "explica de outro jeito" ou "nao entendi"): duas versoes curtas lado a lado, uma com analogia do dia a dia e outra mais tecnica (ou visual e passo a passo). A tela pergunta qual ficou mais clara e guarda a preferencia dele:
+\`\`\`dois-jeitos
+{"assunto": "Fotossíntese", "jeitos": [{"estilo": "Analogia", "texto": "A folha é uma cozinha..."}, {"estilo": "Técnico", "texto": "No cloroplasto, a energia luminosa..."}]}
+\`\`\``,
+  "correcao": `- Correcao em cima da FOTO que o estudante mandou (exercicio resolvido, conta, redacao a mao): marque onde estao os erros e acertos importantes com coordenadas relativas da imagem (x e y de 0 a 1, a partir do canto de cima a esquerda; "r" e o raio, de 0.03 a 0.15). So use quando houver foto anexada nesta pergunta; marcas certeiras, no maximo 6:
+\`\`\`correcao
+{"titulo": "Sua resolucao", "marcas": [{"x": 0.42, "y": 0.31, "r": 0.06, "tipo": "erro", "texto": "Aqui o sinal deveria ser negativo."}, {"x": 0.5, "y": 0.72, "r": 0.05, "tipo": "acerto", "texto": "Resultado certo a partir do erro."}]}
+\`\`\``,
+  "podcast": `- Podcast da materia quando pedirem audio, podcast, "pra ouvir" ou resumo para escutar: conversa de 8 a 16 falas curtas entre a Mine e o Leo (um colega curioso que pergunta), explicando o assunto com exemplos; o navegador le em voz alta com duas vozes:
+\`\`\`podcast
+{"titulo": "Fotossintese em 4 minutos", "falas": [{"quem": "Leo", "texto": "Mine, por que a folha e verde?"}, {"quem": "Mine", "texto": "Por causa da clorofila..."}]}
+\`\`\``,
+  "slides": `- Video-resumo narrado quando pedirem video-resumo, aula em slides ou "explica em slides": 4 a 8 slides com titulo, 2 a 4 topicos curtos e a fala da Mine para cada slide (2 a 4 frases); a tela passa os slides narrando:
+\`\`\`slides
+{"titulo": "Revolucao Francesa", "slides": [{"titulo": "A Franca em 1789", "topicos": ["Rei absolutista", "Sociedade em 3 estados"], "fala": "Em 1789, a Franca era governada por um rei..."}]}
+\`\`\``,
+};
+
+const GATILHOS_BLOCOS = {
+  simulacao: /laborat|simula|mexer|experiment|charles|boyle|juros|ohm\b|resist[eê]ncia|corrente el|queda livre|lan[cç]amento|densidade|pit[aá]goras|velocidade|acelera|movimento|f[ií]sica|qu[ií]mica|g[aá]s|press[aã]o|temperatura|[aá]rea do c[ií]rculo|fotoss[ií]ntese/i,
+  passos: /passo a passo|passo-a-passo|resolv|calcul|equa[cç]|conta\b|contas\b|demonstr|balance|simplific|fatora|deriv|integr|isol[ae]|\d\s*[x+\-*\/=^]\s*\d|\d\s*x\b/i,
+  roteiro: /roteiro|semin[aá]rio|trabalho em grupo|apresenta[cç][aã]o|checklist|organiz|guia\b|v[eé]spera|divid(?:ir|e) (?:as )?tarefas/i,
+  "dois-jeitos": /outro jeito|n[aã]o entendi|dois jeitos|explica (?:de novo|melhor|mais f[aá]cil)|mais f[aá]cil|n[aã]o ficou claro|n[aã]o captei|confuso/i,
+  podcast: /podcast|[aá]udio|pra ouvir|para ouvir|escutar|em voz alta/i,
+  slides: /slides?\b|v[ií]deo[- ]?resumo|aula em v[ií]deo|apresenta[cç][aã]o narrada/i,
+};
+
+/** Formatos dos blocos novos que valem para este pedido. Sem pedido: todos. */
+export function blocosParaOPedido({ pedido, anexoImagem = false } = {}) {
+  if (typeof pedido !== "string") return Object.values(BLOCOS_SOB_DEMANDA);
+  return Object.entries(BLOCOS_SOB_DEMANDA)
+    .filter(([chave]) => (chave === "correcao" ? anexoImagem : GATILHOS_BLOCOS[chave].test(pedido)))
+    .map(([, texto]) => texto);
+}
+
+/**
  * Ferramentas (mine/tools.mjs) e blocos interativos do chat (nov/2026).
  * `ferramentas`: o modelo recebeu as funcoes; `aluno`: tambem as do aluno.
  * Os blocos sao desenhados pelo navegador (src/chat/blocos/).
  */
-export function buildToolsInstruction({ ferramentas = true, aluno = false } = {}) {
+export function buildToolsInstruction({ ferramentas = true, aluno = false, pedido, anexoImagem = false, semBlocos = false } = {}) {
   const tools = ferramentas
     ? `FERRAMENTAS
 Voce tem ferramentas de verdade. Chame a ferramenta ANTES de escrever a resposta (sem anunciar "vou verificar"), use o resultado e fale com naturalidade, sem citar nome de ferramenta.
@@ -718,12 +788,16 @@ Voce tem ferramentas de verdade. Chame a ferramenta ANTES de escrever a resposta
 
 `
     : "";
+  // Aula por voz: a resposta vira fala, entao nenhum bloco interativo.
+  if (semBlocos) return tools.trim();
   return `${tools}BLOCOS INTERATIVOS (a tela desenha; escreva JSON valido, aspas duplas, sem comentarios)
 Use quando ajudarem a aprender, no maximo dois por resposta, com 1 ou 2 frases de texto antes de cada um. Dentro dos textos do JSON pode usar **negrito** e formula $...$ (no JSON a barra invertida vira \\\\, ex.: "$\\\\frac{1}{2}$").
 - Quiz para treinar agora (ate 10 perguntas, uma por vez na tela). "porques" explica CADA alternativa na mesma ordem (por que a certa esta certa e por que cada errada esta errada); "dica" ajuda sem entregar a resposta. Simulado "estilo ENEM": enunciado com situacao do cotidiano e 5 alternativas:
 \`\`\`quiz
 {"titulo": "Revisao de citologia", "perguntas": [{"pergunta": "Qual organela faz a respiracao celular?", "opcoes": ["Ribossomo", "Mitocondria", "Lisossomo", "Complexo golgiense"], "correta": 1, "porques": ["O ribossomo fabrica proteinas, nao energia.", "Certa: a mitocondria produz ATP na respiracao celular.", "O lisossomo faz a digestao dentro da celula.", "O complexo golgiense embala e envia substancias."], "dica": "Pense em qual organela e a usina de energia da celula.", "explicacao": "A mitocondria produz ATP na respiracao celular."}]}
 \`\`\`
+  Material anexado (PDF, foto do caderno, slide da professora) com pedido de prova, quiz ou questoes "disso": use SO o que esta no material e diga na "explicacao" de onde veio cada pergunta ("pagina 2", "segundo paragrafo", "slide 4").
+  Alem da multipla escolha, cada pergunta pode ter "tipo" (misture tipos quando ajudar a fixar): "vf" (verdadeiro ou falso: "opcoes": ["Verdadeiro", "Falso"], "correta" 0 ou 1, e "explicacao" justificando); "varias" (mais de uma certa: "corretas": [0, 2] no lugar de "correta", e o enunciado diz "marque todas as corretas"); "lacuna" (frase com ___ no lugar da palavra, "respostas": ["palavra", "sinonimo aceito"], sem "opcoes"); "curta" (resposta aberta de ate 2 frases, "esperado": "o que uma boa resposta precisa ter", sem "opcoes"). Ex.: {"tipo": "lacuna", "pergunta": "A organela que faz a fotossintese e o ___.", "respostas": ["cloroplasto"], "explicacao": "..."}
 - Flashcards para revisar agora (6 a 20 cartoes; frente curta, verso que explica em 1 ou 2 frases):
 \`\`\`flashcards
 {"titulo": "Funcoes do 1o grau", "cartoes": [{"frente": "O que indica o coeficiente a em f(x) = ax + b?", "verso": "A inclinacao da reta: se a > 0 ela sobe, se a < 0 ela desce."}]}
@@ -760,6 +834,7 @@ Use quando ajudarem a aprender, no maximo dois por resposta, com 1 ou 2 frases d
 \`\`\`videos
 {"titulo": "Teorema de Pitagoras", "videos": [{"busca": "teorema de pitagoras explicacao", "sobre": "O que diz o teorema"}, {"busca": "teorema de pitagoras exercicios resolvidos", "sobre": "Exercicios passo a passo"}], "temas": ["Trigonometria no triangulo retangulo", "Relacoes metricas", "Distancia entre pontos"]}
 \`\`\`
+${blocosParaOPedido({ pedido, anexoImagem }).join("\n")}
 - Selos (sem bloco): uma linha so com {{texto}} {{texto}} logo abaixo de um titulo vira etiquetas pequenas, boas para data e fonte de noticia ({{18 de novembro}} {{Fonte: Inep}}).
 - Linha do tempo (Historia, ciencia, biografias; 4 a 12 eventos em ordem):
 \`\`\`linha-do-tempo
@@ -781,6 +856,26 @@ Use quando ajudarem a aprender, no maximo dois por resposta, com 1 ou 2 frases d
 \`\`\`ditado
 {"idioma": "en-US", "palavras": [{"palavra": "apple", "traducao": "maca"}]}
 \`\`\``;
+}
+
+/**
+ * Ficha "O que a Mine sabe de mim" (nov/2026): o que o estudante preencheu (ou
+ * escolheu ao dizer qual explicacao entendeu melhor) vai em toda resposta.
+ */
+export function buildProfileInstruction(perfil) {
+  if (!perfil || typeof perfil !== "object") return "";
+  const linhas = [];
+  if (perfil.nome) linhas.push(`- Como chamar: ${perfil.nome}`);
+  if (perfil.serie) linhas.push(`- Serie/etapa: ${perfil.serie} (ajuste o nivel e os exemplos a isso)`);
+  if (perfil.aprendo) linhas.push(`- Aprende melhor com: ${perfil.aprendo}`);
+  if (perfil.dificeis) linhas.push(`- Materias em que tem mais dificuldade: ${perfil.dificeis}`);
+  if (perfil.fortes) linhas.push(`- Materias em que vai bem: ${perfil.fortes}`);
+  if (perfil.objetivo) linhas.push(`- Objetivo: ${perfil.objetivo}`);
+  if (perfil.sobre) linhas.push(`- Sobre ele(a): ${perfil.sobre}`);
+  if (Array.isArray(perfil.preferencias) && perfil.preferencias.length) linhas.push(`- Explicacoes que ele(a) disse ter entendido melhor: ${perfil.preferencias.join("; ")}`);
+  if (!linhas.length) return "";
+  return `O QUE VOCE SABE DO ESTUDANTE (ele mesmo preencheu; use com naturalidade, sem repetir esta lista)
+${linhas.join(String.fromCharCode(10))}`;
 }
 
 /**

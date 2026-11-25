@@ -47,6 +47,40 @@ test("pede MP3 à NanoGPT com instruções e guarda no cache", async () => {
   }
 });
 
+test("português vai para a Camila, o Leo para o Arthur, e 'Mine' é falado como Máine", async () => {
+  const previous = process.env.NANOGPT_API_KEY;
+  process.env.NANOGPT_API_KEY = "teste";
+  clearVoiceCache();
+  const calls = [];
+  const fetchImpl = async (_url, init) => {
+    calls.push(JSON.parse(init.body));
+    return audioResponse();
+  };
+  try {
+    await synthesizeVoice({ text: "Oi, eu sou a Mine. A minha aula começa já.", lang: "pt", fetchImpl });
+    assert.equal(calls[0].model, "bytedance/seed-tts-3.0");
+    assert.equal(calls[0].voice, "camila_pt_br");
+    assert.equal(calls[0].language, "pt-BR");
+    assert.equal(calls[0].instructions, undefined);
+    assert.equal(calls[0].input, "Oi, eu sou a Máine. A minha aula começa já.");
+
+    await synthesizeVoice({ text: "E aí, Mine!", lang: "pt", quem: "leo", fetchImpl });
+    assert.equal(calls[1].voice, "arthur_pt_br");
+
+    await synthesizeVoice({ text: "Oi, sou a Mine na chamada.", lang: "pt", chamada: true, fetchImpl });
+    assert.notEqual(calls[2].model, "bytedance/seed-tts-3.0", "a chamada usa a voz rápida");
+    calls.splice(2, 1);
+
+    await synthesizeVoice({ text: "This book is mine.", fetchImpl });
+    assert.equal(calls[2].model, "gpt-4o-mini-tts");
+    assert.equal(calls[2].input, "This book is mine.");
+    assert.ok(calls[2].instructions);
+  } finally {
+    if (previous === undefined) delete process.env.NANOGPT_API_KEY;
+    else process.env.NANOGPT_API_KEY = previous;
+  }
+});
+
 test("erro do provedor vira MineVoiceError, e sem chave responde 503", async () => {
   const previous = process.env.NANOGPT_API_KEY;
   const previousList = process.env.NANOGPT_API_KEYS;

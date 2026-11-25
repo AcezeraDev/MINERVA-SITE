@@ -1,0 +1,215 @@
+/* Painel "O que a Mine sabe de mim" (FichaDialog.tsx). Usa o fundo .mds-fundo do desenhar.css. */
+.mfi-janela {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 0.8rem;
+  width: min(100%, 38rem);
+  max-height: 100%;
+  padding: 1rem;
+  border: 1px solid rgb(var(--theme-text) / 0.12);
+  border-radius: 1.2rem;
+  background: rgb(var(--sheet));
+  color: rgb(var(--theme-text));
+  overflow: hidden;
+}
+.mfi-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.mfi-topo strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.08rem;
+}
+.mfi-topo strong svg,
+.mfi-abas svg,
+.mfi-trava svg {
+  width: 1rem;
+  height: 1rem;
+}
+.mfi-abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.mfi-abas button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--theme-text) / 0.14);
+  background: transparent;
+  color: rgb(var(--theme-text) / 0.7);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.mfi-abas button[aria-selected="true"] {
+  background: rgb(var(--pen));
+  border-color: transparent;
+  color: rgb(var(--pen-ink));
+}
+.mfi-corpo {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+.mfi-dica {
+  margin: 0;
+  color: rgb(var(--theme-text) / 0.62);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.mfi-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+.mfi-grade label,
+.mfi-campo,
+.mfi-pin label,
+.mfi-linha label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text) / 0.75);
+}
+.mfi-janela :is(input:not([type="checkbox"]), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgb(var(--theme-text) / 0.16);
+  background: rgb(var(--panel));
+  color: rgb(var(--theme-text));
+  font: inherit;
+  font-weight: 500;
+}
+.mfi-janela :is(input, select, textarea):focus-visible,
+.mfi-janela button:focus-visible {
+  outline: 2px solid rgb(var(--pen));
+  outline-offset: 2px;
+}
+.mfi-chips,
+.mfi-dias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.mfi-chips button,
+.mfi-dias button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--theme-text) / 0.15);
+  background: transparent;
+  color: rgb(var(--theme-text) / 0.75);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.mfi-chips button svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.mfi-chips button[aria-pressed="true"],
+.mfi-dias button[aria-pressed="true"] {
+  background: rgb(var(--hl-mint) / 0.25);
+  border-color: rgb(var(--hl-mint) / 0.6);
+  color: rgb(var(--theme-text));
+}
+.mfi-janela fieldset {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.mfi-janela fieldset:disabled {
+  opacity: 0.5;
+}
+.mfi-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.mfi-linha label {
+  flex: 1 1 8rem;
+}
+.mfi-liga {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.mfi-liga input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: rgb(var(--pen));
+}
+.mfi-pin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+.mfi-pin label {
+  flex: 1 1 12rem;
+}
+.mfi-trava,
+.mfi-aviso {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.7rem;
+  background: rgb(var(--hl-yellow) / 0.2);
+  font-size: 0.86rem;
+}
+.mfi-rodape {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+.mfi-salvo {
+  margin-right: auto;
+  color: rgb(var(--theme-text) / 0.65);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.mfi-botao {
+  padding: 0.55rem 1.1rem;
+  border-radius: 0.7rem;
+  border: 0;
+  background: rgb(var(--pen));
+  color: rgb(var(--pen-ink));
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+.mfi-botao:disabled {
+  opacity: 0.45;
+}
+.mfi-link {
+  padding: 0.4rem 0.2rem;
+  border: 0;
+  background: none;
+  color: rgb(var(--theme-text) / 0.7);
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  justify-self: start;
+}

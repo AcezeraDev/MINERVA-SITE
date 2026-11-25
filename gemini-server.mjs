@@ -185,7 +185,8 @@ export async function handleGeminiRequest(req, res) {
           ? clampNumber(process.env.MINE_FILE_MAX_OUTPUT_TOKENS, 2000, 16000, 14000)
           : clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
     const requestedTokens = fileRequest || codeRequest ? serverTokenCap : clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
-    const maxTokens = Math.min(requestedTokens, serverTokenCap);
+    // Aula por voz: resposta curta de verdade (vira fala).
+    const maxTokens = payload.voz === true && !task ? Math.min(requestedTokens, serverTokenCap, 1500) : Math.min(requestedTokens, serverTokenCap);
     const wantsStream = payload.stream === true;
 
     if (wantsStream) {
@@ -205,6 +206,8 @@ export async function handleGeminiRequest(req, res) {
       controle: payload.controle === true,
       profundo: payload.profundo === true,
       caprichar: payload.caprichar === true,
+      esforco: ["rapida", "normal", "caprichada"].includes(payload.esforco) ? payload.esforco : "",
+      voz: payload.voz === true,
       aluno: payload.aluno && typeof payload.aluno === "object" ? payload.aluno : null,
       maxTokens,
     });
@@ -267,6 +270,8 @@ async function streamResponse(req, res, { task, payload, maxTokens }) {
       controle: payload.controle === true,
       profundo: payload.profundo === true,
       caprichar: payload.caprichar === true,
+      esforco: ["rapida", "normal", "caprichada"].includes(payload.esforco) ? payload.esforco : "",
+      voz: payload.voz === true,
       aluno: payload.aluno && typeof payload.aluno === "object" ? payload.aluno : null,
       maxTokens,
       signal: controller.signal,

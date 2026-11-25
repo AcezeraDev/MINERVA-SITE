@@ -118,6 +118,13 @@ import {
   Pin,
   PinOff,
   MonitorPlay,
+  Gauge,
+  GitBranch,
+  Phone,
+  MessageCircleQuestion,
+  Split,
+  Quote,
+  UserRound,
 } from "lucide-react";
 import "./fonts";
 import "./index.css";
@@ -166,6 +173,7 @@ import {
   wantsGuidedQuiz,
 } from "../shared/chat-intent.mjs";
 import { parseFlashcards, parseQuiz, type QuizQuestion } from "../shared/study-parsers.mjs";
+import { ofertaFinal } from "../shared/chat-ofertas.mjs";
 import { asksToGenerateImage, describeImageMarkers, extractSuggestions, splitMessageMedia, stripImageMarkers } from "../shared/chat-media.mjs";
 import { MineGlossaryProvider, MineRichText } from "./chat/MineRichText";
 import { MineMonitor, useMonitorOpen } from "./chat/monitor/MineMonitor";
@@ -263,7 +271,12 @@ import { focusRemainingOf, readFocusState, writeFocusState, type FocusState } fr
 import { FocusWidget } from "./foco/FocusWidget";
 import { FocusQuickStart } from "./foco/FocusQuickStart";
 import { mineHeaders } from "./mineAuth";
-import { BlocoAcoesContext, type BlocoAcoes } from "./chat/blocos/Blocos";
+import { BlocoAcoesContext, QuizResultadoContext, type BlocoAcoes } from "./chat/blocos/Blocos";
+import { AnexoDaPerguntaContext } from "./chat/blocos/Novos";
+import { agendarRevisao, anotarPreferencia, avancarRevisao, dentroDaJanela, lerFicha, pareceLicao, revisoesVencidas } from "./chat/ficha";
+import { anotarErros } from "../shared/provas.mjs";
+const MineChamada = React.lazy(() => import("./chat/MineChamada").then((m) => ({ default: m.MineChamada })));
+const FichaDialog = React.lazy(() => import("./chat/FichaDialog").then((m) => ({ default: m.FichaDialog })));
 const AdminView = React.lazy(() => import("./admin/AdminPanel").then((m) => ({ default: m.AdminView })));
 const DesenharModal = React.lazy(() => import("./chat/DesenharModal").then((m) => ({ default: m.DesenharModal })));
 const GamesView = React.lazy(() => import("./games/GamesPanel").then((m) => ({ default: m.GamesView })));
@@ -642,6 +655,8 @@ export type ChatMessage = {
   branches?: ChatMessage[][];
   /** Título da conversa escrito pela IA; fica na primeira pergunta. */
   threadTitle?: string;
+  /** Resposta cortada (parou ou caiu no meio): ganha "Continuar daqui". */
+  incompleta?: boolean;
   /** Ação feita pelo chat ("salva isso em História", "cria um duelo"): o cartão reabre o resultado. */
   action?: ChatAction;
   /** Conversa fixada no topo da lista; fica na primeira mensagem dela. */
@@ -683,6 +698,7 @@ type ChatDeck = {
 };
 
 type MineSource = { url: string; title: string; domain?: string; snippet?: string };
+type MineEsforco = "rapida" | "normal" | "caprichada";
 
 /**
  * Modo fotos: fica desligado até a pessoa ligar, e continua ligado depois.
@@ -1527,7 +1543,25 @@ function App() {
   // Pesquisa aprofundada vale para UMA pergunta (é a mais cara); Pensar com
   // calma fica ligado até a pessoa desligar.
   const [mineProfundo, setMineProfundo] = useState(false);
-  const [mineCaprichar, setMineCaprichar] = useState(false);
+  // Esforço da resposta (25/nov/2026): Rápida, Normal ou Caprichada, no seletor
+  // da barra. Fica salvo no aparelho, como o Modo fotos.
+  const [mineEsforco, setMineEsforcoState] = useState<MineEsforco>(() => {
+    try {
+      const salvo = window.localStorage.getItem("minerva:mine-esforco");
+      return salvo === "rapida" || salvo === "caprichada" ? salvo : "normal";
+    } catch {
+      return "normal";
+    }
+  });
+  const setMineEsforco = useCallback((valor: MineEsforco) => {
+    setMineEsforcoState(valor);
+    try {
+      window.localStorage.setItem("minerva:mine-esforco", valor);
+    } catch {
+      // Sem armazenamento: vale nesta visita.
+    }
+  }, []);
+  const mineCaprichar = mineEsforco === "caprichada";
   const [minePhotos, setMinePhotosState] = useState(() => readMinePhotos());
   const [commandOpen, setCommandOpen] = useState(false);
   const setMinePhotos = useCallback((enabled: boolean) => {
@@ -2287,8 +2321,8 @@ function App() {
           setTutor={setMineTutor}
           profundo={mineProfundo}
           setProfundo={setMineProfundo}
-          caprichar={mineCaprichar}
-          setCaprichar={setMineCaprichar}
+          esforco={mineEsforco}
+          setEsforco={setMineEsforco}
           controle={mineControle}
           setControle={setMineControle}
           controleLive={mineControleLive}
@@ -2302,6 +2336,26 @@ function App() {
           newThread={() => {
             setMineThreadId(uid("thread"));
             setMineSuggestions([]);
+          }}
+          branchFrom={(message) => {
+            // Ramificar (25/nov/2026): copia a conversa até esta resposta para
+            // uma conversa nova, e a original fica como estava.
+            const ate = userData.chats.filter((item) => inThread(item, selectedSubjectId, mineThreadId) && item.createdAt <= message.createdAt);
+            if (!ate.length) return;
+            const novoId = uid("thread");
+            const titulo = ate.find((item) => item.threadTitle)?.threadTitle || ate[0].text.slice(0, 40);
+            const copias = ate.map((item, index) => ({
+              ...item,
+              id: uid("chat"),
+              threadId: novoId,
+              branches: undefined,
+              threadTitle: index === 0 ? `${titulo} (ramo)` : undefined,
+              createdAt: Date.now() - (ate.length - index) * 10,
+            }));
+            update((draft) => ({ ...draft, chats: [...draft.chats, ...copias] }));
+            setMineThreadId(novoId);
+            setMineSuggestions([]);
+            notify("Conversa nova criada a partir desta resposta. A original continua na lista.");
           }}
           deleteThread={(threadId) => {
             const remaining = userData.chats.filter((item) => !inThread(item, selectedSubjectId, threadId));
@@ -2900,15 +2954,21 @@ function App() {
               const assistant = await streamAssistantResponse(
                 {
                   prompt,
-                  history,
+                  // Aula por voz (25/nov/2026): pedido enxuto. Com o histórico
+                  // inteiro, o retrato do aluno e as imagens da matéria, a
+                  // primeira palavra saía em ~6 s; sem eles, em ~2,5 s. As
+                  // ferramentas que usam o retrato ficam desligadas na chamada.
+                  history: options.voz ? history.slice(-10).map((item) => ({ ...item, text: item.text.slice(0, 1200) })) : history,
                   webSearch: mineWebAvailable && mineWebSearch,
                   photos: minePhotos,
                   tutor: mineTutor,
                   profundo: deepRequest || undefined,
                   caprichar: mineCaprichar || undefined,
+                  esforco: mineEsforco !== "normal" ? mineEsforco : undefined,
+                  voz: options.voz || undefined,
                   controle: mineControle || undefined,
-                  aluno: buildAlunoSnapshot(userData, user.id),
-                  attachments: [...attachments, ...earlierAttachments, ...subjectImages].slice(0, maxChatAttachments),
+                  aluno: options.voz ? undefined : buildAlunoSnapshot(userData, user.id),
+                  attachments: (options.voz ? attachments : [...attachments, ...earlierAttachments, ...subjectImages]).slice(0, maxChatAttachments),
                   context: [
                     buildAssistantContext(userData, user, resolvedSubjectId),
                     earlierAttachments.length
@@ -2990,7 +3050,7 @@ function App() {
                     : (error as Error | null)?.message || "Tive um problema para responder agora. Tente novamente em alguns instantes.";
               update((draft) => ({
                 ...draft,
-                chats: [...draft.chats, { id: uid("chat"), userId: user.id, subjectId: resolvedSubjectId, threadId: threadForMessages, role: "mine", text, createdAt: Date.now() + 1 }],
+                chats: [...draft.chats, { id: uid("chat"), userId: user.id, subjectId: resolvedSubjectId, threadId: threadForMessages, role: "mine", text, incompleta: inteiro ? true : undefined, createdAt: Date.now() + 1 }],
               }));
             } finally {
               mineAbortRef.current = null;
@@ -6278,7 +6338,11 @@ const MineMessageList = React.memo(function MineMessageList({
   onOpenDeck,
   onFeedback,
   onShowVersion,
+  onBranch,
+  onExplainTwoWays,
 }: {
+  onBranch: (message: ChatMessage) => void;
+  onExplainTwoWays: (message: ChatMessage) => void;
   messages: ChatMessage[];
   reduceMotion: boolean;
   subjectId?: string;
@@ -6356,7 +6420,7 @@ const MineMessageList = React.memo(function MineMessageList({
               <>
                 <MineThought reasoning={message.reasoning} seconds={message.reasoning ? message.thoughtSeconds : undefined} />
                 <MineSourcesProvider sources={message.sources} queries={message.queries}>
-                  <MineMessageText text={message.text} attachment={questionBefore.get(message.id)?.attachments?.find((item) => item.kind === "image" && item.dataUrl)?.dataUrl} />
+                  <MineCamadas message={message} attachment={questionBefore.get(message.id)?.attachments?.find((item) => item.kind === "image" && item.dataUrl)?.dataUrl} />
                 </MineSourcesProvider>
               </>
             )}
@@ -6401,6 +6465,21 @@ const MineMessageList = React.memo(function MineMessageList({
                   />
                 );
               })()
+            ) : null}
+            {message.role !== "user" && message.incompleta && message.id === lastId && !busy ? (
+              <button type="button" className="mine-continuar" onClick={() => onFollowUp("Continue exatamente de onde você parou, sem repetir o que já escreveu.")}>
+                <ChevronRight aria-hidden className="h-4 w-4" /> Continuar daqui
+              </button>
+            ) : null}
+            {message.role !== "user" && !busy && message.text.length > 200 ? (
+              <div className="mine-extra-acoes">
+                <button type="button" onClick={() => onExplainTwoWays(message)} title="Duas versões lado a lado: analogia e técnica">
+                  <Split aria-hidden className="h-3.5 w-3.5" /> Explicar de dois jeitos
+                </button>
+                <button type="button" onClick={() => onBranch(message)} title="Abre uma conversa nova com tudo até aqui">
+                  <GitBranch aria-hidden className="h-3.5 w-3.5" /> Continuar numa conversa nova
+                </button>
+              </div>
             ) : null}
           </div>
         </motion.article>
@@ -6959,8 +7038,8 @@ function MineView({
   setTutor,
   profundo,
   setProfundo,
-  caprichar,
-  setCaprichar,
+  esforco,
+  setEsforco,
   controle,
   setControle,
   controleLive,
@@ -6969,6 +7048,7 @@ function MineView({
   threadId,
   setThreadId,
   newThread,
+  branchFrom,
   deleteThread,
   setFeedback,
   showVersion,
@@ -7009,8 +7089,8 @@ function MineView({
   setTutor: (value: boolean) => void;
   profundo: boolean;
   setProfundo: (value: boolean) => void;
-  caprichar: boolean;
-  setCaprichar: (value: boolean) => void;
+  esforco: MineEsforco;
+  setEsforco: (value: MineEsforco) => void;
   controle: boolean;
   setControle: (value: boolean) => void;
   /** O pedido em andamento saiu com o Controle Mine ligado. */
@@ -7021,10 +7101,11 @@ function MineView({
   threadId?: string;
   setThreadId: (threadId: string | undefined) => void;
   newThread: () => void;
+  branchFrom: (message: ChatMessage) => void;
   deleteThread: (threadId: string | undefined) => void;
   setFeedback: (message: ChatMessage, value: "up" | "down") => void;
   showVersion: (message: ChatMessage, target: number) => void;
-  send: (text: string, subjectId?: string, attachments?: ChatAttachment[], options?: { replaceFromId?: string }) => void | Promise<void>;
+  send: (text: string, subjectId?: string, attachments?: ChatAttachment[], options?: { replaceFromId?: string; voz?: boolean }) => void | Promise<void>;
   openMaterial: (materialId: string) => void;
   addMaterial: (subjectId: string) => void;
   /** Abre uma conversa de qualquer matéria (resultado da busca). */
@@ -7083,12 +7164,64 @@ function MineView({
   const [criarImagem, setCriarImagem] = useState(false);
   // Pesquisa aprofundada, Modo tutor e Criar imagem são jeitos diferentes de
   // responder: ligar um desliga os outros.
+  // Ficha da Mine (src/chat/ficha.ts): perfil, horário de estudo, família e revisões.
+  const [fichaAberta, setFichaAberta] = useState<false | "perfil" | "horario" | "familia">(false);
+  const [ficha, setFicha] = useState(() => lerFicha(userId));
+  useEffect(() => {
+    setFicha(lerFicha(userId));
+    const atualizar = () => setFicha(lerFicha(userId));
+    window.addEventListener("mine:ficha", atualizar);
+    return () => window.removeEventListener("mine:ficha", atualizar);
+  }, [userId]);
+  const [agora, setAgora] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setAgora(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const emHorarioDeEstudo = dentroDaJanela(ficha.horario, agora);
+  const emDescanso = Boolean(ficha.familia.pin) && dentroDaJanela(ficha.familia.descanso, agora);
+  const tutorTravado = Boolean(ficha.familia.pin) && ficha.familia.tutorSempre;
   const toggleModo = (modo: "profundo" | "tutor" | "imagem") => {
     const ligar = modo === "profundo" ? !profundo : modo === "tutor" ? !tutor : !criarImagem;
     setProfundo(modo === "profundo" && ligar);
-    setTutor(modo === "tutor" && ligar);
+    // Modo família com "tutor sempre": o tutor não desliga.
+    setTutor(tutorTravado || (modo === "tutor" && ligar));
     setCriarImagem(modo === "imagem" && ligar);
   };
+  // Horário de estudo: o tutor liga sozinho ao entrar na janela (uma vez; dá
+  // para desligar). Família com "tutor sempre": fica ligado o tempo todo.
+  const horarioAplicado = useRef(false);
+  const [avisoHorario, setAvisoHorario] = useState(false);
+  useEffect(() => {
+    if (tutorTravado) {
+      if (!tutor) setTutor(true);
+      return;
+    }
+    if (emHorarioDeEstudo && !horarioAplicado.current) {
+      horarioAplicado.current = true;
+      if (!tutor) {
+        setTutor(true);
+        setProfundo(false);
+        setCriarImagem(false);
+        setAvisoHorario(true);
+      }
+    }
+    if (!emHorarioDeEstudo) horarioAplicado.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emHorarioDeEstudo, tutorTravado, tutor]);
+  // "Parece lição de casa": sugere o tutor uma vez por conversa.
+  const [avisoLicao, setAvisoLicao] = useState(false);
+  const licaoDispensada = useRef(false);
+  // Trecho da resposta selecionado para perguntar sobre ele.
+  const [trecho, setTrecho] = useState("");
+  const [trechoPop, setTrechoPop] = useState<{ x: number; y: number; texto: string } | null>(null);
+  // Menções com @ no campo de mensagem.
+  const [mencao, setMencao] = useState<{ inicio: number; busca: string } | null>(null);
+  const [mencaoAtiva, setMencaoAtiva] = useState(0);
+  // "Rabisco vira imagem": o desenho anexado já chega com o pedido escrito.
+  const rabiscoParaImagem = useRef(false);
+  // Aula por voz com a Mine (MineChamada).
+  const [chamada, setChamada] = useState(false);
   const toolsMenuRef = useRef<HTMLDivElement | null>(null);
   const dictation = useDictation(input, setInput);
   const [guidedStudyOpen, setGuidedStudyOpen] = useState(false);
@@ -7115,9 +7248,30 @@ function MineView({
       enviar: (texto) => void sendRef.current(texto, selectedSubjectId),
       salvarFlashcards: (baralho) => window.dispatchEvent(new CustomEvent("mine:salvar-flashcards", { detail: { ...baralho, subjectId: selectedSubjectId } })),
       levarParaAgenda: (plano) => window.dispatchEvent(new CustomEvent("mine:plano-agenda", { detail: { ...plano, subjectId: selectedSubjectId } })),
+      anotarPreferencia: (preferencia) => anotarPreferencia(userId, preferencia),
+      registrarErro: (erro) => registrarErroDoChat(userId, erro, selectedSubjectId),
     }),
-    [selectedSubjectId],
+    [selectedSubjectId, userId],
   );
+  const ramificar = useCallback((message: ChatMessage) => branchFrom(message), [branchFrom]);
+  // Leitor de tela: em vez de ler cada palavra que chega, avisa uma vez quando a resposta fica pronta.
+  const [anuncio, setAnuncio] = useState("");
+  const estavaCarregando = useRef(false);
+  useEffect(() => {
+    if (loading) {
+      estavaCarregando.current = true;
+      setAnuncio("A Mine está respondendo.");
+    } else if (estavaCarregando.current) {
+      estavaCarregando.current = false;
+      setAnuncio("Resposta da Mine pronta.");
+    }
+  }, [loading]);
+  // Fim de um quiz no chat: a Mine reage (o rosto dela comemora ou anima).
+  const quizTerminou = useCallback((r: { titulo: string; acertos: number; total: number }) => {
+    if (r.acertos === r.total) mineSays(`Gabaritou ${r.titulo}!`, "happy");
+    else if (r.acertos >= r.total / 2) mineSays(`${r.acertos} de ${r.total}. Mandou bem!`, "happy");
+    else mineSays("Errar faz parte. Bora revisar juntos?", "wow");
+  }, []);
   // Memoizado porque o texto do streaming mora no App: cada token que chega
   // re-renderiza esta árvore inteira. Sem isto, a lista era recriada a cada
   // token e o <MineMessageList> memoizado abaixo nunca conseguiria pular nada.
@@ -7128,6 +7282,26 @@ function MineView({
   const threads = useMemo(() => threadsOf(data.chats, selectedSubjectId), [data.chats, selectedSubjectId]);
   const activeThread = threads.find((thread) => (thread.id || undefined) === (threadId || undefined));
   const lastMessage = messages[messages.length - 1];
+  // Revisão que volta: conversa com título e resposta entra na fila (1, 3, 7, 14 e 30 dias).
+  const chaveRevisao = `${selectedSubjectId || "geral"}:${threadId || ""}`;
+  const conversaComResposta = messages.length >= 2;
+  useEffect(() => {
+    if (!activeThread?.title || !conversaComResposta) return;
+    agendarRevisao(userId, chaveRevisao, activeThread.title);
+  }, [activeThread?.title, conversaComResposta, chaveRevisao, userId]);
+  const revisoesHoje = useMemo(() => revisoesVencidas(ficha, agora.getTime()).filter((item) => item.id !== chaveRevisao).slice(0, 2), [ficha, agora, chaveRevisao]);
+  // Opções do @: matérias do estudante e os dados dele que a Mine sabe ler.
+  const opcoesMencao = useMemo(() => {
+    if (!mencao) return [];
+    const busca = normalizeText(mencao.busca);
+    const todas = [
+      ...data.subjects.map((subject) => ({ rotulo: subject.name, dica: `matéria: ${subject.name}` })),
+      { rotulo: "caderno de erros", dica: "o que você errou nas provas" },
+      { rotulo: "agenda", dica: "suas tarefas e provas" },
+      { rotulo: "meu progresso", dica: "XP, nível e sequência" },
+    ];
+    return todas.filter((item) => !busca || normalizeText(item.rotulo).includes(busca)).slice(0, 6);
+  }, [mencao, data.subjects]);
   // Sugestões da última resposta; as do App ficam para os atalhos de artefato
   // (mapa, prova, baralho), que não passam pelo chat de texto. Elas valem só
   // para a mensagem que estava no fim quando chegaram: trocar de conversa não
@@ -7143,6 +7317,8 @@ function MineView({
       : lastMessage?.role === "mine" && appSuggestionsOwner.current.messageId === lastMessage.id
         ? suggestions
         : [];
+  // Resposta de um toque: a Mine terminou oferecendo algo ("Quer que eu…?").
+  const oferta = !loading && lastMessage?.role === "mine" ? ofertaFinal(lastMessage.text) : null;
   const selectedSubject = selectedSubjectId ? data.subjects.find((subject) => subject.id === selectedSubjectId) : undefined;
   const quickPrompts: Array<{ title: string; detail: string; prompt: string; icon: LucideIcon; mindmap?: boolean; guided?: boolean }> = selectedSubject
     ? [
@@ -7307,17 +7483,77 @@ function MineView({
 
   // Monitor de código aberto: o chat abre uma terceira coluna para ele.
   const monitorOpen = useMonitorOpen();
+  function escolherMencao(rotulo: string) {
+    if (!mencao) return;
+    const antes = input.slice(0, mencao.inicio);
+    const depois = input.slice(mencao.inicio + 1 + mencao.busca.length);
+    const novo = `${antes}@${rotulo} ${depois.replace(/^\s+/, "")}`;
+    setInput(novo);
+    setMencao(null);
+    window.requestAnimationFrame(() => {
+      const box = textareaRef.current;
+      if (!box) return;
+      const fim = antes.length + rotulo.length + 2;
+      box.focus();
+      box.setSelectionRange(fim, fim);
+    });
+  }
+  // Selecionar um trecho de uma resposta da Mine mostra "Perguntar à Mine sobre isso".
+  useEffect(() => {
+    const ver = () => {
+      const selecao = window.getSelection();
+      const texto = selecao?.toString().replace(/\s+/g, " ").trim() || "";
+      if (!selecao || selecao.rangeCount === 0 || texto.length < 3 || texto.length > 600) {
+        setTrechoPop(null);
+        return;
+      }
+      const no = selecao.anchorNode instanceof Element ? selecao.anchorNode : selecao.anchorNode?.parentElement;
+      if (!no?.closest(".mine-gpt-message.is-mine") || no.closest("input, textarea, button")) {
+        setTrechoPop(null);
+        return;
+      }
+      const caixa = selecao.getRangeAt(0).getBoundingClientRect();
+      if (!caixa.width) return setTrechoPop(null);
+      setTrechoPop({ x: Math.min(window.innerWidth - 120, Math.max(120, caixa.left + caixa.width / 2)), y: Math.max(48, caixa.top), texto });
+    };
+    const fechar = () => setTrechoPop(null);
+    document.addEventListener("mouseup", ver);
+    document.addEventListener("touchend", ver);
+    document.addEventListener("scroll", fechar, true);
+    return () => {
+      document.removeEventListener("mouseup", ver);
+      document.removeEventListener("touchend", ver);
+      document.removeEventListener("scroll", fechar, true);
+    };
+  }, []);
   function submit(event: FormEvent) {
     event.preventDefault();
-    if ((!input.trim() && !attachments.length) || loading) return;
+    if ((!input.trim() && !attachments.length && !trecho) || loading || emDescanso) return;
     if (input.trim().length > MAX_CHAT_PROMPT_CHARS) {
       setAttachmentError(`Sua mensagem tem mais de ${MAX_CHAT_PROMPT_CHARS.toLocaleString("pt-BR")} caracteres. Divida em partes menores para enviar o texto completo.`);
       return;
     }
     dictation.stop();
     launchPlane(document.querySelector('[aria-label="Enviar mensagem"]'));
-    const texto = input.trim();
+    const digitado = input.trim();
+    // @matéria / @agenda viram uma dica no fim do pedido para a Mine usar os dados certos.
+    const dicas = Array.from(digitado.matchAll(/@([^@\n,.;!?]{2,40})/g))
+      .map((m) => normalizeText(m[1].trim()))
+      .map((nome) => {
+        const materia = data.subjects.find((subject) => nome.startsWith(normalizeText(subject.name)));
+        if (materia) return `use os meus conteúdos da matéria ${materia.name}`;
+        if (nome.startsWith("caderno de erros")) return "use o meu caderno de erros";
+        if (nome.startsWith("agenda")) return "veja a minha agenda";
+        if (nome.startsWith("meu progresso")) return "veja o meu progresso e nível";
+        return "";
+      })
+      .filter(Boolean);
+    const comMencoes = dicas.length ? `${digitado}\n\n(${Array.from(new Set(dicas)).join("; ")})` : digitado;
+    const texto = trecho ? `Sobre este trecho da sua resposta: "${trecho}"\n\n${comMencoes || "Explica melhor esse trecho."}` : comMencoes;
+    if (!tutor && !licaoDispensada.current && pareceLicao(digitado, attachments.some((item) => item.kind === "image"))) setAvisoLicao(true);
     send(criarImagem && texto && !asksToGenerateImage(texto) ? `Cria uma imagem: ${texto}` : texto, selectedSubjectId, attachments);
+    setTrecho("");
+    setMencao(null);
     setInput("");
     setAttachments([]);
     setAttachmentError("");
@@ -7558,6 +7794,7 @@ function MineView({
                 />
               ) : (
                 <BlocoAcoesContext.Provider value={blocoAcoes}>
+                <QuizResultadoContext.Provider value={quizTerminou}>
                 <MineMessageList
                   messages={messages}
                   reduceMotion={Boolean(reduceMotion)}
@@ -7573,9 +7810,41 @@ function MineView({
                   onOpenDeck={openDeck}
                   onFeedback={giveFeedback}
                   onShowVersion={openVersion}
+                  onBranch={ramificar}
+                  onExplainTwoWays={(message) => followUp(`Não entendi bem. Explica de dois jeitos diferentes, num bloco dois-jeitos: um com analogia do dia a dia e outro mais técnico. O assunto é o da sua resposta anterior.`)}
                 />
+                </QuizResultadoContext.Provider>
                 </BlocoAcoesContext.Provider>
               )}
+              {/* "Continuar com" no fim da conversa, no fluxo da leitura (como o
+                  ChatGPT): fixo em cima da caixa de mensagem ele comia um terço
+                  da tela enquanto a pessoa lia a resposta. */}
+              {oferta ? (
+                <div className="mine-um-toque">
+                  <button type="button" onClick={() => send(oferta.envio, selectedSubjectId)} title={oferta.pergunta}>
+                    <Check aria-hidden className="h-4 w-4" />
+                    {oferta.botao}
+                  </button>
+                </div>
+              ) : null}
+              {activeSuggestions.length && !loading ? (
+                <div className="mine-next mb-4 pl-1 sm:pl-2">
+                  <p className="mine-next__label">
+                    <Sparkles aria-hidden className="h-3 w-3" />
+                    Continuar com
+                  </p>
+                  <Stagger className="flex flex-wrap gap-2" gap={0.05}>
+                    {activeSuggestions.map((suggestion) => (
+                      <StaggerItem key={suggestion}>
+                        <button type="button" onClick={() => send(suggestion, selectedSubjectId)} className="mine-next__chip">
+                          <span>{suggestion}</span>
+                          <ArrowRight aria-hidden className="h-3.5 w-3.5" />
+                        </button>
+                      </StaggerItem>
+                    ))}
+                  </Stagger>
+                </div>
+              ) : null}
               {/* Um painel só, fora dos dois ramos (trabalhando / escrevendo): assim a
                   página aberta e o vídeo não recomeçam quando o texto começa a chegar. */}
               {loading && controleLive && !artifactLoading ? (
@@ -7599,7 +7868,8 @@ function MineView({
                   {/* Sem avatar na resposta: o texto usa a coluna inteira, como no ChatGPT. */}
                   <div
                     className="mine-gpt-message-body mine-streaming relative min-w-0 w-full max-w-full flex-1 px-1 py-1 text-[15px] leading-[1.72] text-white/82  sm:px-2 sm:py-1.5 sm:text-[15.5px] sm:leading-7"
-                    aria-live="polite"
+                    aria-live="off"
+                    aria-busy="true"
                   >
                     <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.14em] text-white/38"><span>Mine</span></div>
                     {reasoning ? <MineThought reasoning={reasoning} /> : null}
@@ -7644,35 +7914,64 @@ function MineView({
         </div>
 
         <div data-focus-avoid className="mine-composer-area relative shrink-0 bg-gradient-to-t from-[#111310] via-[#111310]/98 to-transparent px-2.5 pb-2.5 pt-3 sm:px-5 sm:pb-4 sm:pt-4">
-          {activeSuggestions.length ? (
-            <div className="mine-next mx-auto mb-2.5 max-w-[54rem]">
-              <p className="mine-next__label">
-                <Sparkles aria-hidden className="h-3 w-3" />
-                Continuar com
+          {emDescanso ? (
+            <div className="mine-aviso mx-auto mb-2 max-w-[54rem]" role="status">
+              <Moon aria-hidden className="h-4 w-4 shrink-0" />
+              <p>
+                <strong>Hora de descansar.</strong> A família pausou o chat da Mine até as {ficha.familia.descanso.fim}.
               </p>
-              <Stagger className="minerva-scroll flex flex-nowrap gap-2 overflow-x-auto pb-1" gap={0.05}>
-                {activeSuggestions.map((suggestion) => (
-                  <StaggerItem key={suggestion}>
-                    <button type="button" onClick={() => send(suggestion, selectedSubjectId)} className="mine-next__chip">
-                      <span>{suggestion}</span>
-                      <ArrowRight aria-hidden className="h-3.5 w-3.5" />
-                    </button>
-                  </StaggerItem>
-                ))}
-              </Stagger>
+            </div>
+          ) : null}
+          {avisoLicao && !tutor ? (
+            <div className="mine-aviso mx-auto mb-2 max-w-[54rem]" role="status">
+              <Lightbulb aria-hidden className="h-4 w-4 shrink-0" />
+              <p>Parece lição de casa. Quer ligar o Modo tutor para aprender fazendo, com dicas em vez da resposta pronta?</p>
+              <button type="button" className="mine-aviso__sim" onClick={() => { toggleModo("tutor"); setAvisoLicao(false); }}>
+                Ligar tutor
+              </button>
+              <button type="button" className="mine-aviso__nao" onClick={() => { licaoDispensada.current = true; setAvisoLicao(false); }}>
+                Agora não
+              </button>
+            </div>
+          ) : null}
+          {!messages.length && revisoesHoje.length && !loading ? (
+            <div className="mine-revisao mx-auto mb-2 max-w-[54rem]">
+              <p className="mine-revisao__titulo">
+                <RotateCcw aria-hidden className="h-4 w-4" /> Revisão rápida
+              </p>
+              {revisoesHoje.map((item) => (
+                <div key={item.id} className="mine-revisao__item">
+                  <span>{item.titulo}</span>
+                  <button
+                    type="button"
+                    className="mine-aviso__sim"
+                    onClick={() => {
+                      avancarRevisao(userId, item.id, 1);
+                      void send(`Revisão rápida de "${item.titulo}": me faz 2 perguntas curtas sobre o que a gente estudou, num bloco quiz.`, selectedSubjectId);
+                    }}
+                  >
+                    Revisar (2 perguntas)
+                  </button>
+                  <button type="button" className="mine-aviso__nao" onClick={() => avancarRevisao(userId, item.id, 2)}>
+                    Já sei
+                  </button>
+                </div>
+              ))}
             </div>
           ) : null}
           {tutor ? (
             <div className="mine-tutor-banner mx-auto mb-2 max-w-[54rem]" role="status">
               <Lightbulb aria-hidden className="h-4 w-4 shrink-0" />
               <p>
-                <strong>Modo tutor.</strong>
+                <strong>{tutorTravado ? "Modo tutor (família)." : avisoHorario && emHorarioDeEstudo ? "Horário de estudo: modo tutor." : "Modo tutor."}</strong>
                 <span className="mine-tutor-banner__detail"> A Mine vai te guiar com dicas e perguntas em vez de entregar a resposta pronta. Peça “mostra a resposta” quando quiser.</span>
                 <span className="mine-tutor-banner__short"> Dicas em vez de resposta pronta.</span>
               </p>
-              <button type="button" onClick={() => setTutor(false)} className="mine-tutor-banner__off">
-                Desligar
-              </button>
+              {tutorTravado ? null : (
+                <button type="button" onClick={() => { setTutor(false); setAvisoHorario(false); }} className="mine-tutor-banner__off">
+                  Desligar
+                </button>
+              )}
             </div>
           ) : null}
           {attachments.length || attachmentError ? (
@@ -7700,6 +7999,41 @@ function MineView({
                   ))}
                 </div>
               ) : null}
+              {attachments.length && !loading ? (
+                <div className="mine-anexo-acoes">
+                  <span>Com este material:</span>
+                  <button type="button" onClick={() => { void send("Faz uma prova de 5 questões só com o conteúdo deste material, dizendo de onde saiu cada pergunta.", selectedSubjectId, attachments); setAttachments([]); }}>
+                    Fazer uma prova
+                  </button>
+                  <button type="button" onClick={() => { void send("Faz um resumo para a prova deste material, com o que mais cai.", selectedSubjectId, attachments); setAttachments([]); }}>
+                    Resumir
+                  </button>
+                  <button type="button" onClick={() => { void send("Faz flashcards deste material.", selectedSubjectId, attachments); setAttachments([]); }}>
+                    Flashcards
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {chamada ? (
+            <React.Suspense fallback={null}>
+              <MineChamada
+                loading={loading}
+                textoAoVivo={loading ? streamText : ""}
+                ultimaResposta={lastMessage?.role === "mine" ? { id: lastMessage.id, text: lastMessage.text } : null}
+                enviar={(texto) => void send(texto, selectedSubjectId, [], { voz: true })}
+                parar={stop}
+                onFechar={() => setChamada(false)}
+              />
+            </React.Suspense>
+          ) : null}
+          {trecho ? (
+            <div className="mine-trecho-citado mx-auto max-w-[54rem]">
+              <Quote aria-hidden className="h-4 w-4 shrink-0" />
+              <p>{trecho}</p>
+              <button type="button" onClick={() => setTrecho("")} aria-label="Tirar o trecho">
+                <X className="h-4 w-4" />
+              </button>
             </div>
           ) : null}
           <form
@@ -7721,11 +8055,25 @@ function MineView({
               ref={textareaRef}
               value={input}
               rows={1}
+              disabled={emDescanso}
               onChange={(event) => {
                 setInput(event.target.value);
                 autoGrow();
+                // @ digitado agora (sem espaço depois): abre a lista de menções.
+                const ate = event.target.value.slice(0, event.target.selectionStart ?? event.target.value.length);
+                const achado = ate.match(/(?:^|\s)@([^\s@]{0,30})$/);
+                setMencao(achado ? { inicio: ate.length - achado[1].length - 1, busca: achado[1] } : null);
+                setMencaoAtiva(0);
               }}
               onKeyDown={(event) => {
+                if (mencao && opcoesMencao.length && (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter" || event.key === "Tab" || event.key === "Escape")) {
+                  event.preventDefault();
+                  if (event.key === "Escape") return setMencao(null);
+                  if (event.key === "ArrowDown") return setMencaoAtiva((i) => (i + 1) % opcoesMencao.length);
+                  if (event.key === "ArrowUp") return setMencaoAtiva((i) => (i - 1 + opcoesMencao.length) % opcoesMencao.length);
+                  escolherMencao(opcoesMencao[mencaoAtiva]?.rotulo || opcoesMencao[0].rotulo);
+                  return;
+                }
                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault();
                   submit(event);
@@ -7754,6 +8102,23 @@ function MineView({
               aria-label="Mensagem para a Mine"
               className="max-h-48 min-h-11 w-full min-w-0 basis-full resize-none bg-transparent px-3 pb-1 pt-2.5 text-[15px] leading-6 text-white outline-none placeholder:text-white/38"
             />
+            {mencao && opcoesMencao.length ? (
+              <div className="mine-mencoes" role="listbox" aria-label="Mencionar">
+                {opcoesMencao.map((opcao, i) => (
+                  <button
+                    key={opcao.rotulo}
+                    type="button"
+                    role="option"
+                    aria-selected={i === mencaoAtiva}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => escolherMencao(opcao.rotulo)}
+                  >
+                    <b>@{opcao.rotulo}</b>
+                    <span>{opcao.dica}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="flex w-full min-w-0 items-center gap-1">
               <div ref={toolsMenuRef} className="relative shrink-0">
                 <motion.button
@@ -7814,13 +8179,36 @@ function MineView({
                         {webSearch ? <Check className="mine-menu__check h-4 w-4" /> : null}
                       </button>
                     ) : null}
-                    <button type="button" role="menuitemcheckbox" aria-checked={caprichar} className={`mine-menu__item ${caprichar ? "is-on" : ""}`} onClick={() => setCaprichar(!caprichar)}>
-                      <Brain className="h-4 w-4" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="mine-menu__item"
+                      onClick={() => {
+                        setToolsMenuOpen(false);
+                        rabiscoParaImagem.current = true;
+                        setDesenharOpen(true);
+                      }}
+                    >
+                      <PenLine className="h-4 w-4" />
                       <span>
-                        Pensar com calma
-                        <span className="mine-menu__detail">Demora um pouco mais e confere melhor</span>
+                        Rabisco vira imagem
+                        <span className="mine-menu__detail">Desenhe e a Mine transforma numa ilustração</span>
                       </span>
-                      {caprichar ? <Check className="mine-menu__check h-4 w-4" /> : null}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="mine-menu__item"
+                      onClick={() => {
+                        setToolsMenuOpen(false);
+                        setFichaAberta("perfil");
+                      }}
+                    >
+                      <UserRound className="h-4 w-4" />
+                      <span>
+                        O que a Mine sabe de mim
+                        <span className="mine-menu__detail">Seu jeito de aprender, horário de estudo e família</span>
+                      </span>
                     </button>
                     {/* Modo fotos. Sem flag de servidor como a busca na web: a foto vem
                         de uma enciclopedia pública e não custa nada por resposta. */}
@@ -7924,7 +8312,7 @@ function MineView({
                     <span className="mine-modo__label">Pesquisa aprofundada</span>
                   </button>
                 ) : null}
-                <button type="button" className="mine-modo mine-modo--tutor" aria-pressed={tutor} onClick={() => toggleModo("tutor")} disabled={loading} title="Dicas e perguntas em vez da resposta pronta">
+                <button type="button" className="mine-modo mine-modo--tutor" aria-pressed={tutor} onClick={() => toggleModo("tutor")} disabled={loading || tutorTravado} title={tutorTravado ? "A família deixou o Modo tutor sempre ligado" : "Dicas e perguntas em vez da resposta pronta"}>
                   <Lightbulb aria-hidden className="h-4 w-4" />
                   <span className="mine-modo__label">Modo tutor</span>
                 </button>
@@ -7937,15 +8325,6 @@ function MineView({
                     <Globe aria-hidden className="h-3.5 w-3.5" />
                     Web
                     <button type="button" className="mine-tool-pill__off" onClick={() => setWebSearch(false)} aria-label="Desligar pesquisa na web" disabled={loading}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ) : null}
-                {caprichar ? (
-                  <span className="mine-tool-pill">
-                    <Brain aria-hidden className="h-3.5 w-3.5" />
-                    Com calma
-                    <button type="button" className="mine-tool-pill__off" onClick={() => setCaprichar(false)} aria-label="Desligar pensar com calma" disabled={loading}>
                       <X className="h-3 w-3" />
                     </button>
                   </span>
@@ -7969,6 +8348,26 @@ function MineView({
                   </span>
                 ) : null}
               </div>
+              <button
+                type="button"
+                className={`mine-ligar${chamada ? " is-on" : ""}`}
+                onClick={() => setChamada((v) => !v)}
+                disabled={emDescanso}
+                aria-pressed={chamada}
+                aria-label={chamada ? "Encerrar aula por voz" : "Aula por voz com a Mine"}
+                title={chamada ? "Encerrar aula por voz" : "Aula por voz: fale e a Mine responde falando"}
+              >
+                <Phone aria-hidden className="h-4 w-4" />
+              </button>
+              <label className="mine-esforco" title="Quanto a Mine pensa antes de responder">
+                <Gauge aria-hidden className="h-4 w-4" />
+                <span className="sr-only">Esforço da resposta</span>
+                <select id="mine-esforco" value={esforco} onChange={(event) => setEsforco(event.target.value as MineEsforco)} disabled={loading}>
+                  <option value="rapida">Rápida</option>
+                  <option value="normal">Normal</option>
+                  <option value="caprichada">Caprichada</option>
+                </select>
+              </label>
               {dictation.supported ? (
                 <motion.button
                   type="button"
@@ -8014,6 +8413,9 @@ function MineView({
         </div>
       </div>
 
+      <p className="sr-only" aria-live="polite">
+        {anuncio}
+      </p>
       <MineMonitor />
 
       <AnimatePresence>
@@ -8119,14 +8521,43 @@ function MineView({
       {desenharOpen ? (
         <React.Suspense fallback={null}>
           <DesenharModal
-            onClose={() => setDesenharOpen(false)}
+            onClose={() => {
+              setDesenharOpen(false);
+              rabiscoParaImagem.current = false;
+            }}
             onAttach={(file) => {
               const lista = new DataTransfer();
               lista.items.add(file);
               void handleFiles(lista.files);
+              if (rabiscoParaImagem.current) {
+                setInput("Transforma este desenho numa ilustração caprichada, em estilo de livro didático, mantendo o que eu desenhei.");
+                window.requestAnimationFrame(() => textareaRef.current?.focus());
+              }
+              rabiscoParaImagem.current = false;
             }}
           />
         </React.Suspense>
+      ) : null}
+      {fichaAberta ? (
+        <React.Suspense fallback={null}>
+          <FichaDialog userId={userId} abaInicial={fichaAberta} onClose={() => setFichaAberta(false)} />
+        </React.Suspense>
+      ) : null}
+      {trechoPop ? (
+        <button
+          type="button"
+          className="mine-trecho-pop"
+          style={{ left: trechoPop.x, top: trechoPop.y }}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            setTrecho(trechoPop.texto);
+            setTrechoPop(null);
+            window.getSelection()?.removeAllRanges();
+            textareaRef.current?.focus();
+          }}
+        >
+          <MessageCircleQuestion aria-hidden className="h-4 w-4" /> Perguntar à Mine sobre isso
+        </button>
       ) : null}
 
       <AnimatePresence>
@@ -8345,7 +8776,7 @@ export function ChatAttachments({ attachments, tone = "dark" }: { attachments?: 
  * um marcador pela metade (`[[imagem: Nik`) apareceria cru na tela por alguns
  * instantes. Ver shared/chat-media.mjs.
  */
-function MineMessageText({ text, streaming = false, attachment }: { text: string; streaming?: boolean; attachment?: string }) {
+function MineMessageText({ text, streaming = false, attachment, essencial = false }: { text: string; streaming?: boolean; attachment?: string; essencial?: boolean }) {
   // Glossário: o marcador sai do texto e a primeira vez de cada termo ganha a
   // marca invisível que o MineRichText transforma em sublinhado com explicação.
   // Durante o streaming o marcador ainda nem chegou: nada é grifado.
@@ -8361,7 +8792,8 @@ function MineMessageText({ text, streaming = false, attachment }: { text: string
 
   return (
     <MineGlossaryProvider value={terms}>
-      <div className="mine-answer">
+      <AnexoDaPerguntaContext.Provider value={attachment}>
+      <div className={`mine-answer${essencial ? " is-essencial" : ""}`}>
         {segments.map((segment, index) =>
           segment.type === "generate" ? (
             <MineGeneratedImage
@@ -8388,7 +8820,82 @@ function MineMessageText({ text, streaming = false, attachment }: { text: string
           ),
         )}
       </div>
+      </AnexoDaPerguntaContext.Provider>
     </MineGlossaryProvider>
+  );
+}
+
+/**
+ * Erro de quiz no chat vai para o caderno de erros da aba Provas (o mesmo
+ * localStorage que a ProvasView lê e sobe para a conta).
+ */
+function registrarErroDoChat(userId: string, erro: { assunto: string; pergunta: string; opcoes: string[]; correta: number; marcada: number }, subjectId?: string) {
+  const chave = `minerva:provas:${userId}`;
+  try {
+    const salvo = JSON.parse(window.localStorage.getItem(chave) || "{}") as { caderno?: unknown[] };
+    const caderno = anotarErros(
+      (Array.isArray(salvo.caderno) ? salvo.caderno : []) as Parameters<typeof anotarErros>[0],
+      [{ indice: 0, questao: { question: erro.pergunta, options: erro.opcoes, correct: erro.correta, explanation: "" }, marcada: erro.marcada, certa: false }] as unknown as Parameters<typeof anotarErros>[1],
+      { provaId: `chat-${Date.now().toString(36)}`, assunto: erro.assunto, subjectId },
+    );
+    window.localStorage.setItem(chave, JSON.stringify({ ...salvo, caderno }));
+  } catch {
+    // Sem armazenamento: o erro só não fica guardado.
+  }
+}
+
+/**
+ * Resposta em camadas (25/nov/2026, da pesquisa com as outras IAs): resposta
+ * longa ganha "Completa / Só o essencial" e as abas "Fontes" e "Imagens". O
+ * essencial deixa os títulos, o primeiro parágrafo de cada parte e os
+ * cartões de destaque, para revisar rápido sem pedir de novo.
+ */
+function MineCamadas({ message, attachment }: { message: ChatMessage; attachment?: string }) {
+  const [vista, setVista] = useState<"resposta" | "essencial" | "fontes" | "imagens">("resposta");
+  const secoes = (message.text.match(/^##\s/gm) || []).length;
+  const longa = secoes >= 3 && message.text.length > 1800;
+  const fontes = message.sources?.length || 0;
+  const assunto = (message.threadTitle || message.text.match(/^##\s+(.+)$/m)?.[1] || "").replace(/[*_`#]/g, "").trim();
+  if (!longa && !fontes) return <MineMessageText text={message.text} attachment={attachment} />;
+  return (
+    <>
+      <div className="mine-camadas" role="tablist" aria-label="Como ver esta resposta">
+        <button type="button" role="tab" aria-selected={vista === "resposta"} onClick={() => setVista("resposta")}>
+          Resposta
+        </button>
+        {longa ? (
+          <button type="button" role="tab" aria-selected={vista === "essencial"} onClick={() => setVista("essencial")}>
+            Só o essencial
+          </button>
+        ) : null}
+        {fontes ? (
+          <button type="button" role="tab" aria-selected={vista === "fontes"} onClick={() => setVista("fontes")}>
+            Fontes <span>{fontes}</span>
+          </button>
+        ) : null}
+        {assunto ? (
+          <button type="button" role="tab" aria-selected={vista === "imagens"} onClick={() => setVista("imagens")}>
+            Imagens
+          </button>
+        ) : null}
+      </div>
+      {vista === "fontes" ? (
+        <ol className="mine-camadas__fontes">
+          {(message.sources || []).map((fonte, i) => (
+            <li key={fonte.url || i}>
+              <a href={fonte.url} target="_blank" rel="noreferrer noopener">
+                <b>{fonte.title || fonte.url}</b>
+                <span>{(() => { try { return new URL(fonte.url).hostname.replace(/^www\./, ""); } catch { return ""; } })()}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      ) : vista === "imagens" ? (
+        <MineImageGallery query={assunto.slice(0, 60)} caption={`Imagens sobre ${assunto.slice(0, 60)}`} />
+      ) : (
+        <MineMessageText text={message.text} attachment={attachment} essencial={vista === "essencial"} />
+      )}
+    </>
   );
 }
 
@@ -11383,7 +11890,7 @@ export async function requestAssistantResponse(payload: {
  * pedaços, e as fontes da web quando houve pesquisa.
  */
 async function streamAssistantResponse(
-  payload: { prompt: string; history: MineHistoryItem[]; context: string; attachments?: ChatAttachment[]; webSearch?: boolean; photos?: boolean; tutor?: boolean; profundo?: boolean; caprichar?: boolean; controle?: boolean; aluno?: unknown },
+  payload: { prompt: string; history: MineHistoryItem[]; context: string; attachments?: ChatAttachment[]; webSearch?: boolean; photos?: boolean; tutor?: boolean; profundo?: boolean; caprichar?: boolean; esforco?: MineEsforco; voz?: boolean; controle?: boolean; aluno?: unknown },
   options: {
     onDelta: (text: string) => void;
     signal: AbortSignal;
