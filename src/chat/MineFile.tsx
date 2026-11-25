@@ -10,7 +10,7 @@
 */
 import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, Eye, FileCode2, FileSpreadsheet, FileText, Loader2, Printer, RotateCcw, X } from "lucide-react";
+import { BookOpenText, Download, Eye, FileCode2, FileSpreadsheet, FileText, Loader2, Printer, RotateCcw, Telescope, X } from "lucide-react";
 import {
   buildDocx,
   buildXlsx,
@@ -22,6 +22,7 @@ import {
   sheetsFromMarkdown,
   type FileKind,
 } from "../../shared/chat-files.mjs";
+import { useMineQueries, useMineSources } from "./MineSources";
 import "./mine-file.css";
 
 const LOOKS: Record<FileKind, { label: string; icon: typeof FileText; tone: string }> = {
@@ -42,18 +43,23 @@ function save(data: BlobPart, type: string, name: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
-/** Abre a impressão do navegador só com a página do arquivo. */
-function printAsPdf(html: string) {
+/** Abre a impressão do navegador só com a página do arquivo, sugerindo o nome no PDF. */
+function printAsPdf(html: string, baseName?: string) {
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;";
   frame.srcdoc = html;
   frame.onload = () => {
     window.setTimeout(() => {
+      const previousTitle = document.title;
+      if (baseName) document.title = baseName;
       try {
         frame.contentWindow?.focus();
         frame.contentWindow?.print();
       } finally {
+        window.setTimeout(() => {
+          if (baseName && document.title === baseName) document.title = previousTitle;
+        }, 1200);
         window.setTimeout(() => frame.remove(), 60_000);
       }
     }, 150);
@@ -63,11 +69,14 @@ function printAsPdf(html: string) {
 
 export const MineFileCard = memo(function MineFileCard({ code, open, cortado = false }: { code: string; open: boolean; cortado?: boolean }) {
   const file = useMemo(() => parseFileBlock(code), [code]);
+  const sources = useMineSources();
+  const queries = useMineQueries();
   const [preview, setPreview] = useState(false);
   const [hint, setHint] = useState("");
-  const html = useMemo(() => (open ? "" : fileHtml(file)), [file, open]);
+  const isDossier = file.modelo === "pesquisa";
+  const html = useMemo(() => (open ? "" : fileHtml(file, { sources, queries })), [file, open, sources, queries]);
   const sheets = useMemo(() => (file.tipo === "excel" && !open ? sheetsFromMarkdown(file.corpo) : []), [file, open]);
-  const look = LOOKS[file.tipo];
+  const look = isDossier ? { label: "Dossiê em PDF", icon: Telescope, tone: "#168A58" } : LOOKS[file.tipo];
   const Icon = look.icon;
   const base = fileBaseName(file.titulo);
 
@@ -78,14 +87,23 @@ export const MineFileCard = memo(function MineFileCard({ code, open, cortado = f
   }, [hint]);
 
   if (open) {
+    const headings = file.corpo.match(/^##\s+(.+)$/gm) || [];
+    const liveSecs = headings.length;
+    const lastSec = headings.length ? headings[headings.length - 1].replace(/^##\s+/, "").trim() : "";
     return (
-      <div className="mfile is-building" role="status" aria-live="polite">
+      <div className={`mfile is-building${isDossier ? " is-pesquisa" : ""}`} role="status" aria-live="polite">
         <span className="mfile__icon" style={{ "--mfile-tone": look.tone } as React.CSSProperties}>
           <Loader2 className="mfile__spin" aria-hidden />
         </span>
         <span className="mfile__body">
-          <strong>Montando o {look.label}…</strong>
-          <small>{file.titulo !== "Arquivo da Mine" ? file.titulo : "a Mine está escrevendo o conteúdo"}</small>
+          <strong>{isDossier ? "Montando o PDF do dossiê…" : `Montando o ${look.label}…`}</strong>
+          <small>
+            {lastSec
+              ? `${file.titulo !== "Arquivo da Mine" ? `${file.titulo} · ` : ""}seção ${liveSecs}: ${lastSec}`
+              : file.titulo !== "Arquivo da Mine"
+                ? file.titulo
+                : "a Mine está escrevendo e organizando o conteúdo"}
+          </small>
         </span>
       </div>
     );
@@ -96,13 +114,16 @@ export const MineFileCard = memo(function MineFileCard({ code, open, cortado = f
       ? `${sheets.length || 1} ${sheets.length === 1 ? "aba" : "abas"} · ${sheets.reduce((sum, sheet) => sum + sheet.rows.length - 1, 0)} linhas`
       : (() => {
           const secoes = (file.corpo.match(/^##\s/gm) || []).length || 1;
-          return `${secoes} ${secoes === 1 ? "seção" : "seções"} · ${Math.max(1, Math.round(file.corpo.split(/\s+/).length / 380))} pág. aprox.`;
+          const pags = Math.max(1, Math.round(file.corpo.split(/\s+/).length / 360));
+          const refs = sources?.length ? ` · ${sources.length} ${sources.length === 1 ? "fonte" : "fontes"}` : "";
+          return `${secoes} ${secoes === 1 ? "seção" : "seções"} · ${pags} pág. aprox.${refs}`;
         })();
 
   const pdf = () => {
-    printAsPdf(html);
-    setHint("Na janela que abriu, escolha “Salvar como PDF” como impressora.");
+    printAsPdf(html, base);
+    setHint("Na janela de impressão que abriu, escolha “Salvar como PDF” para guardar o documento diagramado.");
   };
+  const downloadHtml = () => save(html, "text/html;charset=utf-8", `${base}.html`);
   const actions: Array<{ key: string; label: string; run: () => void }> =
     file.tipo === "excel"
       ? [
@@ -112,20 +133,28 @@ export const MineFileCard = memo(function MineFileCard({ code, open, cortado = f
         ]
       : [
           { key: "pdf", label: "PDF", run: pdf },
-          { key: "docx", label: "Word (.docx)", run: () => save(buildDocx(file), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", `${base}.docx`) },
-          { key: "html", label: "HTML", run: () => save(html, "text/html;charset=utf-8", `${base}.html`) },
+          // O dossiê da Pesquisa aprofundada sai só em PDF: o HTML é a forma de
+          // diagramar a página, não um formato a mais para o estudante.
+          ...(isDossier ? [] : [{ key: "html", label: "HTML", run: downloadHtml }]),
+          ...(isDossier ? [] : [{ key: "docx", label: "Word (.docx)", run: () => save(buildDocx(file, { sources }), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", `${base}.docx`) }]),
         ];
   const primaryKey = { pdf: "pdf", word: "docx", excel: "xlsx", html: "html" }[file.tipo];
   const primary = actions.find((action) => action.key === primaryKey) || actions[0];
   const others = actions.filter((action) => action !== primary);
 
   return (
-    <figure className="mfile" style={{ "--mfile-tone": look.tone } as React.CSSProperties}>
+    <figure className={`mfile${isDossier ? " mfile--pesquisa" : ""}`} style={{ "--mfile-tone": look.tone } as React.CSSProperties}>
       <button type="button" className="mfile__sheet" onClick={() => setPreview(true)} aria-label={`Ver prévia de ${file.titulo}`}>
+        {isDossier ? (
+          <span className="mfile__badge">
+            <Telescope aria-hidden />
+            Pesquisa aprofundada · PDF
+          </span>
+        ) : null}
         {file.tipo === "excel" && sheets[0] ? <SheetThumb rows={displayRows(sheets[0])} /> : <PageThumb html={html} title={file.titulo} />}
         <span className="mfile__peek">
           <Eye aria-hidden />
-          Ver
+          {isDossier ? "Ler dossiê" : "Ver"}
         </span>
       </button>
       <figcaption className="mfile__info">
@@ -133,7 +162,9 @@ export const MineFileCard = memo(function MineFileCard({ code, open, cortado = f
           <Icon aria-hidden />
         </span>
         <span className="mfile__body">
+          {isDossier && file.materia ? <span className="mfile__eyebrow">{file.materia}</span> : null}
           <strong>{file.titulo}</strong>
+          {isDossier && file.subtitulo ? <span className="mfile__sub">{file.subtitulo}</span> : null}
           <small>
             {look.label} · {meta}
           </small>
@@ -141,12 +172,18 @@ export const MineFileCard = memo(function MineFileCard({ code, open, cortado = f
         <span className="mfile__actions">
           <button type="button" className="mfile__primary" onClick={primary.run}>
             {primary.key === "pdf" ? <Printer aria-hidden /> : <Download aria-hidden />}
-            Baixar {primary.label.replace(/\s*\(.*\)/, "")}
+            {isDossier ? "Salvar em PDF" : `Baixar ${primary.label.replace(/\s*\(.*\)/, "")}`}
           </button>
+          {isDossier ? (
+            <button type="button" className="mfile__read" onClick={() => setPreview(true)}>
+              <BookOpenText aria-hidden />
+              Ver o PDF
+            </button>
+          ) : null}
           <span className="mfile__more" aria-label="Outros formatos">
             {others.map((action) => (
               <button key={action.key} type="button" onClick={action.run}>
-                {action.label}
+                {action.key === "html" ? `Baixar ${action.label}` : action.label}
               </button>
             ))}
           </span>
@@ -168,7 +205,7 @@ export const MineFileCard = memo(function MineFileCard({ code, open, cortado = f
           </span>
         ) : null}
       </figcaption>
-      {preview ? <PreviewDialog html={html} title={file.titulo} onClose={() => setPreview(false)} onPdf={pdf} /> : null}
+      {preview ? <PreviewDialog html={html} title={file.titulo} onClose={() => setPreview(false)} onPdf={pdf} onDownloadHtml={file.tipo !== "excel" && !isDossier ? downloadHtml : undefined} /> : null}
     </figure>
   );
 });
@@ -207,7 +244,19 @@ function SheetThumb({ rows }: { rows: string[][] }) {
   );
 }
 
-function PreviewDialog({ html, title, onClose, onPdf }: { html: string; title: string; onClose: () => void; onPdf: () => void }) {
+function PreviewDialog({
+  html,
+  title,
+  onClose,
+  onPdf,
+  onDownloadHtml,
+}: {
+  html: string;
+  title: string;
+  onClose: () => void;
+  onPdf: () => void;
+  onDownloadHtml?: () => void;
+}) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     closeRef.current?.focus();
@@ -225,6 +274,12 @@ function PreviewDialog({ html, title, onClose, onPdf }: { html: string; title: s
       <div className="mfile-dialog__panel" onClick={(event) => event.stopPropagation()}>
         <header>
           <strong>{title}</strong>
+          {onDownloadHtml ? (
+            <button type="button" className="is-ghost" onClick={onDownloadHtml}>
+              <Download aria-hidden />
+              Baixar HTML
+            </button>
+          ) : null}
           <button type="button" onClick={onPdf}>
             <Printer aria-hidden />
             Salvar em PDF
@@ -233,7 +288,7 @@ function PreviewDialog({ html, title, onClose, onPdf }: { html: string; title: s
             <X aria-hidden />
           </button>
         </header>
-        <iframe title={`Prévia: ${title}`} srcDoc={html} sandbox="" />
+        <iframe title={`Prévia: ${title}`} srcDoc={html} sandbox="allow-popups allow-popups-to-escape-sandbox" />
       </div>
     </div>,
     document.body,

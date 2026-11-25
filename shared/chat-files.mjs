@@ -57,31 +57,136 @@ export function asksForStudySheet(text) {
 // ---------------------------------------------------------------------------
 // Bloco ```arquivo
 
-const KINDS = { pdf: "pdf", word: "word", docx: "word", doc: "word", documento: "word", excel: "excel", xlsx: "excel", planilha: "excel", csv: "excel", html: "html", pagina: "html" };
+const KINDS = {
+  pdf: "pdf",
+  relatorio: "pdf",
+  dossie: "pdf",
+  pesquisa: "pdf",
+  word: "word",
+  docx: "word",
+  doc: "word",
+  documento: "word",
+  excel: "excel",
+  xlsx: "excel",
+  planilha: "excel",
+  csv: "excel",
+  html: "html",
+  pagina: "html",
+};
+
+const HEADER_KEYS = {
+  tipo: "tipo",
+  type: "tipo",
+  formato: "tipo",
+  titulo: "titulo",
+  title: "titulo",
+  modelo: "modelo",
+  estilo: "modelo",
+  layout: "modelo",
+  subtitulo: "subtitulo",
+  subtitle: "subtitulo",
+  materia: "materia",
+  disciplina: "materia",
+  area: "materia",
+  resumo: "resumo",
+  sintese: "resumo",
+};
 
 /** Lê o cabeçalho do bloco. Sem cabeçalho, é um PDF com o texto todo. */
 export function parseFileBlock(code) {
   const lines = String(code || "").replace(/\r/g, "").split("\n");
   const header = {};
   let index = 0;
-  for (; index < Math.min(lines.length, 8); index += 1) {
+  for (; index < Math.min(lines.length, 12); index += 1) {
     const line = lines[index].trim();
+    if (!line && Object.keys(header).length) continue;
     if (/^-{3,}$/.test(line)) {
       index += 1;
       break;
     }
-    const match = line.match(/^(tipo|titulo|título|title|type|formato)\s*:\s*(.+)$/i);
+    const match = line.match(/^([\p{L}_-]{3,16})\s*:\s*(.+)$/u);
     if (!match) break;
-    header[fold(match[1]).replace("title", "titulo").replace("type", "tipo").replace("formato", "tipo")] = match[2].trim();
+    const key = HEADER_KEYS[fold(match[1]).replace(/[^a-z]/g, "")];
+    if (!key) break;
+    header[key] = match[2].trim();
   }
-  const tipo = KINDS[fold(header.tipo || "").replace(/[^a-z]/g, "")] || "pdf";
+  const rawTipo = fold(header.tipo || "").replace(/[^a-z]/g, "");
+  const tipo = KINDS[rawTipo] || "pdf";
+  const rawModelo = fold(header.modelo || "").replace(/[^a-z]/g, "");
+  const modelo = /^(?:pesquisa|relatorio|dossie|academico|aprofundad)/.test(rawModelo) || /^(?:relatorio|dossie|pesquisa)$/.test(rawTipo) ? "pesquisa" : "";
   const corpo = lines.slice(index).join("\n").trim();
-  const titulo = (header.titulo || firstHeading(corpo) || "Arquivo da Mine").replace(/[*_`#]/g, "").trim().slice(0, 90);
-  return { tipo, titulo, corpo };
+  const cleanMeta = (value, max) => String(value || "").replace(/[*_`#]/g, "").trim().slice(0, max);
+  const titulo = cleanMeta(header.titulo || firstHeading(corpo) || "Arquivo da Mine", 140);
+  const subtitulo = cleanMeta(header.subtitulo, 180);
+  const materia = cleanMeta(header.materia, 60);
+  const resumo = String(header.resumo || "").trim().slice(0, 900);
+  return {
+    tipo,
+    titulo,
+    corpo,
+    ...(modelo ? { modelo } : {}),
+    ...(subtitulo ? { subtitulo } : {}),
+    ...(materia ? { materia } : {}),
+    ...(resumo ? { resumo } : {}),
+  };
 }
 
 function firstHeading(markdown) {
   return markdown.match(/^#{1,3}\s+(.+)$/m)?.[1] || "";
+}
+
+function cleanHeadingTitle(text) {
+  return String(text || "")
+    .replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, "")
+    .replace(/^\d{1,2}\s*[.)\-–—:]\s*/, "")
+    .trim();
+}
+
+/**
+ * Garante que toda resposta de Pesquisa Aprofundada tenha um bloco ```arquivo
+ * com `modelo: pesquisa` pronto para virar PDF/HTML, mesmo se o modelo esquecer
+ * o cabeçalho `modelo: pesquisa` ou escrever o relatório direto no markdown.
+ */
+export function ensureDeepResearchFile(reply, { prompt = "", subjectName = "" } = {}) {
+  const source = String(reply || "").trim();
+  if (!source) return source;
+
+  // Já veio com ```arquivo: apenas garante `modelo: pesquisa` no cabeçalho se for PDF/HTML.
+  if (/```arquivo\b/i.test(source)) {
+    return source.replace(/```arquivo[ \t]*\r?\n([\s\S]*?)```/i, (full, inner) => {
+      const parsed = parseFileBlock(inner);
+      if (parsed.tipo === "excel" || parsed.modelo === "pesquisa") return full;
+      const lines = String(inner || "").replace(/\r/g, "").split("\n");
+      const sepIndex = lines.findIndex((line, idx) => idx < 12 && /^-{3,}$/.test(line.trim()));
+      if (sepIndex >= 0) {
+        lines.splice(sepIndex, 0, "modelo: pesquisa");
+        return `\`\`\`arquivo\n${lines.join("\n")}\`\`\``;
+      }
+      return `\`\`\`arquivo\ntipo: pdf\nmodelo: pesquisa\ntitulo: ${parsed.titulo}\n---\n${parsed.corpo}\n\`\`\``;
+    });
+  }
+
+  // Sem ```arquivo: só embrulha se for de fato um relatório estruturado (não uma recusa curta).
+  const headings = source.match(/^#{1,3}\s+.+$/gm) || [];
+  if (headings.length < 2 && source.length < 700) return source;
+
+  // Separa marcador final de sugestões/glossário para continuar fora do arquivo.
+  const trailing = [];
+  const mainBody = source
+    .replace(/\n*\[\[(?:sugestoes|sugestões|glossario|glossário):[^\]]*\]\]\s*/gi, (match) => {
+      trailing.push(match.trim());
+      return "\n";
+    })
+    .trim();
+
+  const blocks = mainBody.split(/\n{2,}/);
+  const firstHeadingAt = blocks.findIndex((chunk) => /^#{1,3}\s+/.test(chunk.trim()));
+  const intro = firstHeadingAt > 0 ? blocks.slice(0, Math.min(2, firstHeadingAt)).join("\n\n").trim() : "";
+  const rawTitle = cleanHeadingTitle(firstHeading(mainBody)) || cleanHeadingTitle(prompt).slice(0, 90) || "Relatório de Pesquisa";
+  const materiaLine = subjectName ? `materia: ${String(subjectName).replace(/\r?\n/g, " ").trim().slice(0, 60)}\n` : "";
+  const lead = intro || `Preparei o relatório completo sobre **${rawTitle}** em PDF e HTML logo abaixo.`;
+  const fileBlock = `\`\`\`arquivo\ntipo: pdf\nmodelo: pesquisa\ntitulo: ${rawTitle}\n${materiaLine}---\n${mainBody}\n\`\`\``;
+  return [lead, fileBlock, ...trailing].filter(Boolean).join("\n\n");
 }
 
 /** Nome de arquivo sem acento nem símbolo: "Resumo de Fotossíntese" → "resumo-de-fotossintese". */
@@ -97,7 +202,17 @@ export function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 }
 
-function inlineHtml(text) {
+function sourceDomain(source) {
+  if (source?.domain) return String(source.domain).replace(/^www\./, "");
+  try {
+    return new URL(String(source?.url || "")).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function inlineHtml(text, ctx = {}) {
+  const sources = Array.isArray(ctx.sources) ? ctx.sources : [];
   const render = (tokens) =>
     tokens
       .map((token) => {
@@ -117,7 +232,17 @@ function inlineHtml(text) {
           case "del":
             return `<del>${render(token.children)}</del>`;
           case "link":
-            return /^https?:\/\//i.test(token.href) ? `<a href="${escapeHtml(token.href)}">${render(token.children)}</a>` : render(token.children);
+            return /^https?:\/\//i.test(token.href) ? `<a href="${escapeHtml(token.href)}" target="_blank" rel="noreferrer noopener">${render(token.children)}</a>` : render(token.children);
+          case "cite": {
+            const n = Number(token.index);
+            if (!Number.isFinite(n) || n < 1) return "";
+            const src = sources[n - 1];
+            if (src) {
+              const tip = `${n}. ${src.title || sourceDomain(src)}${sourceDomain(src) ? ` (${sourceDomain(src)})` : ""}`;
+              return `<a href="#ref-${n}" class="cite" title="${escapeHtml(tip)}">[${n}]</a>`;
+            }
+            return `<sup class="cite">[${n}]</sup>`;
+          }
           default:
             return "";
         }
@@ -131,32 +256,172 @@ function checkbox(text) {
   return match ? { done: match[1] !== " ", text: match[2] } : null;
 }
 
-function blocksHtml(blocks) {
+const NUMERIC_COL = /^[-+−]?\s*(?:R\$|US\$|\$|€)?\s*[\d.,]+\s*(?:%|°C?|km²?|kg|m|cm|mm|g|s|h|min|mi|bi|tri|mil)?$/i;
+
+function isNumericColumn(rows, column) {
+  const filled = rows.map((row) => String(row[column] ?? "").replace(/\*\*/g, "").trim()).filter((cell) => cell && cell !== "-" && cell !== "—");
+  return filled.length > 0 && filled.every((cell) => NUMERIC_COL.test(cell));
+}
+
+/**
+ * Blocos ricos dentro de `> [!TIPO] Título` nos arquivos da Mine:
+ * - `[!DADOS]` / `[!NUMEROS]` / `[!INDICADORES]`: grade de cartões de indicadores
+ * - `[!GRAFICO]` / `[!BARRAS]`: gráfico de barras horizontais em HTML/CSS puro
+ * - `[!LINHA DO TEMPO]` / `[!CRONOLOGIA]`: linha do tempo editorial conectada
+ * - Outros `[!DEBATE]`, `[!CONCLUSAO]`, `[!PARA APROFUNDAR]`: cartão de destaque
+ */
+function parseSpecialQuote(block) {
+  if (block.type !== "quote" || !block.children?.length) return null;
+  const first = block.children[0];
+  if (first.type !== "paragraph") return null;
+  const match = String(first.text || "").match(/^\s*\[!\s*([\p{L} -]{3,28})\s*\]\s*(.*)$/u);
+  if (!match) return null;
+  const rawTag = fold(match[1]).replace(/[-_\s]+/g, " ").trim();
+  const title = match[2].trim();
+  const rest = block.children.slice(1);
+  const rawItems = [];
+  for (const child of rest) {
+    if (child.type === "list") {
+      for (const item of child.items) rawItems.push(item.text);
+    } else if (child.type === "paragraph" && child.text.trim()) {
+      rawItems.push(child.text.replace(/^[-*•]\s+/, "").trim());
+    }
+  }
+  if (/^(?:dados|numeros|indicadores|estatisticas|panorama)$/.test(rawTag) && rawItems.length) {
+    const items = rawItems
+      .map((line) => {
+        if (line.includes("|")) {
+          const [val, label, ...note] = line.split("|").map((part) => part.trim());
+          return { value: val.replace(/^\*\*|\*\*$/g, "").trim(), label: label || "", note: note.join(" · ").trim() };
+        }
+        const pair = line.match(/^(?:\*\*(.+?)\*\*|([^:—–-]{1,24}))\s*[:—–-]\s*(.+)$/);
+        if (pair) return { value: (pair[1] || pair[2] || "").trim(), label: pair[3].trim(), note: "" };
+        return null;
+      })
+      .filter((item) => item && item.value && item.label);
+    if (items.length) return { kind: "kpi", title, items };
+  }
+  if (/^(?:grafico|barras|comparativo)$/.test(rawTag) && rawItems.length) {
+    const rows = rawItems
+      .map((line) => {
+        const parts = line.split("|").map((part) => part.trim());
+        if (parts.length < 2) return null;
+        const rawNum = parts[1].replace(/[*%R$US€\s]/gi, "");
+        const parsed = cellValue(rawNum);
+        const num = parsed.kind === "number" ? (parsed.percent ? parsed.value * 100 : parsed.value) : Number(rawNum.replace(/\./g, "").replace(",", "."));
+        if (!Number.isFinite(num) || num < 0) return null;
+        return { label: parts[0].replace(/^\*\*|\*\*$/g, "").trim(), display: parts[1].replace(/^\*\*|\*\*$/g, "").trim(), num, note: parts.slice(2).join(" · ").trim() };
+      })
+      .filter(Boolean);
+    if (rows.length >= 2) return { kind: "chart", title, rows };
+  }
+  if (/^(?:linha do tempo|cronologia|historico|marcos)$/.test(rawTag) && rawItems.length) {
+    const events = rawItems
+      .map((line) => {
+        if (line.includes("|")) {
+          const [when, head, ...detail] = line.split("|").map((part) => part.trim());
+          const bodyText = detail.length ? detail.join(" ").trim() : "";
+          return {
+            when: when.replace(/^\*\*|\*\*$/g, "").trim(),
+            head: bodyText ? head.replace(/^\*\*|\*\*$/g, "").trim() : "",
+            text: bodyText || head,
+          };
+        }
+        const full = line.match(/^\*\*(.+?)\*\*\s*(?:[—–-]\s*\*\*(.+?)\*\*\s*[:—–-]?\s*|[—–:-]\s*)(.+)$/);
+        if (full) return { when: full[1].trim(), head: (full[2] || "").trim(), text: full[3].trim() };
+        return null;
+      })
+      .filter((event) => event && event.when && (event.text || event.head));
+    if (events.length) return { kind: "timeline", title, events };
+  }
+  const CALLOUT_MAP = {
+    debate: ["debate", "Visões e debates"],
+    controversia: ["debate", "Controvérsia"],
+    visoes: ["debate", "Diferentes visões"],
+    conclusao: ["summary", "Conclusão"],
+    "para aprofundar": ["note", "Para aprofundar"],
+    metodologia: ["note", "Metodologia"],
+    contexto: ["definition", "Contexto"],
+  };
+  const mapped = CALLOUT_MAP[rawTag] || ["note", match[1].trim()];
+  return { kind: "callout", tone: mapped[0], label: mapped[1], title, children: rest };
+}
+
+function blocksHtml(blocks, ctx = {}) {
   return blocks
     .map((block) => {
       switch (block.type) {
         case "heading": {
           const level = Math.min(4, Math.max(2, block.level + (block.level === 1 ? 1 : 0)));
-          return `<h${level}>${inlineHtml(block.text)}</h${level}>`;
+          if (level === 2 && ctx.isResearch) {
+            ctx.secCounter = (ctx.secCounter || 0) + 1;
+            const num = String(ctx.secCounter).padStart(2, "0");
+            const clean = cleanHeadingTitle(block.text) || block.text;
+            return `<h2 id="sec-${ctx.secCounter}" class="sec-h2"><span class="sec-num">${num}</span><span>${inlineHtml(clean, ctx)}</span></h2>`;
+          }
+          return `<h${level}>${inlineHtml(block.text, ctx)}</h${level}>`;
         }
         case "paragraph":
-          return `<p>${inlineHtml(block.text)}</p>`;
+          return `<p>${inlineHtml(block.text, ctx)}</p>`;
+        case "chips":
+          return `<p class="chips">${block.items.map((item) => `<span class="chip">${inlineHtml(item, ctx)}</span>`).join("")}</p>`;
         case "rule":
           return "<hr>";
         case "code":
           return `<pre><code>${escapeHtml(block.code)}</code></pre>`;
         case "math":
           return `<p class="math-block">${escapeHtml(block.tex)}</p>`;
-        case "table":
-          return `<table><thead><tr>${block.header.map((cell) => `<th>${inlineHtml(cell)}</th>`).join("")}</tr></thead><tbody>${block.rows
-            .map((row) => `<tr>${row.map((cell) => `<td>${inlineHtml(cell)}</td>`).join("")}</tr>`)
-            .join("")}</tbody></table>`;
+        case "table": {
+          const numeric = block.header.map((_, column) => isNumericColumn(block.rows, column));
+          return `<div class="table-wrap"><table><thead><tr>${block.header
+            .map((cell, column) => `<th${numeric[column] ? ' class="num"' : ""}>${inlineHtml(cell, ctx)}</th>`)
+            .join("")}</tr></thead><tbody>${block.rows
+            .map((row) => `<tr>${row.map((cell, column) => `<td${numeric[column] ? ' class="num"' : ""}>${inlineHtml(cell, ctx)}</td>`).join("")}</tr>`)
+            .join("")}</tbody></table></div>`;
+        }
         case "callout":
-          return `<aside class="callout callout-${block.kind}"><p class="callout-title">${escapeHtml(CALLOUT_TITLES[block.kind] || "Nota")}${block.title ? ` · ${inlineHtml(block.title)}` : ""}</p>${blocksHtml(block.children)}</aside>`;
-        case "quote":
-          return `<blockquote>${blocksHtml(block.children)}</blockquote>`;
+          return `<aside class="callout callout-${block.kind}"><p class="callout-title">${escapeHtml(CALLOUT_TITLES[block.kind] || "Nota")}${block.title ? ` · ${inlineHtml(block.title, ctx)}` : ""}</p>${blocksHtml(block.children, ctx)}</aside>`;
+        case "quote": {
+          const special = parseSpecialQuote(block);
+          if (special?.kind === "kpi") {
+            return `<section class="kpi-section">${special.title ? `<p class="eyebrow-label">${inlineHtml(special.title, ctx)}</p>` : ""}<div class="kpi-grid">${special.items
+              .slice(0, 6)
+              .map(
+                (item) =>
+                  `<div class="kpi-card"><strong class="kpi-val">${escapeHtml(item.value)}</strong><span class="kpi-label">${inlineHtml(item.label, ctx)}</span>${
+                    item.note ? `<small class="kpi-note">${inlineHtml(item.note, ctx)}</small>` : ""
+                  }</div>`,
+              )
+              .join("")}</div></section>`;
+          }
+          if (special?.kind === "chart") {
+            const max = Math.max(...special.rows.map((r) => r.num), 1);
+            return `<figure class="chart-box">${special.title ? `<figcaption class="chart-title">${inlineHtml(special.title, ctx)}</figcaption>` : ""}<div class="chart-rows">${special.rows
+              .slice(0, 8)
+              .map((row) => {
+                const pct = Math.max(4, Math.min(100, Math.round((row.num / max) * 1000) / 10));
+                return `<div class="chart-row"><div class="chart-head"><span class="chart-label">${inlineHtml(row.label, ctx)}</span><strong class="chart-val">${escapeHtml(row.display)}</strong></div><div class="chart-track"><span class="chart-fill" style="width:${pct}%"></span></div>${
+                  row.note ? `<p class="chart-note">${inlineHtml(row.note, ctx)}</p>` : ""
+                }</div>`;
+              })
+              .join("")}</div></figure>`;
+          }
+          if (special?.kind === "timeline") {
+            return `<section class="timeline-section">${special.title ? `<p class="eyebrow-label">${inlineHtml(special.title, ctx)}</p>` : ""}<ol class="timeline">${special.events
+              .slice(0, 12)
+              .map(
+                (ev) =>
+                  `<li class="tl-item"><span class="tl-when">${escapeHtml(ev.when)}</span><div class="tl-body">${ev.head ? `<strong class="tl-head">${inlineHtml(ev.head, ctx)}</strong>` : ""}<p>${inlineHtml(ev.text, ctx)}</p></div></li>`,
+              )
+              .join("")}</ol></section>`;
+          }
+          if (special?.kind === "callout") {
+            return `<aside class="callout callout-${special.tone}"><p class="callout-title">${escapeHtml(special.label)}${special.title ? ` · ${inlineHtml(special.title, ctx)}` : ""}</p>${blocksHtml(special.children, ctx)}</aside>`;
+          }
+          return `<blockquote>${blocksHtml(block.children, ctx)}</blockquote>`;
+        }
         case "list":
-          return listHtml(block);
+          return listHtml(block, ctx);
         default:
           return "";
       }
@@ -164,84 +429,272 @@ function blocksHtml(blocks) {
     .join("\n");
 }
 
-function listHtml(list) {
+function listHtml(list, ctx = {}) {
   const tag = list.ordered ? "ol" : "ul";
   const start = list.ordered && list.start !== 1 ? ` start="${list.start}"` : "";
   const checklist = !list.ordered && list.items.every((item) => checkbox(item.text));
   return `<${tag}${start}${checklist ? ' class="checklist"' : ""}>${list.items
     .map((item) => {
       const box = checklist ? checkbox(item.text) : null;
-      const body = box ? `<span class="box">${box.done ? "✓" : ""}</span>${inlineHtml(box.text)}` : inlineHtml(item.text);
-      return `<li>${body}${(item.children || []).map(listHtml).join("")}</li>`;
+      const body = box ? `<span class="box">${box.done ? "✓" : ""}</span>${inlineHtml(box.text, ctx)}` : inlineHtml(item.text, ctx);
+      return `<li>${body}${(item.children || []).map((child) => listHtml(child, ctx)).join("")}</li>`;
     })
     .join("")}</${tag}>`;
 }
 
 const PAGE_CSS = `
-@page { size: A4; margin: 16mm 16mm 18mm; }
+@page { size: A4; margin: 15mm 15mm 17mm; }
+:root {
+  --ink: #0f2119;
+  --text: #1d2622;
+  --muted: #58665f;
+  --accent: #147a4d;
+  --accent-bright: #2fd483;
+  --accent-soft: #e7f6ee;
+  --line: #d4e0d9;
+  --surface: #f6faf8;
+}
 * { box-sizing: border-box; }
-html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-body { margin: 0; background: #eef1ee; color: #1d2320; font: 11pt/1.55 "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
-.page { max-width: 210mm; margin: 0 auto; padding: 18mm 18mm 20mm; background: #fff; min-height: 100vh; }
-.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 3px solid #2fd483; margin-bottom: 18px; }
-.brand { font-size: 8.5pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #3b8f68; }
-.date { font-size: 8.5pt; color: #6b756f; }
-h1 { font-size: 22pt; line-height: 1.15; margin: 0 0 14px; letter-spacing: -.01em; color: #10221a; }
-h2 { font-size: 14pt; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid #d5e9de; color: #14513a; break-after: avoid; }
-h3 { font-size: 12pt; margin: 16px 0 6px; color: #1f3b2f; break-after: avoid; }
-h4 { font-size: 11pt; margin: 12px 0 4px; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; scroll-behavior: smooth; }
+body { margin: 0; background: #e8edea; color: var(--text); font: 10.5pt/1.62 "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
+.page { max-width: 210mm; margin: 0 auto; padding: 17mm 18mm 20mm; background: #fff; min-height: 100vh; box-shadow: 0 12px 42px rgba(15, 33, 25, .08); }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 3px solid var(--accent-bright); margin-bottom: 18px; }
+.brand { font-size: 8.5pt; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.date { font-size: 8.5pt; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Cabeçalho editorial do Dossiê de Pesquisa */
+.dossier-cover { position: relative; padding: 14px 16px 16px; margin-bottom: 18px; border-radius: 10px; border: 1px solid var(--line); border-top: 4px solid var(--ink); background: linear-gradient(180deg, #f7fbf9 0%, #ffffff 100%); break-inside: avoid; }
+.dossier-cover::after { content: ""; position: absolute; top: -4px; left: 0; width: 92px; height: 4px; background: var(--accent-bright); border-top-left-radius: 10px; }
+.dossier-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.dossier-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dossier-kicker { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 7.5pt; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.dossier-subject { display: inline-block; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid #bfe4cf; font-size: 7.8pt; font-weight: 700; }
+.dossier-cover h1 { font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif; font-size: 23pt; line-height: 1.13; margin: 0 0 6px; letter-spacing: -.015em; color: var(--ink); }
+.dossier-sub { margin: 0 0 10px; font-size: 11pt; line-height: 1.45; color: #3d4d45; }
+.dossier-stats { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.stat-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 6px; background: #f2f6f4; border: 1px solid #dfe8e3; font-size: 8pt; font-weight: 600; color: #394840; font-variant-numeric: tabular-nums; }
+
+.exec-summary { margin: 0 0 16px; padding: 12px 15px 10px; border-radius: 9px; border: 1px solid #c6e6d5; border-left: 4px solid var(--accent); background: #f3fbf6; break-inside: avoid; }
+.exec-label, .eyebrow-label, .toc-title { margin: 0 0 5px; font-size: 8pt; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.exec-summary p:last-child { margin-bottom: 0; }
+
+.toc { margin: 0 0 20px; padding: 11px 14px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); break-inside: avoid; }
+.toc-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 18px; }
+.toc-list li { margin: 0; min-width: 0; }
+.toc-list a { display: flex; align-items: baseline; gap: 7px; text-decoration: none; color: var(--ink); font-size: 9.2pt; line-height: 1.35; padding: 2px 0; border-bottom: 1px dotted #d6e1db; }
+.toc-list a:hover { color: var(--accent); }
+.toc-num { font-family: Consolas, "DM Mono", monospace; font-size: 8pt; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+.toc-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+h1 { font-size: 21pt; line-height: 1.15; margin: 0 0 14px; letter-spacing: -.01em; color: var(--ink); }
+h2 { font-size: 13.5pt; margin: 22px 0 8px; padding-bottom: 5px; border-bottom: 1.5px solid #d5e9de; color: #124d36; break-after: avoid; page-break-after: avoid; }
+h2.sec-h2 { display: flex; align-items: baseline; gap: 9px; font-size: 14pt; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1.5px solid var(--ink); color: var(--ink); }
+.sec-num { display: inline-block; padding: 1px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font: 800 8.5pt/1.3 Consolas, "DM Mono", monospace; letter-spacing: .04em; flex-shrink: 0; }
+h3 { font-size: 11.5pt; margin: 15px 0 6px; color: #1c3d2f; break-after: avoid; page-break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 12px 0 4px; break-after: avoid; }
 p { margin: 0 0 9px; }
 ul, ol { margin: 0 0 10px; padding-left: 22px; }
-li { margin: 3px 0; }
+li { margin: 3.5px 0; }
 ul.checklist { list-style: none; padding-left: 4px; }
 ul.checklist .box { display: inline-block; width: 12px; height: 12px; margin-right: 8px; border: 1.5px solid #3b8f68; border-radius: 3px; font-size: 9px; line-height: 10px; text-align: center; vertical-align: -1px; }
-mark { background: #fff2a8; padding: 0 2px; border-radius: 2px; }
-code, pre, .math, .math-block { font-family: Consolas, "DM Mono", monospace; font-size: 9.5pt; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.chip { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #eef5f1; border: 1px solid #d3e2da; font-size: 8pt; font-weight: 700; color: #2b4a3c; }
+.cite { display: inline-block; margin-left: 1px; padding: 0 4px; border-radius: 4px; background: #e8f3fe; color: #18559b; font: 700 7.5pt/1.35 Consolas, "DM Mono", monospace; text-decoration: none; vertical-align: super; }
+.cite:hover { background: #d0e7fd; }
+
+/* Grade de indicadores (KPIs) */
+.kpi-section { margin: 12px 0 16px; break-inside: avoid; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 9px; }
+.kpi-card { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); border-top: 3px solid var(--accent); background: #fbfdfc; break-inside: avoid; }
+.kpi-val { font-family: Georgia, "Times New Roman", serif; font-size: 16.5pt; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.kpi-label { font-size: 9pt; font-weight: 700; line-height: 1.3; color: #24332c; }
+.kpi-note { font-size: 7.8pt; line-height: 1.3; color: var(--muted); }
+
+/* Gráfico de barras horizontais em HTML/CSS puro */
+.chart-box { margin: 12px 0 16px; padding: 12px 14px; border-radius: 9px; border: 1px solid var(--line); background: #fbfdfc; break-inside: avoid; }
+.chart-title { font-size: 9pt; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin-bottom: 9px; }
+.chart-rows { display: flex; flex-direction: column; gap: 8px; }
+.chart-row { break-inside: avoid; }
+.chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 9.3pt; margin-bottom: 3px; }
+.chart-label { font-weight: 600; color: var(--text); }
+.chart-val { font-variant-numeric: tabular-nums; color: var(--ink); font-size: 9.3pt; }
+.chart-track { height: 8px; width: 100%; border-radius: 999px; background: #e6efea; overflow: hidden; }
+.chart-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #147a4d, #2fd483); }
+.chart-note { margin: 2px 0 0; font-size: 7.8pt; color: var(--muted); }
+
+/* Linha do tempo conectada */
+.timeline-section { margin: 12px 0 16px; }
+.timeline { list-style: none; margin: 6px 0 0; padding: 0 0 0 14px; border-left: 2px solid #b5d9c6; }
+.tl-item { position: relative; margin: 0 0 10px; padding: 0 0 2px 12px; break-inside: avoid; }
+.tl-item:last-child { margin-bottom: 0; }
+.tl-item::before { content: ""; position: absolute; left: -19px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 0 1.5px var(--accent); }
+.tl-when { display: inline-block; margin-bottom: 2px; padding: 1px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); font: 800 8pt/1.35 Consolas, "DM Mono", monospace; }
+.tl-head { display: block; font-size: 9.8pt; color: var(--ink); margin-bottom: 1px; }
+.tl-body p { margin: 0; font-size: 9.5pt; line-height: 1.48; color: #2d3b34; }
+
+mark { background: #fff2a8; padding: 0 3px; border-radius: 2px; }
+code, pre, .math, .math-block { font-family: "Cascadia Mono", Consolas, "DM Mono", monospace; font-size: 9.2pt; }
 code { background: #f1f4f2; padding: 1px 4px; border-radius: 3px; }
 pre { background: #f6f8f7; border: 1px solid #e1e7e3; border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; break-inside: avoid; }
 pre code { background: none; padding: 0; }
-.math-block { text-align: center; background: #f7faf8; border-radius: 6px; padding: 8px; }
-table { width: 100%; border-collapse: collapse; margin: 6px 0 14px; font-size: 10pt; break-inside: auto; }
+.math-block { text-align: center; background: #f7faf8; border-radius: 6px; padding: 8px; break-inside: avoid; }
+.table-wrap { margin: 8px 0 14px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 9.5pt; break-inside: auto; }
+thead { display: table-header-group; }
 th, td { border: 1px solid #cfdad3; padding: 6px 8px; text-align: left; vertical-align: top; }
-thead th { background: #e3f5eb; color: #14513a; font-weight: 700; }
+thead th { background: #e3f5eb; color: #124d36; font-weight: 700; }
 tbody tr:nth-child(even) td { background: #f8fbf9; }
-tr { break-inside: avoid; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; }
-blockquote { margin: 0 0 10px; padding: 4px 0 4px 12px; border-left: 3px solid #c9d6ce; color: #46524b; }
-.callout { margin: 10px 0 12px; padding: 10px 12px 4px; border-radius: 8px; border-left: 4px solid #2fd483; background: #effaf4; break-inside: avoid; }
-.callout-title { font-size: 9pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; color: #14513a; }
-.callout-tip, .callout-example { border-color: #f2b705; background: #fff9e6; }
-.callout-tip .callout-title, .callout-example .callout-title { color: #8a6500; }
-.callout-warning, .callout-mistake { border-color: #ef6b5b; background: #fff1ef; }
-.callout-warning .callout-title, .callout-mistake .callout-title { color: #a33a2c; }
-.callout-important { border-color: #7c6cf2; background: #f3f1ff; }
-.callout-important .callout-title { color: #4b3fb3; }
-.callout-definition, .callout-note, .callout-summary { border-color: #3aa0e8; background: #eef7fe; }
-.callout-definition .callout-title, .callout-note .callout-title, .callout-summary .callout-title { color: #1d5f8f; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+blockquote { margin: 0 0 10px; padding: 5px 0 5px 13px; border-left: 3px solid #b9cbc1; color: #425048; font-style: italic; }
+
+.callout { margin: 10px 0 13px; padding: 10px 13px 5px; border-radius: 8px; border: 1px solid #d5ebe0; border-left: 4px solid #2fd483; background: #effaf4; break-inside: avoid; page-break-inside: avoid; }
+.callout-title { font-size: 8.5pt; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 4px; color: #14513a; }
+.callout-tip, .callout-example { border-color: #f3e2a9; border-left-color: #e0a100; background: #fff9e6; }
+.callout-tip .callout-title, .callout-example .callout-title { color: #8a6000; }
+.callout-warning, .callout-mistake { border-color: #f7cdc8; border-left-color: #e5533d; background: #fff1ef; }
+.callout-warning .callout-title, .callout-mistake .callout-title { color: #a33324; }
+.callout-important { border-color: #dcd6fc; border-left-color: #6d5ce8; background: #f4f2ff; }
+.callout-important .callout-title { color: #4738ad; }
+.callout-definition, .callout-note, .callout-summary { border-color: #cbe3f8; border-left-color: #2b86d6; background: #eef7fe; }
+.callout-definition .callout-title, .callout-note .callout-title, .callout-summary .callout-title { color: #1b598f; }
+.callout-debate { border-color: #f4d9be; border-left-color: #d97706; background: #fff8f1; }
+.callout-debate .callout-title { color: #9a4d06; }
+
+/* Referências verificadas */
+.refs { margin-top: 26px; padding-top: 14px; border-top: 2px solid var(--ink); }
+.refs h2 { margin-top: 0; }
+.ref-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+.ref-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding: 7px 10px; border-radius: 7px; border: 1px solid #e2ebe6; background: #fafcfb; font-size: 8.8pt; line-height: 1.42; break-inside: avoid; }
+.ref-num { font: 800 8pt/1.4 Consolas, "DM Mono", monospace; color: var(--accent); padding: 1px 5px; border-radius: 4px; background: var(--accent-soft); height: fit-content; }
+.ref-meta { min-width: 0; }
+.ref-title { font-weight: 700; color: var(--ink); }
+.ref-domain { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #eef3f0; color: var(--muted); font: 600 7.5pt/1.4 Consolas, "DM Mono", monospace; }
+.ref-url { display: block; margin-top: 1px; color: #1d6f50; font-size: 7.8pt; word-break: break-all; text-decoration: none; }
+.ref-url:hover { text-decoration: underline; }
+.ref-queries { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 7.8pt; color: var(--muted); }
+.ref-queries strong { color: #394840; }
+
 hr { border: 0; border-top: 1px dashed #cdd8d1; margin: 16px 0; }
-a { color: #1d6f50; }
-.foot { margin-top: 26px; padding-top: 8px; border-top: 1px solid #e3e9e5; font-size: 8pt; color: #8a948e; }
-@media print { body { background: #fff; } .page { padding: 0; max-width: none; min-height: 0; } }
-@media (max-width: 640px) { .page { padding: 18px 16px; } h1 { font-size: 18pt; } }
+a { color: #186647; }
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 26px; padding-top: 8px; border-top: 1px solid #e1e8e4; font-size: 8pt; color: #7b8780; }
+@media print {
+  body { background: #fff; }
+  .page { padding: 0; max-width: none; min-height: 0; box-shadow: none; }
+  a { text-decoration: none; }
+}
+@media (max-width: 640px) {
+  .page { padding: 18px 15px; }
+  .dossier-cover h1, h1 { font-size: 18pt; }
+  .toc-list { grid-template-columns: 1fr; }
+}
 `;
 
 /** Página HTML completa e diagramada: é o arquivo .html e a base do PDF. */
-export function fileHtml({ titulo, corpo, tipo = "pdf" }, { date = new Date() } = {}) {
+export function fileHtml(
+  { titulo, corpo, tipo = "pdf", modelo = "", subtitulo = "", materia = "", resumo = "" },
+  { date = new Date(), sources = [], queries = [] } = {},
+) {
+  const cleanSources = (Array.isArray(sources) ? sources : []).filter((item) => item && /^https?:\/\//i.test(String(item.url || "")));
+  const cleanQueries = (Array.isArray(queries) ? queries : []).map((q) => String(q || "").replace(/^site:\S+\s*/, "").trim()).filter(Boolean);
   const blocks = parseBlocks(String(corpo || ""));
   // Um "# Título" igual ao título do arquivo seria repetido logo abaixo do h1.
-  const body = blocks[0]?.type === "heading" && fold(blocks[0].text) === fold(titulo) ? blocks.slice(1) : blocks;
+  let body = blocks[0]?.type === "heading" && fold(cleanHeadingTitle(blocks[0].text)) === fold(cleanHeadingTitle(titulo)) ? blocks.slice(1) : blocks;
+  const isResearch = modelo === "pesquisa";
+
+  // Na pesquisa aprofundada, chips iniciais e resumo executivo sobem para a capa.
+  let coverChips = [];
+  if (isResearch && body[0]?.type === "chips") {
+    coverChips = body[0].items;
+    body = body.slice(1);
+  }
+  let execHtml = "";
+  if (isResearch) {
+    if (resumo) {
+      execHtml = `<section class="exec-summary"><p class="exec-label">Síntese executiva</p><p>${inlineHtml(resumo, { sources: cleanSources })}</p></section>`;
+    } else if (body[0]?.type === "callout" && body[0].kind === "summary") {
+      execHtml = `<section class="exec-summary"><p class="exec-label">${escapeHtml(body[0].title || "Síntese executiva")}</p>${blocksHtml(body[0].children, { sources: cleanSources })}</section>`;
+      body = body.slice(1);
+    }
+  }
+
   const sheets = tipo === "excel" ? sheetsFromMarkdown(corpo) : [];
+  const ctx = { isResearch, secCounter: 0, sources: cleanSources };
+  const h2Titles = isResearch
+    ? body
+        .filter((block) => block.type === "heading" && Math.min(4, Math.max(2, block.level + (block.level === 1 ? 1 : 0))) === 2)
+        .map((block) => cleanHeadingTitle(block.text) || block.text)
+    : [];
+
   const content = sheets.length
-    ? sheets.map((sheet) => {
-        const shown = displayRows(sheet);
-        const numeric = sheet.rows[0].map((_, column) => sheet.rows.slice(1).some((row) => cellValue(row[column]).kind !== "text"));
-        return `<h2>${escapeHtml(sheet.name)}</h2>${sheet.note ? `<p>${inlineHtml(sheet.note)}</p>` : ""}<table><thead><tr>${shown[0].map((cell) => `<th>${escapeHtml(cell)}</th>`).join("")}</tr></thead><tbody>${shown
-          .slice(1)
-          .map((row) => `<tr>${row.map((cell, column) => `<td${numeric[column] ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr>`)
-          .join("")}</tbody></table>`;
-      }).join("\n")
-    : blocksHtml(body);
+    ? sheets
+        .map((sheet) => {
+          const shown = displayRows(sheet);
+          const numeric = sheet.rows[0].map((_, column) => sheet.rows.slice(1).some((row) => cellValue(row[column]).kind !== "text"));
+          return `<h2>${escapeHtml(sheet.name)}</h2>${sheet.note ? `<p>${inlineHtml(sheet.note, ctx)}</p>` : ""}<div class="table-wrap"><table><thead><tr>${shown[0]
+            .map((cell, column) => `<th${numeric[column] ? ' class="num"' : ""}>${escapeHtml(cell)}</th>`)
+            .join("")}</tr></thead><tbody>${shown
+            .slice(1)
+            .map((row) => `<tr>${row.map((cell, column) => `<td${numeric[column] ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+            .join("")}</tbody></table></div>`;
+        })
+        .join("\n")
+    : blocksHtml(body, ctx);
+
+  const hasCitedRefs = /\[\d{1,2}\]/.test(String(corpo || "")) || isResearch;
+  const showRefs = !sheets.length && cleanSources.length > 0 && hasCitedRefs;
+  const refsSecNum = isResearch ? String((ctx.secCounter || 0) + 1).padStart(2, "0") : "";
+  const tocEntries = [
+    ...h2Titles.map((text, idx) => ({ href: `#sec-${idx + 1}`, num: String(idx + 1).padStart(2, "0"), text })),
+    ...(showRefs && isResearch ? [{ href: "#referencias", num: refsSecNum, text: "Referências e fontes consultadas" }] : []),
+  ];
+  const tocHtml =
+    isResearch && tocEntries.length >= 3
+      ? `<nav class="toc" aria-label="Sumário"><p class="toc-title">Sumário do relatório</p><ol class="toc-list">${tocEntries
+          .map((item) => `<li><a href="${item.href}"><span class="toc-num">${item.num}</span><span class="toc-text">${escapeHtml(item.text)}</span></a></li>`)
+          .join("")}</ol></nav>`
+      : "";
+
+  const refsHtml = showRefs
+    ? `<section class="refs" id="referencias">${
+        isResearch
+          ? `<h2 class="sec-h2"><span class="sec-num">${refsSecNum}</span><span>Referências e fontes consultadas</span></h2>`
+          : `<h2>Fontes consultadas</h2>`
+      }<ol class="ref-list">${cleanSources
+        .map((src, idx) => {
+          const dom = sourceDomain(src);
+          return `<li class="ref-item" id="ref-${idx + 1}"><span class="ref-num">[${idx + 1}]</span><div class="ref-meta"><span class="ref-title">${escapeHtml(src.title || dom || src.url)}</span>${
+            dom ? `<span class="ref-domain">${escapeHtml(dom)}</span>` : ""
+          }<a class="ref-url" href="${escapeHtml(src.url)}" target="_blank" rel="noreferrer noopener">${escapeHtml(src.url)}</a></div></li>`;
+        })
+        .join("")}</ol>${
+        cleanQueries.length
+          ? `<p class="ref-queries"><strong>Buscas realizadas:</strong> ${cleanQueries.map((q) => escapeHtml(q)).join(" · ")}</p>`
+          : ""
+      }</section>`
+    : "";
+
   const dia = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(date);
+  const wordsCount = String(corpo || "").trim().split(/\s+/).filter(Boolean).length;
+  const readingMin = Math.max(1, Math.round(wordsCount / 210));
+  const stats = isResearch
+    ? [
+        h2Titles.length ? `${h2Titles.length} ${h2Titles.length === 1 ? "seção" : "seções"}` : "",
+        cleanSources.length ? `${cleanSources.length} ${cleanSources.length === 1 ? "fonte verificada" : "fontes verificadas"}` : "",
+        `~${readingMin} min de leitura`,
+        ...coverChips.slice(0, 3),
+      ].filter(Boolean)
+    : [];
+
+  const headerHtml = isResearch
+    ? `<header class="dossier-cover"><div class="dossier-bar"><div class="dossier-badges"><span class="dossier-kicker">Minerva · Pesquisa aprofundada</span>${
+        materia ? `<span class="dossier-subject">${escapeHtml(materia)}</span>` : ""
+      }</div><span class="date">${escapeHtml(dia)}</span></div><h1>${escapeHtml(titulo)}</h1>${
+        subtitulo ? `<p class="dossier-sub">${escapeHtml(subtitulo)}</p>` : ""
+      }${stats.length ? `<div class="dossier-stats">${stats.map((item) => `<span class="stat-pill">${escapeHtml(item)}</span>`).join("")}</div>` : ""}</header>${execHtml}${tocHtml}`
+    : `<div class="top"><span class="brand">Minerva · feito com a Mine</span><span class="date">${escapeHtml(dia)}</span></div>\n<h1>${escapeHtml(titulo)}</h1>`;
+
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -251,11 +704,11 @@ export function fileHtml({ titulo, corpo, tipo = "pdf" }, { date = new Date() } 
 <style>${PAGE_CSS}</style>
 </head>
 <body>
-<main class="page">
-<div class="top"><span class="brand">Minerva · feito com a Mine</span><span class="date">${escapeHtml(dia)}</span></div>
-<h1>${escapeHtml(titulo)}</h1>
+<main class="page${isResearch ? " is-research" : ""}">
+${headerHtml}
 ${content}
-<p class="foot">Criado pela Mine, a tutora do Minerva. Confira as informações com o seu material de aula.</p>
+${refsHtml}
+<p class="foot"><span>${isResearch ? "Dossiê gerado pela Mine · Plataforma Minerva" : "Criado pela Mine, a tutora do Minerva."}</span><span>Confira os dados nas fontes citadas e no seu material de aula.</span></p>
 </main>
 </body>
 </html>`;
@@ -662,6 +1115,7 @@ function runsXml(text, base = {}) {
         if (token.type === "mark") return render(token.children, { ...style, mark: true });
         if (token.type === "del") return render(token.children, { ...style, strike: true });
         if (token.type === "link") return render(token.children, { ...style, link: true });
+        if (token.type === "cite") return run(`[${token.index}]`, { ...style, bold: true, color: "18559B" });
         return "";
       })
       .join("");
@@ -702,6 +1156,7 @@ const CALLOUT_COLORS = {
   definition: ["3AA0E8", "EEF7FE"],
   note: ["3AA0E8", "EEF7FE"],
   summary: ["3AA0E8", "EEF7FE"],
+  debate: ["D97706", "FFF8F1"],
   fun: ["2FD483", "EFFAF4"],
 };
 
@@ -710,9 +1165,11 @@ function docxBlocks(blocks, context = {}) {
     .map((block) => {
       switch (block.type) {
         case "heading":
-          return para(runsXml(block.text), { style: block.level <= 2 ? "Heading1" : block.level === 3 ? "Heading2" : "Heading3", keepNext: true });
+          return para(runsXml(cleanHeadingTitle(block.text) || block.text), { style: block.level <= 2 ? "Heading1" : block.level === 3 ? "Heading2" : "Heading3", keepNext: true });
         case "paragraph":
           return para(runsXml(block.text), { shade: context.shade, border: context.border });
+        case "chips":
+          return para(runsXml(block.items.join("  ·  "), { bold: true, color: "2B4A3C" }), { spacingAfter: 120 });
         case "rule":
           return para("", { style: "Divisor" });
         case "code":
@@ -721,8 +1178,33 @@ function docxBlocks(blocks, context = {}) {
           return para(run(block.tex, { mono: true }), { shade: "F7FAF8" });
         case "list":
           return docxList(block, 0, context);
-        case "quote":
+        case "quote": {
+          const special = parseSpecialQuote(block);
+          if (special?.kind === "kpi") {
+            return docxTable({
+              header: ["Indicador", "Descrição", "Detalhe / Fonte"],
+              rows: special.items.map((item) => [`**${item.value}**`, item.label, item.note || "—"]),
+            });
+          }
+          if (special?.kind === "chart") {
+            return docxTable({
+              header: [special.title || "Item", "Valor", "Observação"],
+              rows: special.rows.map((row) => [row.label, `**${row.display}**`, row.note || "—"]),
+            });
+          }
+          if (special?.kind === "timeline") {
+            return (
+              (special.title ? para(run(special.title.toUpperCase(), { bold: true, color: "14513A" }), { spacingAfter: 60 }) : "") +
+              special.events.map((ev) => para(`${run(`${ev.when} — `, { bold: true, color: "14513A" })}${ev.head ? run(`${ev.head}: `, { bold: true }) : ""}${runsXml(ev.text)}`, { border: "2FD483", shade: "F7FBF9", spacingAfter: 80 })).join("")
+            );
+          }
+          if (special?.kind === "callout") {
+            const [border, shade] = CALLOUT_COLORS[special.tone] || CALLOUT_COLORS.note;
+            const head = para(run(`${special.label}${special.title ? ` · ${special.title.replace(/[*=`]/g, "")}` : ""}`.toUpperCase(), { bold: true, color: border }), { shade, border, spacingAfter: 40 });
+            return head + docxBlocks(special.children, { shade, border });
+          }
           return docxBlocks(block.children, { ...context, border: "C9D6CE" });
+        }
         case "callout": {
           const [border, shade] = CALLOUT_COLORS[block.kind] || CALLOUT_COLORS.note;
           const title = para(run(`${CALLOUT_TITLES[block.kind] || "Nota"}${block.title ? ` · ${block.title.replace(/[*=`]/g, "")}` : ""}`.toUpperCase(), { bold: true, color: border }), { shade, border, spacingAfter: 40 });
@@ -769,11 +1251,32 @@ function docxTable(block) {
 const DOCX_STYLES = `${XML_HEAD}<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="pt-BR"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="140" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="18" w:space="6" w:color="2FD483"/></w:pBdr><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:color w:val="10221A"/><w:sz w:val="44"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:basedOn w:val="Normal"/><w:qFormat/><w:rPr><w:caps/><w:color w:val="3B8F68"/><w:spacing w:val="20"/><w:sz w:val="16"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="D5E9DE"/></w:pBdr><w:spacing w:before="320" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="14513A"/><w:sz w:val="30"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="220" w:after="80"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:color w:val="1F3B2F"/><w:sz w:val="25"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="160" w:after="60"/><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:b/><w:sz w:val="22"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Divisor"><w:name w:val="Divisor"/><w:basedOn w:val="Normal"/><w:pPr><w:pBdr><w:bottom w:val="dashed" w:sz="4" w:space="1" w:color="CDD8D1"/></w:pBdr></w:pPr></w:style><w:style w:type="paragraph" w:styleId="Rodape"><w:name w:val="Rodape"/><w:basedOn w:val="Normal"/><w:rPr><w:color w:val="8A948E"/><w:sz w:val="16"/></w:rPr></w:style></w:styles>`;
 
 /** Arquivos de dentro do .docx. */
-export function docxFiles({ titulo, corpo }, { date = new Date() } = {}) {
+export function docxFiles({ titulo, corpo, subtitulo = "", materia = "", resumo = "" }, { date = new Date(), sources = [] } = {}) {
+  const cleanSources = (Array.isArray(sources) ? sources : []).filter((item) => item && /^https?:\/\//i.test(String(item.url || "")));
   const blocks = parseBlocks(String(corpo || ""));
-  const body = blocks[0]?.type === "heading" && fold(blocks[0].text) === fold(titulo) ? blocks.slice(1) : blocks;
+  const body = blocks[0]?.type === "heading" && fold(cleanHeadingTitle(blocks[0].text)) === fold(cleanHeadingTitle(titulo)) ? blocks.slice(1) : blocks;
   const dia = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(date);
-  const document = `${XML_HEAD}<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${para(run(`Minerva · feito com a Mine · ${dia}`), { style: "Subtitle" })}${para(run(titulo), { style: "Title" })}${docxBlocks(body)}${para(run("Criado pela Mine, a tutora do Minerva. Confira as informações com o seu material de aula."), { style: "Rodape" })}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const subtitleText = ["Minerva · feito com a Mine", materia, dia].filter(Boolean).join(" · ");
+  const subPara = subtitulo ? para(run(subtitulo, { italic: true, color: "3D4D45" }), { spacingAfter: 180 }) : "";
+  const execPara = resumo
+    ? para(run("SÍNTESE EXECUTIVA", { bold: true, color: "14513A" }), { border: "2FD483", shade: "EFFAF4", spacingAfter: 40 }) +
+      para(runsXml(resumo), { border: "2FD483", shade: "EFFAF4", spacingAfter: 180 })
+    : "";
+  const refsXml =
+    cleanSources.length && /\[\d{1,2}\]/.test(String(corpo || ""))
+      ? para(run("Referências e fontes consultadas"), { style: "Heading1", keepNext: true }) +
+        cleanSources
+          .map((src, idx) =>
+            para(
+              `${run(`[${idx + 1}] `, { bold: true, color: "14513A" })}${run(src.title || sourceDomain(src) || src.url, { bold: true })}${
+                sourceDomain(src) ? run(` (${sourceDomain(src)})`, { color: "58665F" }) : ""
+              }${run(` — ${src.url}`, { link: true })}`,
+              { spacingAfter: 80 },
+            ),
+          )
+          .join("")
+      : "";
+  const document = `${XML_HEAD}<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${para(run(subtitleText), { style: "Subtitle" })}${para(run(titulo), { style: "Title" })}${subPara}${execPara}${docxBlocks(body)}${refsXml}${para(run("Criado pela Mine, a tutora do Minerva. Confira as informações com o seu material de aula."), { style: "Rodape" })}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   return {
     "[Content_Types].xml": `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`,
     "_rels/.rels": `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`,

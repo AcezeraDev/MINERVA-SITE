@@ -7,6 +7,7 @@ import {
   buildXlsx,
   cellValue,
   displayRows,
+  ensureDeepResearchFile,
   excelFormula,
   fileBaseName,
   fileHtml,
@@ -166,4 +167,89 @@ test("imagem: formato e edição da foto anexada", () => {
 test("salvar em PDF vai para a Mine, não para uma matéria chamada PDF", () => {
   assert.equal(chatActionFromPrompt("salva isso em pdf"), null);
   assert.equal(chatActionFromPrompt("salva isso em História")?.destino, "História");
+});
+
+test("dossiê de pesquisa aprofundada em HTML/PDF e Word: capa, sumário, indicadores, gráfico, linha do tempo e fontes", () => {
+  const bloco = [
+    "tipo: pdf",
+    "modelo: pesquisa",
+    "titulo: Energia Solar no Brasil",
+    "subtitulo: Crescimento da geração, custos e desafios na rede",
+    "materia: Geografia e Atualidades",
+    "resumo: O Brasil ultrapassou 45 GW de potência solar instalada [1] e lidera na América Latina [2].",
+    "---",
+    "## 📊 1. Panorama atual",
+    "A matriz elétrica brasileira mantém alta participação renovável [1].",
+    "",
+    "> [!DADOS] Indicadores essenciais",
+    "> - **45 GW** | Potência solar instalada | ABSOLAR [1]",
+    "> - **11,6%** | Participação na matriz elétrica | EPE [2]",
+    "",
+    "## Comparação entre fontes",
+    "| Fonte | Participação (%) | Custo relativo |",
+    "| --- | --- | --- |",
+    "| Hidrelétrica | 56,8% | Baixo |",
+    "| Solar | 11,6% | Médio-baixo |",
+    "",
+    "> [!GRAFICO] Participação na geração (%)",
+    "> - Hidrelétrica | 56,8 | Base do sistema [2]",
+    "> - Solar | 11,6 | Expansão rápida [1]",
+    "",
+    "## Marcos recentes",
+    "> [!LINHA DO TEMPO] Evolução",
+    "> - **2012** | Resolução 482 da ANEEL | Início da geração distribuída [1]",
+    "> - **2022** | Lei 14.300 | Marco legal da microgeração [2]",
+    "",
+    "## Visões e desafios",
+    "> [!DEBATE] Gargalos de transmissão",
+    "> A expansão no Nordeste exige novas linhas de transmissão para escoar a energia [2].",
+  ].join("\n");
+
+  const file = parseFileBlock(bloco);
+  assert.equal(file.modelo, "pesquisa");
+  assert.equal(file.materia, "Geografia e Atualidades");
+  assert.equal(file.subtitulo, "Crescimento da geração, custos e desafios na rede");
+
+  const sources = [
+    { url: "https://www.absolar.org.br/dados", title: "Infográfico ABSOLAR", domain: "absolar.org.br" },
+    { url: "https://www.epe.gov.br/ben", title: "Balanço Energético Nacional", domain: "epe.gov.br" },
+  ];
+  const html = fileHtml(file, { date: new Date(2026, 10, 24), sources, queries: ["energia solar brasil gw", "balanco energetico epe"] });
+
+  assert.match(html, /class="dossier-cover"/);
+  assert.match(html, /Minerva · Pesquisa aprofundada/);
+  assert.match(html, /Geografia e Atualidades/);
+  assert.match(html, /class="exec-summary"/);
+  assert.match(html, /class="toc"/);
+  assert.match(html, /href="#sec-1"/);
+  assert.match(html, /href="#referencias"/);
+  // Tira emoji e numeração duplicada do h2 do dossiê
+  assert.match(html, /<h2 id="sec-1" class="sec-h2"><span class="sec-num">01<\/span><span>Panorama atual<\/span><\/h2>/);
+  assert.match(html, /class="kpi-grid"/);
+  assert.match(html, /45 GW/);
+  assert.match(html, /class="chart-box"/);
+  assert.match(html, /class="timeline"/);
+  assert.match(html, /class="callout callout-debate"/);
+  // Citações viram âncoras para a bibliografia e todas as fontes entram no rodapé
+  assert.match(html, /href="#ref-1" class="cite"/);
+  assert.match(html, /id="ref-2"/);
+  assert.match(html, /Balanço Energético Nacional/);
+  assert.match(html, /Buscas realizadas:/);
+
+  const docxText = new TextDecoder().decode(buildDocx(file, { date: new Date(2026, 10, 24), sources }));
+  assert.match(docxText, /SÍNTESE EXECUTIVA/);
+  assert.match(docxText, /\[1\]/);
+  assert.match(docxText, /Referências e fontes consultadas/);
+  assert.match(docxText, /epe\.gov\.br/);
+});
+
+test("ensureDeepResearchFile embrulha relatório solto e completa modelo: pesquisa", () => {
+  const semModelo = "Síntese rápida [1].\n\n```arquivo\ntipo: pdf\ntitulo: Clima no Brasil\n---\n## Contexto\nTexto [1].\n```";
+  const ajustado = ensureDeepResearchFile(semModelo, { prompt: "Clima no Brasil" });
+  assert.match(ajustado, /modelo: pesquisa/);
+
+  const solto = "Em resumo, o desmatamento caiu em 2025 segundo o INPE [1].\n\n## Contexto atual\nDados do PRODES mostram queda [1].\n\n## Causas e fiscalização\nAumento da fiscalização ambiental [2].\n\n[[sugestoes: E no Cerrado? | Quais os dados por estado?]]";
+  const embrulhado = ensureDeepResearchFile(solto, { prompt: "Desmatamento na Amazônia" });
+  assert.match(embrulhado, /```arquivo\ntipo: pdf\nmodelo: pesquisa/);
+  assert.match(embrulhado, /\[\[sugestoes: E no Cerrado\?/);
 });

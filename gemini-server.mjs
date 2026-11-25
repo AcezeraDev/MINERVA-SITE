@@ -179,9 +179,11 @@ export async function handleGeminiRequest(req, res) {
     const codeRequest = !task && !payload.controle && Boolean(asksForCode(payload.prompt, payload.history));
     const serverTokenCap = codeRequest
       ? clampNumber(process.env.MINE_CODE_MAX_OUTPUT_TOKENS, 2000, 32000, 20000)
-      : fileRequest
-        ? clampNumber(process.env.MINE_FILE_MAX_OUTPUT_TOKENS, 2000, 16000, 14000)
-        : clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
+      : payload.profundo === true && !task
+        ? clampNumber(process.env.MINE_DEEP_MAX_OUTPUT_TOKENS, 4000, 20000, 16000)
+        : fileRequest
+          ? clampNumber(process.env.MINE_FILE_MAX_OUTPUT_TOKENS, 2000, 16000, 14000)
+          : clampNumber(process.env.MINE_MAX_OUTPUT_TOKENS, 256, 16000, 8000);
     const requestedTokens = fileRequest || codeRequest ? serverTokenCap : clampNumber(payload.maxOutputTokens, 256, 16000, serverTokenCap);
     const maxTokens = Math.min(requestedTokens, serverTokenCap);
     const wantsStream = payload.stream === true;

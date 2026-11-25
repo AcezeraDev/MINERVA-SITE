@@ -2,7 +2,7 @@ import { MINE_CODE_MODEL, MINE_FAST_MODEL, MINE_MODEL, MINE_TASK_MODEL, effortFo
 import { buildMessages } from "./messages.mjs";
 import { buildCodeInstruction, buildDeepResearchInstruction, buildFileInstruction, buildToolsInstruction, buildGlossaryInstruction, buildImageGenerationInstruction, buildImageRequestInstruction, buildImageStyleInstruction, buildInstructionForTask, buildMorePhotosInstruction, buildPhotoModeInstruction, buildStudySheetInstruction, buildSuggestionsInstruction, buildTutorInstruction } from "./prompts.mjs";
 import { asksForImage, asksToGenerateImage, continuesGallery, continuesGeneration, editsAttachedImage, extractSuggestions, imageFormatFrom, imageStyleFrom, previousGalleryStyle, withImageRequest, withImageStyle } from "../shared/chat-media.mjs";
-import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
+import { asksForFile, asksForStudySheet, ensureDeepResearchFile } from "../shared/chat-files.mjs";
 import { asksForCode } from "../shared/code-intent.mjs";
 import { replyQualityIssue } from "./quality.mjs";
 import { buildSearchQuery, cleanQueries, freshenQueries, matchesSearchTopic, matchesSourceScope, planSearchQueries, resultLimit, searchMany, searchSourcePolicy, searchWeb, WEB_SEARCH_TOOL, webSearchEnabled, webSearchFailedInstruction, webSearchInstruction, webSearchMode } from "./web.mjs";
@@ -339,7 +339,7 @@ async function prepareWebContext({ prompt, history, signal, deadline, queries: g
     // detalhe (a data no meio do edital, o numero da tabela).
     const readMs = searchDeadline - Date.now();
     if (pageReadingEnabled() && readMs >= 1_500) {
-      results = await readTopPages(results, queries.join(" "), { count: deep ? 6 : 3, signal, timeoutMs: Math.min(deep ? 9_000 : 4_500, readMs) });
+      results = await readTopPages(results, queries.join(" "), { count: deep ? 6 : 3, limit: deep ? 5_200 : undefined, signal, timeoutMs: Math.min(deep ? 9_500 : 4_500, readMs) });
     }
     if (signal?.aborted) throw new MineError("Geração cancelada.", { code: "aborted" });
     const read = results.filter((item) => item.content).length;
@@ -548,23 +548,25 @@ export async function runMineRequest({
   const imageStyle = wantsImage ? imageStyleFrom(prompt) || (previousGallery ? previousGalleryStyle(history) : "") : "";
   const baseSystem = [
     ...(wantsGeneration ? [buildImageGenerationInstruction({ previousPrompt: previousGenerated, formato: imageFormat, anexo: editAttached })] : []),
-    ...(studySheet ? [buildStudySheetInstruction()] : fileKind ? [buildFileInstruction(fileKind)] : []),
-    ...(codeKind && !wantsFile && !wantsGeneration ? [buildCodeInstruction(codeKind)] : []),
-    // Glossário só no chat livre e fora dos arquivos (o arquivo tem o próprio texto).
-    ...(cleanTask || wantsFile ? [] : [buildGlossaryInstruction()]),
-    // Modo fotos e do chat livre: uma task (simulado, mapa, jogo) tem formato
-    // proprio, e um marcador de imagem no meio dela quebraria o parser.
-    ...(cleanTask || wantsGeneration || wantsFile ? [] : photos ? [buildPhotoModeInstruction()] : asksForImage(prompt) || previousGallery ? [buildImageRequestInstruction()] : []),
+    // Na pesquisa aprofundada o próprio buildDeepResearchInstruction já pede o
+    // dossiê em PDF/HTML (modelo: pesquisa); só planilha explícita usa outro formato.
+    ...(studySheet ? [buildStudySheetInstruction()] : fileKind && (!deep || fileKind === "excel") ? [buildFileInstruction(fileKind)] : []),
+    ...(codeKind && !wantsFile && !wantsGeneration && !deep ? [buildCodeInstruction(codeKind)] : []),
+    // Glossário só no chat livre e fora dos arquivos/dossiês (o arquivo tem o próprio texto).
+    ...(cleanTask || wantsFile || deep ? [] : [buildGlossaryInstruction()]),
+    // Modo fotos e do chat livre: uma task (simulado, mapa, jogo) ou dossiê PDF tem formato
+    // proprio, e um marcador de imagem no meio dela quebraria o documento.
+    ...(cleanTask || wantsGeneration || wantsFile || deep ? [] : photos ? [buildPhotoModeInstruction()] : asksForImage(prompt) || previousGallery ? [buildImageRequestInstruction()] : []),
     // "Manda mais" depois de uma galeria: o mesmo termo devolveria as mesmas
     // fotos (a galeria fica em cache por termo), então a Mine varia o termo.
-    ...(cleanTask || !previousGallery ? [] : [buildMorePhotosInstruction(previousGallery)]),
-    ...(imageStyle ? [buildImageStyleInstruction(imageStyle)] : []),
+    ...(cleanTask || deep || !previousGallery ? [] : [buildMorePhotosInstruction(previousGallery)]),
+    ...(imageStyle && !deep ? [buildImageStyleInstruction(imageStyle)] : []),
     // Tutor e sugestoes sao do chat livre: tarefas tem formato proprio.
-    ...(cleanTask ? [] : tutor ? [buildTutorInstruction()] : []),
+    ...(cleanTask ? [] : tutor && !deep ? [buildTutorInstruction()] : []),
     ...(deep ? [buildDeepResearchInstruction()] : []),
     ...(control ? [CONTROL_INSTRUCTION, ...controlLinks.extraSystem] : []),
-    ...(cleanTask ? [] : [buildSuggestionsInstruction({ tutor: Boolean(tutor) })]),
-    ...(extraTools.length || (!cleanTask && !codeKind && !control) ? [buildToolsInstruction({ ferramentas: extraTools.length > 0, aluno: Boolean(alunoData) && extraTools.length > 0 })] : []),
+    ...(cleanTask ? [] : [buildSuggestionsInstruction({ tutor: Boolean(tutor && !deep) })]),
+    ...(extraTools.length || (!cleanTask && !codeKind && !control && !deep) ? [buildToolsInstruction({ ferramentas: extraTools.length > 0, aluno: Boolean(alunoData) && extraTools.length > 0 })] : []),
   ];
 
   let lastError = null;
@@ -579,7 +581,8 @@ export async function runMineRequest({
     // mais que o streaming) sai com o estilo que o estudante pediu.
     const styled = imageStyle ? withImageStyle(extracted, imageStyle) : extracted;
     // Formato pedido ("papel de parede do celular") e foto anexada também.
-    const reply = imageFormat || editAttached ? withImageRequest(styled, { formato: imageFormat, anexo: editAttached }) : styled;
+    const withMedia = imageFormat || editAttached ? withImageRequest(styled, { formato: imageFormat, anexo: editAttached }) : styled;
+    const reply = deep && fileKind !== "excel" ? ensureDeepResearchFile(withMedia, { prompt }) : withMedia;
     return {
       ...result,
       reply: reply || result.reply,

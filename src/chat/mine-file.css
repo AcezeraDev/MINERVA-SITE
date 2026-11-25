@@ -32,6 +32,18 @@
   .mfile__spin { animation: none; }
 }
 
+.mfile--pesquisa {
+  width: min(40rem, 100%);
+  border-color: color-mix(in srgb, var(--mfile-tone) 45%, rgb(var(--theme-text) / 0.55));
+}
+
+.mfile.is-building.is-pesquisa {
+  border-color: color-mix(in srgb, var(--mfile-tone) 50%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--mfile-tone) 9%, transparent), transparent 65%),
+    rgb(var(--sheet));
+}
+
 /* a folha: miniatura da página ou da planilha */
 .mfile__sheet {
   position: relative;
@@ -43,6 +55,37 @@
     radial-gradient(circle at 20% 0%, rgb(var(--pen) / 0.08), transparent 60%),
     rgb(var(--theme-text) / 0.04);
   cursor: zoom-in;
+}
+
+.mfile--pesquisa .mfile__sheet {
+  height: 15rem;
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--mfile-tone) 18%, transparent), transparent 62%),
+    rgb(var(--theme-text) / 0.05);
+}
+
+.mfile__badge {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.75rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgb(15 33 25 / 0.88);
+  color: #dffbef;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+}
+
+.mfile__badge svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  color: #2fd483;
 }
 
 .mfile__page {
@@ -57,6 +100,11 @@
   background: #fff;
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.18), 0 1px 0 rgb(0 0 0 / 0.1);
   pointer-events: none;
+}
+
+.mfile--pesquisa .mfile__page {
+  top: 2.35rem;
+  transform: translateX(-50%) scale(0.44);
 }
 
 .mfile__page iframe {
@@ -170,6 +218,14 @@
   gap: 0.15rem;
 }
 
+.mfile__eyebrow {
+  color: var(--mfile-tone);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
 .mfile__body strong {
   overflow: hidden;
   color: rgb(var(--theme-text));
@@ -177,6 +233,22 @@
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mfile--pesquisa .mfile__body strong {
+  font-size: 1.02rem;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.28;
+}
+
+.mfile__sub {
+  color: rgb(var(--theme-text) / 0.72);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .mfile__body small {
@@ -220,6 +292,32 @@
 
 .mfile__primary:active {
   transform: translateY(1px);
+}
+
+.mfile__read {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  border: 1.5px solid color-mix(in srgb, var(--mfile-tone) 45%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--mfile-tone) 12%, transparent);
+  color: rgb(var(--theme-text));
+  font-size: 0.83rem;
+  font-weight: 800;
+  transition: background-color 140ms, border-color 140ms;
+}
+
+.mfile__read svg {
+  width: 0.98rem;
+  height: 0.98rem;
+  color: var(--mfile-tone);
+}
+
+.mfile__read:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--mfile-tone) 20%, transparent);
+  border-color: var(--mfile-tone);
 }
 
 .mfile__more {
@@ -332,6 +430,16 @@
   color: #fff;
   font-size: 0.82rem;
   font-weight: 800;
+}
+
+.mfile-dialog__panel header button.is-ghost {
+  border: 1px solid #cdd8d1;
+  background: #f5f9f7;
+  color: #14513a;
+}
+
+.mfile-dialog__panel header button.is-ghost:hover {
+  background: #e6f4ec;
 }
 
 .mfile-dialog__panel header button.is-close {

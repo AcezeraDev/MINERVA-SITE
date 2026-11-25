@@ -695,3 +695,45 @@ test("pergunta sobre o material do aluno nao pesquisa na web", async () => {
     assert.equal(webSearchMode({ prompt: "Na imagem, qual é o preço final?", requested: true }), "force");
   });
 });
+
+test("pesquisa aprofundada força busca ampla e garante entrega de dossiê em PDF/HTML", async () => {
+  let answerSystem = "";
+  const queries = [];
+  await withNano(
+    { NANOGPT_API_KEY: "nano_profundo_teste", MINE_WEB_READ_PAGES: "off" },
+    async (url, options) => {
+      const body = JSON.parse(options.body);
+      if (String(url).endsWith("/api/web")) {
+        queries.push(body.query);
+        return jsonResponse({
+          data: [
+            { name: `Fonte ${queries.length}`, url: `https://gov.br/estudo-${queries.length}`, content: "Dados oficiais verificados." },
+          ],
+        });
+      }
+      if (body.model === "openai/gpt-5.4-mini") {
+        return jsonResponse({
+          choices: [{ message: { content: '{"consultas": ["transicao energetica brasil dados", "matriz eletrica renovavel epe", "desafios energia solar eolica brasil"]}' } }],
+        });
+      }
+      answerSystem = body.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+      // Simula um modelo que respondeu com seções sem abrir ```arquivo: ensureDeepResearchFile embrulha.
+      return jsonResponse({
+        choices: [{
+          message: {
+            content: "A matriz elétrica brasileira tem mais de 80% de fontes renováveis [1][2].\n\n## Panorama atual\nDados oficiais mostram liderança renovável [1].\n\n## Desafios de infraestrutura\nLinhas de transmissão precisam acompanhar a expansão [2][3].\n\n[[sugestoes: Como isso cai no ENEM? | Compare solar e eólica]]",
+          },
+        }],
+      });
+    },
+    async () => {
+      const result = await runMineRequest({ prompt: "Transição energética no Brasil", profundo: true });
+      assert.equal(queries.length, 3);
+      assert.equal(result.sources.length, 3);
+      assert.match(answerSystem, /PESQUISA APROFUNDADA/);
+      assert.match(answerSystem, /modelo: pesquisa/);
+      assert.match(result.reply, /```arquivo\ntipo: pdf\nmodelo: pesquisa/);
+      assert.deepEqual(result.suggestions, ["Como isso cai no ENEM?", "Compare solar e eólica"]);
+    },
+  );
+});

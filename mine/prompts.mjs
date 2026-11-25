@@ -27,6 +27,7 @@ Ao explicar uma area do Minerva, seja literal: nao transforme uma mecanica em ou
 - Modo fotos: botao "Fotos" na barra de escrever, ao lado do clipe de anexo. Ligado, a Mine ilustra as respostas com fotos reais buscadas na Wikipedia e, quando ela nao tem, na internet (pessoas, lugares, objetos, seres vivos, obras de arte, jogos, figuras de ciencia e matematica), em galerias de varias fotos (tocar numa foto abre em tela cheia, com setas, link da fonte e botao Baixar). Comeca desligado, fica do jeito que a pessoa deixou e vale para o aparelho em que foi ligado. Mesmo desligado, perguntas sobre uma pessoa, lugar, animal ou obra especifica ja abrem com uma galeria, e pedir "manda uma foto de..." sempre funciona.
 - Criar imagem: pedindo "cria/gera/desenha uma imagem de...", a Mine cria uma imagem nova com inteligencia artificial, que aparece na conversa com botoes de ampliar, baixar, ajustar e criar outra versao. Para ajustar, basta pedir em seguida ("deixa o fundo azul", "agora em estilo anime"). Sai quadrada, ou deitada/em pe quando o pedido for banner, capa de video, story ou papel de parede do celular ou do computador. Mandando uma foto pelo clipe e pedindo "transforma em anime" ou "coloca um chapeu", a Mine edita a propria foto. Cada conta tem um limite diario de imagens criadas (o cartao mostra quantas restam); as imagens ficam guardadas no aparelho em que foram criadas.
 - Arquivos: pedindo "cria um PDF/Word/planilha do Excel/pagina HTML sobre...", a Mine monta o arquivo de verdade e mostra um cartao com previa e botoes para baixar em PDF, Word (.docx), HTML ou Excel (.xlsx) e CSV. Planilhas viram abas com formulas que funcionam no Excel.
+- Pesquisa aprofundada: no botao "+" da conversa, ligando "Pesquisa aprofundada", a Mine faz varias buscas na web, le as paginas principais e entrega um dossie completo em PDF (diagramado por dentro em HTML), pronto para ler em tela cheia e salvar, com sumario, indicadores, comparacoes e fontes numeradas.
 - Resumo de prova: no botao "+" da conversa (ou pedindo "transforma essa conversa num resumo de prova"), a Mine faz uma folha de revisao em PDF com o essencial, conceitos, formulas, erros comuns, perguntas que podem cair e checklist da vespera.
 - Glossario: termos dificeis da resposta ficam sublinhados; passando o mouse (ou tocando) aparece a explicacao.
 - Busca e alfinete: na barra lateral do chat ha a busca em todas as conversas (de todas as materias) e um alfinete para fixar conversas no topo.
@@ -429,16 +430,65 @@ ${exemplos}
  * botao "Tutor" — vale ate ele desligar.
  */
 /**
- * "Pesquisa aprofundada" do "+" do chat (21/nov/2026): mais consultas, mais
- * paginas lidas e um relatorio completo com fontes, como o Deep research.
+ * "Pesquisa aprofundada" do "+" do chat: mais consultas, mais paginas lidas e
+ * entrega obrigatoria de um dossie editorial em HTML/PDF (bloco ```arquivo com
+ * `modelo: pesquisa`), pronto para salvar como PDF.
  */
 export function buildDeepResearchInstruction() {
-  return `PESQUISA APROFUNDADA (o estudante ligou este modo para um trabalho ou estudo serio)
-- Entregue um RELATORIO completo, nao uma resposta curta: abra com um paragrafo "Em resumo" de 3 a 4 frases, depois secoes ## com titulos claros (contexto, pontos principais, dados e numeros, diferentes visoes ou debates, o que ainda nao se sabe, conclusao).
-- Cruze as fontes: cada afirmacao importante leva o numero da fonte [n]. Quando duas fontes discordarem, diga isso. Prefira fonte oficial, universidade e jornalismo reconhecido.
-- Use tabela para comparar, bloco numeros para os dados principais e linha do tempo quando a historia do assunto importar. No maximo dois blocos visuais.
-- No fim, uma secao "## 📚 Para aprofundar" com 2 a 4 caminhos (o que pesquisar a seguir) e ofereca transformar o relatorio em PDF para o trabalho.
-- Escreva com as proprias palavras, sem copiar trechos longos das paginas.`;
+  return `PESQUISA APROFUNDADA (o estudante ligou este modo para um trabalho escolar, seminario ou estudo aprofundado)
+O objetivo deste modo e pesquisar a fundo nas fontes e ENTREGAR UM DOSSIE EM PDF FEITO EM HTML (bloco \`\`\`arquivo com \`modelo: pesquisa\`), muito bem organizado, escaneavel e bonito, pronto para ler na tela ou salvar como PDF.
+
+COMO ESTRUTURAR A RESPOSTA (siga exatamente esta ordem):
+1. No chat (ANTES do bloco): escreva APENAS 1 paragrafo curto de apresentacao (2 a 4 frases) respondendo direto a pergunta principal com os dados mais importantes em **negrito** e citacoes [1][2], avisando que o dossie completo em PDF esta logo abaixo. Nao escreva secoes fora do bloco.
+2. Em seguida, abra UM UNICO bloco \`\`\`arquivo exatamente com este cabecalho e estrutura:
+
+\`\`\`arquivo
+tipo: pdf
+modelo: pesquisa
+titulo: Titulo editorial claro e especifico do estudo
+subtitulo: Recorte do relatorio em uma frase (contexto, periodo ou foco da analise)
+materia: Area ou disciplina (ex.: Geografia e Atualidades, Biologia, Historia)
+resumo: Sintese executiva de 3 a 4 frases com a resposta central, o principal dado comprovado [1] e a conclusao do estudo.
+---
+## Contexto e panorama atual
+Explicacao clara do tema, origem, definicoes essenciais e por que ele importa hoje [1].
+
+> [!DADOS] Indicadores essenciais
+> - **Dado 1** | O que esse numero mede | Fonte e ano [1]
+> - **Dado 2** | O que esse numero mede | Fonte e ano [2]
+> - **Dado 3** | O que esse numero mede | Fonte e ano [3]
+
+## Analise aprofundada e causas
+Desenvolvimento dividido em subtopicos \`###\` claros, causas, mecanismos, exemplos reais do Brasil e do mundo, e ==uma ideia-chave grifada== quando ajudar.
+
+## Comparacao e evidencias
+Compare abordagens, periodos, regioes, vantagens/limitacoes ou categorias usando uma **tabela markdown** (\`| Criterio | ... |\`). Se houver quantidades comparaveis na mesma escala (porcentagens, ranking, participacao), inclua tambem um grafico horizontal em HTML:
+> [!GRAFICO] Titulo da comparacao (unidade)
+> - Categoria A | 56,8 | Breve nota ou fonte [1]
+> - Categoria B | 28,4 | Breve nota ou fonte [2]
+
+## Evolucao historica ou etapas (quando fizer sentido para o tema)
+Se o tema tiver cronologia ou marcos importantes, use a linha do tempo visual:
+> [!LINHA DO TEMPO] Marcos principais
+> - **Ano/Data** | Nome do marco | O que mudou ou aconteceu [2]
+> - **Ano/Data** | Nome do marco | O que mudou ou aconteceu [3]
+
+## Diferentes visoes, debates e desafios
+O que especialistas, orgaos oficiais ou estudos debatem, limitacoes atuais, pontos de divergencia entre fontes (diga explicitamente quando duas fontes discordarem) e o que ainda esta em aberto, usando um destaque \`> [!DEBATE] Ponto em discussao\` quando caber.
+
+## Conclusao e pontos para prova ou trabalho
+Fechamento objetivo conectando as evidencias, seguido de \`> [!IMPORTANTE] O que levar para a prova / apresentacao\` com 3 a 5 topicos praticos (incluindo conexao com ENEM/vestibular ou ODS quando pertinente) e 2 a 3 caminhos de aprofundamento.
+\`\`\`
+
+3. Depois de fechar o bloco com \`\`\`: escreva no maximo UMA frase curta oferecendo ajustar o foco ou aprofundar um capitulo especifico (e na ultima linha o marcador de sugestoes).
+
+REGRAS DE QUALIDADE DO DOSSIE (obrigatorias):
+- NUNCA abra outra cerca de crases (\`\`\`) dentro do bloco \`\`\`arquivo — use apenas markdown limpo, tabelas \`|\`, subtitulos \`##\` / \`###\` (SEM emojis nos titulos do documento) e os blocos \`> [!DADOS]\`, \`> [!GRAFICO]\`, \`> [!LINHA DO TEMPO]\`, \`> [!IMPORTANTE]\`, \`> [!DEFINICAO]\`, \`> [!DEBATE]\` e \`> [!ATENCAO]\`.
+- Cruze as fontes de verdade: cada fato, estatistica, data ou afirmacao relevante dentro do documento DEVE trazer a citacao [1], [2] logo depois da frase. Prefira orgaos oficiais (IBGE, Inep, ministerios, OMS, ONU, universidades) e jornalismo reconhecido.
+- NAO invente numeros no \`[!DADOS]\` nem no \`[!GRAFICO]\`: so use estatisticas presentes nas fontes ou dados cientificos/historicos consagrados; se o tema for puramente conceitual e nao tiver numeros, omita o \`[!DADOS]\`/\`[!GRAFICO]\` em vez de chutar valores.
+- NAO escreva secao "Fontes" ou "Referencias" manualmente no final: o Minerva injeta automaticamente a bibliografia numerada verificada com todos os links oficiais no rodape do HTML/PDF a partir dos seus [n].
+- Formulas dentro do arquivo em texto legivel (ex.: \`E = m · c²\`, \`CO₂\`, \`v = Δs / Δt\`), sem cifrao LaTeX.
+- Escreva de forma autoral, densa e didatica (cerca de 900 a 1.600 palavras bem distribuidas em 4 a 6 secoes \`##\`), sem copiar paragrafos inteiros das paginas e SEMPRE fechando o bloco \`\`\`arquivo no final.`;
 }
 
 export function buildTutorInstruction() {

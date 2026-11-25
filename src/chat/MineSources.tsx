@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Globe,
   Search,
+  Telescope,
   Wrench,
   X,
 } from "lucide-react";
@@ -46,19 +47,32 @@ export type MineSearchStatus = {
 };
 
 const SourcesContext = createContext<MineSource[] | undefined>(undefined);
+const QueriesContext = createContext<string[] | undefined>(undefined);
 
 export function MineSourcesProvider({
   sources,
+  queries,
   children,
 }: {
   sources?: MineSource[];
+  queries?: string[];
   children: React.ReactNode;
 }) {
   return (
     <SourcesContext.Provider value={sources?.length ? sources : undefined}>
-      {children}
+      <QueriesContext.Provider value={queries?.length ? queries : undefined}>
+        {children}
+      </QueriesContext.Provider>
     </SourcesContext.Provider>
   );
+}
+
+export function useMineSources() {
+  return useContext(SourcesContext);
+}
+
+export function useMineQueries() {
+  return useContext(QueriesContext);
 }
 
 export function domainOf(source: MineSource) {
@@ -376,9 +390,11 @@ function useElapsed(running: boolean) {
 export function MineWorking({
   status,
   reasoning: rawReasoning,
+  deep = false,
 }: {
   status: MineSearchStatus | null;
   reasoning: string;
+  deep?: boolean;
 }) {
   // Pensamento em inglês não vai para a tela (shared/reasoning-lang.mjs).
   const reasoning = visibleReasoning(rawReasoning);
@@ -388,16 +404,24 @@ export function MineWorking({
     status?.stage === "tool"
       ? status.label || "Usando uma ferramenta"
       : status?.stage === "reading"
-        ? `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"}`
+        ? deep
+          ? `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"} para o dossiê`
+          : `Lendo ${status.sources?.length || 0} ${status.sources?.length === 1 ? "fonte" : "fontes"}`
         : status?.stage === "searching"
-          ? "Pesquisando na web"
-          : "Pensando";
+          ? deep
+            ? "Pesquisando a fundo na web"
+            : "Pesquisando na web"
+          : deep
+            ? "Montando o dossiê em PDF"
+            : "Pensando";
   return (
     <div className="mine-working" aria-live="polite">
       <div className="mine-working__row">
         <span className="mine-working__icon" aria-hidden>
           {status?.stage === "tool" ? (
             <Wrench className="h-3.5 w-3.5" />
+          ) : deep ? (
+            <Telescope className="h-3.5 w-3.5" />
           ) : status ? (
             <Globe className="h-3.5 w-3.5" />
           ) : (

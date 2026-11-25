@@ -34,6 +34,7 @@ import {
   Home,
   // `Images` e nao `Image`: o icone `Image` do lucide sombrearia o construtor
   // `new Image()` que este arquivo usa para carregar avatar.
+  ImagePlus,
   Images,
   Info,
   Layers,
@@ -165,7 +166,7 @@ import {
   wantsGuidedQuiz,
 } from "../shared/chat-intent.mjs";
 import { parseFlashcards, parseQuiz, type QuizQuestion } from "../shared/study-parsers.mjs";
-import { describeImageMarkers, extractSuggestions, splitMessageMedia, stripImageMarkers } from "../shared/chat-media.mjs";
+import { asksToGenerateImage, describeImageMarkers, extractSuggestions, splitMessageMedia, stripImageMarkers } from "../shared/chat-media.mjs";
 import { MineGlossaryProvider, MineRichText } from "./chat/MineRichText";
 import { MineMonitor, useMonitorOpen } from "./chat/monitor/MineMonitor";
 import { extractGlossary, markGlossary } from "../shared/chat-glossary.mjs";
@@ -1538,6 +1539,7 @@ function App() {
   const [mineControle, setMineControle] = useState(false);
   const [mineVisits, setMineVisits] = useState<MineVisit[]>([]);
   const [mineControleLive, setMineControleLive] = useState(false);
+  const [mineDeepLive, setMineDeepLive] = useState(false);
   const [mineTutor, setMineTutorState] = useState(() => readMineTutor());
   const setMineTutor = useCallback((enabled: boolean) => {
     setMineTutorState(enabled);
@@ -2290,6 +2292,7 @@ function App() {
           controle={mineControle}
           setControle={setMineControle}
           controleLive={mineControleLive}
+          deepLive={mineDeepLive}
           liveVisits={mineVisits}
           threadId={mineThreadId}
           setThreadId={(threadId) => {
@@ -2884,6 +2887,8 @@ function App() {
             setMineReasoning("");
             setMineVisits([]);
             setMineControleLive(mineControle);
+            const deepRequest = Boolean(mineWebAvailable && mineProfundo && !mineControle);
+            setMineDeepLive(deepRequest);
             mineStreamRef.current = "";
             const controller = new AbortController();
             mineAbortRef.current = controller;
@@ -2899,7 +2904,7 @@ function App() {
                   webSearch: mineWebAvailable && mineWebSearch,
                   photos: minePhotos,
                   tutor: mineTutor,
-                  profundo: (mineWebAvailable && mineProfundo) || undefined,
+                  profundo: deepRequest || undefined,
                   caprichar: mineCaprichar || undefined,
                   controle: mineControle || undefined,
                   aluno: buildAlunoSnapshot(userData, user.id),
@@ -2993,6 +2998,7 @@ function App() {
               setMineStreamText("");
               setMineStatus(null);
               setMineReasoning("");
+              setMineDeepLive(false);
               setMineLoading(false);
             }
           }}
@@ -6349,7 +6355,7 @@ const MineMessageList = React.memo(function MineMessageList({
             ) : (
               <>
                 <MineThought reasoning={message.reasoning} seconds={message.reasoning ? message.thoughtSeconds : undefined} />
-                <MineSourcesProvider sources={message.sources}>
+                <MineSourcesProvider sources={message.sources} queries={message.queries}>
                   <MineMessageText text={message.text} attachment={questionBefore.get(message.id)?.attachments?.find((item) => item.kind === "image" && item.dataUrl)?.dataUrl} />
                 </MineSourcesProvider>
               </>
@@ -6958,6 +6964,7 @@ function MineView({
   controle,
   setControle,
   controleLive,
+  deepLive,
   liveVisits,
   threadId,
   setThreadId,
@@ -7008,6 +7015,8 @@ function MineView({
   setControle: (value: boolean) => void;
   /** O pedido em andamento saiu com o Controle Mine ligado. */
   controleLive: boolean;
+  /** O pedido em andamento saiu com a Pesquisa aprofundada ligada. */
+  deepLive: boolean;
   liveVisits: MineVisit[];
   threadId?: string;
   setThreadId: (threadId: string | undefined) => void;
@@ -7069,6 +7078,17 @@ function MineView({
   const [contextPanelOpen, setContextPanelOpen] = useState(false);
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
   const [desenharOpen, setDesenharOpen] = useState(false);
+  // "Criar imagem" na barra: enquanto ligado, o que a pessoa escreve vira
+  // pedido de imagem (a Mine responde com [[gerar_imagem: ...]]).
+  const [criarImagem, setCriarImagem] = useState(false);
+  // Pesquisa aprofundada, Modo tutor e Criar imagem são jeitos diferentes de
+  // responder: ligar um desliga os outros.
+  const toggleModo = (modo: "profundo" | "tutor" | "imagem") => {
+    const ligar = modo === "profundo" ? !profundo : modo === "tutor" ? !tutor : !criarImagem;
+    setProfundo(modo === "profundo" && ligar);
+    setTutor(modo === "tutor" && ligar);
+    setCriarImagem(modo === "imagem" && ligar);
+  };
   const toolsMenuRef = useRef<HTMLDivElement | null>(null);
   const dictation = useDictation(input, setInput);
   const [guidedStudyOpen, setGuidedStudyOpen] = useState(false);
@@ -7296,7 +7316,8 @@ function MineView({
     }
     dictation.stop();
     launchPlane(document.querySelector('[aria-label="Enviar mensagem"]'));
-    send(input.trim(), selectedSubjectId, attachments);
+    const texto = input.trim();
+    send(criarImagem && texto && !asksToGenerateImage(texto) ? `Cria uma imagem: ${texto}` : texto, selectedSubjectId, attachments);
     setInput("");
     setAttachments([]);
     setAttachmentError("");
@@ -7583,7 +7604,7 @@ function MineView({
                     <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.14em] text-white/38"><span>Mine</span></div>
                     {reasoning ? <MineThought reasoning={reasoning} /> : null}
                     {/* A ponta da caneta no fim do texto vem do CSS (.mine-streaming). */}
-                    <MineSourcesProvider sources={searchStatus?.sources}>
+                    <MineSourcesProvider sources={searchStatus?.sources} queries={searchStatus?.queries}>
                       <MineMessageText text={streamText} streaming />
                     </MineSourcesProvider>
                   </div>
@@ -7597,7 +7618,7 @@ function MineView({
                 >
                   <span className="mt-1"><MineAvatar size="sm" thinking /></span>
                   <div className="min-w-0 flex-1 pt-0.5">
-                    <MineWorking status={searchStatus} reasoning={reasoning} />
+                    <MineWorking status={searchStatus} reasoning={reasoning} deep={deepLive} />
                   </div>
                 </motion.article>
               ) : null}
@@ -7720,11 +7741,15 @@ function MineView({
               placeholder={
                 dictation.listening
                   ? "Pode falar, estou ouvindo..."
-                  : tutor
-                    ? "Mande o exercício ou a dúvida..."
-                    : selectedSubject
-                      ? `Pergunte sobre ${selectedSubject.name}...`
-                      : "Pergunte qualquer coisa"
+                  : criarImagem
+                    ? "Descreva a imagem que a Mine vai criar..."
+                    : profundo && webSearchAvailable
+                    ? "Qual tema pesquisar a fundo? (entrega um dossiê em PDF)..."
+                    : tutor
+                      ? "Mande o exercício ou a dúvida..."
+                      : selectedSubject
+                        ? `Pergunte sobre ${selectedSubject.name}...`
+                        : "Pergunte qualquer coisa"
               }
               aria-label="Mensagem para a Mine"
               className="max-h-48 min-h-11 w-full min-w-0 basis-full resize-none bg-transparent px-3 pb-1 pt-2.5 text-[15px] leading-6 text-white outline-none placeholder:text-white/38"
@@ -7768,13 +7793,14 @@ function MineView({
                       className="mine-menu__item"
                       onClick={() => {
                         setToolsMenuOpen(false);
-                        setDesenharOpen(true);
+                        if (!criarImagem) toggleModo("imagem");
+                        textareaRef.current?.focus();
                       }}
                     >
-                      <PenLine className="h-4 w-4" />
+                      <ImagePlus className="h-4 w-4" />
                       <span>
-                        Desenhar
-                        <span className="mine-menu__detail">Rabisque uma figura e mande para a Mine</span>
+                        Criar imagem
+                        <span className="mine-menu__detail">Descreva e a Mine cria a imagem com IA</span>
                       </span>
                     </button>
                     <div className="mine-menu__sep" />
@@ -7786,16 +7812,6 @@ function MineView({
                           <span className="mine-menu__detail">Sempre buscar fontes antes de responder</span>
                         </span>
                         {webSearch ? <Check className="mine-menu__check h-4 w-4" /> : null}
-                      </button>
-                    ) : null}
-                    {webSearchAvailable ? (
-                      <button type="button" role="menuitemcheckbox" aria-checked={profundo} className={`mine-menu__item ${profundo ? "is-on" : ""}`} onClick={() => setProfundo(!profundo)}>
-                        <Telescope className="h-4 w-4" />
-                        <span>
-                          Pesquisa aprofundada
-                          <span className="mine-menu__detail">Mais fontes e um relatório completo (para trabalhos)</span>
-                        </span>
-                        {profundo ? <Check className="mine-menu__check h-4 w-4" /> : null}
                       </button>
                     ) : null}
                     <button type="button" role="menuitemcheckbox" aria-checked={caprichar} className={`mine-menu__item ${caprichar ? "is-on" : ""}`} onClick={() => setCaprichar(!caprichar)}>
@@ -7815,24 +7831,6 @@ function MineView({
                         <span className="mine-menu__detail">Ilustrar as respostas com fotos reais</span>
                       </span>
                       {photos ? <Check className="mine-menu__check h-4 w-4" /> : null}
-                    </button>
-                    {/* Modo tutor: a Mine conduz com dicas em vez de entregar a resposta. */}
-                    <button type="button" role="menuitemcheckbox" aria-checked={tutor} className={`mine-menu__item ${tutor ? "is-on" : ""}`} onClick={() => setTutor(!tutor)}>
-                      <Lightbulb className="h-4 w-4" />
-                      <span>
-                        Modo tutor
-                        <span className="mine-menu__detail">Dicas e perguntas em vez da resposta pronta</span>
-                      </span>
-                      {tutor ? <Check className="mine-menu__check h-4 w-4" /> : null}
-                    </button>
-                    {/* Controle Mine: a Mine abre sites e vídeos na sua frente. */}
-                    <button type="button" role="menuitemcheckbox" aria-checked={controle} className={"mine-menu__item " + (controle ? "is-on" : "")} onClick={() => setControle(!controle)}>
-                      <MousePointer2 className="h-4 w-4" />
-                      <span>
-                        Controle Mine
-                        <span className="mine-menu__detail">Ver a Mine abrir sites, tirar prints e resumir vídeos</span>
-                      </span>
-                      {controle ? <Check className="mine-menu__check h-4 w-4" /> : null}
                     </button>
                     <div className="mine-menu__sep" />
                     <p className="mine-menu__label">Estudar</p>
@@ -7917,22 +7915,28 @@ function MineView({
                   </div>
                 ) : null}
               </div>
-              {/* Ferramentas ligadas aparecem como pílulas, cada uma com o seu "x". */}
+              {/* Os três modos ficam sempre à mão na barra; os outros ligados no
+                  "+" aparecem como pílulas, cada uma com o seu "x". */}
               <div className="minerva-scroll flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+                {webSearchAvailable ? (
+                  <button type="button" className="mine-modo mine-modo--deep" aria-pressed={profundo} onClick={() => toggleModo("profundo")} disabled={loading} title="Busca ampla na web e entrega um dossiê em PDF">
+                    <Telescope aria-hidden className="h-4 w-4" />
+                    <span className="mine-modo__label">Pesquisa aprofundada</span>
+                  </button>
+                ) : null}
+                <button type="button" className="mine-modo mine-modo--tutor" aria-pressed={tutor} onClick={() => toggleModo("tutor")} disabled={loading} title="Dicas e perguntas em vez da resposta pronta">
+                  <Lightbulb aria-hidden className="h-4 w-4" />
+                  <span className="mine-modo__label">Modo tutor</span>
+                </button>
+                <button type="button" className="mine-modo mine-modo--imagem" aria-pressed={criarImagem} onClick={() => toggleModo("imagem")} disabled={loading} title="Descreva e a Mine cria a imagem com IA">
+                  <ImagePlus aria-hidden className="h-4 w-4" />
+                  <span className="mine-modo__label">Criar imagem</span>
+                </button>
                 {webSearch && webSearchAvailable ? (
                   <span className="mine-tool-pill">
                     <Globe aria-hidden className="h-3.5 w-3.5" />
                     Web
                     <button type="button" className="mine-tool-pill__off" onClick={() => setWebSearch(false)} aria-label="Desligar pesquisa na web" disabled={loading}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ) : null}
-                {profundo && webSearchAvailable ? (
-                  <span className="mine-tool-pill">
-                    <Telescope aria-hidden className="h-3.5 w-3.5" />
-                    Pesquisa aprofundada
-                    <button type="button" className="mine-tool-pill__off" onClick={() => setProfundo(false)} aria-label="Desligar pesquisa aprofundada" disabled={loading}>
                       <X className="h-3 w-3" />
                     </button>
                   </span>
@@ -7951,15 +7955,6 @@ function MineView({
                     <Images aria-hidden className="h-3.5 w-3.5" />
                     Fotos
                     <button type="button" className="mine-tool-pill__off" onClick={() => setPhotos(false)} aria-label="Desligar modo fotos" disabled={loading}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ) : null}
-                {tutor ? (
-                  <span className="mine-tool-pill mine-tool-pill--tutor">
-                    <Lightbulb aria-hidden className="h-3.5 w-3.5" />
-                    Tutor
-                    <button type="button" className="mine-tool-pill__off" onClick={() => setTutor(false)} aria-label="Desligar modo tutor" disabled={loading}>
                       <X className="h-3 w-3" />
                     </button>
                   </span>

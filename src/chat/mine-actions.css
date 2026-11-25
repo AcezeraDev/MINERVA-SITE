@@ -206,6 +206,12 @@
   color: rgb(var(--theme-text) / 0.85);
 }
 
+.mine-tool-pill--deep {
+  border: 1px solid rgb(47 212 131 / 0.34);
+  background: rgb(47 212 131 / 0.16);
+  color: #6ff0b3;
+}
+
 .mine-tool-pill__off {
   display: grid;
   place-items: center;
@@ -218,6 +224,65 @@
 .mine-tool-pill__off:hover {
   background: rgb(var(--theme-text) / 0.1);
   opacity: 1;
+}
+
+/* ------------------------------- modos na barra (pesquisa, tutor, imagem) */
+
+.mine-modo {
+  --modo: var(--pen);
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.25rem;
+  padding: 0 0.8rem;
+  border: 1px solid rgb(var(--theme-text) / 0.12);
+  border-radius: 999px;
+  color: rgb(var(--theme-text) / 0.66);
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.mine-modo:hover:not(:disabled) {
+  background: rgb(var(--theme-text) / 0.07);
+  color: rgb(var(--theme-text) / 0.92);
+}
+
+.mine-modo:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.mine-modo--deep { --modo: 47 212 131; }
+.mine-modo--tutor { --modo: var(--hl-yellow); }
+.mine-modo--imagem { --modo: 167 139 250; }
+
+.mine-modo[aria-pressed="true"] {
+  border-color: rgb(var(--modo) / 0.45);
+  background: rgb(var(--modo) / 0.16);
+  color: rgb(var(--modo));
+}
+
+.mine-modo--tutor[aria-pressed="true"] {
+  color: rgb(var(--theme-text) / 0.9);
+}
+
+@media (max-width: 560px) {
+  .mine-modo {
+    width: 2.25rem;
+    justify-content: center;
+    padding: 0;
+  }
+  .mine-modo__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* ------------------------------------------------------------- ditado */

@@ -269,9 +269,9 @@ export async function pageForPanel(rawUrl, { signal, timeoutMs = 7_000 } = {}) {
  * `content` preenchido nas que deram certo. O tempo e o da pagina mais lenta,
  * limitado por `timeoutMs`.
  */
-export async function readTopPages(results, query, { count = 3, signal, timeoutMs = PAGE_TIMEOUT_MS } = {}) {
+export async function readTopPages(results, query, { count = 3, limit = PAGE_TEXT_CHARS, signal, timeoutMs = PAGE_TIMEOUT_MS } = {}) {
   const head = results.slice(0, count);
-  const pages = await Promise.all(head.map((item) => openPage(item.url, `${query} ${item.title}`, { signal, timeoutMs })));
+  const pages = await Promise.all(head.map((item) => openPage(item.url, `${query} ${item.title}`, { signal, timeoutMs, limit })));
   return results.map((item, index) => {
     const page = index < count ? pages[index] : null;
     // `highlights`: os trechos que o Controle Mine grifa na pagina ao vivo.
