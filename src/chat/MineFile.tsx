@@ -23,6 +23,7 @@ import {
   type FileKind,
 } from "../../shared/chat-files.mjs";
 import { useMineQueries, useMineSources } from "./MineSources";
+import { DossieProgresso } from "./DossieProgresso";
 import "./mine-file.css";
 
 const LOOKS: Record<FileKind, { label: string; icon: typeof FileText; tone: string }> = {
@@ -85,6 +86,10 @@ export const MineFileCard = memo(function MineFileCard({ code, open, cortado = f
     const timer = window.setTimeout(() => setHint(""), 6000);
     return () => window.clearTimeout(timer);
   }, [hint]);
+
+  if (open && isDossier) {
+    return <DossieProgresso fase="escrevendo" queries={queries} sources={sources} corpo={file.corpo} titulo={file.titulo} />;
+  }
 
   if (open) {
     const headings = file.corpo.match(/^##\s+(.+)$/gm) || [];

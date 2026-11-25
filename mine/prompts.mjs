@@ -743,7 +743,7 @@ const BLOCOS_SOB_DEMANDA = {
 \`\`\`correcao
 {"titulo": "Sua resolucao", "marcas": [{"x": 0.42, "y": 0.31, "r": 0.06, "tipo": "erro", "texto": "Aqui o sinal deveria ser negativo."}, {"x": 0.5, "y": 0.72, "r": 0.05, "tipo": "acerto", "texto": "Resultado certo a partir do erro."}]}
 \`\`\``,
-  "podcast": `- Podcast da materia quando pedirem audio, podcast, "pra ouvir" ou resumo para escutar: conversa de 8 a 16 falas curtas entre a Mine e o Leo (um colega curioso que pergunta), explicando o assunto com exemplos; o navegador le em voz alta com duas vozes:
+  "podcast": `- Podcast da materia quando pedirem audio, podcast, "pra ouvir" ou resumo para escutar: conversa entre a Mine e o Leo (um colega curioso que pergunta), explicando o assunto com exemplos; o navegador le em voz alta com duas vozes. Sem duracao pedida: 8 a 16 falas curtas. Com duracao (ex.: "podcast de 4 minutos"): conte 150 palavras por minuto, entao 4 minutos = 22 a 30 falas somando uns 600 palavras, com abertura, 3 ou 4 partes do assunto, um exemplo do dia a dia e um fechamento com o resumo:
 \`\`\`podcast
 {"titulo": "Fotossintese em 4 minutos", "falas": [{"quem": "Leo", "texto": "Mine, por que a folha e verde?"}, {"quem": "Mine", "texto": "Por causa da clorofila..."}]}
 \`\`\``,
@@ -791,7 +791,7 @@ Voce tem ferramentas de verdade. Chame a ferramenta ANTES de escrever a resposta
   // Aula por voz: a resposta vira fala, entao nenhum bloco interativo.
   if (semBlocos) return tools.trim();
   return `${tools}BLOCOS INTERATIVOS (a tela desenha; escreva JSON valido, aspas duplas, sem comentarios)
-Use quando ajudarem a aprender, no maximo dois por resposta, com 1 ou 2 frases de texto antes de cada um. Dentro dos textos do JSON pode usar **negrito** e formula $...$ (no JSON a barra invertida vira \\\\, ex.: "$\\\\frac{1}{2}$").
+Use quando ajudarem a aprender, no maximo dois por resposta, com 1 ou 2 frases de texto antes de cada um. Sempre dentro de uma cerca de tres crases com o nome do bloco (\`\`\`quiz ... \`\`\`), nunca como marcador [[quiz: ...]]. Dentro dos textos do JSON pode usar **negrito** e formula $...$ (no JSON a barra invertida vira \\\\, ex.: "$\\\\frac{1}{2}$").
 - Quiz para treinar agora (ate 10 perguntas, uma por vez na tela). "porques" explica CADA alternativa na mesma ordem (por que a certa esta certa e por que cada errada esta errada); "dica" ajuda sem entregar a resposta. Simulado "estilo ENEM": enunciado com situacao do cotidiano e 5 alternativas:
 \`\`\`quiz
 {"titulo": "Revisao de citologia", "perguntas": [{"pergunta": "Qual organela faz a respiracao celular?", "opcoes": ["Ribossomo", "Mitocondria", "Lisossomo", "Complexo golgiense"], "correta": 1, "porques": ["O ribossomo fabrica proteinas, nao energia.", "Certa: a mitocondria produz ATP na respiracao celular.", "O lisossomo faz a digestao dentro da celula.", "O complexo golgiense embala e envia substancias."], "dica": "Pense em qual organela e a usina de energia da celula.", "explicacao": "A mitocondria produz ATP na respiracao celular."}]}

@@ -178,6 +178,9 @@ import { asksToGenerateImage, describeImageMarkers, extractSuggestions, splitMes
 import { MineGlossaryProvider, MineRichText } from "./chat/MineRichText";
 import { MineMonitor, useMonitorOpen } from "./chat/monitor/MineMonitor";
 import { extractGlossary, markGlossary } from "../shared/chat-glossary.mjs";
+import { colchetesParaBlocos } from "../shared/chat-blocos-colchete.mjs";
+import { DossieProgresso } from "./chat/DossieProgresso";
+import { FORMATOS_CHAT, formatoChat, pedidoComFormato, type FormatoChat } from "./chat/formatosChat";
 import { asksForFile, asksForStudySheet } from "../shared/chat-files.mjs";
 import { searchConversations } from "../shared/chat-search.mjs";
 import { chatActionFromPrompt, planejarAcao, type ChatAction } from "./chat/acoes";
@@ -7162,6 +7165,8 @@ function MineView({
   // "Criar imagem" na barra: enquanto ligado, o que a pessoa escreve vira
   // pedido de imagem (a Mine responde com [[gerar_imagem: ...]]).
   const [criarImagem, setCriarImagem] = useState(false);
+  // Formato na barra (vídeo-resumo, podcast, laboratório...): src/chat/formatosChat.tsx.
+  const [formato, setFormato] = useState<FormatoChat | null>(null);
   // Pesquisa aprofundada, Modo tutor e Criar imagem são jeitos diferentes de
   // responder: ligar um desliga os outros.
   // Ficha da Mine (src/chat/ficha.ts): perfil, horário de estudo, família e revisões.
@@ -7187,6 +7192,17 @@ function MineView({
     // Modo família com "tutor sempre": o tutor não desliga.
     setTutor(tutorTravado || (modo === "tutor" && ligar));
     setCriarImagem(modo === "imagem" && ligar);
+    setFormato(null);
+  };
+  const toggleFormato = (id: FormatoChat) => {
+    const ligar = formato !== id;
+    setFormato(ligar ? id : null);
+    if (ligar) {
+      setProfundo(false);
+      setCriarImagem(false);
+      if (!tutorTravado) setTutor(false);
+    }
+    textareaRef.current?.focus();
   };
   // Horário de estudo: o tutor liga sozinho ao entrar na janela (uma vez; dá
   // para desligar). Família com "tutor sempre": fica ligado o tempo todo.
@@ -7528,7 +7544,7 @@ function MineView({
   }, []);
   function submit(event: FormEvent) {
     event.preventDefault();
-    if ((!input.trim() && !attachments.length && !trecho) || loading || emDescanso) return;
+    if ((!input.trim() && !attachments.length && !trecho && !(formato && messages.length)) || loading || emDescanso) return;
     if (input.trim().length > MAX_CHAT_PROMPT_CHARS) {
       setAttachmentError(`Sua mensagem tem mais de ${MAX_CHAT_PROMPT_CHARS.toLocaleString("pt-BR")} caracteres. Divida em partes menores para enviar o texto completo.`);
       return;
@@ -7551,7 +7567,9 @@ function MineView({
     const comMencoes = dicas.length ? `${digitado}\n\n(${Array.from(new Set(dicas)).join("; ")})` : digitado;
     const texto = trecho ? `Sobre este trecho da sua resposta: "${trecho}"\n\n${comMencoes || "Explica melhor esse trecho."}` : comMencoes;
     if (!tutor && !licaoDispensada.current && pareceLicao(digitado, attachments.some((item) => item.kind === "image"))) setAvisoLicao(true);
-    send(criarImagem && texto && !asksToGenerateImage(texto) ? `Cria uma imagem: ${texto}` : texto, selectedSubjectId, attachments);
+    const pedido = formato ? pedidoComFormato(formato, texto, messages.length > 0) : texto;
+    if (formato) setFormato(null);
+    send(criarImagem && pedido && !asksToGenerateImage(pedido) ? `Cria uma imagem: ${pedido}` : pedido, selectedSubjectId, attachments);
     setTrecho("");
     setMencao(null);
     setInput("");
@@ -7873,6 +7891,10 @@ function MineView({
                   >
                     <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[.14em] text-white/38"><span>Mine</span></div>
                     {reasoning ? <MineThought reasoning={reasoning} /> : null}
+                    {/* Pesquisa aprofundada: o progresso continua até o bloco do PDF abrir. */}
+                    {deepLive && !/```arquivo/.test(streamText) ? (
+                      <DossieProgresso fase="escrevendo" queries={searchStatus?.queries} sources={searchStatus?.sources} cronometro />
+                    ) : null}
                     {/* A ponta da caneta no fim do texto vem do CSS (.mine-streaming). */}
                     <MineSourcesProvider sources={searchStatus?.sources} queries={searchStatus?.queries}>
                       <MineMessageText text={streamText} streaming />
@@ -7888,7 +7910,16 @@ function MineView({
                 >
                   <span className="mt-1"><MineAvatar size="sm" thinking /></span>
                   <div className="min-w-0 flex-1 pt-0.5">
-                    <MineWorking status={searchStatus} reasoning={reasoning} deep={deepLive} />
+                    {deepLive && searchStatus?.stage !== "tool" ? (
+                      <DossieProgresso
+                        fase={searchStatus?.stage === "reading" ? "lendo" : searchStatus?.stage === "searching" ? "buscando" : "planejando"}
+                        queries={searchStatus?.queries}
+                        sources={searchStatus?.sources}
+                        cronometro
+                      />
+                    ) : (
+                      <MineWorking status={searchStatus} reasoning={reasoning} deep={deepLive} />
+                    )}
                   </div>
                 </motion.article>
               ) : null}
@@ -8089,6 +8120,8 @@ function MineView({
               placeholder={
                 dictation.listening
                   ? "Pode falar, estou ouvindo..."
+                  : formato
+                    ? formatoChat(formato)?.placeholder
                   : criarImagem
                     ? "Descreva a imagem que a Mine vai criar..."
                     : profundo && webSearchAvailable
@@ -8119,6 +8152,25 @@ function MineView({
                 ))}
               </div>
             ) : null}
+            {/* Formatos da Mine (vídeo-resumo, podcast, laboratório...): uma fileira
+                própria, para não sumirem na rolagem dos modos. */}
+            <div className="mine-formatos minerva-scroll" role="group" aria-label="Criar com a Mine">
+              <span className="mine-formatos__label">Criar</span>
+              {FORMATOS_CHAT.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className={`mine-formato mine-formato--${f.id}`}
+                  aria-pressed={formato === f.id}
+                  onClick={() => toggleFormato(f.id)}
+                  disabled={loading}
+                  title={f.dica}
+                >
+                  <f.icon aria-hidden className="h-3.5 w-3.5" />
+                  {f.label}
+                </button>
+              ))}
+            </div>
             <div className="flex w-full min-w-0 items-center gap-1">
               <div ref={toolsMenuRef} className="relative shrink-0">
                 <motion.button
@@ -8398,7 +8450,7 @@ function MineView({
                 </motion.button>
               ) : (
                 <motion.button
-                  disabled={!input.trim() && !attachments.length}
+                  disabled={!input.trim() && !attachments.length && !(formato && messages.length)}
                   whileTap={{ scale: 0.9 }}
                   transition={spring.snappy}
                   aria-label="Enviar mensagem"
@@ -8781,7 +8833,8 @@ function MineMessageText({ text, streaming = false, attachment, essencial = fals
   // marca invisível que o MineRichText transforma em sublinhado com explicação.
   // Durante o streaming o marcador ainda nem chegou: nada é grifado.
   const { body, terms } = useMemo(() => {
-    const glossary = extractGlossary(text);
+    // `[[quiz: {...}]]` escrito como marcador vira o bloco de verdade.
+    const glossary = extractGlossary(colchetesParaBlocos(text));
     return { body: streaming ? glossary.text : markGlossary(glossary.text, glossary.terms), terms: glossary.terms };
   }, [text, streaming]);
   // Até 3 galerias: uma abrindo a resposta e as outras no meio da explicação.

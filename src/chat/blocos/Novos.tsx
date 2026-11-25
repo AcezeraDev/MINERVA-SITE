@@ -702,7 +702,7 @@ function lerPodcast(data: Record<string, unknown>) {
       return { quem: str(f.quem, 20) || "Mine", texto: str(f.texto, 800) };
     })
     .filter((f) => f.texto)
-    .slice(0, 30);
+    .slice(0, 40);
   return falas.length >= 2 ? { titulo: str(data.titulo, 120) || "Podcast da Mine", falas } : null;
 }
 
