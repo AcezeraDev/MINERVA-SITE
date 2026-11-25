@@ -289,6 +289,7 @@ const RedacaoView = React.lazy(() => import("./redacao/RedacaoView").then((m) =>
 const AtividadesView = React.lazy(() => import("./atividades/AtividadesView").then((m) => ({ default: m.AtividadesView })));
 const SalaView = React.lazy(() => import("./sala/SalaView").then((m) => ({ default: m.SalaView })));
 const CuboView = React.lazy(() => import("./cubo/CuboView").then((m) => ({ default: m.CuboView })));
+const FerramentasView = React.lazy(() => import("./ferramentas/FerramentasView").then((m) => ({ default: m.FerramentasView })));
 const VideosView = React.lazy(() => import("./videos/VideosView").then((m) => ({ default: m.VideosView })));
 const LaboratorioView = React.lazy(() => import("./laboratorio/LaboratorioView").then((m) => ({ default: m.LaboratorioView })));
 const LeituraView = React.lazy(() => import("./leitura/LeituraView").then((m) => ({ default: m.LeituraView })));
@@ -464,6 +465,7 @@ type View =
   | "mine"
   | "games"
   | "cubo"
+  | "ferramentas"
   | "sala"
   | "atelie"
   | "idiomas"
@@ -985,6 +987,7 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
   { view: "mine", label: "Mine", icon: Bot },
   { view: "games", label: "Games com a Mine", icon: Gamepad2 },
   { view: "cubo", label: "Cubo Mágico", icon: Box },
+  { view: "ferramentas", label: "Ferramentas", icon: Calculator },
   { view: "sala", label: "Sala de estudo", icon: Headphones },
   { view: "atelie", label: "Ateliê da Mine", icon: Palette },
   { view: "idiomas", label: "Idiomas com a Mine", icon: Languages },
@@ -1007,10 +1010,10 @@ const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
  */
 export type NavArea = "materias" | "estudar" | "praticar" | "jogar" | "organizar" | "turma";
 const navGroups: Array<{ id: NavArea; label: string; hint: string; icon: LucideIcon; views: View[] }> = [
-  { id: "estudar", label: "Estudar", hint: "Mine, vídeos, leitura, laboratório, idiomas", icon: BookOpen, views: ["mine", "videos", "leitura", "laboratorio", "idiomas", "search"] },
+  { id: "estudar", label: "Estudar", hint: "Mine, vídeos, leitura, laboratório, ferramentas", icon: BookOpen, views: ["mine", "videos", "leitura", "laboratorio", "ferramentas", "idiomas", "search"] },
   { id: "praticar", label: "Praticar", hint: "Atividades, provas, redação, duelo", icon: ClipboardCheck, views: ["atividades", "provas", "redacao", "duelo"] },
   { id: "jogar", label: "Jogar", hint: "Games, cubo mágico, ateliê", icon: Gamepad2, views: ["games", "cubo", "atelie"] },
-  { id: "organizar", label: "Organizar", hint: "Agenda, plano, progresso", icon: CalendarDays, views: ["agenda", "plan", "progress", "foco"] },
+  { id: "organizar", label: "Organizar", hint: "Agenda, foco, plano, progresso", icon: CalendarDays, views: ["agenda", "plan", "progress", "foco"] },
   { id: "turma", label: "Turma", hint: "Sala, ranking, comentários", icon: Headphones, views: ["sala", "ranking", "comments", "suggestions"] },
 ];
 const accountViews: View[] = ["perfil", "como-usar", "about", "admin"];
@@ -1025,11 +1028,10 @@ const mobilePrimary: View[] = ["home", "agenda", "atividades", "mine"];
 
 /**
  * Telas que continuam existindo (os links e atalhos funcionam) mas não
- * aparecem em nenhum menu. O Foco saiu do menu em nov/2026: o cronômetro
- * segue abrindo pelos botões "Iniciar foco", pela paleta e pela ficha que a
- * Mine liga pelo chat.
+ * aparecem em nenhum menu. O Foco chegou a sair do menu em nov/2026 e voltou
+ * no fim do mês, na área Organizar, a pedido do usuário.
  */
-const hiddenFromMenu: View[] = ["foco"];
+const hiddenFromMenu: View[] = [];
 
 function navItemOf(view: View) {
   return navItems.find((item) => item.view === view);
@@ -3076,6 +3078,7 @@ function App() {
     if (route.view === "laboratorio") return <React.Suspense fallback={<PageLoading />}><LaboratorioView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "sala") return <React.Suspense fallback={<PageLoading />}><SalaView user={user} codigoRota={route.id} /></React.Suspense>;
     if (route.view === "cubo") return <React.Suspense fallback={<PageLoading />}><CuboView user={user} /></React.Suspense>;
+    if (route.view === "ferramentas") return <React.Suspense fallback={<PageLoading />}><FerramentasView userId={user.id} aba={route.id} askMine={(text) => askMineInChat(text)} /></React.Suspense>;
     if (route.view === "duelo") return <React.Suspense fallback={<PageLoading />}><DueloView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "provas") return <React.Suspense fallback={<PageLoading />}><ProvasView data={userData} user={user} update={update} /></React.Suspense>;
     if (route.view === "videos") return <React.Suspense fallback={<PageLoading />}><VideosView data={userData} user={user} update={update} notify={notify} /></React.Suspense>;
@@ -13261,7 +13264,7 @@ function applyAssistantActions(data: AppData, userId: string, actions: Assistant
     }
 
     if (action.type === "navigate") {
-      const allowed: View[] = ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "duelo", "progress", "ranking", "mine", "games", "cubo", "sala", "atelie", "idiomas", "videos", "search", "plan", "comments", "suggestions", "about", "perfil"];
+      const allowed: View[] = ["home", "agenda", "atividades", "provas", "redacao", "leitura", "laboratorio", "ferramentas", "foco", "duelo", "progress", "ranking", "mine", "games", "cubo", "sala", "atelie", "idiomas", "videos", "search", "plan", "comments", "suggestions", "about", "perfil"];
       if (action.view === "subject") {
         const subject = findSubject(next.subjects.filter((item) => item.userId === userId), action);
         if (subject) route = { view: "subject", id: subject.id };
