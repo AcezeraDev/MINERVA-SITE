@@ -12,12 +12,19 @@
 }
 
 @media (min-width: 1100px) {
-  .lei-grid,
-  .lei-resultado {
+  .lei-grid {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   }
-  .lei-perguntas {
-    grid-column: 1 / -1;
+  /* Resultado: o texto fica parado à esquerda enquanto as perguntas rolam à direita. */
+  .lei-resultado {
+    grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  }
+  .lei-resultado .lei-leitura {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }
 
@@ -248,35 +255,185 @@
   color: rgb(var(--theme-muted));
 }
 
-.lei-fonte {
+/* Ajustes de leitura: letra, espaço, letra fácil, sépia, régua e ouvir. */
+.lei-ferramentas {
   display: flex;
-  gap: 0.25rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1.1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px dashed rgb(var(--line));
+}
+
+.lei-ferramenta,
+.lei-ferramenta-grupo {
+  display: inline-flex;
   align-items: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text) / 0.85);
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+  transition: background-color 140ms ease, box-shadow 140ms ease;
 }
 
-.lei-fonte button {
-  display: grid;
-  place-items: center;
-  width: 2.3rem;
-  height: 2.3rem;
-  border-radius: 0.6rem;
-  color: rgb(var(--theme-text) / 0.7);
+.lei-ferramenta:hover,
+.lei-ferramenta-grupo button:hover:not(:disabled) {
+  background: rgb(var(--theme-text) / 0.06);
 }
 
-.lei-fonte button.is-on {
+.lei-ferramenta[aria-pressed="true"] {
   color: rgb(var(--pen-ink));
   background: rgb(var(--pen));
+  box-shadow: none;
+}
+
+.lei-ferramenta-grupo {
+  padding: 0 0.2rem;
+  gap: 0.1rem;
+}
+
+.lei-ferramenta-grupo span {
+  font-family: "Literata Variable", Georgia, serif;
+  font-size: 0.95rem;
+}
+
+.lei-ferramenta-grupo button {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.lei-ferramenta-grupo button:disabled {
+  opacity: 0.35;
+}
+
+.lei-linhas {
+  display: grid;
+  width: 1rem;
+}
+
+.lei-linhas i {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.lei-amostra-sepia {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  background: #f1e2c4;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.2);
+}
+
+.lei-leitura.is-sepia {
+  --theme-text: 59 45 27;
+  --theme-muted: 127 103 71;
+  --line: 214 195 160;
+  background: #f5ead3;
+}
+
+.lei-corpo-wrap {
+  position: relative;
+}
+
+/* Régua: faixa de uma linha que acompanha o mouse (só transform). */
+.lei-regua {
+  position: absolute;
+  top: 0;
+  left: -0.6rem;
+  right: -0.6rem;
+  z-index: 0;
+  translate: 0 -50%;
+  border-radius: 0.4rem;
+  background: rgb(var(--mint) / 0.18);
+  box-shadow: 0 0 0 1px rgb(var(--mint) / 0.35);
+  pointer-events: none;
+  will-change: transform;
 }
 
 .lei-corpo {
+  position: relative;
+  z-index: 1;
   max-width: 68ch;
-  line-height: 1.8;
+  line-height: 1.85;
   color: rgb(var(--theme-text));
+}
+
+.lei-leitura.letra-livro .lei-corpo {
+  font-family: "Literata Variable", "Literata", Georgia, serif;
+}
+
+.lei-leitura.letra-clara .lei-corpo {
+  font-family: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.lei-corpo p {
+  border-radius: 0.3em;
+  transition: background-color 200ms ease;
 }
 
 .lei-corpo p + p {
   margin-top: 1em;
   text-indent: 1.5em;
+}
+
+/* Parágrafo sendo lido em voz alta. */
+.lei-corpo p.is-lendo {
+  background: rgb(var(--mint) / 0.2);
+  box-shadow: 0 0 0 0.3em rgb(var(--mint) / 0.2);
+}
+
+/* Grifo do próprio aluno (lilás, para não confundir com as palavras difíceis). */
+.lei-grifo {
+  background: linear-gradient(transparent 12%, rgb(var(--hl-lilac) / 0.42) 12%, rgb(var(--hl-lilac) / 0.42) 90%, transparent 90%);
+  mix-blend-mode: var(--hl-blend);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.lei-dica-texto {
+  margin-top: 1.2rem;
+  font-size: 0.8rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* Barra do trecho selecionado. */
+.lei-selecao {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: #1f1d1a;
+  color: #fbf7ee;
+  box-shadow: 0 14px 30px -12px rgb(0 0 0 / 0.5);
+  transform: translate(-50%, calc(-100% - 0.6rem));
+}
+
+.lei-selecao button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.1rem;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.lei-selecao button:hover {
+  background: rgb(255 255 255 / 0.14);
 }
 
 .lei-palavra {
@@ -402,11 +559,204 @@
   opacity: 0.8;
 }
 
+/* Painel da direita: abas Perguntas, Palavras e Resumo. */
+.lei-painel {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 1rem;
+}
+
+.lei-abas {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: rgb(var(--panel));
+  box-shadow: inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+.lei-abas button {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 2.4rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: rgb(var(--theme-text) / 0.75);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.lei-abas button[aria-selected="true"] {
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--pen));
+}
+
+.lei-aba-conta {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  background: rgb(var(--theme-text) / 0.1);
+}
+
+.lei-abas button[aria-selected="true"] .lei-aba-conta {
+  background: rgb(255 255 255 / 0.22);
+}
+
 .lei-perguntas {
   padding: 1.3rem 1.4rem;
   border-radius: 1.2rem;
   background: rgb(var(--panel));
   box-shadow: var(--card-shadow), inset 0 0 0 1px rgb(var(--line) / 0.6);
+}
+
+/* Alternativa escolhida e ainda não confirmada. */
+.lei-alt.is-marcada {
+  background: rgb(var(--pen) / 0.12);
+  box-shadow: inset 0 0 0 2px rgb(var(--pen));
+}
+
+.lei-confirmar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  margin: 0.6rem 0 0 2.3rem;
+  font-size: 0.8rem;
+  color: rgb(var(--theme-muted));
+}
+
+/* Pergunta aberta: explicar com as próprias palavras. */
+.lei-aberta {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1.6rem;
+  padding-top: 1.3rem;
+  border-top: 1px dashed rgb(var(--line));
+}
+
+.lei-num.is-aberta {
+  color: #14161b;
+  background: rgb(var(--hl-yellow));
+}
+
+.lei-aberta-campo {
+  width: calc(100% - 2.3rem);
+  margin-left: 2.3rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.8rem;
+  font-size: 0.93rem;
+  line-height: 1.5;
+  color: rgb(var(--theme-text));
+  background: rgb(var(--sheet));
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+  resize: vertical;
+}
+
+.lei-aberta-campo:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgb(var(--pen));
+}
+
+.lei-aberta-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  margin-left: 2.3rem;
+  font-size: 0.8rem;
+  color: rgb(var(--theme-muted));
+}
+
+.lei-aberta-sua {
+  margin-bottom: 0.35rem;
+  font-style: italic;
+  color: rgb(var(--theme-text) / 0.75);
+}
+
+.lei-aberta .lei-explica p + p {
+  margin-top: 0.35rem;
+}
+
+/* Resumo travado até terminar as perguntas. */
+.lei-trava {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: rgb(var(--theme-text) / 0.85);
+}
+
+.lei-trava svg {
+  flex: none;
+  margin-top: 0.2rem;
+}
+
+.lei-dicas {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+  padding-left: 1.2rem;
+  list-style: decimal;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.lei-trava-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin-top: 0.9rem;
+}
+
+.lei-salvar-cartoes {
+  margin-top: 0.9rem;
+}
+
+/* Antes de ler: para quê e nível. */
+.lei-escolhas {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.lei-escolha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.lei-escolha-rotulo {
+  min-width: 4.6rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgb(var(--theme-muted));
+}
+
+.lei-escolha button {
+  min-height: 2.2rem;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgb(var(--theme-text) / 0.85);
+  box-shadow: inset 0 0 0 1.5px rgb(var(--line));
+}
+
+.lei-escolha button[aria-checked="true"] {
+  color: rgb(var(--pen-ink));
+  background: rgb(var(--pen));
+  box-shadow: none;
+}
+
+.lei-lista.is-passos {
+  list-style: decimal;
 }
 
 .lei-perguntas-top {
@@ -626,8 +976,17 @@
     padding-left: 2.6rem;
   }
   .lei-alternativas,
-  .lei-explica {
+  .lei-explica,
+  .lei-confirmar,
+  .lei-aberta-acoes {
     margin-left: 0;
+  }
+  .lei-aberta-campo {
+    width: 100%;
+    margin-left: 0;
+  }
+  .lei-regua {
+    display: none;
   }
 }
 
@@ -638,7 +997,9 @@
     background-size: 100% 100%;
   }
   .lei-alt,
-  .lei-exemplo {
+  .lei-exemplo,
+  .lei-corpo p,
+  .lei-abas button {
     transition: none;
   }
 }

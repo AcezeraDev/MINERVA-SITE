@@ -259,10 +259,121 @@ async function textoAustralia(numero) {
   throw new Error("texto indisponível");
 }
 
+/* ── Wikisource em português (ids do catálogo deslocados em 20 milhões) ── */
+
+const VAZIAS = new Set(["br", "img", "hr", "meta", "link", "input", "wbr", "source", "col", "area"]);
+
+/**
+ * Tira do HTML os elementos cujos atributos batem com `teste`, com tudo o que
+ * há dentro (conta as tags do mesmo nome para achar o fechamento certo).
+ */
+function semElementos(html, teste) {
+  const tag = /<(\/?)([a-z][a-z0-9]*)\b([^>]*)>/gi;
+  let saida = "";
+  let cursor = 0;
+  let fora = null; // { nome, nivel } enquanto estiver dentro de um elemento removido
+  for (let achado = tag.exec(html); achado; achado = tag.exec(html)) {
+    const [inteira, fecha, nomeBruto, atributos] = achado;
+    const nome = nomeBruto.toLowerCase();
+    const vazia = VAZIAS.has(nome) || /\/\s*$/.test(atributos);
+    if (fora) {
+      if (nome !== fora.nome || vazia) continue;
+      fora.nivel += fecha ? -1 : 1;
+      if (fora.nivel === 0) {
+        fora = null;
+        cursor = achado.index + inteira.length;
+      }
+      continue;
+    }
+    if (!fecha && !vazia && teste(atributos)) {
+      saida += html.slice(cursor, achado.index);
+      fora = { nome, nivel: 1 };
+    }
+  }
+  return fora ? saida : saida + html.slice(cursor);
+}
+
+/** Navegação, cabeçalhos de capítulo, números de página e links de edição. */
+const ENFEITES = /class="[^"]*\b(noprint|ws-noexport|mw-editsection|pagenum|ws-pagenum|wst-dhr|reference|mw-references-wrap|reflist|metadata|ws-summary)\b|id="(modernizar|ws-data|navigationHeader|navigationNotes)"|display:\s*none/i;
+
+/** HTML da versão para impressão do Wikisource → texto com parágrafos separados por linha em branco. */
+export function htmlWikisourceParaTexto(html) {
+  let corpo = String(html || "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "");
+  corpo = semElementos(corpo, (atributos) => ENFEITES.test(atributos));
+  // O índice de capítulos (só links) não é leitura: sai até o próximo título.
+  corpo = corpo.replace(/<div class="mw-heading[^"]*"><h2 id="[ÍI]ndice"[\s\S]*?(?=<div class="mw-heading|<h2[\s>])/i, "");
+  // Lista feita só de links (os capítulos do índice, com ou sem título "Índice").
+  corpo = corpo.replace(/<(ul|ol)\b[^>]*>([\s\S]*?)<\/\1>/gi, (lista, _tag, dentro) => {
+    const itens = (dentro.match(/<li\b/gi) || []).length;
+    const foraDosLinks = dentro.replace(/<a\b[\s\S]*?<\/a>/gi, "").replace(/<[^>]+>/g, "").replace(/[\s.,;:–—\-]+/g, "");
+    return itens >= 3 && /<a\b/i.test(dentro) && !foraDosLinks ? "" : lista;
+  });
+  const texto = decodificar(
+    corpo
+      // Dentro do parágrafo, a quebra de linha é só da página escaneada.
+      .replace(/\s*\n\s*/g, " ")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|h[1-6]|div|li|blockquote|dd|dt|tr|table|center)>/gi, "\n\n")
+      .replace(/<(h[1-6])[^>]*>/gi, "\n\n")
+      .replace(/<[^>]+>/g, ""),
+  );
+  const blocos = texto
+    .replace(/[ \t ]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .split(/\n{2,}/)
+    .map((bloco) => bloco.trim())
+    // Setas "↑" das notas de rodapé e títulos "Notas" vazios não são leitura.
+    .filter((bloco) => bloco && !/^[↑\s^]+$/.test(bloco));
+  const limpos = [];
+  for (let i = 0; i < blocos.length; i += 1) {
+    const bloco = blocos[i];
+    if (/^notas?$/i.test(bloco) && (!blocos[i + 1] || blocos[i + 1].length > 200 || /\n/.test(blocos[i + 1]))) continue;
+    // "Índice" seguido da lista de capítulos (linhas curtas, sem verso): sai tudo.
+    if (/^(í?n+dice|i+n+dice|sumário|sumario|conteúdo)$/i.test(bloco)) {
+      let fim = i + 1;
+      while (fim < blocos.length && blocos[fim].length < 70 && !blocos[fim].includes("\n")) fim += 1;
+      // Sem lista embaixo (os links já saíram no HTML), sai só o título.
+      if (fim - i - 1 >= 3) i = fim - 1;
+      continue;
+    }
+    limpos.push(bloco);
+  }
+  return limpos.join("\n\n");
+}
+
+async function textoWikisource(pageid) {
+  const url = `https://pt.wikisource.org/w/api.php?${new URLSearchParams({ action: "parse", pageid: String(pageid), prop: "text", format: "json", formatversion: "2" })}`;
+  const pedir = () => fetch(url, { headers: { "user-agent": "MinervaEstudos/1.0 (site escolar; leitor de livros)" }, signal: AbortSignal.timeout(40_000) });
+  // Obras grandes levam alguns segundos para o Wikisource montar a página inteira.
+  let response = await pedir();
+  // 429: a Wikimedia pede uma pausa (Retry-After, em geral 10 s). Espera e tenta mais uma vez.
+  if (response.status === 429) {
+    const espera = Math.min(15, Number(response.headers.get("retry-after")) || 5);
+    await new Promise((fim) => setTimeout(fim, espera * 1000));
+    response = await pedir();
+  }
+  if (!response.ok) throw new Error("texto indisponível");
+  const dados = await response.json();
+  // Só a versão para impressão (Anexo:Imprimir/…): outro pageid não é um livro do catálogo.
+  if (!String(dados?.parse?.title || "").startsWith("Anexo:Imprimir/")) throw new Error("livro inválido");
+  const texto = htmlWikisourceParaTexto(dados.parse.text).slice(0, 3_000_000);
+  if (texto.length < 200) throw new Error("texto indisponível");
+  return texto;
+}
+
 export async function textoDoLivro(idBruto) {
   const id = Number(idBruto);
-  if (!Number.isInteger(id) || id < 1 || (id > 200000 && (id < 10_000_000 || id > 19_999_999))) throw new Error("livro inválido");
+  const valido = Number.isInteger(id) && ((id >= 1 && id <= 200000) || (id >= 10_000_000 && id <= 29_999_999));
+  if (!valido) throw new Error("livro inválido");
   if (textos.has(id)) return textos.get(id);
+  if (id >= 20_000_000) {
+    const texto = await textoWikisource(id - 20_000_000);
+    if (textos.size >= 20) textos.delete(textos.keys().next().value);
+    textos.set(id, texto);
+    return texto;
+  }
   if (id >= 10_000_000) {
     const texto = await textoAustralia(id - 10_000_000);
     if (textos.size >= 20) textos.delete(textos.keys().next().value);

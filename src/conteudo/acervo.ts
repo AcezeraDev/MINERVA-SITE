@@ -17,14 +17,19 @@ export type LivroAcervo = {
   l: string;
   /** gêneros em português (ver GENEROS) */
   g: string[];
-  /** "au" = Projeto Gutenberg Austrália (id deslocado em 10 milhões, sem capa) */
-  f?: "au";
+  /**
+   * "au" = Projeto Gutenberg Austrália (id deslocado em 10 milhões, sem capa);
+   * "ws" = Wikisource em português (20 milhões + pageid da página
+   * "Anexo:Imprimir/…", sem capa), gerado por scripts/gerar-acervo-wikisource.mjs.
+   */
+  f?: "au" | "ws";
   /** nome em português de um clássico estrangeiro ("a revolução dos bichos") */
   s?: string;
 };
 
 /** Nome da fonte para mostrar no leitor. */
 export function fonteAcervo(livro: Pick<LivroAcervo, "f">): string {
+  if (livro.f === "ws") return "Wikisource";
   return livro.f === "au" ? "Projeto Gutenberg Austrália" : "Projeto Gutenberg";
 }
 
@@ -67,7 +72,7 @@ export function carregarAcervo(): Promise<LivroAcervo[]> {
 
 /** Capa pelo espelho oficial: o www.gutenberg.org recusa muitos acessos (503). */
 export function capaAcervo(id: number): string {
-  // O Gutenberg Austrália não tem capas: fica a capa desenhada.
+  // O Gutenberg Austrália e o Wikisource não têm capas: fica a capa desenhada.
   if (id >= 10_000_000) return "";
   return `https://gutenberg.pglaf.org/cache/epub/${id}/pg${id}.cover.medium.jpg`;
 }

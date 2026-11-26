@@ -589,7 +589,7 @@ function Biblioteca({
   return (
     <>
       <p className="caderno-mx-dica mt-0">
-        Livros em domínio público no Brasil, do Projeto Gutenberg e do Projeto Gutenberg Austrália: grátis para ler inteiros, aqui mesmo na Mine. Machado de Assis, Camões, José de Alencar, Eça de Queirós e também George Orwell (1984), Fitzgerald e Virginia Woolf. Busque pelo nome em português.
+        Livros em domínio público no Brasil, do Projeto Gutenberg, do Projeto Gutenberg Austrália e do Wikisource: grátis para ler inteiros, aqui mesmo na Mine. Machado de Assis, Camões, José de Alencar, Eça de Queirós e também George Orwell (1984), Fitzgerald e Virginia Woolf. Busque pelo nome em português.
       </p>
       <div className="caderno-lv-busca">
         <label className="caderno-lv-campo">

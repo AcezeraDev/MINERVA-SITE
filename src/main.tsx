@@ -8945,7 +8945,8 @@ function MineMessageText({ text, streaming = false, attachment, essencial = fals
  * Erro de quiz no chat vai para o caderno de erros da aba Provas (o mesmo
  * localStorage que a ProvasView lê e sobe para a conta).
  */
-function registrarErroDoChat(userId: string, erro: { assunto: string; pergunta: string; opcoes: string[]; correta: number; marcada: number }, subjectId?: string) {
+/** Também usada pela aba Leitura: pergunta de interpretação errada vai para o caderno de erros. */
+export function registrarErroDoChat(userId: string, erro: { assunto: string; pergunta: string; opcoes: string[]; correta: number; marcada: number }, subjectId?: string) {
   const chave = `minerva:provas:${userId}`;
   try {
     const salvo = JSON.parse(window.localStorage.getItem(chave) || "{}") as { caderno?: unknown[] };

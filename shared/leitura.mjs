@@ -232,14 +232,94 @@ export function marcarPalavras(texto, palavras) {
   return partes;
 }
 
-/** Contexto mandado junto com o texto. */
-export function contextoLeitura({ titulo = "", objetivo = "" } = {}) {
+/** Para que o aluno vai usar a leitura (nov/2026): muda o tom das perguntas. */
+export const objetivosLeitura = [
+  { id: "entender", nome: "Só entender", contexto: "entender bem o texto, sem pressa de prova" },
+  { id: "escola", nome: "Prova da escola", contexto: "prova da escola: perguntas claras, no nivel da sala de aula" },
+  { id: "enem", nome: "ENEM", contexto: "ENEM: perguntas no estilo do ENEM, com distratores plausiveis e foco em interpretacao" },
+  { id: "vestibular", nome: "Vestibular", contexto: "vestibular (Fuvest, Unicamp, Unesp): perguntas mais exigentes, com inferencia fina e linguagem" },
+];
+
+/** Série do aluno: o fundamental recebe linguagem e perguntas mais diretas. */
+export const niveisLeitura = [
+  { id: "fundamental", nome: "Fundamental", contexto: "estudante do ensino fundamental II (11 a 14 anos): linguagem simples e perguntas diretas" },
+  { id: "medio", nome: "Médio", contexto: "estudante do ensino medio" },
+];
+
+/** Contexto mandado junto com o texto. `objetivo` e `nivel` são ids das listas acima. */
+export function contextoLeitura({ titulo = "", objetivo = "", nivel = "" } = {}) {
+  const alvo = objetivosLeitura.find((item) => item.id === objetivo);
+  const serie = niveisLeitura.find((item) => item.id === nivel);
   return [
     titulo ? `Título informado pelo estudante: ${titulo}` : "",
-    objetivo ? `Para que o estudante vai usar a leitura: ${objetivo}` : "",
+    alvo ? `Para que o estudante vai usar a leitura: ${alvo.contexto}` : "",
+    serie ? `Nível: ${serie.contexto}` : "",
   ]
     .filter(Boolean)
     .join("\n") || "Leitura de estudo do ensino médio.";
+}
+
+const escapar = (valor) => valor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Onde o `trecho` está no `texto` ({ inicio, fim } ou null). A Mine copia o
+ * trecho com os espaços juntados numa linha só, então a busca aceita quebra
+ * de linha e espaço duplo entre as palavras, e tenta sem a pontuação final.
+ */
+export function acharTrecho(texto, trecho) {
+  const fonte = String(texto || "");
+  const alvo = String(trecho || "").trim();
+  if (alvo.length < 4) return null;
+  const exato = fonte.indexOf(alvo);
+  if (exato >= 0) return { inicio: exato, fim: exato + alvo.length };
+  const flexivel = new RegExp(alvo.split(/\s+/).map(escapar).join("\\s+"));
+  const achado = flexivel.exec(fonte);
+  if (achado) return { inicio: achado.index, fim: achado.index + achado[0].length };
+  const semPontuacao = alvo.replace(/[\s.,;:!?…"'“”‘’«»]+$/u, "");
+  return semPontuacao !== alvo ? acharTrecho(fonte, semPontuacao) : null;
+}
+
+/**
+ * Pedaços do texto para a tela: cada um sabe a posição no texto (`inicio`),
+ * se é palavra difícil (`marca`, índice ou -1, `primeiro` no começo da
+ * palavra) e se está no trecho que prova a resposta ou num grifo do aluno.
+ * `faixas`: [{ inicio, fim, tipo: "prova" | "grifo" }].
+ */
+export function segmentosLeitura(texto, palavras, faixas = []) {
+  const fonte = String(texto || "");
+  const cortes = new Set();
+  faixas.forEach((faixa) => {
+    cortes.add(faixa.inicio);
+    cortes.add(faixa.fim);
+  });
+  const saida = [];
+  let posicao = 0;
+  for (const parte of marcarPalavras(fonte, palavras)) {
+    const inicio = posicao;
+    const fim = posicao + parte.texto.length;
+    posicao = fim;
+    const pontos = [inicio, ...[...cortes].filter((corte) => corte > inicio && corte < fim).sort((a, b) => a - b), fim];
+    for (let i = 0; i < pontos.length - 1; i += 1) {
+      const de = pontos[i];
+      const ate = pontos[i + 1];
+      if (ate <= de) continue;
+      const tipos = faixas.filter((faixa) => faixa.inicio < ate && faixa.fim > de).map((faixa) => faixa.tipo);
+      saida.push({ texto: fonte.slice(de, ate), inicio: de, marca: parte.marca, primeiro: de === inicio, prova: tipos.includes("prova"), grifo: tipos.includes("grifo") });
+    }
+  }
+  return saida;
+}
+
+/** Junta grifos que se encostam ou se sobrepõem (o aluno grifa por partes). */
+export function juntarGrifos(grifos) {
+  const ordem = [...(grifos || [])].filter((g) => g.fim > g.inicio).sort((a, b) => a.inicio - b.inicio);
+  const saida = [];
+  for (const grifo of ordem) {
+    const ultimo = saida[saida.length - 1];
+    if (ultimo && grifo.inicio <= ultimo.fim) ultimo.fim = Math.max(ultimo.fim, grifo.fim);
+    else saida.push({ inicio: grifo.inicio, fim: grifo.fim });
+  }
+  return saida;
 }
 
 /** Textos curtos de domínio público para quem quer testar sem colar nada. */
